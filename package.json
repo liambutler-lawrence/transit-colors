@@ -6,6 +6,6 @@
   "scripts": {
     "build:data:cdmx": "node scripts/build-cdmx-data.mjs",
     "dev": "python3 -m http.server 5173",
-    "check": "node --check scripts/build-cdmx-data.mjs"
+    "check": "node --check scripts/build-cdmx-data.mjs && node --check app.js"
   }
 }

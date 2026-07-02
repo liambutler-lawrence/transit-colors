@@ -29,13 +29,26 @@ Open `http://localhost:5173`.
 
 The data script fetches CDMX roads and station-like transit features from Overpass once, then writes static GeoJSON into `data/`.
 
-Station inputs currently include:
+Raw station candidates currently include:
 
 - `railway=station`
 - `railway=halt`
 - `railway=tram_stop`
 - `public_transport=station`
 - `amenity=bus_station`
+
+The builder then keeps rapid-transit systems only:
+
+- Metro
+- Metrobús and Mexibús
+- Tren Ligero
+- Cablebús and Mexicable
+- Tren Suburbano
+- Tren Interurbano / El Insurgente
+- Trolebús station-like records
+- Monorail records
+
+Generic local bus terminals, route bases, airport/long-distance bus terminals, and CETRAM-only records are excluded unless their network/operator identifies one of the rapid-transit systems above.
 
 Street color is computed from the nearest station and clamped to `0-10000m`.
 

@@ -58,10 +58,13 @@
           </label>
         </div>
 
+        <div id="station-breakdown" class="station-breakdown" aria-label="Station mode counts"></div>
+
         <div class="selection" aria-live="polite">
-          <span class="metric-label">Selected street</span>
-          <strong id="street-name">None</strong>
-          <span id="street-distance">Hover a highlighted street</span>
+          <span id="selection-type" class="metric-label">Selected feature</span>
+          <strong id="feature-name">None</strong>
+          <span id="feature-summary">Hover a highlighted street or station</span>
+          <dl id="feature-metadata" class="feature-metadata"></dl>
         </div>
       </section>
     </main>

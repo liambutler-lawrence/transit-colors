@@ -43,6 +43,17 @@ const CDMX_CENTER = {
 const STREET_TYPES_TO_SKIP =
   '^(footway|path|cycleway|steps|bridleway|corridor|elevator|escalator|platform|construction|proposed|abandoned)$';
 
+const MODE_LABELS = {
+  subway: 'Metro',
+  brt: 'BRT',
+  light_rail: 'Light rail',
+  cable_car: 'Cable car',
+  commuter_rail: 'Commuter rail',
+  regional_rail: 'Regional rail',
+  trolleybus: 'Trolleybus',
+  monorail: 'Monorail',
+};
+
 function stationQuery(tileBbox) {
   return `
 [out:json][timeout:180];
@@ -77,6 +88,67 @@ function formatBbox(bounds) {
 
 function roundCoordinate(value) {
   return Number(value.toFixed(COORD_DECIMALS));
+}
+
+function normalizeTag(value = '') {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+function classifyStation(tags = {}) {
+  const station = normalizeTag(tags.station);
+  const railway = normalizeTag(tags.railway);
+  const network = normalizeTag(tags.network);
+  const operator = normalizeTag(tags.operator);
+  const transitContext = `${network} ${operator}`;
+
+  if (
+    station === 'subway' ||
+    /\bstc metro\b|\bmetro cdmx\b/.test(transitContext) ||
+    (operator === 'stc' && railway === 'station')
+  ) {
+    return { keep: true, mode: 'subway', system: MODE_LABELS.subway };
+  }
+
+  if (station === 'light_rail' || /tren ligero|ste tren ligero/.test(transitContext)) {
+    return { keep: true, mode: 'light_rail', system: MODE_LABELS.light_rail };
+  }
+
+  if (station === 'monorail') {
+    return { keep: true, mode: 'monorail', system: MODE_LABELS.monorail };
+  }
+
+  if (/cablebus|mexicable/.test(transitContext)) {
+    return { keep: true, mode: 'cable_car', system: MODE_LABELS.cable_car };
+  }
+
+  if (/metrobus|mexibus/.test(transitContext)) {
+    return { keep: true, mode: 'brt', system: MODE_LABELS.brt };
+  }
+
+  if (/fc suburbano|suburbano/.test(transitContext)) {
+    return {
+      keep: true,
+      mode: 'commuter_rail',
+      system: MODE_LABELS.commuter_rail,
+    };
+  }
+
+  if (/tren interurbano|el insurgente/.test(transitContext)) {
+    return {
+      keep: true,
+      mode: 'regional_rail',
+      system: MODE_LABELS.regional_rail,
+    };
+  }
+
+  if (/trolebus/.test(transitContext)) {
+    return { keep: true, mode: 'trolleybus', system: MODE_LABELS.trolleybus };
+  }
+
+  return { keep: false, mode: 'excluded', system: 'Excluded' };
 }
 
 function project(lon, lat) {
@@ -277,15 +349,9 @@ function stationCoordinate(element) {
   return null;
 }
 
-function stationMode(tags) {
-  if (tags.station) return tags.station;
-  if (tags.railway) return tags.railway;
-  if (tags.amenity === 'bus_station') return 'bus_station';
-  return tags.public_transport ?? 'station';
-}
-
 function buildStationFeatures(elements) {
   const deduped = new Map();
+  const excluded = [];
 
   for (const element of elements) {
     const coordinate = stationCoordinate(element);
@@ -293,6 +359,13 @@ function buildStationFeatures(elements) {
 
     const [lon, lat] = coordinate;
     const tags = element.tags ?? {};
+    const stationClass = classifyStation(tags);
+
+    if (!stationClass.keep) {
+      excluded.push(element);
+      continue;
+    }
+
     const rounded = [roundCoordinate(lon), roundCoordinate(lat)];
     const key = `${rounded[0]},${rounded[1]},${tags.name ?? ''}`;
 
@@ -305,13 +378,25 @@ function buildStationFeatures(elements) {
         },
         properties: {
           id: `${element.type}/${element.id}`,
+          osm_type: element.type,
+          osm_id: element.id,
           name: tags.name ?? '',
-          mode: stationMode(tags),
+          mode: stationClass.mode,
+          system: stationClass.system,
+          network: tags.network ?? '',
+          operator: tags.operator ?? '',
+          station: tags.station ?? '',
+          railway: tags.railway ?? '',
+          amenity: tags.amenity ?? '',
+          public_transport: tags.public_transport ?? '',
         },
       });
     }
   }
 
+  console.log(
+    `Excluded ${excluded.length.toLocaleString()} generic bus/terminal station elements.`,
+  );
   return [...deduped.values()];
 }
 
@@ -390,6 +475,15 @@ function histogram(features) {
   return result;
 }
 
+function propertyCounts(features, property) {
+  return features
+    .reduce((counts, feature) => {
+      const key = feature.properties[property] || 'unknown';
+      counts[key] = (counts[key] ?? 0) + 1;
+      return counts;
+    }, {});
+}
+
 function featureCollection(features) {
   return {
     type: 'FeatureCollection',
@@ -420,6 +514,7 @@ async function main() {
     max_distance_m: MAX_DISTANCE_M,
     street_count: streetFeatures.length,
     station_count: stationFeatures.length,
+    station_modes: propertyCounts(stationFeatures, 'mode'),
     histogram: histogram(streetFeatures),
     street_property_schema: {
       d: 'nearest station distance in meters, clamped to max_distance_m',

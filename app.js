@@ -11,6 +11,28 @@ const COLORS = {
   far: '#c7362f',
 };
 
+const MODE_LABELS = {
+  subway: 'Metro',
+  brt: 'BRT',
+  light_rail: 'Light rail',
+  cable_car: 'Cable car',
+  commuter_rail: 'Commuter rail',
+  regional_rail: 'Regional rail',
+  trolleybus: 'Trolleybus',
+  monorail: 'Monorail',
+};
+
+const MODE_COLORS = {
+  subway: '#f05a28',
+  brt: '#8b2bb1',
+  light_rail: '#1a9d8f',
+  cable_car: '#0072ce',
+  commuter_rail: '#5c6f82',
+  regional_rail: '#b35a00',
+  trolleybus: '#2e7d32',
+  monorail: '#111827',
+};
+
 const map = new maplibregl.Map({
   container: 'map',
   style: 'https://tiles.openfreemap.org/styles/liberty',
@@ -28,8 +50,11 @@ const statusEl = document.querySelector('#status');
 const streetCountEl = document.querySelector('#street-count');
 const stationCountEl = document.querySelector('#station-count');
 const nearCountEl = document.querySelector('#near-count');
-const streetNameEl = document.querySelector('#street-name');
-const streetDistanceEl = document.querySelector('#street-distance');
+const stationBreakdownEl = document.querySelector('#station-breakdown');
+const selectionTypeEl = document.querySelector('#selection-type');
+const featureNameEl = document.querySelector('#feature-name');
+const featureSummaryEl = document.querySelector('#feature-summary');
+const featureMetadataEl = document.querySelector('#feature-metadata');
 const streetToggle = document.querySelector('#toggle-streets');
 const stationToggle = document.querySelector('#toggle-stations');
 
@@ -45,6 +70,28 @@ const streetColor = [
   COLORS.midFar,
   10000,
   COLORS.far,
+];
+
+const stationColor = [
+  'match',
+  ['get', 'mode'],
+  'subway',
+  MODE_COLORS.subway,
+  'brt',
+  MODE_COLORS.brt,
+  'light_rail',
+  MODE_COLORS.light_rail,
+  'cable_car',
+  MODE_COLORS.cable_car,
+  'commuter_rail',
+  MODE_COLORS.commuter_rail,
+  'regional_rail',
+  MODE_COLORS.regional_rail,
+  'trolleybus',
+  MODE_COLORS.trolleybus,
+  'monorail',
+  MODE_COLORS.monorail,
+  '#18222c',
 ];
 
 function formatInteger(value) {
@@ -88,6 +135,59 @@ function renderMetadata(metadata) {
   streetCountEl.textContent = formatInteger(streetCount);
   stationCountEl.textContent = formatInteger(stationCount);
   nearCountEl.textContent = formatInteger(nearCount);
+
+  const stationModes = metadata.station_modes ?? {};
+  stationBreakdownEl.replaceChildren(
+    ...Object.entries(stationModes)
+      .sort((a, b) => b[1] - a[1])
+      .map(([mode, count]) => {
+        const item = document.createElement('span');
+        item.className = 'mode-pill';
+        item.style.setProperty('--mode-color', MODE_COLORS[mode] ?? '#18222c');
+        item.textContent = `${MODE_LABELS[mode] ?? mode}: ${formatInteger(count)}`;
+        return item;
+      }),
+  );
+}
+
+function renderDetails(details) {
+  featureMetadataEl.replaceChildren(
+    ...details
+      .filter((detail) => detail.value)
+      .map((detail) => {
+        const term = document.createElement('dt');
+        term.textContent = detail.label;
+
+        const description = document.createElement('dd');
+        description.textContent = detail.value;
+
+        const fragment = document.createDocumentFragment();
+        fragment.append(term, description);
+        return fragment;
+      }),
+  );
+}
+
+function showStreetFeature(props) {
+  const streetName = props.n || props.h || 'Unnamed street';
+  selectionTypeEl.textContent = 'Selected street';
+  featureNameEl.textContent = streetName;
+  featureSummaryEl.textContent = `${formatDistance(props.d)} from nearest station`;
+  renderDetails([
+    { label: 'OSM highway', value: props.h },
+  ]);
+}
+
+function showStationFeature(props) {
+  selectionTypeEl.textContent = 'Selected station';
+  featureNameEl.textContent = props.name || 'Unnamed station';
+  featureSummaryEl.textContent = props.system || MODE_LABELS[props.mode] || 'Transit station';
+  renderDetails([
+    { label: 'Mode', value: props.system || MODE_LABELS[props.mode] },
+    { label: 'Network', value: props.network },
+    { label: 'Operator', value: props.operator },
+    { label: 'OSM', value: props.id },
+  ]);
 }
 
 function installHover() {
@@ -104,10 +204,7 @@ function installHover() {
     hoveredId = feature.id;
     map.setFeatureState({ source: 'streets', id: hoveredId }, { hover: true });
 
-    const props = feature.properties;
-    const streetName = props.n || props.h || 'Unnamed street';
-    streetNameEl.textContent = streetName;
-    streetDistanceEl.textContent = `${formatDistance(props.d)} from nearest station`;
+    showStreetFeature(feature.properties);
     map.getCanvas().style.cursor = 'pointer';
   });
 
@@ -117,6 +214,28 @@ function installHover() {
     }
     hoveredId = null;
     map.getCanvas().style.cursor = '';
+  });
+
+  map.on('click', 'street-proximity', (event) => {
+    const feature = event.features?.[0];
+    if (feature) showStreetFeature(feature.properties);
+  });
+
+  map.on('mousemove', 'station-points', (event) => {
+    const feature = event.features?.[0];
+    if (!feature) return;
+
+    showStationFeature(feature.properties);
+    map.getCanvas().style.cursor = 'pointer';
+  });
+
+  map.on('mouseleave', 'station-points', () => {
+    map.getCanvas().style.cursor = '';
+  });
+
+  map.on('click', 'station-points', (event) => {
+    const feature = event.features?.[0];
+    if (feature) showStationFeature(feature.properties);
   });
 }
 
@@ -178,10 +297,30 @@ async function initialize() {
       type: 'circle',
       source: 'stations',
       paint: {
-        'circle-color': '#ffffff',
+        'circle-color': stationColor,
         'circle-stroke-color': '#18222c',
         'circle-stroke-width': 1.5,
-        'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 2.5, 13, 5.5],
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3, 13, 6],
+      },
+    });
+
+    map.addLayer({
+      id: 'station-labels',
+      type: 'symbol',
+      source: 'stations',
+      minzoom: 11.4,
+      layout: {
+        'text-field': ['get', 'name'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 11.4, 10, 15, 13],
+        'text-offset': [0, 1.2],
+        'text-anchor': 'top',
+        'text-allow-overlap': false,
+        'text-optional': true,
+      },
+      paint: {
+        'text-color': '#18222c',
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 1.2,
       },
     });
 
@@ -190,7 +329,7 @@ async function initialize() {
   } catch (error) {
     console.error(error);
     updateStatus('Data missing', true);
-    streetDistanceEl.textContent = 'Run npm run build:data:cdmx, then refresh.';
+    featureSummaryEl.textContent = 'Run npm run build:data:cdmx, then refresh.';
   }
 }
 
@@ -200,6 +339,7 @@ streetToggle.addEventListener('change', () => {
 
 stationToggle.addEventListener('change', () => {
   setLayerVisibility('station-points', stationToggle.checked);
+  setLayerVisibility('station-labels', stationToggle.checked);
 });
 
 map.on('load', initialize);
