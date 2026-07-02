@@ -19,7 +19,6 @@ const MODE_LABELS = {
   cable_car: 'Cable car',
   commuter_rail: 'Commuter rail',
   regional_rail: 'Regional rail',
-  trolleybus: 'Trolleybus',
   monorail: 'Monorail',
 };
 
@@ -30,7 +29,6 @@ const MODE_COLORS = {
   cable_car: '#0072ce',
   commuter_rail: '#5c6f82',
   regional_rail: '#b35a00',
-  trolleybus: '#2e7d32',
   monorail: '#111827',
 };
 
@@ -39,10 +37,6 @@ const map = new maplibregl.Map({
   style: 'https://tiles.openfreemap.org/styles/liberty',
   center: [-99.1332, 19.4326],
   zoom: 10.5,
-  maxBounds: [
-    [-99.55, 18.88],
-    [-98.72, 19.76],
-  ],
 });
 
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
@@ -89,8 +83,6 @@ const stationColor = [
   MODE_COLORS.commuter_rail,
   'regional_rail',
   MODE_COLORS.regional_rail,
-  'trolleybus',
-  MODE_COLORS.trolleybus,
   'monorail',
   MODE_COLORS.monorail,
   '#18222c',
@@ -182,6 +174,42 @@ function renderMetadata(metadata) {
   );
 }
 
+function metadataBounds(metadata) {
+  const bounds = metadata.bbox;
+  if (
+    !bounds ||
+    !Number.isFinite(bounds.west) ||
+    !Number.isFinite(bounds.south) ||
+    !Number.isFinite(bounds.east) ||
+    !Number.isFinite(bounds.north)
+  ) {
+    return null;
+  }
+
+  return [
+    [bounds.west, bounds.south],
+    [bounds.east, bounds.north],
+  ];
+}
+
+function applyMapBounds(metadata) {
+  const bounds = metadataBounds(metadata);
+  if (!bounds) return;
+
+  const leftPadding = window.innerWidth >= 760 ? 360 : 48;
+
+  map.setMaxBounds(bounds);
+  map.fitBounds(bounds, {
+    padding: {
+      top: 48,
+      right: 48,
+      bottom: 48,
+      left: leftPadding,
+    },
+    duration: 0,
+  });
+}
+
 function renderDetails(details) {
   featureMetadataEl.replaceChildren(
     ...details
@@ -219,6 +247,9 @@ function showStationFeature(props) {
     { label: 'Mode', value: props.system || MODE_LABELS[props.mode] },
     { label: 'Network', value: props.network },
     { label: 'Operator', value: props.operator },
+    { label: 'Ref', value: props.local_ref || props.route_ref || props.ref },
+    { label: 'Route', value: props.route_name || props.route_relation },
+    { label: 'Stop tag', value: props.highway || props.public_transport },
     { label: 'Opening', value: props.opening_date },
     { label: 'OSM', value: props.id },
   ]);
@@ -285,6 +316,7 @@ async function initialize() {
     ]);
 
     renderMetadata(metadata);
+    applyMapBounds(metadata);
 
     const labelLayerId = firstSymbolLayerId();
 

@@ -35,20 +35,25 @@ Raw station candidates currently include:
 - `railway=halt`
 - `railway=tram_stop`
 - `public_transport=station`
+- BRT `public_transport=platform` / `stop_position` records
 - `amenity=bus_station`
+- BRT `highway=bus_stop` records
 
 The builder then keeps rapid-transit systems only:
 
 - Metro
-- Metrobús and Mexibús
+- BRT, including Metrobús, Mexibús, and BRT-style Trolebús corridors
 - Tren Ligero
 - Cablebús and Mexicable
 - Tren Suburbano
 - Tren Interurbano / El Insurgente
-- Trolebús station-like records
 - Monorail records
 
 Generic local bus terminals, route bases, airport/long-distance bus terminals, and CETRAM-only records are excluded unless their network/operator identifies one of the rapid-transit systems above.
+
+Stations are fetched from OpenStreetMap records inside the Ciudad de México and Estado de México administrative areas. Street data is then fetched from the minimum bbox around the kept stations, padded by 5km.
+
+BRT stops can also inherit network metadata from matching OSM route relations when the stop/platform element itself is missing `network` or `operator` tags.
 
 Stations are classified as open or future/planned before street distances are calculated. The gradient uses open stations only. Future/planned stations are kept in `data/cdmx-stations.geojson` for optional display behind the Future toggle.
 
