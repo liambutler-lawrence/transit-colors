@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Transit Colors CDMX</title>
+    <link rel="preconnect" href="https://tiles.openfreemap.org" />
+    <link rel="preconnect" href="https://unpkg.com" />
+    <link href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" rel="stylesheet" />
+    <link href="styles.css" rel="stylesheet" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <div id="map" aria-label="CDMX transit proximity map"></div>
+
+      <section class="panel" aria-label="Map details">
+        <div class="panel-header">
+          <div>
+            <p class="kicker">CDMX</p>
+            <h1>Transit Street Gradient</h1>
+          </div>
+          <span id="status" class="status">Loading</span>
+        </div>
+
+        <div class="metric-grid">
+          <div class="metric">
+            <span class="metric-label">Streets</span>
+            <strong id="street-count">--</strong>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Stations</span>
+            <strong id="station-count">--</strong>
+          </div>
+          <div class="metric">
+            <span class="metric-label">Within 2.5 km</span>
+            <strong id="near-count">--</strong>
+          </div>
+        </div>
+
+        <div class="legend" aria-label="Distance legend">
+          <div class="legend-bar"></div>
+          <div class="legend-labels">
+            <span>0 km</span>
+            <span>2.5</span>
+            <span>5</span>
+            <span>10 km</span>
+          </div>
+        </div>
+
+        <div class="toggles" aria-label="Layer controls">
+          <label>
+            <input id="toggle-streets" type="checkbox" checked />
+            <span>Streets</span>
+          </label>
+          <label>
+            <input id="toggle-stations" type="checkbox" checked />
+            <span>Stations</span>
+          </label>
+        </div>
+
+        <div class="selection" aria-live="polite">
+          <span class="metric-label">Selected street</span>
+          <strong id="street-name">None</strong>
+          <span id="street-distance">Hover a highlighted street</span>
+        </div>
+      </section>
+    </main>
+
+    <script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
+    <script type="module" src="app.js"></script>
+  </body>
+</html>

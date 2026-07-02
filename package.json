@@ -1,0 +1,11 @@
+{
+  "name": "transit-colors",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:data:cdmx": "node scripts/build-cdmx-data.mjs",
+    "dev": "python3 -m http.server 5173",
+    "check": "node --check scripts/build-cdmx-data.mjs"
+  }
+}
