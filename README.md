@@ -62,4 +62,4 @@ Street color is computed from the nearest open station and clamped to `0-5000m`.
 
 ## Deployment
 
-GitHub Pages is configured to publish from the `main` branch at `/`. Every push to `main` publishes the static site without a build step.
+GitHub Pages is configured to deploy from GitHub Actions using `.github/workflows/pages.yml`. Every push to `main` uploads the static site and publishes it without an application build step.
