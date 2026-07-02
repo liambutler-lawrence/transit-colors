@@ -41,4 +41,4 @@ Street color is computed from the nearest station and clamped to `0-10000m`.
 
 ## Deployment
 
-The repo includes a GitHub Pages workflow at `.github/workflows/pages.yml`. When Pages is configured to deploy from GitHub Actions, every push to `main` publishes the static site.
+GitHub Pages is configured to publish from the `main` branch at `/`. Every push to `main` publishes the static site without a build step.
