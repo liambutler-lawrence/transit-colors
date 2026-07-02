@@ -8,7 +8,7 @@ const dataDir = resolve(rootDir, 'data');
 const cacheDir = resolve(dataDir, '.overpass-cache');
 
 const OVERPASS_URL = process.env.OVERPASS_URL ?? 'https://overpass-api.de/api/interpreter';
-const MAX_DISTANCE_M = Number.parseInt(process.env.MAX_DISTANCE_M ?? '10000', 10);
+const MAX_DISTANCE_M = Number.parseInt(process.env.MAX_DISTANCE_M ?? '5000', 10);
 const COORD_DECIMALS = Number.parseInt(process.env.COORD_DECIMALS ?? '4', 10);
 const STREET_TILE_ROWS = Number.parseInt(process.env.STREET_TILE_ROWS ?? '4', 10);
 const STREET_TILE_COLS = Number.parseInt(process.env.STREET_TILE_COLS ?? '4', 10);
@@ -29,6 +29,7 @@ const OVERPASS_RETRY_DELAY_MS = Number.parseInt(
   10,
 );
 const REFRESH_OVERPASS_CACHE = process.env.REFRESH_OVERPASS_CACHE === '1';
+const STATUS_DATE = new Date(process.env.STATUS_DATE ?? new Date());
 const CDMX_BBOX = {
   south: 19.048,
   west: -99.365,
@@ -53,6 +54,21 @@ const MODE_LABELS = {
   trolleybus: 'Trolleybus',
   monorail: 'Monorail',
 };
+
+const FUTURE_NETWORK_RULES = [
+  {
+    pattern: /mexicable linea 3|mexicable línea 3/,
+    status: 'future',
+    status_detail: 'Under construction',
+    reason: 'Mexicable Line 3 is not yet open',
+  },
+  {
+    pattern: /tren ligero texcoco-la paz/,
+    status: 'future',
+    status_detail: 'Planned',
+    reason: 'Tagged as proposed in OSM',
+  },
+];
 
 function stationQuery(tileBbox) {
   return `
@@ -95,6 +111,131 @@ function normalizeTag(value = '') {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .toLowerCase();
+}
+
+function parseOpeningDate(value) {
+  if (!value) return null;
+
+  const trimmed = String(value).trim();
+  const yearMatch = trimmed.match(/^(\d{4})$/);
+  if (yearMatch) {
+    return { date: new Date(`${yearMatch[1]}-01-01T00:00:00Z`), precision: 'year' };
+  }
+
+  const monthMatch = trimmed.match(/^(\d{4})-(\d{2})$/);
+  if (monthMatch) {
+    return {
+      date: new Date(`${monthMatch[1]}-${monthMatch[2]}-01T00:00:00Z`),
+      precision: 'month',
+    };
+  }
+
+  const dayMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dayMatch) {
+    return { date: new Date(`${trimmed}T00:00:00Z`), precision: 'day' };
+  }
+
+  return null;
+}
+
+function openingDateIsFuture(value) {
+  const parsed = parseOpeningDate(value);
+  if (!parsed || Number.isNaN(parsed.date.getTime())) return false;
+
+  const statusYear = STATUS_DATE.getUTCFullYear();
+  const statusMonth = STATUS_DATE.getUTCMonth();
+
+  if (parsed.precision === 'year') {
+    return parsed.date.getUTCFullYear() > statusYear;
+  }
+
+  if (parsed.precision === 'month') {
+    return (
+      parsed.date.getUTCFullYear() > statusYear ||
+      (parsed.date.getUTCFullYear() === statusYear &&
+        parsed.date.getUTCMonth() > statusMonth)
+    );
+  }
+
+  return parsed.date > STATUS_DATE;
+}
+
+function openingDateIsPastOrPresent(value) {
+  const parsed = parseOpeningDate(value);
+  if (!parsed || Number.isNaN(parsed.date.getTime())) return false;
+
+  return !openingDateIsFuture(value);
+}
+
+function hasTagPrefix(tags, prefix) {
+  return Object.keys(tags).some((key) => key.startsWith(prefix));
+}
+
+function stationStatus(tags = {}) {
+  const network = normalizeTag(tags.network);
+  const operator = normalizeTag(tags.operator);
+  const transitContext = `${network} ${operator}`;
+  const openingFuture = openingDateIsFuture(tags.opening_date);
+  const openingPastOrPresent = openingDateIsPastOrPresent(tags.opening_date);
+
+  for (const rule of FUTURE_NETWORK_RULES) {
+    if (rule.pattern.test(transitContext)) {
+      return {
+        status: rule.status,
+        status_detail: tags.opening_date
+          ? `${rule.status_detail}; opening ${tags.opening_date}`
+          : rule.status_detail,
+        status_source: rule.reason,
+      };
+    }
+  }
+
+  if (openingFuture) {
+    return {
+      status: 'future',
+      status_detail: `Opening ${tags.opening_date}`,
+      status_source: 'OSM opening_date is in the future',
+    };
+  }
+
+  if (openingPastOrPresent) {
+    return {
+      status: 'open',
+      status_detail: 'Open',
+      status_source: 'OSM opening_date is not in the future',
+    };
+  }
+
+  const railway = normalizeTag(tags.railway);
+  const construction = normalizeTag(tags.construction);
+  const proposed = normalizeTag(tags.proposed);
+  const hasProposedTag = proposed === 'yes' || hasTagPrefix(tags, 'proposed:');
+
+  if (hasProposedTag || railway === 'proposed' || railway === 'prpopsed') {
+    return {
+      status: 'future',
+      status_detail: 'Planned',
+      status_source: 'OSM proposed lifecycle tags',
+    };
+  }
+
+  if (
+    railway === 'construction' ||
+    construction === 'yes' ||
+    construction === 'construction'
+  ) {
+    return {
+      status: 'future',
+      status_detail: 'Under construction',
+      status_source: 'OSM construction lifecycle tags',
+    };
+  }
+
+  return {
+    status: 'open',
+    status_detail: 'Open',
+    status_source: 'No future/construction lifecycle tags',
+  };
 }
 
 function classifyStation(tags = {}) {
@@ -360,6 +501,7 @@ function buildStationFeatures(elements) {
     const [lon, lat] = coordinate;
     const tags = element.tags ?? {};
     const stationClass = classifyStation(tags);
+    const status = stationStatus(tags);
 
     if (!stationClass.keep) {
       excluded.push(element);
@@ -369,28 +511,38 @@ function buildStationFeatures(elements) {
     const rounded = [roundCoordinate(lon), roundCoordinate(lat)];
     const key = `${rounded[0]},${rounded[1]},${tags.name ?? ''}`;
 
-    if (!deduped.has(key)) {
-      deduped.set(key, {
-        type: 'Feature',
-        geometry: {
-          type: 'Point',
-          coordinates: rounded,
-        },
-        properties: {
-          id: `${element.type}/${element.id}`,
-          osm_type: element.type,
-          osm_id: element.id,
-          name: tags.name ?? '',
-          mode: stationClass.mode,
-          system: stationClass.system,
-          network: tags.network ?? '',
-          operator: tags.operator ?? '',
-          station: tags.station ?? '',
-          railway: tags.railway ?? '',
-          amenity: tags.amenity ?? '',
-          public_transport: tags.public_transport ?? '',
-        },
-      });
+    const feature = {
+      type: 'Feature',
+      geometry: {
+        type: 'Point',
+        coordinates: rounded,
+      },
+      properties: {
+        id: `${element.type}/${element.id}`,
+        osm_type: element.type,
+        osm_id: element.id,
+        name: tags.name ?? '',
+        mode: stationClass.mode,
+        system: stationClass.system,
+        status: status.status,
+        status_detail: status.status_detail,
+        status_source: status.status_source,
+        network: tags.network ?? '',
+        operator: tags.operator ?? '',
+        opening_date: tags.opening_date ?? '',
+        station: tags.station ?? '',
+        railway: tags.railway ?? '',
+        amenity: tags.amenity ?? '',
+        public_transport: tags.public_transport ?? '',
+      },
+    };
+
+    const existing = deduped.get(key);
+    if (
+      !existing ||
+      (existing.properties.status !== 'open' && status.status === 'open')
+    ) {
+      deduped.set(key, feature);
     }
   }
 
@@ -452,23 +604,23 @@ function buildStreetFeatures(elements, stationFeatures) {
 
 function histogram(features) {
   const result = {
+    under_500_m: 0,
     under_1000_m: 0,
     under_2500_m: 0,
     under_5000_m: 0,
-    under_10000_m: 0,
-    over_10000_m: 0,
+    over_5000_m: 0,
   };
 
   for (const feature of features) {
     const distance = feature.properties.d;
 
+    if (distance <= 500) result.under_500_m += 1;
     if (distance <= 1000) result.under_1000_m += 1;
     if (distance <= 2500) result.under_2500_m += 1;
-    if (distance <= 5000) result.under_5000_m += 1;
     if (feature.properties.o === 1) {
-      result.over_10000_m += 1;
+      result.over_5000_m += 1;
     } else {
-      result.under_10000_m += 1;
+      result.under_5000_m += 1;
     }
   }
 
@@ -504,7 +656,20 @@ async function main() {
   const stationFeatures = buildStationFeatures(stationElements);
   console.log(`Built ${stationFeatures.length.toLocaleString()} station features.`);
 
-  const streetFeatures = buildStreetFeatures(streetElements, stationFeatures);
+  const openStationFeatures = stationFeatures.filter(
+    (feature) => feature.properties.status === 'open',
+  );
+  const futureStationFeatures = stationFeatures.filter(
+    (feature) => feature.properties.status !== 'open',
+  );
+  console.log(
+    `Using ${openStationFeatures.length.toLocaleString()} open stations for distance calculation.`,
+  );
+  console.log(
+    `Keeping ${futureStationFeatures.length.toLocaleString()} future/planned stations for optional display.`,
+  );
+
+  const streetFeatures = buildStreetFeatures(streetElements, openStationFeatures);
   console.log(`Built ${streetFeatures.length.toLocaleString()} street features.`);
 
   const metadata = {
@@ -512,9 +677,21 @@ async function main() {
     generated_at: new Date().toISOString(),
     bbox: CDMX_BBOX,
     max_distance_m: MAX_DISTANCE_M,
+    status_date: STATUS_DATE.toISOString(),
     street_count: streetFeatures.length,
     station_count: stationFeatures.length,
+    open_station_count: openStationFeatures.length,
+    future_station_count: futureStationFeatures.length,
     station_modes: propertyCounts(stationFeatures, 'mode'),
+    station_modes_open: propertyCounts(openStationFeatures, 'mode'),
+    station_modes_future: propertyCounts(futureStationFeatures, 'mode'),
+    station_statuses: propertyCounts(stationFeatures, 'status'),
+    distance_station_scope: 'open stations only',
+    future_station_rules: FUTURE_NETWORK_RULES.map((rule) => ({
+      pattern: String(rule.pattern),
+      status_detail: rule.status_detail,
+      reason: rule.reason,
+    })),
     histogram: histogram(streetFeatures),
     street_property_schema: {
       d: 'nearest station distance in meters, clamped to max_distance_m',

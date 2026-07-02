@@ -9,6 +9,7 @@ const COLORS = {
   midNear: '#ffd43b',
   midFar: '#f97316',
   far: '#c7362f',
+  future: '#64748b',
 };
 
 const MODE_LABELS = {
@@ -57,6 +58,7 @@ const featureSummaryEl = document.querySelector('#feature-summary');
 const featureMetadataEl = document.querySelector('#feature-metadata');
 const streetToggle = document.querySelector('#toggle-streets');
 const stationToggle = document.querySelector('#toggle-stations');
+const futureStationToggle = document.querySelector('#toggle-future-stations');
 
 const streetColor = [
   'interpolate',
@@ -64,11 +66,11 @@ const streetColor = [
   ['get', 'd'],
   0,
   COLORS.near,
-  2500,
+  1000,
   COLORS.midNear,
-  5000,
+  2500,
   COLORS.midFar,
-  10000,
+  5000,
   COLORS.far,
 ];
 
@@ -93,6 +95,11 @@ const stationColor = [
   MODE_COLORS.monorail,
   '#18222c',
 ];
+
+const openStationFilter = ['==', ['get', 'status'], 'open'];
+const futureStationFilter = ['!=', ['get', 'status'], 'open'];
+const openStationLayers = ['station-points-open', 'station-labels-open'];
+const futureStationLayers = ['station-points-future', 'station-labels-future'];
 
 function formatInteger(value) {
   return new Intl.NumberFormat('en-US').format(value);
@@ -122,6 +129,19 @@ function setLayerVisibility(id, visible) {
   }
 }
 
+function syncStationVisibility() {
+  const showStations = stationToggle.checked;
+  const showFuture = showStations && futureStationToggle.checked;
+
+  for (const layerId of openStationLayers) {
+    setLayerVisibility(layerId, showStations);
+  }
+
+  for (const layerId of futureStationLayers) {
+    setLayerVisibility(layerId, showFuture);
+  }
+}
+
 function updateStatus(label, isError = false) {
   statusEl.textContent = label;
   statusEl.classList.toggle('error', isError);
@@ -129,14 +149,15 @@ function updateStatus(label, isError = false) {
 
 function renderMetadata(metadata) {
   const streetCount = metadata.street_count ?? 0;
-  const stationCount = metadata.station_count ?? 0;
+  const stationCount = metadata.open_station_count ?? metadata.station_count ?? 0;
+  const futureStationCount = metadata.future_station_count ?? 0;
   const nearCount = metadata.histogram?.under_2500_m ?? 0;
 
   streetCountEl.textContent = formatInteger(streetCount);
   stationCountEl.textContent = formatInteger(stationCount);
   nearCountEl.textContent = formatInteger(nearCount);
 
-  const stationModes = metadata.station_modes ?? {};
+  const stationModes = metadata.station_modes_open ?? metadata.station_modes ?? {};
   stationBreakdownEl.replaceChildren(
     ...Object.entries(stationModes)
       .sort((a, b) => b[1] - a[1])
@@ -147,6 +168,17 @@ function renderMetadata(metadata) {
         item.textContent = `${MODE_LABELS[mode] ?? mode}: ${formatInteger(count)}`;
         return item;
       }),
+    ...[
+      futureStationCount > 0
+        ? (() => {
+            const item = document.createElement('span');
+            item.className = 'mode-pill future-mode-pill';
+            item.style.setProperty('--mode-color', COLORS.future);
+            item.textContent = `Future: ${formatInteger(futureStationCount)}`;
+            return item;
+          })()
+        : null,
+    ].filter(Boolean),
   );
 }
 
@@ -183,15 +215,18 @@ function showStationFeature(props) {
   featureNameEl.textContent = props.name || 'Unnamed station';
   featureSummaryEl.textContent = props.system || MODE_LABELS[props.mode] || 'Transit station';
   renderDetails([
+    { label: 'Status', value: props.status_detail || props.status },
     { label: 'Mode', value: props.system || MODE_LABELS[props.mode] },
     { label: 'Network', value: props.network },
     { label: 'Operator', value: props.operator },
+    { label: 'Opening', value: props.opening_date },
     { label: 'OSM', value: props.id },
   ]);
 }
 
 function installHover() {
   let hoveredId = null;
+  const stationLayerIds = ['station-points-open', 'station-points-future'];
 
   map.on('mousemove', 'street-proximity', (event) => {
     const feature = event.features?.[0];
@@ -221,22 +256,24 @@ function installHover() {
     if (feature) showStreetFeature(feature.properties);
   });
 
-  map.on('mousemove', 'station-points', (event) => {
-    const feature = event.features?.[0];
-    if (!feature) return;
+  for (const layerId of stationLayerIds) {
+    map.on('mousemove', layerId, (event) => {
+      const feature = event.features?.[0];
+      if (!feature) return;
 
-    showStationFeature(feature.properties);
-    map.getCanvas().style.cursor = 'pointer';
-  });
+      showStationFeature(feature.properties);
+      map.getCanvas().style.cursor = 'pointer';
+    });
 
-  map.on('mouseleave', 'station-points', () => {
-    map.getCanvas().style.cursor = '';
-  });
+    map.on('mouseleave', layerId, () => {
+      map.getCanvas().style.cursor = '';
+    });
 
-  map.on('click', 'station-points', (event) => {
-    const feature = event.features?.[0];
-    if (feature) showStationFeature(feature.properties);
-  });
+    map.on('click', layerId, (event) => {
+      const feature = event.features?.[0];
+      if (feature) showStationFeature(feature.properties);
+    });
+  }
 }
 
 async function initialize() {
@@ -293,9 +330,10 @@ async function initialize() {
     );
 
     map.addLayer({
-      id: 'station-points',
+      id: 'station-points-open',
       type: 'circle',
       source: 'stations',
+      filter: openStationFilter,
       paint: {
         'circle-color': stationColor,
         'circle-stroke-color': '#18222c',
@@ -305,9 +343,27 @@ async function initialize() {
     });
 
     map.addLayer({
-      id: 'station-labels',
+      id: 'station-points-future',
+      type: 'circle',
+      source: 'stations',
+      filter: futureStationFilter,
+      layout: {
+        visibility: 'none',
+      },
+      paint: {
+        'circle-color': stationColor,
+        'circle-opacity': 0.42,
+        'circle-stroke-color': COLORS.future,
+        'circle-stroke-width': 2,
+        'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3.5, 13, 7],
+      },
+    });
+
+    map.addLayer({
+      id: 'station-labels-open',
       type: 'symbol',
       source: 'stations',
+      filter: openStationFilter,
       minzoom: 11.4,
       layout: {
         'text-field': ['get', 'name'],
@@ -324,7 +380,31 @@ async function initialize() {
       },
     });
 
+    map.addLayer({
+      id: 'station-labels-future',
+      type: 'symbol',
+      source: 'stations',
+      filter: futureStationFilter,
+      minzoom: 10.8,
+      layout: {
+        visibility: 'none',
+        'text-field': ['concat', ['get', 'name'], ' (future)'],
+        'text-size': ['interpolate', ['linear'], ['zoom'], 10.8, 10, 15, 13],
+        'text-offset': [0, 1.25],
+        'text-anchor': 'top',
+        'text-allow-overlap': false,
+        'text-optional': true,
+      },
+      paint: {
+        'text-color': '#334155',
+        'text-halo-color': '#ffffff',
+        'text-halo-width': 1.2,
+        'text-opacity': 0.8,
+      },
+    });
+
     installHover();
+    syncStationVisibility();
     updateStatus('Ready');
   } catch (error) {
     console.error(error);
@@ -338,8 +418,11 @@ streetToggle.addEventListener('change', () => {
 });
 
 stationToggle.addEventListener('change', () => {
-  setLayerVisibility('station-points', stationToggle.checked);
-  setLayerVisibility('station-labels', stationToggle.checked);
+  syncStationVisibility();
+});
+
+futureStationToggle.addEventListener('change', () => {
+  syncStationVisibility();
 });
 
 map.on('load', initialize);

@@ -1,6 +1,6 @@
 # Transit Colors
 
-Static POC that overlays CDMX streets with a color gradient based on distance to the nearest transit station.
+Static POC that overlays CDMX streets with a color gradient based on distance to the nearest open transit station.
 
 ## Stack
 
@@ -50,7 +50,15 @@ The builder then keeps rapid-transit systems only:
 
 Generic local bus terminals, route bases, airport/long-distance bus terminals, and CETRAM-only records are excluded unless their network/operator identifies one of the rapid-transit systems above.
 
-Street color is computed from the nearest station and clamped to `0-10000m`.
+Stations are classified as open or future/planned before street distances are calculated. The gradient uses open stations only. Future/planned stations are kept in `data/cdmx-stations.geojson` for optional display behind the Future toggle.
+
+Future/planned status is based on:
+
+- OSM lifecycle tags such as `proposed=yes`, `proposed:*`, `railway=proposed`, or `railway=construction`
+- OSM `opening_date` values later than the generation date
+- Narrow network-level overrides for known not-yet-open systems whose OSM tags are incomplete, currently Mexicable Línea 3 and Tren Ligero Texcoco-La Paz
+
+Street color is computed from the nearest open station and clamped to `0-5000m`.
 
 ## Deployment
 
