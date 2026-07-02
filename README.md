@@ -62,4 +62,6 @@ Street color is computed from the nearest open station and clamped to `0-5000m`.
 
 ## Deployment
 
-GitHub Pages is configured to deploy from GitHub Actions using `.github/workflows/pages.yml`. Every push to `main` uploads the static site and publishes it without an application build step.
+GitHub Pages is currently configured for branch-based publishing from `main` at `/`.
+
+GitHub Actions Pages deployment was tested again on July 2, 2026 after the `candlefinance` org role changed from admin to member, but GitHub still rejected the workflow job before runner startup with: `The job was not started because your account is locked due to a billing issue.`
