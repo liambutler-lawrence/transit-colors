@@ -5,13 +5,16 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Transit Colors</title>
     <link rel="preconnect" href="https://tiles.openfreemap.org" />
-    <link rel="preconnect" href="https://unpkg.com" />
-    <link href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" rel="stylesheet" />
+    <link href="vendor/maplibre-gl.css" rel="stylesheet" />
     <link href="styles.css" rel="stylesheet" />
   </head>
   <body>
     <main class="app-shell">
       <div id="map" aria-label="Transit access map"></div>
+      <div id="map-loading" class="map-loading" role="status" aria-live="polite">
+        <span class="loading-spinner" aria-hidden="true"></span>
+        <span id="map-loading-label">Loading map…</span>
+      </div>
 
       <section class="panel" aria-label="Map details">
         <div class="panel-header">
@@ -25,7 +28,7 @@
             </label>
             <h1>Transit Street Gradient</h1>
           </div>
-          <span id="status" class="status">Loading</span>
+          <span id="status" class="status loading">Loading map</span>
         </div>
 
         <div class="metric-grid">
@@ -132,7 +135,8 @@
       </section>
     </main>
 
-    <script src="https://unpkg.com/maplibre-gl/dist/maplibre-gl.js"></script>
+    <script src="vendor/maplibre-gl.js"></script>
+    <script src="vendor/pmtiles.js"></script>
     <script type="module" src="app.js"></script>
   </body>
 </html>

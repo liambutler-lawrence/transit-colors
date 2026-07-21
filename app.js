@@ -1,7 +1,6 @@
 import {
   DEFAULT_TIME_SCALE_MINUTES,
   WALKING_METERS_PER_MINUTE,
-  assignNearestStations,
   buildTransitGraph,
   calculateTransitTimes,
   scheduledWaitForStation,
@@ -14,11 +13,9 @@ const AREAS = {
     label: 'Mexico City',
     center: [-99.1332, 19.4326],
     zoom: 10.5,
-    streets: 'data/cdmx-streets.geojson',
-    streetModeDistances: 'data/cdmx-street-mode-distances.json',
+    streetTiles: 'data/cdmx-streets.pmtiles',
     stations: 'data/cdmx-stations.geojson',
     metadata: 'data/cdmx-metadata.json',
-    streetAccess: 'data/cdmx-street-access.json',
     schedules: 'data/cdmx-schedules.json',
     supportsDestination: true,
     buildCommand: 'npm run build:data:cdmx',
@@ -27,12 +24,9 @@ const AREAS = {
     label: 'New York City metro',
     center: [-73.98, 40.75],
     zoom: 9.5,
-    streets: null,
-    streetModeDistances: null,
     liveRoads: true,
     stations: 'data/nyc-stations.geojson',
     metadata: 'data/nyc-metadata.json',
-    streetAccess: null,
     schedules: null,
     supportsDestination: false,
     buildCommand: 'npm run build:data:nyc',
@@ -80,6 +74,17 @@ const MODE_DISTANCE_PROPERTIES = {
   monorail: 'dm',
 };
 
+const pmtilesProtocol = new pmtiles.Protocol();
+maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile);
+
+const map = new maplibregl.Map({
+  container: 'map',
+  style: 'vendor/openfreemap-shell.json',
+  center: AREAS[initialAreaKey].center,
+  zoom: AREAS[initialAreaKey].zoom,
+});
+window.__transitMap = map;
+
 const FUTURE_MODE_DISTANCE_PROPERTIES = {
   subway: 'fs',
   brt: 'fb',
@@ -90,16 +95,12 @@ const FUTURE_MODE_DISTANCE_PROPERTIES = {
   monorail: 'fm',
 };
 
-const map = new maplibregl.Map({
-  container: 'map',
-  style: 'https://tiles.openfreemap.org/styles/liberty',
-  center: AREAS[initialAreaKey].center,
-  zoom: AREAS[initialAreaKey].zoom,
-});
-
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
 const statusEl = document.querySelector('#status');
+const mapEl = document.querySelector('#map');
+const mapLoadingEl = document.querySelector('#map-loading');
+const mapLoadingLabelEl = document.querySelector('#map-loading-label');
 const streetCountEl = document.querySelector('#street-count');
 const stationCountEl = document.querySelector('#station-count');
 const nearCountEl = document.querySelector('#near-count');
@@ -125,7 +126,6 @@ const streetToggle = document.querySelector('#toggle-streets');
 const stationToggle = document.querySelector('#toggle-stations');
 const futureStationToggle = document.querySelector('#toggle-future-stations');
 const areaSelect = document.querySelector('#metro-area');
-const mapEl = document.querySelector('#map');
 
 let activeAreaKey = initialAreaKey;
 let loadSequence = 0;
@@ -168,17 +168,32 @@ const futureStationLayers = ['station-points-future', 'station-labels-future'];
 const activeStationModes = new Set();
 const allStationModes = new Set();
 let maxDistanceMeters = 5000;
-let streetFeatureCount = 0;
-let streetModeDistances = {};
-let futureStreetModeDistances = {};
-let streetFeatureBounds = null;
-let stationStatistics = [];
 let selectedStreetProperties = null;
 let selectedLiveStreetFeature = null;
+let streetSourceLoaded = false;
+let pendingBasemapStyle = null;
+let basemapInstallScheduled = false;
+let basemapInstalled = false;
+let loadingOperation = {
+  type: 'initial',
+  label: 'Loading map',
+  startedAt: performance.now(),
+};
+let initialLoadComplete = false;
+let loadingCanFinish = false;
+
+window.__transitPerformance = {
+  startedAt: loadingOperation.startedAt,
+  initialReadyMs: null,
+  styleLoadedMs: null,
+  dataFetchedMs: null,
+  firstStreetRenderMs: null,
+  lastInteractionMs: null,
+  operations: [],
+};
 
 const state = {
   metadata: null,
-  streets: null,
   stationById: new Map(),
   transitGraph: null,
   transitTimes: null,
@@ -291,23 +306,6 @@ function timeStreetColor(transitTimes, scaleMinutes) {
     stops.redMinutes,
     COLORS.far,
   ];
-}
-
-function applyStreetAccess(streets, streetAccess) {
-  const stationIds = streetAccess?.station_ids;
-  const stationIndexes = streetAccess?.street_station_indexes;
-  if (
-    !Array.isArray(stationIds) ||
-    !Array.isArray(stationIndexes) ||
-    stationIndexes.length !== streets.features.length
-  ) {
-    return false;
-  }
-
-  streets.features.forEach((feature, index) => {
-    feature.properties.s = stationIds[stationIndexes[index]];
-  });
-  return true;
 }
 
 async function fetchJson(url) {
@@ -452,164 +450,84 @@ function syncStreetColor() {
   }
 }
 
-function selectedDistanceArrays() {
-  const selectedDistanceArrays = [...activeStationModes]
-    .map((mode) => streetModeDistances[mode])
+function streetDistanceFromProperties(properties) {
+  const distanceProperties = [...activeStationModes]
+    .map((mode) => MODE_DISTANCE_PROPERTIES[mode])
     .filter(Boolean);
 
   if (futureStationToggle.checked) {
-    selectedDistanceArrays.push(
+    distanceProperties.push(
       ...[...activeStationModes]
-        .map((mode) => futureStreetModeDistances[mode])
+        .map((mode) => FUTURE_MODE_DISTANCE_PROPERTIES[mode])
         .filter(Boolean),
     );
   }
 
-  return selectedDistanceArrays;
+  let distance = Number.POSITIVE_INFINITY;
+  for (const property of distanceProperties) {
+    const value = Number(properties[property]);
+    if (Number.isFinite(value)) distance = Math.min(distance, value);
+  }
+  return distance;
 }
 
-function initializeStatisticsData(streets, stations) {
-  const streetFeatures = streets.features ?? [];
-  streetFeatureBounds = streetFeatures.length
-    ? new Float64Array(streetFeatures.length * 4)
-    : null;
+function visibleTiledStreets() {
+  if (!streetToggle.checked || !map.getLayer('street-proximity')) return [];
 
-  for (const [featureIndex, feature] of streetFeatures.entries()) {
-    const coordinates = feature.geometry?.coordinates ?? [];
-    let west = Number.POSITIVE_INFINITY;
-    let south = Number.POSITIVE_INFINITY;
-    let east = Number.NEGATIVE_INFINITY;
-    let north = Number.NEGATIVE_INFINITY;
-
-    for (const [lon, lat] of coordinates) {
-      west = Math.min(west, lon);
-      south = Math.min(south, lat);
-      east = Math.max(east, lon);
-      north = Math.max(north, lat);
-    }
-
-    const offset = featureIndex * 4;
-    streetFeatureBounds[offset] = west;
-    streetFeatureBounds[offset + 1] = south;
-    streetFeatureBounds[offset + 2] = east;
-    streetFeatureBounds[offset + 3] = north;
+  const byId = new Map();
+  for (const feature of map.queryRenderedFeatures({ layers: ['street-proximity'] })) {
+    const key = feature.properties?.i ?? feature.id;
+    if (key !== undefined && !byId.has(key)) byId.set(key, feature.properties ?? {});
   }
-
-  stationStatistics = (stations.features ?? []).map((feature) => ({
-    coordinates: feature.geometry?.coordinates ?? [],
-    mode: feature.properties?.mode,
-    status: feature.properties?.status,
-  }));
+  return [...byId.values()];
 }
 
 function updateViewportStatistics() {
   const bounds = map.getBounds();
-  const west = bounds.getWest();
-  const south = bounds.getSouth();
-  const east = bounds.getEast();
-  const north = bounds.getNorth();
-  const distanceArrays = selectedDistanceArrays();
   const timeStops = timeScaleStops(state.timeScaleMinutes);
   const timeMode =
     !AREAS[activeAreaKey].liveRoads && state.destination && state.transitTimes;
-  let visibleStreetCount = 0;
-  let nearCount = 0;
-
-  if (streetToggle.checked && streetFeatureBounds) {
-    for (let featureIndex = 0; featureIndex < streetFeatureCount; featureIndex += 1) {
-      const offset = featureIndex * 4;
-      const isInView =
-        streetFeatureBounds[offset] <= east &&
-        streetFeatureBounds[offset + 2] >= west &&
-        streetFeatureBounds[offset + 1] <= north &&
-        streetFeatureBounds[offset + 3] >= south;
-
-      if (!isInView) continue;
-
-      visibleStreetCount += 1;
-      const isNear = timeMode
-        ? streetTravelTime(
-            state.streets.features[featureIndex].properties,
-            state.transitTimes,
-          ).totalMinutes <= timeStops.orangeMinutes
-        : distanceArrays.some((distances) => distances[featureIndex] <= 2500);
-      if (isNear) {
-        nearCount += 1;
-      }
-    }
-  }
 
   let visibleStationCount = 0;
-
   if (stationToggle.checked) {
-    for (const station of stationStatistics) {
-      const [lon, lat] = station.coordinates;
+    for (const feature of loadedStations.features ?? []) {
+      const [lon, lat] = feature.geometry?.coordinates ?? [];
+      const properties = feature.properties ?? {};
       const statusVisible =
-        station.status === 'open' || futureStationToggle.checked;
-
+        properties.status === 'open' || futureStationToggle.checked;
       if (
         statusVisible &&
-        activeStationModes.has(station.mode) &&
-        lon >= west &&
-        lon <= east &&
-        lat >= south &&
-        lat <= north
+        activeStationModes.has(properties.mode) &&
+        bounds.contains([lon, lat])
       ) {
         visibleStationCount += 1;
       }
     }
   }
+  stationCountEl.textContent = formatInteger(visibleStationCount);
 
   if (AREAS[activeAreaKey].liveRoads) {
     nearCountLabelEl.textContent = 'Within 2.5 km';
     streetCountEl.textContent = streetToggle.checked ? 'Live' : '0';
     nearCountEl.textContent = streetToggle.checked ? 'Live' : '0';
-  } else {
-    nearCountLabelEl.textContent = timeMode
-      ? `Within ${timeStops.orangeMinutes} min`
-      : 'Within 2.5 km';
-    streetCountEl.textContent = formatInteger(visibleStreetCount);
-    nearCountEl.textContent = formatInteger(nearCount);
+    return;
   }
 
-  stationCountEl.textContent = formatInteger(visibleStationCount);
-}
-
-function attachStreetModeDistances(streets, distanceData) {
-  const features = streets.features ?? [];
-  const distancesByMode = distanceData.distances_by_mode ?? {};
-  const futureDistancesByMode = distanceData.future_distances_by_mode ?? {};
-
-  if (distanceData.feature_count !== features.length) {
-    throw new Error(
-      `Street mode distances have ${distanceData.feature_count} features; expected ${features.length}.`,
-    );
+  const streets = visibleTiledStreets();
+  let nearCount = 0;
+  for (const properties of streets) {
+    const isNear = timeMode
+      ? streetTravelTime(properties, state.transitTimes).totalMinutes <=
+        timeStops.orangeMinutes
+      : streetDistanceFromProperties(properties) <= 2500;
+    if (isNear) nearCount += 1;
   }
 
-  maxDistanceMeters = distanceData.max_distance_m ?? maxDistanceMeters;
-  streetFeatureCount = features.length;
-  streetModeDistances = distancesByMode;
-  futureStreetModeDistances = futureDistancesByMode;
-
-  const attachDistances = (modeDistances, properties, status) => {
-    for (const [mode, distances] of Object.entries(modeDistances)) {
-      const property = properties[mode];
-      if (!property || distances.length !== features.length) {
-        throw new Error(`Invalid ${status} street distance data for station mode: ${mode}.`);
-      }
-
-      for (let featureIndex = 0; featureIndex < features.length; featureIndex += 1) {
-        features[featureIndex].properties[property] = distances[featureIndex];
-      }
-    }
-  };
-
-  attachDistances(distancesByMode, MODE_DISTANCE_PROPERTIES, 'open');
-  attachDistances(
-    futureDistancesByMode,
-    FUTURE_MODE_DISTANCE_PROPERTIES,
-    'future',
-  );
+  nearCountLabelEl.textContent = timeMode
+    ? `Within ${timeStops.orangeMinutes} min`
+    : 'Within 2.5 km';
+  streetCountEl.textContent = formatInteger(streets.length);
+  nearCountEl.textContent = formatInteger(nearCount);
 }
 
 function syncStreetVisibility() {
@@ -621,9 +539,95 @@ function syncStreetVisibility() {
   }
 }
 
-function updateStatus(label, isError = false) {
+function updateStatus(label, { isError = false, isLoading = false } = {}) {
   statusEl.textContent = label;
   statusEl.classList.toggle('error', isError);
+  statusEl.classList.toggle('loading', isLoading);
+}
+
+function beginLoading(label, type) {
+  loadingOperation = {
+    type,
+    label,
+    startedAt: performance.now(),
+  };
+  loadingCanFinish = false;
+  updateStatus(label, { isLoading: true });
+  mapLoadingLabelEl.textContent = `${label}…`;
+  mapLoadingEl.hidden = false;
+  mapEl.setAttribute('aria-busy', 'true');
+}
+
+function finishLoading() {
+  if (!loadingOperation || !loadingCanFinish) return;
+
+  const completedOperation = {
+    ...loadingOperation,
+    durationMs: performance.now() - loadingOperation.startedAt,
+  };
+  window.__transitPerformance.operations.push(completedOperation);
+
+  if (completedOperation.type === 'initial') {
+    initialLoadComplete = true;
+    window.__transitPerformance.initialReadyMs = completedOperation.durationMs;
+    scheduleBasemapInstall();
+  } else {
+    window.__transitPerformance.lastInteractionMs = completedOperation.durationMs;
+  }
+
+  loadingOperation = null;
+  loadingCanFinish = false;
+  updateStatus('Ready');
+  mapLoadingEl.hidden = true;
+  mapEl.setAttribute('aria-busy', 'false');
+  window.dispatchEvent(
+    new CustomEvent('transit:ready', { detail: completedOperation }),
+  );
+}
+
+function installBasemap() {
+  if (!pendingBasemapStyle) return;
+
+  try {
+    for (const [sourceId, source] of Object.entries(pendingBasemapStyle.sources ?? {})) {
+      if (!map.getSource(sourceId)) map.addSource(sourceId, source);
+    }
+
+    for (const layer of pendingBasemapStyle.layers ?? []) {
+      if (layer.type !== 'background' && !map.getLayer(layer.id)) {
+        const beforeLayer =
+          layer.type === 'symbol' ? 'station-points-open' : 'street-proximity';
+        map.addLayer(layer, beforeLayer);
+      }
+    }
+    basemapInstalled = true;
+    if (AREAS[activeAreaKey].liveRoads) {
+      installLiveStreetLayers(loadedStations);
+      syncStreetVisibility();
+    }
+  } catch (error) {
+    console.error('Basemap could not be installed.', error);
+  } finally {
+    pendingBasemapStyle = null;
+  }
+}
+
+function scheduleBasemapInstall() {
+  if (!pendingBasemapStyle || basemapInstallScheduled) return;
+  basemapInstallScheduled = true;
+  setTimeout(installBasemap, 1000);
+}
+
+function runMapUpdate(label, callback) {
+  beginLoading(label, 'filter');
+  callback();
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      loadingCanFinish = true;
+      finishLoading();
+    });
+  });
 }
 
 function setLegend(mode) {
@@ -709,15 +713,17 @@ stationBreakdownEl.addEventListener('click', (event) => {
     activeStationModes.delete(mode);
   }
 
-  syncStationFilters();
-  syncStreetColor();
-  updateViewportStatistics();
+  runMapUpdate('Updating filter', () => {
+    syncStationFilters();
+    syncStreetColor();
+    updateViewportStatistics();
 
-  if (selectedStreetProperties) {
-    showStreetFeature(selectedStreetProperties);
-  } else if (selectedLiveStreetFeature) {
-    showLiveStreetFeature(selectedLiveStreetFeature);
-  }
+    if (selectedStreetProperties) {
+      showStreetFeature(selectedStreetProperties);
+    } else if (selectedLiveStreetFeature) {
+      showLiveStreetFeature(selectedLiveStreetFeature);
+    }
+  });
 });
 
 function renderDestinationOptions(stationFeatures) {
@@ -768,7 +774,6 @@ function renderDestinationOptions(stationFeatures) {
 
 function resetDestinationRouting() {
   state.metadata = null;
-  state.streets = null;
   state.stationById.clear();
   state.transitGraph = null;
   state.transitTimes = null;
@@ -1171,11 +1176,17 @@ function installHover() {
     if (!feature) return;
 
     if (hoveredId !== null) {
-      map.setFeatureState({ source: 'streets', id: hoveredId }, { hover: false });
+      map.setFeatureState(
+        { source: 'streets', sourceLayer: 'streets', id: hoveredId },
+        { hover: false },
+      );
     }
 
     hoveredId = feature.id;
-    map.setFeatureState({ source: 'streets', id: hoveredId }, { hover: true });
+    map.setFeatureState(
+      { source: 'streets', sourceLayer: 'streets', id: hoveredId },
+      { hover: true },
+    );
 
     showStreetFeature(feature.properties);
     map.getCanvas().style.cursor = 'pointer';
@@ -1183,7 +1194,10 @@ function installHover() {
 
   map.on('mouseleave', 'street-proximity', () => {
     if (hoveredId !== null) {
-      map.setFeatureState({ source: 'streets', id: hoveredId }, { hover: false });
+      map.setFeatureState(
+        { source: 'streets', sourceLayer: 'streets', id: hoveredId },
+        { hover: false },
+      );
     }
     hoveredId = null;
     map.getCanvas().style.cursor = '';
@@ -1309,23 +1323,22 @@ function installLiveStreetLayers(stations) {
   }
 }
 
-function installMapData(streets, stations, useLiveRoads) {
-  const existingStreets = map.getSource('streets');
+function installMapData(stations) {
   const existingStations = map.getSource('stations');
 
-  if (existingStreets && existingStations) {
-    existingStreets.setData(streets ?? { type: 'FeatureCollection', features: [] });
+  if (existingStations) {
     existingStations.setData(stations);
-    if (useLiveRoads) installLiveStreetLayers(stations);
     return;
   }
 
   const labelLayerId = firstSymbolLayerId();
+  const streetTilesUrl = new URL(AREAS.cdmx.streetTiles, window.location.href).href;
 
   map.addSource('streets', {
-    type: 'geojson',
-    data: streets ?? { type: 'FeatureCollection', features: [] },
-    generateId: true,
+    type: 'vector',
+    url: `pmtiles://${streetTilesUrl}`,
+    attribution: '© OpenStreetMap contributors',
+    promoteId: 'i',
   });
 
   map.addSource('stations', {
@@ -1339,6 +1352,10 @@ function installMapData(streets, stations, useLiveRoads) {
       id: 'street-proximity',
       type: 'line',
       source: 'streets',
+      'source-layer': 'streets',
+      layout: {
+        visibility: 'none',
+      },
       paint: {
         'line-color': streetColorExpression(),
         'line-width': [
@@ -1360,7 +1377,7 @@ function installMapData(streets, stations, useLiveRoads) {
         ],
       },
     },
-    labelLayerId,
+    labelLayerId ?? undefined,
   );
 
   map.addLayer({
@@ -1451,114 +1468,195 @@ function installMapData(streets, stations, useLiveRoads) {
   });
 
   installHover();
-  if (useLiveRoads) installLiveStreetLayers(stations);
 }
 
-async function loadArea(areaKey) {
+function scheduleDestinationSetup(area, stations, sequence) {
+  if (!area.supportsDestination) return;
+
+  const start = async () => {
+    const schedules = area.schedules
+      ? await fetchJson(area.schedules).catch(() => null)
+      : null;
+    if (sequence !== loadSequence) return;
+
+    const initializeDestination = () => {
+      if (sequence !== loadSequence) return;
+      state.schedules = schedules;
+      state.transitGraph = buildTransitGraph(stations.features);
+      applyScheduleContext();
+      renderDestinationOptions(stations.features);
+    };
+
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(initializeDestination, { timeout: 2_000 });
+    } else {
+      setTimeout(initializeDestination, 0);
+    }
+  };
+
+  if (loadingOperation) {
+    window.addEventListener('transit:ready', start, { once: true });
+  } else {
+    start();
+  }
+}
+
+async function loadArea(areaKey, { initial = false } = {}) {
   const area = AREAS[areaKey];
   const sequence = ++loadSequence;
 
+  if (!initial) beginLoading(`Loading ${area.label}`, 'area');
   activeAreaKey = areaKey;
+  streetSourceLoaded = false;
   resetDestinationRouting();
   updateAreaChrome(areaKey);
   resetSelection();
-  updateStatus('Loading');
 
   try {
-    const [
-      streets,
-      streetModeDistanceData,
-      stations,
-      metadata,
-      streetAccess,
-      schedules,
-    ] = await Promise.all([
-      area.streets
-        ? fetchJson(area.streets)
-        : Promise.resolve({ type: 'FeatureCollection', features: [] }),
-      area.streetModeDistances ? fetchJson(area.streetModeDistances) : Promise.resolve(null),
+    const [stations, metadata] = await Promise.all([
       fetchJson(area.stations),
       fetchJson(area.metadata),
-      area.streetAccess ? fetchJson(area.streetAccess).catch(() => null) : null,
-      area.schedules ? fetchJson(area.schedules).catch(() => null) : null,
     ]);
 
     if (sequence !== loadSequence) return;
 
-    if (streetModeDistanceData) {
-      attachStreetModeDistances(streets, streetModeDistanceData);
-    } else {
-      streetFeatureCount = 0;
-      streetModeDistances = {};
-      futureStreetModeDistances = {};
-    }
-
     state.metadata = metadata;
-    state.streets = streets;
-    state.schedules = schedules;
     state.stationById = new Map(
       stations.features.map((feature) => [feature.properties.id, feature]),
     );
 
-    if (area.supportsDestination) {
-      const hasPrecomputedAccess = applyStreetAccess(streets, streetAccess);
-      if (!hasPrecomputedAccess) {
-        updateStatus('Indexing streets');
-        await assignNearestStations(streets.features, stations.features, {
-          onProgress(completed, total) {
-            const percent = Math.round((completed / total) * 100);
-            updateStatus(`Indexing ${percent}%`);
-          },
-        });
-      }
-      if (sequence !== loadSequence) return;
-      state.transitGraph = buildTransitGraph(stations.features);
-      applyScheduleContext();
-      renderDestinationOptions(stations.features);
+    loadedStations = stations;
+    renderMetadata(metadata);
+    installMapData(stations);
+    applyMapBounds(metadata);
+
+    if (area.liveRoads && pendingBasemapStyle) installBasemap();
+    if (area.liveRoads && basemapInstalled) {
+      installLiveStreetLayers(stations);
     }
 
-    loadedStations = stations;
-    initializeStatisticsData(streets, stations);
-    renderMetadata(metadata);
-    applyMapBounds(metadata);
-    installMapData(streets, stations, area.liveRoads);
     syncStationFilters();
     syncStreetColor();
     syncStreetVisibility();
     syncStationVisibility();
     updateViewportStatistics();
-    updateStatus('Ready');
+    window.__transitPerformance.dataFetchedMs =
+      performance.now() - window.__transitPerformance.startedAt;
+    scheduleDestinationSetup(area, stations, sequence);
+
+    if (area.liveRoads) {
+      loadingCanFinish = true;
+      requestAnimationFrame(() => requestAnimationFrame(finishLoading));
+    }
   } catch (error) {
     if (sequence !== loadSequence) return;
     console.error(error);
-    updateStatus('Data missing', true);
+    loadingOperation = null;
+    loadingCanFinish = false;
+    updateStatus('Data missing', { isError: true });
+    mapLoadingLabelEl.textContent = 'Map data could not be loaded';
+    mapEl.setAttribute('aria-busy', 'false');
     featureSummaryEl.textContent = `Run ${area.buildCommand}, then refresh.`;
   }
 }
 
+async function initialize() {
+  try {
+    pendingBasemapStyle = await fetchJson('vendor/openfreemap-liberty.json');
+    await loadArea(initialAreaKey, { initial: true });
+  } catch (error) {
+    console.error(error);
+    loadingOperation = null;
+    updateStatus('Map unavailable', { isError: true });
+    mapLoadingLabelEl.textContent = 'Map could not be initialized';
+    mapEl.setAttribute('aria-busy', 'false');
+  }
+}
+
 streetToggle.addEventListener('change', () => {
-  syncStreetVisibility();
-  updateViewportStatistics();
+  runMapUpdate('Updating layers', () => {
+    syncStreetVisibility();
+    updateViewportStatistics();
+  });
 });
 
 stationToggle.addEventListener('change', () => {
-  syncStationVisibility();
-  updateViewportStatistics();
+  runMapUpdate('Updating layers', () => {
+    syncStationVisibility();
+    updateViewportStatistics();
+  });
 });
 
 futureStationToggle.addEventListener('change', () => {
-  syncStationVisibility();
-  syncStreetColor();
-  updateViewportStatistics();
+  runMapUpdate('Updating layers', () => {
+    syncStationVisibility();
+    syncStreetColor();
+    updateViewportStatistics();
 
-  if (selectedStreetProperties) {
-    showStreetFeature(selectedStreetProperties);
-  } else if (selectedLiveStreetFeature) {
-    showLiveStreetFeature(selectedLiveStreetFeature);
+    if (selectedStreetProperties) {
+      showStreetFeature(selectedStreetProperties);
+    } else if (selectedLiveStreetFeature) {
+      showLiveStreetFeature(selectedLiveStreetFeature);
+    }
+  });
+});
+
+map.on('sourcedataloading', (event) => {
+  if (
+    event.sourceId !== 'streets' ||
+    AREAS[activeAreaKey].liveRoads ||
+    !initialLoadComplete
+  ) {
+    return;
+  }
+
+  if (!loadingOperation) {
+    streetSourceLoaded = false;
+    beginLoading('Loading area', 'area');
+  }
+});
+
+map.on('sourcedata', (event) => {
+  if (event.sourceId === 'streets' && event.isSourceLoaded) {
+    streetSourceLoaded = true;
   }
 });
 
 map.on('moveend', updateViewportStatistics);
+map.on('idle', () => {
+  updateViewportStatistics();
+  if (AREAS[activeAreaKey].liveRoads && loadingOperation?.type !== 'filter') {
+    loadingCanFinish = true;
+    finishLoading();
+  }
+});
+map.on('render', () => {
+  if (!map.getLayer('street-proximity')) return;
+
+  const renderedStreets = AREAS[activeAreaKey].liveRoads
+    ? []
+    : map.queryRenderedFeatures({ layers: ['street-proximity'] });
+  if (
+    window.__transitPerformance.firstStreetRenderMs === null &&
+    renderedStreets.length > 0
+  ) {
+    window.__transitPerformance.firstStreetRenderMs =
+      performance.now() - window.__transitPerformance.startedAt;
+  }
+
+  if (
+    !AREAS[activeAreaKey].liveRoads &&
+    loadingOperation?.type !== 'filter' &&
+    renderedStreets.length > 0 &&
+    (streetSourceLoaded || map.isSourceLoaded('streets'))
+  ) {
+    streetSourceLoaded = true;
+    updateViewportStatistics();
+    loadingCanFinish = true;
+    finishLoading();
+  }
+});
+
 areaSelect.addEventListener('change', () => {
   const areaKey = areaSelect.value;
   if (areaKey !== activeAreaKey) loadArea(areaKey);
@@ -1587,4 +1685,8 @@ scheduleDaySelect.value = String(initialDeparture.weekday);
 scheduleTimeInput.value = formatTimeInput(initialDeparture.minute);
 applyTimeScale();
 
-map.on('load', () => loadArea(initialAreaKey));
+map.once('style.load', () => {
+  window.__transitPerformance.styleLoadedMs =
+    performance.now() - window.__transitPerformance.startedAt;
+  initialize();
+});

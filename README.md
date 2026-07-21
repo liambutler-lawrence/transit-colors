@@ -21,9 +21,16 @@ The destination view's time scale is configurable. Set the green-to-yellow trans
 Generate data for either metro area:
 
 ```sh
+brew install tippecanoe
+npm install
 npm run build:data:cdmx
 npm run build:data:nyc
 ```
+
+`build:data:cdmx` refreshes the source GeoJSON and then creates the browser-facing
+PMTiles archive. To rebuild only the archive from existing source data, run
+`npm run build:tiles:cdmx`. Pinned browser libraries and the local OpenFreeMap
+style snapshot can be refreshed with `npm run build:vendor`.
 
 Refresh schedule data from the official SEMOVI GTFS feed after generating stations:
 
@@ -80,10 +87,43 @@ Future/planned status is based on:
 - Narrow network-level overrides for known not-yet-open systems whose OSM tags are incomplete, currently Mexicable Línea 3 and Tren Ligero Texcoco-La Paz
 
 Street color is computed from the nearest selected open-station mode and clamped to
-`0-5000m`. Per-mode distances live in the compact companion file
-`data/cdmx-street-mode-distances.json`, allowing the map gradient to update without
-reloading the street geometry. Enabling the top-level Future control also includes
-future/planned stations from the currently selected modes in the gradient.
+`0-5000m`. The source per-mode distances live in
+`data/cdmx-street-mode-distances.json`; the browser reads those values from
+`data/cdmx-streets.pmtiles` in 50m display increments. The archive uses a road-class
+zoom hierarchy so overview maps load major roads first and add local streets as the
+user zooms in. Enabling the top-level Future control also includes future/planned
+stations from the currently selected modes in the gradient.
+
+## Performance
+
+The original page blocked on 111MB of JSON, expanded seven distance arrays into
+420,348 street features on the main thread, and rescanned every feature after each
+mode filter change, making both startup and repeated filtering scale with the full
+citywide dataset.
+
+The optimized path:
+
+- requests only visible byte ranges from a PMTiles vector archive;
+- precomputes all 128 station-mode count combinations for constant-time filter counts;
+- initializes the transit overlay as soon as the map style shell is ready, then adds
+  the full basemap progressively;
+- serves pinned MapLibre/PMTiles assets locally and uses a range- and gzip-capable
+  development server;
+- shows an accessible loading badge and map spinner until the relevant street tiles
+  have rendered on initial load and area changes.
+
+Cold-cache headless Chrome checks with software WebGL on July 21, 2026 completed in:
+
+- CDMX initial interactive street render: 624-735ms across three final runs;
+- NYC direct initial load: 314ms;
+- station-mode filter update: 65ms;
+- CDMX → NYC area switch: 229ms;
+- NYC → CDMX area switch, including fresh street-tile ranges: 524ms;
+- destination selection and schedule-aware recolor: 39ms.
+
+Destination graph construction and its schedule/options setup run during idle time
+after the initial map becomes interactive, keeping that optional work off the
+startup critical path.
 
 ## NYC Metro Data Notes
 
