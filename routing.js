@@ -224,8 +224,9 @@ function defaultYield() {
 }
 
 /**
- * Adds the stable ID of each street's nearest open station to `properties.s`.
- * Existing precomputed distances are used to keep the spatial search small.
+ * Adds the stable ID and distance of each street's nearest open station to
+ * `properties.s` and `properties.d`. Existing precomputed distances are used
+ * to keep the spatial search small.
  */
 export async function assignNearestStations(
   streetFeatures,
@@ -296,7 +297,10 @@ export async function assignNearestStations(
       padding *= 2;
     }
 
-    if (bestStation) feature.properties.s = bestStation.id;
+    if (bestStation) {
+      feature.properties.s = bestStation.id;
+      feature.properties.d = Math.round(Math.sqrt(bestDistanceSquared));
+    }
 
     if ((index + 1) % batchSize === 0) {
       onProgress(index + 1, streetFeatures.length);

@@ -3,9 +3,9 @@
 Static POC for the Mexico City and New York City metropolitan areas. It overlays streets with:
 
 - A color gradient based on distance to the nearest selected transit modes in either metro area.
-- In Mexico City, schedule-adjusted travel time to a selected station, including the access walk, expected boarding wait, and estimated ride through the transit network.
+- Schedule-adjusted travel time to a selected station in either metro area, including the access walk, expected boarding wait, and estimated ride through the transit network.
 
-For Mexico City, choose a destination from the panel or click an open station on the map. Set a weekday and departure time to apply published service windows and headways. Select “Nearest station only” to return to the distance view.
+Choose a destination from the panel or click an open station on the map. Set a weekday and departure time to apply published service windows and headways. Select “Nearest station only” to return to the distance view.
 
 The destination view's time scale is configurable. Set the green-to-yellow transition in minutes; the orange and red transitions follow at 2× and 4× that value.
 
@@ -137,7 +137,9 @@ The NYC builder combines current static GTFS station data for:
 
 The committed dataset is clipped to the regional transit footprint from `40.0-41.9° N` and `74.8-71.8° W`, which includes the outer commuter-rail branches while excluding NJ Transit service outside the NYC region.
 
-Unlike the precomputed CDMX street file, NYC street distances are evaluated in the browser against OpenFreeMap's OpenStreetMap vector roads using MapLibre's `distance` expression. This keeps the NYC addition small while preserving the same `0-5000m` color scale. The metadata displays `Live` for street totals and proximity counts because those roads are loaded as viewport-based vector tiles rather than a fixed GeoJSON collection.
+Unlike the precomputed CDMX street file, the browser collects the currently loaded OpenFreeMap roads for NYC and builds a viewport-based GeoJSON overlay. Each road receives its nearest selected station and distance, so the same visible `0-5000m` gradient, street details, destination routing, and in-view counts work in both metro areas. Panning or zooming refreshes the road overlay from the loaded vector tiles.
+
+`data/nyc-schedules.json` is generated with the station snapshot from the MTA, NJ Transit, and PATH static GTFS feeds. It compresses published departures into recurring weekday service windows and headway estimates for 945 of the 947 current station records. The remaining records use the labeled four-minute boarding-wait estimate.
 
 Downloaded GTFS archives are cached in `data/.gtfs-cache/`. Set `REFRESH_GTFS_CACHE=1` to force a refresh.
 
@@ -147,7 +149,7 @@ Downloaded GTFS archives are cached in `data/.gtfs-cache/`. Set `REFRESH_GTFS_CA
 
 For a selected weekday and time, the app uses the GTFS frequency windows at each matched stop. During service, expected wait is half the published headway; outside service, the calculation waits until the next weekly service window. Overnight times above 24:00 are supported. Because the current feed's absolute calendar end dates are stale for most services, the builder deliberately uses its recurring weekday flags and does not claim date-specific exceptions.
 
-Destination travel times remain schedule-adjusted estimates, not exact journey-planner or live-routing results. The ride and transfer portion comes from a lightweight graph built from OSM route metadata, station mode, nearby transfers, and average speeds. The schedule changes the initial boarding wait; transfer waits, real-time disruptions, traffic, and holiday exceptions are not modeled. The street access walk uses the existing nearest-station distance at 80 m/min.
+Destination travel times remain schedule-adjusted estimates, not exact journey-planner or live-routing results. The ride and transfer portion comes from a lightweight graph built from route metadata, station mode, nearby transfers, and average speeds. The schedule changes the initial boarding wait; transfer waits, real-time disruptions, traffic, and holiday exceptions are not modeled. The street access walk uses the nearest-station distance at 80 m/min.
 
 ## Deployment
 
