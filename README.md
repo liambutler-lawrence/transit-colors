@@ -66,7 +66,8 @@ Future/planned status is based on:
 Street color is computed from the nearest selected open-station mode and clamped to
 `0-5000m`. Per-mode distances live in the compact companion file
 `data/cdmx-street-mode-distances.json`, allowing the map gradient to update without
-reloading the street geometry.
+reloading the street geometry. Enabling the top-level Future control also includes
+future/planned stations from the currently selected modes in the gradient.
 
 ## Deployment
 

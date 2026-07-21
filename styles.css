@@ -233,12 +233,6 @@ h1 {
   filter: grayscale(1);
 }
 
-.future-mode-pill {
-  border-style: dashed;
-  color: #334155;
-  cursor: default;
-}
-
 .selection {
   min-height: 82px;
   padding-top: 14px;

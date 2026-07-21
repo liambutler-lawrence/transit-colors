@@ -43,6 +43,16 @@ const MODE_DISTANCE_PROPERTIES = {
   monorail: 'dm',
 };
 
+const FUTURE_MODE_DISTANCE_PROPERTIES = {
+  subway: 'fs',
+  brt: 'fb',
+  light_rail: 'fl',
+  cable_car: 'fc',
+  commuter_rail: 'ft',
+  regional_rail: 'fr',
+  monorail: 'fm',
+};
+
 const map = new maplibregl.Map({
   container: 'map',
   style: 'https://tiles.openfreemap.org/styles/liberty',
@@ -92,9 +102,11 @@ const futureStationLayers = ['station-points-future', 'station-labels-future'];
 const activeStationModes = new Set();
 const allStationModes = new Set();
 let maxDistanceMeters = 5000;
-let allModesNearCount = 0;
 let streetFeatureCount = 0;
 let streetModeDistances = {};
+let futureStreetModeDistances = {};
+let streetFeatureBounds = null;
+let stationStatistics = [];
 let selectedStreetProperties = null;
 
 function formatInteger(value) {
@@ -167,13 +179,26 @@ function syncStationFilters() {
 }
 
 function streetDistanceExpression() {
-  if (activeStationModes.size === allStationModes.size) {
+  if (
+    activeStationModes.size === allStationModes.size &&
+    !futureStationToggle.checked
+  ) {
     return ['get', 'd'];
   }
 
-  const modeDistances = [...activeStationModes]
+  const distanceProperties = [...activeStationModes]
     .map((mode) => MODE_DISTANCE_PROPERTIES[mode])
-    .filter(Boolean)
+    .filter(Boolean);
+
+  if (futureStationToggle.checked) {
+    distanceProperties.push(
+      ...[...activeStationModes]
+        .map((mode) => FUTURE_MODE_DISTANCE_PROPERTIES[mode])
+        .filter(Boolean),
+    );
+  }
+
+  const modeDistances = distanceProperties
     .map((property) => ['to-number', ['get', property], maxDistanceMeters]);
 
   if (modeDistances.length === 0) return maxDistanceMeters;
@@ -203,29 +228,114 @@ function syncStreetColor() {
   }
 }
 
-function syncNearCount() {
-  if (activeStationModes.size === allStationModes.size) {
-    nearCountEl.textContent = formatInteger(allModesNearCount);
-    return;
-  }
-
+function selectedDistanceArrays() {
   const selectedDistanceArrays = [...activeStationModes]
     .map((mode) => streetModeDistances[mode])
     .filter(Boolean);
+
+  if (futureStationToggle.checked) {
+    selectedDistanceArrays.push(
+      ...[...activeStationModes]
+        .map((mode) => futureStreetModeDistances[mode])
+        .filter(Boolean),
+    );
+  }
+
+  return selectedDistanceArrays;
+}
+
+function initializeStatisticsData(streets, stations) {
+  const streetFeatures = streets.features ?? [];
+  streetFeatureBounds = new Float64Array(streetFeatures.length * 4);
+
+  for (const [featureIndex, feature] of streetFeatures.entries()) {
+    const coordinates = feature.geometry?.coordinates ?? [];
+    let west = Number.POSITIVE_INFINITY;
+    let south = Number.POSITIVE_INFINITY;
+    let east = Number.NEGATIVE_INFINITY;
+    let north = Number.NEGATIVE_INFINITY;
+
+    for (const [lon, lat] of coordinates) {
+      west = Math.min(west, lon);
+      south = Math.min(south, lat);
+      east = Math.max(east, lon);
+      north = Math.max(north, lat);
+    }
+
+    const offset = featureIndex * 4;
+    streetFeatureBounds[offset] = west;
+    streetFeatureBounds[offset + 1] = south;
+    streetFeatureBounds[offset + 2] = east;
+    streetFeatureBounds[offset + 3] = north;
+  }
+
+  stationStatistics = (stations.features ?? []).map((feature) => ({
+    coordinates: feature.geometry?.coordinates ?? [],
+    mode: feature.properties?.mode,
+    status: feature.properties?.status,
+  }));
+}
+
+function updateViewportStatistics() {
+  if (!streetFeatureBounds) return;
+
+  const bounds = map.getBounds();
+  const west = bounds.getWest();
+  const south = bounds.getSouth();
+  const east = bounds.getEast();
+  const north = bounds.getNorth();
+  const distanceArrays = selectedDistanceArrays();
+  let visibleStreetCount = 0;
   let nearCount = 0;
 
-  for (let featureIndex = 0; featureIndex < streetFeatureCount; featureIndex += 1) {
-    if (selectedDistanceArrays.some((distances) => distances[featureIndex] <= 2500)) {
-      nearCount += 1;
+  if (streetToggle.checked) {
+    for (let featureIndex = 0; featureIndex < streetFeatureCount; featureIndex += 1) {
+      const offset = featureIndex * 4;
+      const isInView =
+        streetFeatureBounds[offset] <= east &&
+        streetFeatureBounds[offset + 2] >= west &&
+        streetFeatureBounds[offset + 1] <= north &&
+        streetFeatureBounds[offset + 3] >= south;
+
+      if (!isInView) continue;
+
+      visibleStreetCount += 1;
+      if (distanceArrays.some((distances) => distances[featureIndex] <= 2500)) {
+        nearCount += 1;
+      }
     }
   }
 
+  let visibleStationCount = 0;
+
+  if (stationToggle.checked) {
+    for (const station of stationStatistics) {
+      const [lon, lat] = station.coordinates;
+      const statusVisible =
+        station.status === 'open' || futureStationToggle.checked;
+
+      if (
+        statusVisible &&
+        activeStationModes.has(station.mode) &&
+        lon >= west &&
+        lon <= east &&
+        lat >= south &&
+        lat <= north
+      ) {
+        visibleStationCount += 1;
+      }
+    }
+  }
+
+  streetCountEl.textContent = formatInteger(visibleStreetCount);
+  stationCountEl.textContent = formatInteger(visibleStationCount);
   nearCountEl.textContent = formatInteger(nearCount);
 }
 
 function attachStreetModeDistances(streets, distanceData) {
   const features = streets.features ?? [];
   const distancesByMode = distanceData.distances_by_mode ?? {};
+  const futureDistancesByMode = distanceData.future_distances_by_mode ?? {};
 
   if (distanceData.feature_count !== features.length) {
     throw new Error(
@@ -236,17 +346,27 @@ function attachStreetModeDistances(streets, distanceData) {
   maxDistanceMeters = distanceData.max_distance_m ?? maxDistanceMeters;
   streetFeatureCount = features.length;
   streetModeDistances = distancesByMode;
+  futureStreetModeDistances = futureDistancesByMode;
 
-  for (const [mode, distances] of Object.entries(distancesByMode)) {
-    const property = MODE_DISTANCE_PROPERTIES[mode];
-    if (!property || distances.length !== features.length) {
-      throw new Error(`Invalid street distance data for station mode: ${mode}.`);
-    }
+  const attachDistances = (modeDistances, properties, status) => {
+    for (const [mode, distances] of Object.entries(modeDistances)) {
+      const property = properties[mode];
+      if (!property || distances.length !== features.length) {
+        throw new Error(`Invalid ${status} street distance data for station mode: ${mode}.`);
+      }
 
-    for (let featureIndex = 0; featureIndex < features.length; featureIndex += 1) {
-      features[featureIndex].properties[property] = distances[featureIndex];
+      for (let featureIndex = 0; featureIndex < features.length; featureIndex += 1) {
+        features[featureIndex].properties[property] = distances[featureIndex];
+      }
     }
-  }
+  };
+
+  attachDistances(distancesByMode, MODE_DISTANCE_PROPERTIES, 'open');
+  attachDistances(
+    futureDistancesByMode,
+    FUTURE_MODE_DISTANCE_PROPERTIES,
+    'future',
+  );
 }
 
 function updateStatus(label, isError = false) {
@@ -257,11 +377,9 @@ function updateStatus(label, isError = false) {
 function renderMetadata(metadata) {
   const streetCount = metadata.street_count ?? 0;
   const stationCount = metadata.open_station_count ?? metadata.station_count ?? 0;
-  const futureStationCount = metadata.future_station_count ?? 0;
   const nearCount = metadata.histogram?.under_2500_m ?? 0;
 
   maxDistanceMeters = metadata.max_distance_m ?? maxDistanceMeters;
-  allModesNearCount = nearCount;
 
   streetCountEl.textContent = formatInteger(streetCount);
   stationCountEl.textContent = formatInteger(stationCount);
@@ -291,17 +409,6 @@ function renderMetadata(metadata) {
       item.textContent = `${label}: ${formatInteger(count)}`;
       return item;
     }),
-    ...[
-      futureStationCount > 0
-        ? (() => {
-            const item = document.createElement('span');
-            item.className = 'mode-pill future-mode-pill';
-            item.style.setProperty('--mode-color', COLORS.future);
-            item.textContent = `Future: ${formatInteger(futureStationCount)}`;
-            return item;
-          })()
-        : null,
-    ].filter(Boolean),
   );
 }
 
@@ -324,7 +431,7 @@ stationBreakdownEl.addEventListener('click', (event) => {
 
   syncStationFilters();
   syncStreetColor();
-  syncNearCount();
+  updateViewportStatistics();
 
   if (selectedStreetProperties) {
     showStreetFeature(selectedStreetProperties);
@@ -401,6 +508,13 @@ function showStreetFeature(props) {
     } else {
       for (const mode of activeStationModes) {
         const value = Number(props[MODE_DISTANCE_PROPERTIES[mode]]);
+        if (Number.isFinite(value)) distance = Math.min(distance, value);
+      }
+    }
+
+    if (futureStationToggle.checked) {
+      for (const mode of activeStationModes) {
+        const value = Number(props[FUTURE_MODE_DISTANCE_PROPERTIES[mode]]);
         if (Number.isFinite(value)) distance = Math.min(distance, value);
       }
     }
@@ -497,6 +611,7 @@ async function initialize() {
     ]);
 
     attachStreetModeDistances(streets, streetModeDistanceData);
+    initializeStatisticsData(streets, stations);
     renderMetadata(metadata);
     applyMapBounds(metadata);
 
@@ -620,6 +735,7 @@ async function initialize() {
     installHover();
     syncStationFilters();
     syncStationVisibility();
+    updateViewportStatistics();
     updateStatus('Ready');
   } catch (error) {
     console.error(error);
@@ -630,14 +746,23 @@ async function initialize() {
 
 streetToggle.addEventListener('change', () => {
   setLayerVisibility('street-proximity', streetToggle.checked);
+  updateViewportStatistics();
 });
 
 stationToggle.addEventListener('change', () => {
   syncStationVisibility();
+  updateViewportStatistics();
 });
 
 futureStationToggle.addEventListener('change', () => {
   syncStationVisibility();
+  syncStreetColor();
+  updateViewportStatistics();
+
+  if (selectedStreetProperties) {
+    showStreetFeature(selectedStreetProperties);
+  }
 });
 
+map.on('moveend', updateViewportStatistics);
 map.on('load', initialize);
