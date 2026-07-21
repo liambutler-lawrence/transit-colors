@@ -1625,6 +1625,13 @@ map.on('sourcedata', (event) => {
   if (event.sourceId === 'streets' && event.isSourceLoaded) {
     streetSourceLoaded = true;
   }
+  if (
+    event.sourceId === 'openmaptiles' &&
+    event.isSourceLoaded &&
+    AREAS[activeAreaKey].liveRoads
+  ) {
+    scheduleLiveStreetRefresh();
+  }
 });
 
 map.on('moveend', () => {
