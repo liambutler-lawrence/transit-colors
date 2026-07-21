@@ -6,7 +6,7 @@
     <title>Transit Colors</title>
     <link rel="preconnect" href="https://tiles.openfreemap.org" />
     <link href="vendor/maplibre-gl.css" rel="stylesheet" />
-    <link href="styles.css" rel="stylesheet" />
+    <link href="styles.css?v=20260721d" rel="stylesheet" />
   </head>
   <body>
     <main class="app-shell">
@@ -18,7 +18,7 @@
 
       <section class="panel" aria-label="Map details">
         <div class="panel-header">
-          <div>
+          <div class="panel-heading">
             <label class="area-control" for="metro-area">
               <span>Metro area</span>
               <select id="metro-area">
@@ -28,115 +28,133 @@
             </label>
             <h1>Transit Street Gradient</h1>
           </div>
-          <span id="status" class="status loading">Loading map</span>
-        </div>
-
-        <div class="metric-grid">
-          <div class="metric">
-            <span class="metric-label">Streets in view</span>
-            <strong id="street-count">--</strong>
-          </div>
-          <div class="metric">
-            <span class="metric-label">Stations in view</span>
-            <strong id="station-count">--</strong>
-          </div>
-          <div class="metric">
-            <span id="near-count-label" class="metric-label">Within 2.5 km</span>
-            <strong id="near-count">--</strong>
-          </div>
-        </div>
-
-        <div id="legend" class="legend" aria-label="Distance legend">
-          <div class="legend-bar"></div>
-          <div id="legend-labels" class="legend-labels">
-            <span>0 km</span>
-            <span>1</span>
-            <span>2.5</span>
-            <span>5 km</span>
+          <div class="panel-actions">
+            <span id="status" class="status loading">Loading map</span>
+            <button
+              id="toggle-panel"
+              class="panel-toggle"
+              type="button"
+              aria-expanded="true"
+              aria-controls="panel-content"
+              aria-label="Hide controls"
+              title="Hide controls"
+            >
+              <span class="panel-toggle-label">Hide controls</span>
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="m12.5 4.5-5 5.5 5 5.5" />
+              </svg>
+            </button>
           </div>
         </div>
 
-        <div class="destination-control">
-          <label for="destination-select">Destination station</label>
-          <select id="destination-select" disabled>
-            <option value="">Nearest station only</option>
-          </select>
-          <p id="destination-summary">
-            Choose a station here or click an open station on the map.
-          </p>
-        </div>
+        <div id="panel-content" class="panel-content">
+          <div class="metric-grid">
+            <div class="metric">
+              <span class="metric-label">Streets in view</span>
+              <strong id="street-count">--</strong>
+            </div>
+            <div class="metric">
+              <span class="metric-label">Stations in view</span>
+              <strong id="station-count">--</strong>
+            </div>
+            <div class="metric">
+              <span id="near-count-label" class="metric-label">Within 2.5 km</span>
+              <strong id="near-count">--</strong>
+            </div>
+          </div>
 
-        <fieldset class="departure-control">
-          <legend>Departure</legend>
-          <div class="departure-inputs">
+          <div id="legend" class="legend" aria-label="Distance legend">
+            <div class="legend-bar"></div>
+            <div id="legend-labels" class="legend-labels">
+              <span>0 km</span>
+              <span>1</span>
+              <span>2.5</span>
+              <span>5 km</span>
+            </div>
+          </div>
+
+          <div class="destination-control">
+            <label for="destination-select">Destination station</label>
+            <select id="destination-select" disabled>
+              <option value="">Nearest station only</option>
+            </select>
+            <p id="destination-summary">
+              Choose a station here or click an open station on the map.
+            </p>
+          </div>
+
+          <fieldset class="departure-control">
+            <legend>Departure</legend>
+            <div class="departure-inputs">
+              <label>
+                <span>Day</span>
+                <select id="schedule-day">
+                  <option value="0">Monday</option>
+                  <option value="1">Tuesday</option>
+                  <option value="2">Wednesday</option>
+                  <option value="3">Thursday</option>
+                  <option value="4">Friday</option>
+                  <option value="5">Saturday</option>
+                  <option value="6">Sunday</option>
+                </select>
+              </label>
+              <label>
+                <span>Time</span>
+                <input id="schedule-time" type="time" step="300" />
+              </label>
+            </div>
+            <p id="schedule-summary">Loading official weekly schedules…</p>
+          </fieldset>
+
+          <fieldset class="time-scale-control">
+            <legend>Time color scale</legend>
+            <div class="time-scale-input">
+              <label for="time-scale-minutes">Green → yellow at</label>
+              <input
+                id="time-scale-minutes"
+                type="number"
+                min="1"
+                max="120"
+                step="5"
+                value="15"
+                inputmode="numeric"
+              />
+              <span>min</span>
+            </div>
+            <p id="time-scale-summary">
+              Yellow at 15 min, orange at 30 min, and red at 60 min.
+            </p>
+          </fieldset>
+
+          <div class="toggles" aria-label="Layer controls">
             <label>
-              <span>Day</span>
-              <select id="schedule-day">
-                <option value="0">Monday</option>
-                <option value="1">Tuesday</option>
-                <option value="2">Wednesday</option>
-                <option value="3">Thursday</option>
-                <option value="4">Friday</option>
-                <option value="5">Saturday</option>
-                <option value="6">Sunday</option>
-              </select>
+              <input id="toggle-streets" type="checkbox" checked />
+              <span>Streets</span>
             </label>
             <label>
-              <span>Time</span>
-              <input id="schedule-time" type="time" step="300" />
+              <input id="toggle-stations" type="checkbox" checked />
+              <span>Stations</span>
+            </label>
+            <label>
+              <input id="toggle-future-stations" type="checkbox" />
+              <span>Future</span>
             </label>
           </div>
-          <p id="schedule-summary">Loading official weekly schedules…</p>
-        </fieldset>
 
-        <fieldset class="time-scale-control">
-          <legend>Time color scale</legend>
-          <div class="time-scale-input">
-            <label for="time-scale-minutes">Green → yellow at</label>
-            <input
-              id="time-scale-minutes"
-              type="number"
-              min="1"
-              max="120"
-              step="5"
-              value="15"
-              inputmode="numeric"
-            />
-            <span>min</span>
+          <div id="station-breakdown" class="station-breakdown" aria-label="Station mode counts"></div>
+
+          <div class="selection" aria-live="polite">
+            <span id="selection-type" class="metric-label">Selected feature</span>
+            <strong id="feature-name">None</strong>
+            <span id="feature-summary">Hover a highlighted street or station</span>
+            <dl id="feature-metadata" class="feature-metadata"></dl>
           </div>
-          <p id="time-scale-summary">
-            Yellow at 15 min, orange at 30 min, and red at 60 min.
-          </p>
-        </fieldset>
-
-        <div class="toggles" aria-label="Layer controls">
-          <label>
-            <input id="toggle-streets" type="checkbox" checked />
-            <span>Streets</span>
-          </label>
-          <label>
-            <input id="toggle-stations" type="checkbox" checked />
-            <span>Stations</span>
-          </label>
-          <label>
-            <input id="toggle-future-stations" type="checkbox" />
-            <span>Future</span>
-          </label>
-        </div>
-
-        <div id="station-breakdown" class="station-breakdown" aria-label="Station mode counts"></div>
-
-        <div class="selection" aria-live="polite">
-          <span id="selection-type" class="metric-label">Selected feature</span>
-          <strong id="feature-name">None</strong>
-          <span id="feature-summary">Hover a highlighted street or station</span>
-          <dl id="feature-metadata" class="feature-metadata"></dl>
         </div>
       </section>
     </main>
 
     <script src="vendor/maplibre-gl.js"></script>
     <script src="vendor/pmtiles.js"></script>
-    <script type="module" src="app.js?v=20260721c"></script>
+    <script type="module" src="app.js?v=20260721d"></script>
   </body>
 </html>
