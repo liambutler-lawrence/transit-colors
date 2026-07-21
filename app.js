@@ -1,6 +1,6 @@
 const DATASETS = {
-  streets: 'data/cdmx-streets.geojson',
-  streetModeDistances: 'data/cdmx-street-mode-distances.json',
+  basemapStyle: 'vendor/openfreemap-liberty.json',
+  streetTiles: 'data/cdmx-streets.pmtiles',
   stations: 'data/cdmx-stations.geojson',
   metadata: 'data/cdmx-metadata.json',
 };
@@ -43,16 +43,23 @@ const MODE_DISTANCE_PROPERTIES = {
   monorail: 'dm',
 };
 
+const pmtilesProtocol = new pmtiles.Protocol();
+maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile);
+
 const map = new maplibregl.Map({
   container: 'map',
-  style: 'https://tiles.openfreemap.org/styles/liberty',
+  style: 'vendor/openfreemap-shell.json',
   center: [-99.1332, 19.4326],
   zoom: 10.5,
 });
+window.__transitMap = map;
 
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
 const statusEl = document.querySelector('#status');
+const mapEl = document.querySelector('#map');
+const mapLoadingEl = document.querySelector('#map-loading');
+const mapLoadingLabelEl = document.querySelector('#map-loading-label');
 const streetCountEl = document.querySelector('#street-count');
 const stationCountEl = document.querySelector('#station-count');
 const nearCountEl = document.querySelector('#near-count');
@@ -93,9 +100,29 @@ const activeStationModes = new Set();
 const allStationModes = new Set();
 let maxDistanceMeters = 5000;
 let allModesNearCount = 0;
-let streetFeatureCount = 0;
-let streetModeDistances = {};
+let nearCountModeOrder = Object.keys(MODE_DISTANCE_PROPERTIES);
+let nearCountsByModeSelection = {};
 let selectedStreetProperties = null;
+let streetSourceLoaded = false;
+let pendingBasemapStyle = null;
+let basemapInstallScheduled = false;
+let loadingOperation = {
+  type: 'initial',
+  label: 'Loading map',
+  startedAt: performance.now(),
+};
+let initialLoadComplete = false;
+let loadingCanFinish = false;
+
+window.__transitPerformance = {
+  startedAt: loadingOperation.startedAt,
+  initialReadyMs: null,
+  styleLoadedMs: null,
+  dataFetchedMs: null,
+  firstStreetRenderMs: null,
+  lastInteractionMs: null,
+  operations: [],
+};
 
 function formatInteger(value) {
   return new Intl.NumberFormat('en-US').format(value);
@@ -204,54 +231,100 @@ function syncStreetColor() {
 }
 
 function syncNearCount() {
-  if (activeStationModes.size === allStationModes.size) {
-    nearCountEl.textContent = formatInteger(allModesNearCount);
-    return;
-  }
+  const selectionKey = nearCountModeOrder
+    .filter((mode) => activeStationModes.has(mode))
+    .join(',');
+  const nearCount = nearCountsByModeSelection[selectionKey];
 
-  const selectedDistanceArrays = [...activeStationModes]
-    .map((mode) => streetModeDistances[mode])
-    .filter(Boolean);
-  let nearCount = 0;
-
-  for (let featureIndex = 0; featureIndex < streetFeatureCount; featureIndex += 1) {
-    if (selectedDistanceArrays.some((distances) => distances[featureIndex] <= 2500)) {
-      nearCount += 1;
-    }
-  }
-
-  nearCountEl.textContent = formatInteger(nearCount);
+  nearCountEl.textContent = Number.isFinite(nearCount)
+    ? formatInteger(nearCount)
+    : formatInteger(allModesNearCount);
 }
 
-function attachStreetModeDistances(streets, distanceData) {
-  const features = streets.features ?? [];
-  const distancesByMode = distanceData.distances_by_mode ?? {};
-
-  if (distanceData.feature_count !== features.length) {
-    throw new Error(
-      `Street mode distances have ${distanceData.feature_count} features; expected ${features.length}.`,
-    );
-  }
-
-  maxDistanceMeters = distanceData.max_distance_m ?? maxDistanceMeters;
-  streetFeatureCount = features.length;
-  streetModeDistances = distancesByMode;
-
-  for (const [mode, distances] of Object.entries(distancesByMode)) {
-    const property = MODE_DISTANCE_PROPERTIES[mode];
-    if (!property || distances.length !== features.length) {
-      throw new Error(`Invalid street distance data for station mode: ${mode}.`);
-    }
-
-    for (let featureIndex = 0; featureIndex < features.length; featureIndex += 1) {
-      features[featureIndex].properties[property] = distances[featureIndex];
-    }
-  }
-}
-
-function updateStatus(label, isError = false) {
+function updateStatus(label, { isError = false, isLoading = false } = {}) {
   statusEl.textContent = label;
   statusEl.classList.toggle('error', isError);
+  statusEl.classList.toggle('loading', isLoading);
+}
+
+function beginLoading(label, type) {
+  loadingOperation = {
+    type,
+    label,
+    startedAt: performance.now(),
+  };
+  loadingCanFinish = false;
+  updateStatus(label, { isLoading: true });
+  mapLoadingLabelEl.textContent = `${label}…`;
+  mapLoadingEl.hidden = false;
+  mapEl.setAttribute('aria-busy', 'true');
+}
+
+function finishLoading() {
+  if (!loadingOperation || !loadingCanFinish) return;
+
+  const completedOperation = {
+    ...loadingOperation,
+    durationMs: performance.now() - loadingOperation.startedAt,
+  };
+  window.__transitPerformance.operations.push(completedOperation);
+
+  if (completedOperation.type === 'initial') {
+    initialLoadComplete = true;
+    window.__transitPerformance.initialReadyMs = completedOperation.durationMs;
+    scheduleBasemapInstall();
+  } else {
+    window.__transitPerformance.lastInteractionMs = completedOperation.durationMs;
+  }
+
+  loadingOperation = null;
+  loadingCanFinish = false;
+  updateStatus('Ready');
+  mapLoadingEl.hidden = true;
+  mapEl.setAttribute('aria-busy', 'false');
+  window.dispatchEvent(
+    new CustomEvent('transit:ready', { detail: completedOperation }),
+  );
+}
+
+function installBasemap() {
+  if (!pendingBasemapStyle) return;
+
+  try {
+    for (const [sourceId, source] of Object.entries(pendingBasemapStyle.sources ?? {})) {
+      if (!map.getSource(sourceId)) map.addSource(sourceId, source);
+    }
+
+    for (const layer of pendingBasemapStyle.layers ?? []) {
+      if (layer.type !== 'background' && !map.getLayer(layer.id)) {
+        const beforeLayer =
+          layer.type === 'symbol' ? 'station-points-open' : 'street-proximity';
+        map.addLayer(layer, beforeLayer);
+      }
+    }
+  } catch (error) {
+    console.error('Basemap could not be installed.', error);
+  } finally {
+    pendingBasemapStyle = null;
+  }
+}
+
+function scheduleBasemapInstall() {
+  if (!pendingBasemapStyle || basemapInstallScheduled) return;
+  basemapInstallScheduled = true;
+  setTimeout(installBasemap, 1000);
+}
+
+function runMapUpdate(label, callback) {
+  beginLoading(label, 'filter');
+  callback();
+
+  requestAnimationFrame(() => {
+    requestAnimationFrame(() => {
+      loadingCanFinish = true;
+      finishLoading();
+    });
+  });
 }
 
 function renderMetadata(metadata) {
@@ -262,6 +335,9 @@ function renderMetadata(metadata) {
 
   maxDistanceMeters = metadata.max_distance_m ?? maxDistanceMeters;
   allModesNearCount = nearCount;
+  nearCountModeOrder =
+    metadata.near_count_mode_order ?? Object.keys(MODE_DISTANCE_PROPERTIES);
+  nearCountsByModeSelection = metadata.near_counts_by_mode_selection ?? {};
 
   streetCountEl.textContent = formatInteger(streetCount);
   stationCountEl.textContent = formatInteger(stationCount);
@@ -322,13 +398,15 @@ stationBreakdownEl.addEventListener('click', (event) => {
     activeStationModes.delete(mode);
   }
 
-  syncStationFilters();
-  syncStreetColor();
-  syncNearCount();
+  runMapUpdate('Updating filter', () => {
+    syncStationFilters();
+    syncStreetColor();
+    syncNearCount();
 
-  if (selectedStreetProperties) {
-    showStreetFeature(selectedStreetProperties);
-  }
+    if (selectedStreetProperties) {
+      showStreetFeature(selectedStreetProperties);
+    }
+  });
 });
 
 function metadataBounds(metadata) {
@@ -444,11 +522,17 @@ function installHover() {
     if (!feature) return;
 
     if (hoveredId !== null) {
-      map.setFeatureState({ source: 'streets', id: hoveredId }, { hover: false });
+      map.setFeatureState(
+        { source: 'streets', sourceLayer: 'streets', id: hoveredId },
+        { hover: false },
+      );
     }
 
     hoveredId = feature.id;
-    map.setFeatureState({ source: 'streets', id: hoveredId }, { hover: true });
+    map.setFeatureState(
+      { source: 'streets', sourceLayer: 'streets', id: hoveredId },
+      { hover: true },
+    );
 
     showStreetFeature(feature.properties);
     map.getCanvas().style.cursor = 'pointer';
@@ -456,7 +540,10 @@ function installHover() {
 
   map.on('mouseleave', 'street-proximity', () => {
     if (hoveredId !== null) {
-      map.setFeatureState({ source: 'streets', id: hoveredId }, { hover: false });
+      map.setFeatureState(
+        { source: 'streets', sourceLayer: 'streets', id: hoveredId },
+        { hover: false },
+      );
     }
     hoveredId = null;
     map.getCanvas().style.cursor = '';
@@ -489,23 +576,29 @@ function installHover() {
 
 async function initialize() {
   try {
-    const [streets, streetModeDistanceData, stations, metadata] = await Promise.all([
-      fetchJson(DATASETS.streets),
-      fetchJson(DATASETS.streetModeDistances),
+    const [stations, metadata, basemapStyle] = await Promise.all([
       fetchJson(DATASETS.stations),
       fetchJson(DATASETS.metadata),
+      fetchJson(DATASETS.basemapStyle),
     ]);
+    pendingBasemapStyle = basemapStyle;
+    window.__transitPerformance.dataFetchedMs =
+      performance.now() - window.__transitPerformance.startedAt;
 
-    attachStreetModeDistances(streets, streetModeDistanceData);
     renderMetadata(metadata);
     applyMapBounds(metadata);
 
     const labelLayerId = firstSymbolLayerId();
+    const streetTilesUrl = new URL(
+      metadata.street_tiles_file ?? DATASETS.streetTiles,
+      window.location.href,
+    ).href;
 
     map.addSource('streets', {
-      type: 'geojson',
-      data: streets,
-      generateId: true,
+      type: 'vector',
+      url: `pmtiles://${streetTilesUrl}`,
+      attribution: '© OpenStreetMap contributors',
+      promoteId: 'i',
     });
 
     map.addSource('stations', {
@@ -519,6 +612,7 @@ async function initialize() {
         id: 'street-proximity',
         type: 'line',
         source: 'streets',
+        'source-layer': 'streets',
         paint: {
           'line-color': streetColorExpression(),
           'line-width': [
@@ -620,24 +714,68 @@ async function initialize() {
     installHover();
     syncStationFilters();
     syncStationVisibility();
-    updateStatus('Ready');
+    loadingCanFinish = true;
   } catch (error) {
     console.error(error);
-    updateStatus('Data missing', true);
+    loadingOperation = null;
+    updateStatus('Data missing', { isError: true });
+    mapLoadingLabelEl.textContent = 'Map data could not be loaded';
+    mapEl.setAttribute('aria-busy', 'false');
     featureSummaryEl.textContent = 'Run npm run build:data:cdmx, then refresh.';
   }
 }
 
 streetToggle.addEventListener('change', () => {
-  setLayerVisibility('street-proximity', streetToggle.checked);
+  runMapUpdate('Updating layers', () => {
+    setLayerVisibility('street-proximity', streetToggle.checked);
+  });
 });
 
 stationToggle.addEventListener('change', () => {
-  syncStationVisibility();
+  runMapUpdate('Updating layers', syncStationVisibility);
 });
 
 futureStationToggle.addEventListener('change', () => {
-  syncStationVisibility();
+  runMapUpdate('Updating layers', syncStationVisibility);
 });
 
-map.on('load', initialize);
+map.on('sourcedataloading', (event) => {
+  if (event.sourceId !== 'streets' || !initialLoadComplete) return;
+
+  if (!loadingOperation) {
+    streetSourceLoaded = false;
+    beginLoading('Loading area', 'area');
+    loadingCanFinish = true;
+  }
+});
+
+map.on('sourcedata', (event) => {
+  if (
+    event.sourceId === 'streets' &&
+    event.isSourceLoaded
+  ) {
+    streetSourceLoaded = true;
+  }
+});
+
+map.on('idle', finishLoading);
+map.on('render', () => {
+  if (
+    window.__transitPerformance.firstStreetRenderMs === null &&
+    map.getLayer('street-proximity') &&
+    map.queryRenderedFeatures({ layers: ['street-proximity'] }).length > 0
+  ) {
+    window.__transitPerformance.firstStreetRenderMs =
+      performance.now() - window.__transitPerformance.startedAt;
+  }
+
+  if (streetSourceLoaded && loadingOperation?.type !== 'filter') {
+    loadingCanFinish = true;
+    finishLoading();
+  }
+});
+map.once('style.load', () => {
+  window.__transitPerformance.styleLoadedMs =
+    performance.now() - window.__transitPerformance.startedAt;
+  initialize();
+});

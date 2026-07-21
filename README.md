@@ -14,8 +14,15 @@ Static POC that overlays CDMX streets with a color gradient based on distance to
 Generate CDMX data:
 
 ```sh
+brew install tippecanoe
+npm install
 npm run build:data:cdmx
 ```
+
+`build:data:cdmx` refreshes the source GeoJSON and then creates the browser-facing
+PMTiles archive. To rebuild only the archive from existing source data, run
+`npm run build:tiles:cdmx`. Pinned browser libraries and the local OpenFreeMap
+style snapshot can be refreshed with `npm run build:vendor`.
 
 Serve the static site:
 
@@ -64,9 +71,35 @@ Future/planned status is based on:
 - Narrow network-level overrides for known not-yet-open systems whose OSM tags are incomplete, currently Mexicable Línea 3 and Tren Ligero Texcoco-La Paz
 
 Street color is computed from the nearest selected open-station mode and clamped to
-`0-5000m`. Per-mode distances live in the compact companion file
-`data/cdmx-street-mode-distances.json`, allowing the map gradient to update without
-reloading the street geometry.
+`0-5000m`. The source per-mode distances live in
+`data/cdmx-street-mode-distances.json`; the browser reads those values from
+`data/cdmx-streets.pmtiles` in 50m display increments. The archive uses a road-class
+zoom hierarchy so overview maps load major roads first and add local streets as the
+user zooms in.
+
+## Performance
+
+The original page blocked on 111MB of JSON, expanded seven distance arrays into
+420,348 street features on the main thread, and rescanned every feature after each
+mode filter change, making both startup and repeated filtering scale with the full
+citywide dataset.
+
+The optimized path:
+
+- requests only visible byte ranges from a PMTiles vector archive;
+- precomputes all 128 station-mode count combinations for constant-time filter counts;
+- initializes the transit overlay as soon as the map style shell is ready, then adds
+  the full basemap progressively;
+- serves pinned MapLibre/PMTiles assets locally and uses a range- and gzip-capable
+  development server;
+- shows an accessible loading badge and map spinner until the relevant street tiles
+  have rendered on initial load and area changes.
+
+Cold-cache headless Chrome checks with software WebGL on July 21, 2026 completed in:
+
+- initial interactive street render: 518-627ms end to end;
+- station-mode filter update: 19-71ms;
+- uncached zoom/area update: 18-69ms.
 
 ## Deployment
 

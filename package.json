@@ -4,8 +4,14 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "build:data:cdmx": "node scripts/build-cdmx-data.mjs",
-    "dev": "python3 -m http.server 5173",
-    "check": "node --check scripts/build-cdmx-data.mjs && node --check app.js"
+    "build:vendor": "node scripts/copy-vendor-assets.mjs",
+    "build:data:cdmx": "node scripts/build-cdmx-data.mjs && node scripts/build-cdmx-tiles.mjs",
+    "build:tiles:cdmx": "node scripts/build-cdmx-tiles.mjs",
+    "dev": "node scripts/serve.mjs",
+    "check": "node --check scripts/build-cdmx-data.mjs && node --check scripts/build-cdmx-tiles.mjs && node --check scripts/copy-vendor-assets.mjs && node --check scripts/serve.mjs && node --check app.js"
+  },
+  "devDependencies": {
+    "maplibre-gl": "5.13.0",
+    "pmtiles": "4.4.1"
   }
 }

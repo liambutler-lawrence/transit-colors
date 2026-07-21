@@ -40,6 +40,46 @@ body {
   inset: 0;
 }
 
+.map-loading {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  z-index: 3;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 38px;
+  padding: 9px 13px;
+  transform: translateX(-50%);
+  border: 1px solid rgba(216, 221, 229, 0.94);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.96);
+  box-shadow: 0 8px 24px rgba(24, 34, 44, 0.16);
+  color: #1d4f49;
+  font-size: 0.8rem;
+  font-weight: 800;
+  pointer-events: none;
+}
+
+.map-loading[hidden] {
+  display: none;
+}
+
+.loading-spinner {
+  width: 14px;
+  height: 14px;
+  border: 2px solid rgba(20, 123, 111, 0.22);
+  border-top-color: #147b6f;
+  border-radius: 50%;
+  animation: loading-spin 700ms linear infinite;
+}
+
+@keyframes loading-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
 .panel {
   position: absolute;
   top: 24px;
@@ -86,6 +126,23 @@ h1 {
   font-weight: 800;
   text-align: center;
   white-space: nowrap;
+}
+
+.status.loading::before {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  margin-right: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: loading-pulse 800ms ease-in-out infinite alternate;
+  content: "";
+}
+
+@keyframes loading-pulse {
+  to {
+    opacity: 0.32;
+  }
 }
 
 .status.error {
@@ -279,6 +336,10 @@ h1 {
 }
 
 @media (max-width: 680px) {
+  .map-loading {
+    top: 12px;
+  }
+
   .panel {
     top: auto;
     right: 12px;
