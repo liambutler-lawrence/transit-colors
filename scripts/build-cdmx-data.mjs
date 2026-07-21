@@ -2,7 +2,10 @@ import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-const __dirname = dirname(fileURLToPath(import.meta.url));
+import { CURATED_CDMX_STATIONS, OFFICIAL_SOURCES } from './cdmx-curated-stations.mjs';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
 const rootDir = resolve(__dirname, '..');
 const dataDir = resolve(rootDir, 'data');
 const cacheDir = resolve(
@@ -83,12 +86,22 @@ const BRT_QUERY_PATTERN = [
   'trolebús linea 11',
   'trolebus línea 11',
   'trolebús línea 11',
+  'trolebus linea 12',
+  'trolebús linea 12',
+  'trolebus línea 12',
+  'trolebús línea 12',
   'linea 10',
   'línea 10',
   'linea 11',
   'línea 11',
+  'linea 12',
+  'línea 12',
   'chalco',
   'santa marta',
+  'avenida aztecas',
+  'tasqueña',
+  'taxqueña',
+  'perisur',
 ].join('|');
 const BRT_OPERATOR_QUERY_PATTERN = [
   'metrobus',
@@ -111,6 +124,13 @@ const MODE_LABELS = {
 };
 const MODE_KEYS = Object.keys(MODE_LABELS);
 const OVER_RANGE_DISTANCE_M = MAX_DISTANCE_M + 1;
+const CURATED_REPLACEMENT_DISTANCE_M = 3000;
+
+const FALSE_POSITIVE_NAME_PATTERNS = [
+  /^plaza maguey$/,
+  /(?:transportes?|servicios) urbanos y suburbanos xinantecatl/,
+  /transporte colectivo urbano y suburbano de pasajeros en autobuses de ruta fija/,
+];
 
 const FUTURE_NETWORK_RULES = [
   {
@@ -345,12 +365,33 @@ function transitContextForTags(tags = {}) {
     .join(' ');
 }
 
+function transitProviderContextForTags(tags = {}) {
+  return [
+    tags.network,
+    tags.operator,
+    tags.brand,
+    tags['network:short'],
+    tags['operator:short'],
+  ]
+    .map((value) => normalizeTag(value))
+    .filter(Boolean)
+    .join(' ');
+}
+
+function isKnownFalsePositiveTags(tags = {}) {
+  const name = normalizeTag(tags.name);
+  return FALSE_POSITIVE_NAME_PATTERNS.some((pattern) => pattern.test(name));
+}
+
 function isBrtTrolleybus(tags = {}, transitContext = transitContextForTags(tags)) {
   const trolleybus = normalizeTag(tags.trolleybus);
+  const route = normalizeTag(tags.route);
   const hasTrolleybusContext =
-    trolleybus === 'yes' || /trolebus|trolebus elevado/.test(transitContext);
+    trolleybus === 'yes' ||
+    route === 'trolleybus' ||
+    /trolebus|trolebus elevado/.test(transitContext);
   const hasBrtCorridorContext =
-    /trolebus elevado|linea\s*10|linea\s*11|\bl10\b|\bl11\b|chalco|santa marta|teotongo|\bxico\b/.test(
+    /trolebus elevado|linea\s*(?:10|11|12)|\bl(?:10|11|12)\b|chalco|santa marta|teotongo|\bxico\b|avenida aztecas|tasquena|taxquena|perisur/.test(
       transitContext,
     );
 
@@ -362,6 +403,7 @@ function classifyStation(tags = {}) {
   const railway = normalizeTag(tags.railway);
   const operator = normalizeTag(tags.operator);
   const transitContext = transitContextForTags(tags);
+  const providerContext = transitProviderContextForTags(tags);
 
   if (
     station === 'subway' ||
@@ -387,7 +429,13 @@ function classifyStation(tags = {}) {
     return { keep: true, mode: 'brt', system: MODE_LABELS.brt };
   }
 
-  if (/fc suburbano|suburbano/.test(transitContext)) {
+  const isRailStop = /^(station|halt|stop)$/.test(railway);
+  if (
+    /\bsuburbano\b|ferrocarriles suburbanos|tren felipe angeles/.test(
+      providerContext,
+    ) ||
+    (isRailStop && /fc suburbano|tren suburbano|tren felipe angeles/.test(transitContext))
+  ) {
     return {
       keep: true,
       mode: 'commuter_rail',
@@ -877,6 +925,11 @@ function buildStationFeatures(elements, routeContexts = new Map()) {
     const tags = stationTagsForElement(element, routeContexts);
     const publicTransport = normalizeTag(tags.public_transport);
 
+    if (isKnownFalsePositiveTags(tags)) {
+      excluded.push(element);
+      continue;
+    }
+
     if (!isStationLikeTags(tags) && !routeContexts.has(elementKey)) {
       excluded.push(element);
       continue;
@@ -946,6 +999,81 @@ function buildStationFeatures(elements, routeContexts = new Map()) {
     `Excluded ${excluded.length.toLocaleString()} generic bus/terminal station elements.`,
   );
   return [...deduped.values()];
+}
+
+function coordinateDistanceMeters(first, second) {
+  const centerLat = ((first[1] + second[1]) / 2) * (Math.PI / 180);
+  const dx = (first[0] - second[0]) * 111_320 * Math.cos(centerLat);
+  const dy = (first[1] - second[1]) * 111_320;
+  return Math.hypot(dx, dy);
+}
+
+function curatedStationFeature(station) {
+  return {
+    type: 'Feature',
+    geometry: {
+      type: 'Point',
+      coordinates: station.coordinates.map(roundCoordinate),
+    },
+    properties: {
+      id: station.id,
+      osm_type: '',
+      osm_id: null,
+      name: station.name,
+      mode: station.mode,
+      system: station.system,
+      status: 'open',
+      status_detail: 'Open',
+      status_source: 'Official operator source',
+      network: station.network,
+      operator: station.operator,
+      opening_date: station.opening_date ?? '',
+      station: station.mode === 'commuter_rail' ? 'train' : '',
+      railway: station.mode === 'commuter_rail' ? 'station' : '',
+      amenity: '',
+      public_transport: 'station',
+      highway: station.mode === 'brt' ? 'bus_stop' : '',
+      bus: station.mode === 'brt' ? 'yes' : '',
+      trolleybus: station.mode === 'brt' ? 'yes' : '',
+      brand: station.network,
+      ref: '',
+      local_ref: '',
+      route_ref: station.route_ref,
+      route_name: station.route_name,
+      route_relation: '',
+      source: station.source,
+      source_url: station.source_url,
+    },
+  };
+}
+
+function reconcileStationFeatures(features) {
+  const curatedFeatures = CURATED_CDMX_STATIONS.map(curatedStationFeature);
+  const retainedFeatures = features.filter((feature) => {
+    const properties = feature.properties ?? {};
+    if (String(properties.id ?? '').startsWith('official/')) return false;
+    if (isKnownFalsePositiveTags(properties)) return false;
+
+    const normalizedName = normalizeTag(properties.name);
+    const routeRefs = new Set(
+      String(properties.route_ref ?? '')
+        .split(';')
+        .map((value) => normalizeTag(value)),
+    );
+    return !curatedFeatures.some(
+      (curated) =>
+        curated.properties.mode === properties.mode &&
+        (normalizeTag(curated.properties.name) === normalizedName ||
+          (properties.mode === 'brt' &&
+            routeRefs.has(normalizeTag(curated.properties.route_ref)))) &&
+        coordinateDistanceMeters(
+          curated.geometry.coordinates,
+          feature.geometry.coordinates,
+        ) <= CURATED_REPLACEMENT_DISTANCE_M,
+    );
+  });
+
+  return [...retainedFeatures, ...curatedFeatures];
 }
 
 function lineCoordinates(element) {
@@ -1096,9 +1224,11 @@ async function main() {
   );
   const routeContexts = routeMemberContexts(routeElements);
 
-  const stationFeatures = buildStationFeatures(
-    [...stationElements, ...routeElements],
-    routeContexts,
+  const stationFeatures = reconcileStationFeatures(
+    buildStationFeatures(
+      [...stationElements, ...routeElements],
+      routeContexts,
+    ),
   );
   console.log(`Built ${stationFeatures.length.toLocaleString()} station features.`);
   const dataBounds = roundedBounds(stationBounds(stationFeatures));
@@ -1173,6 +1303,7 @@ async function main() {
     sources: [
       'OpenStreetMap contributors',
       'Overpass API',
+      ...Object.values(OFFICIAL_SOURCES),
     ],
   };
 
@@ -1204,7 +1335,23 @@ async function main() {
   console.log('Wrote data/cdmx-metadata.json');
 }
 
-main().catch((error) => {
-  console.error(error);
-  process.exitCode = 1;
-});
+if (process.argv[1] === __filename) {
+  main().catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  });
+}
+
+export {
+  buildStationFeatures,
+  buildStreetFeatures,
+  classifyStation,
+  featureCollection,
+  histogram,
+  isKnownFalsePositiveTags,
+  MODE_KEYS,
+  propertyCounts,
+  reconcileStationFeatures,
+  setProjectionCenter,
+  writeJson,
+};

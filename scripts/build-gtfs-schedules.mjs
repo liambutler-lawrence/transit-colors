@@ -138,7 +138,7 @@ function namesMatch(first, second) {
 
 function routeMode(route) {
   if (route.agency_id === 'TROLE') {
-    return /^(10|11|13)$/.test(route.route_short_name) ? 'brt' : null;
+    return /^(10|11|12|13)$/.test(route.route_short_name) ? 'brt' : null;
   }
   return AGENCY_MODES[route.agency_id] ?? null;
 }

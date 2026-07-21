@@ -247,6 +247,7 @@ const filterableOpenStationLayers = [
 const futureStationLayers = ['station-points-future', 'station-labels-future'];
 const activeStationModes = new Set();
 const allStationModes = new Set();
+const futureStationModes = new Set();
 let maxDistanceMeters = 5000;
 let streetAccessStationIds = [];
 let futureStreetAccessStationIds = [];
@@ -401,8 +402,10 @@ function timeStreetColor(transitTimes, scaleMinutes) {
     distanceProperties,
     accessProperties,
     stationIds,
+    availableModes = null,
   ) => {
     for (const mode of activeStationModes) {
+      if (availableModes && !availableModes.has(mode)) continue;
       const distanceProperty = distanceProperties[mode];
       const accessProperty = accessProperties[mode];
       if (!distanceProperty || !accessProperty) continue;
@@ -443,6 +446,7 @@ function timeStreetColor(transitTimes, scaleMinutes) {
         FUTURE_MODE_DISTANCE_PROPERTIES,
         FUTURE_MODE_ACCESS_PROPERTIES,
         futureStreetAccessStationIds,
+        futureStationModes,
       );
     }
   }
@@ -555,6 +559,7 @@ function streetDistanceExpression() {
   if (futureStationToggle.checked) {
     distanceProperties.push(
       ...[...activeStationModes]
+        .filter((mode) => futureStationModes.has(mode))
         .map((mode) => FUTURE_MODE_DISTANCE_PROPERTIES[mode])
         .filter(Boolean),
     );
@@ -628,6 +633,7 @@ function streetDistanceFromProperties(properties) {
   if (futureStationToggle.checked) {
     distanceProperties.push(
       ...[...activeStationModes]
+        .filter((mode) => futureStationModes.has(mode))
         .map((mode) => FUTURE_MODE_DISTANCE_PROPERTIES[mode])
         .filter(Boolean),
     );
@@ -658,8 +664,14 @@ function streetAccessCandidates(properties) {
     }
   }
 
-  const appendCandidates = (distanceProperties, accessProperties, stationIds) => {
+  const appendCandidates = (
+    distanceProperties,
+    accessProperties,
+    stationIds,
+    availableModes = null,
+  ) => {
     for (const mode of activeStationModes) {
+      if (availableModes && !availableModes.has(mode)) continue;
       const distanceMeters = Number(properties[distanceProperties[mode]]);
       const stationIndex = Number(properties[accessProperties[mode]]);
       const stationId = stationIds[stationIndex];
@@ -679,6 +691,7 @@ function streetAccessCandidates(properties) {
         FUTURE_MODE_DISTANCE_PROPERTIES,
         FUTURE_MODE_ACCESS_PROPERTIES,
         futureStreetAccessStationIds,
+        futureStationModes,
       );
     }
   }
@@ -911,9 +924,13 @@ function renderMetadata(metadata) {
 
   activeStationModes.clear();
   allStationModes.clear();
+  futureStationModes.clear();
   for (const [mode] of sortedStationModes) {
     activeStationModes.add(mode);
     allStationModes.add(mode);
+  }
+  for (const [mode, count] of Object.entries(metadata.station_modes_future ?? {})) {
+    if (count > 0) futureStationModes.add(mode);
   }
 
   stationBreakdownEl.replaceChildren(
@@ -1257,6 +1274,7 @@ function showStreetFeature(props) {
 
     if (futureStationToggle.checked) {
       for (const mode of activeStationModes) {
+        if (!futureStationModes.has(mode)) continue;
         const value = Number(props[FUTURE_MODE_DISTANCE_PROPERTIES[mode]]);
         if (Number.isFinite(value)) distance = Math.min(distance, value);
       }

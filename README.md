@@ -17,7 +17,8 @@ collapsed so the map retains nearly the full screen until controls are needed.
 
 - Map renderer: MapLibre GL JS
 - Basemap: OpenFreeMap
-- Source data: OpenStreetMap via Overpass API and the official SEMOVI GTFS feed
+- Source data: OpenStreetMap via Overpass API, official AIFA/STE station maps,
+  and the official SEMOVI GTFS feed
 - Hosting target: GitHub Pages
 
 ## Local Development
@@ -78,7 +79,7 @@ The builder then keeps rapid-transit systems only:
 
 Generic local bus terminals, route bases, airport/long-distance bus terminals, and CETRAM-only records are excluded unless their network/operator identifies one of the rapid-transit systems above.
 
-Stations are fetched from OpenStreetMap records inside the Ciudad de México and Estado de México administrative areas. Street data is then fetched from the minimum bbox around the kept stations, padded by 5km.
+Stations are fetched from OpenStreetMap records inside the Ciudad de México and Estado de México administrative areas. Source-backed supplements cover the newly opened Tren Felipe Ángeles branch to AIFA and the fixed-station Trolebús Lines 10–12; these also replace stale OSM copies near the official coordinates. Street data is then fetched from the minimum bbox around the kept stations, padded by 5km.
 
 BRT stops can also inherit network metadata from matching OSM route relations when the stop/platform element itself is missing `network` or `operator` tags.
 
@@ -149,7 +150,7 @@ Downloaded GTFS archives are cached in `data/.gtfs-cache/`. Set `REFRESH_GTFS_CA
 
 `data/cdmx-street-access.json` stores the nearest-station index for every street. It is generated alongside the other data by `npm run build:data:cdmx`; `npm run build:data:access` can regenerate only this sidecar from the checked-in station and street files.
 
-`data/cdmx-schedules.json` is generated from the [official CDMX GTFS dataset](https://datos.cdmx.gob.mx/tr/dataset/gtfs). The checked-in snapshot was matched to 765 of 1,001 open OSM station records. It covers Metro, Metrobús, Tren Ligero, Cablebús, Tren Suburbano, Tren Interurbano, and the elevated Trolebús corridors present in that feed. Unmatched records, including systems outside the feed, use a clearly labeled four-minute boarding-wait estimate.
+`data/cdmx-schedules.json` is generated from the [official CDMX GTFS dataset](https://datos.cdmx.gob.mx/tr/dataset/gtfs). The checked-in snapshot was matched to 806 of 1,051 open station records. It covers Metro, Metrobús, Tren Ligero, Cablebús, Tren Suburbano, Tren Interurbano, and the BRT-style Trolebús corridors present in that feed. Unmatched records, including systems outside the feed, use a clearly labeled four-minute boarding-wait estimate.
 
 For a selected weekday and time, the app uses the GTFS frequency windows at each matched stop. During service, expected wait is half the published headway; outside service, the calculation waits until the next weekly service window. Overnight times above 24:00 are supported. Because the current feed's absolute calendar end dates are stale for most services, the builder deliberately uses its recurring weekday flags and does not claim date-specific exceptions.
 
