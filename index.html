@@ -3,7 +3,7 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Transit Colors CDMX</title>
+    <title>Transit Colors</title>
     <link rel="preconnect" href="https://tiles.openfreemap.org" />
     <link rel="preconnect" href="https://unpkg.com" />
     <link href="https://unpkg.com/maplibre-gl/dist/maplibre-gl.css" rel="stylesheet" />
@@ -11,12 +11,18 @@
   </head>
   <body>
     <main class="app-shell">
-      <div id="map" aria-label="CDMX transit proximity map"></div>
+      <div id="map" aria-label="Transit proximity map"></div>
 
       <section class="panel" aria-label="Map details">
         <div class="panel-header">
           <div>
-            <p class="kicker">CDMX</p>
+            <label class="area-control" for="metro-area">
+              <span>Metro area</span>
+              <select id="metro-area">
+                <option value="cdmx">Mexico City</option>
+                <option value="nyc">NYC metro area</option>
+              </select>
+            </label>
             <h1>Transit Street Gradient</h1>
           </div>
           <span id="status" class="status">Loading</span>
