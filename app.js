@@ -80,6 +80,26 @@ const MODE_DISTANCE_PROPERTIES = {
 const pmtilesProtocol = new pmtiles.Protocol();
 maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile);
 
+const appShellEl = document.querySelector('.app-shell');
+const panelToggleButton = document.querySelector('#toggle-panel');
+const panelToggleLabelEl = panelToggleButton.querySelector('.panel-toggle-label');
+const compactPanelQuery = window.matchMedia('(max-width: 680px)');
+let panelCollapsePreference = null;
+let panelCollapsed = compactPanelQuery.matches;
+
+function renderPanelState() {
+  appShellEl.classList.toggle('panel-collapsed', panelCollapsed);
+  panelToggleButton.setAttribute('aria-expanded', String(!panelCollapsed));
+  panelToggleButton.setAttribute(
+    'aria-label',
+    panelCollapsed ? 'Show controls' : 'Hide controls',
+  );
+  panelToggleButton.title = panelCollapsed ? 'Show controls' : 'Hide controls';
+  panelToggleLabelEl.textContent = panelCollapsed ? 'Show controls' : 'Hide controls';
+}
+
+renderPanelState();
+
 const map = new maplibregl.Map({
   container: 'map',
   style: 'vendor/openfreemap-shell.json',
@@ -130,6 +150,27 @@ const streetToggle = document.querySelector('#toggle-streets');
 const stationToggle = document.querySelector('#toggle-stations');
 const futureStationToggle = document.querySelector('#toggle-future-stations');
 const areaSelect = document.querySelector('#metro-area');
+
+function setPanelCollapsed(nextCollapsed, { remember = true } = {}) {
+  panelCollapsed = nextCollapsed;
+  if (remember) panelCollapsePreference = nextCollapsed;
+  renderPanelState();
+}
+
+panelToggleButton.addEventListener('click', () => {
+  setPanelCollapsed(!panelCollapsed);
+});
+
+compactPanelQuery.addEventListener('change', (event) => {
+  if (panelCollapsePreference === null) {
+    setPanelCollapsed(event.matches, { remember: false });
+  }
+});
+
+new ResizeObserver(() => {
+  map.resize();
+  if (map.loaded()) updateViewportStatistics();
+}).observe(mapEl);
 
 let activeAreaKey = initialAreaKey;
 let loadSequence = 0;
@@ -859,17 +900,12 @@ function applyMapBounds(metadata) {
   const bounds = metadataBounds(metadata);
   if (!bounds) return;
 
-  const leftPadding = window.innerWidth >= 760 ? 360 : 48;
+  const padding = compactPanelQuery.matches ? 24 : 48;
 
   map.setMaxBounds(null);
   map.setMaxBounds(bounds);
   map.fitBounds(bounds, {
-    padding: {
-      top: 48,
-      right: 48,
-      bottom: 48,
-      left: leftPadding,
-    },
+    padding,
     duration: 0,
   });
 }

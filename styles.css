@@ -28,29 +28,37 @@ body {
 }
 
 .app-shell {
-  position: relative;
+  display: grid;
+  grid-template-areas: "panel map";
+  grid-template-columns: minmax(320px, 380px) minmax(0, 1fr);
   width: 100%;
   height: 100%;
   min-height: 100dvh;
   overflow: hidden;
+  transition: grid-template-columns 180ms ease;
+}
+
+.app-shell.panel-collapsed {
+  grid-template-columns: 60px minmax(0, 1fr);
 }
 
 #map {
-  position: absolute;
-  inset: 0;
+  grid-area: map;
+  min-width: 0;
+  min-height: 0;
 }
 
 .map-loading {
-  position: absolute;
-  top: 24px;
-  left: 50%;
+  grid-area: map;
+  align-self: start;
+  justify-self: center;
   z-index: 3;
   display: flex;
   align-items: center;
   gap: 9px;
   min-height: 38px;
+  margin-top: 24px;
   padding: 9px 13px;
-  transform: translateX(-50%);
   border: 1px solid rgba(216, 221, 229, 0.94);
   border-radius: 999px;
   background: rgba(255, 255, 255, 0.96);
@@ -81,19 +89,17 @@ body {
 }
 
 .panel {
-  position: absolute;
-  top: 24px;
-  left: 24px;
+  grid-area: panel;
   z-index: 2;
-  width: min(380px, calc(100vw - 48px));
-  max-height: calc(100dvh - 48px);
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
   padding: 18px;
-  border: 1px solid rgba(216, 221, 229, 0.92);
-  border-radius: 8px;
-  background: rgba(255, 255, 255, 0.94);
-  box-shadow: var(--shadow);
-  backdrop-filter: blur(16px);
-  overflow-y: auto;
+  border-right: 1px solid rgba(216, 221, 229, 0.92);
+  background: rgba(255, 255, 255, 0.97);
+  box-shadow: 8px 0 28px rgba(24, 34, 44, 0.12);
+  overflow: hidden;
 }
 
 .panel-header {
@@ -101,6 +107,83 @@ body {
   align-items: flex-start;
   justify-content: space-between;
   gap: 16px;
+}
+
+.panel-heading {
+  min-width: 0;
+}
+
+.panel-actions {
+  display: flex;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 8px;
+}
+
+.panel-toggle {
+  appearance: none;
+  display: grid;
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  color: var(--ink);
+  cursor: pointer;
+}
+
+.panel-toggle:hover {
+  border-color: #aeb7c3;
+  background: #f8fafb;
+}
+
+.panel-toggle:focus-visible {
+  outline: 3px solid rgba(20, 123, 111, 0.28);
+  outline-offset: 2px;
+}
+
+.panel-toggle svg {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 2;
+  transition: transform 180ms ease;
+}
+
+.panel-toggle-label {
+  display: none;
+}
+
+.panel-content {
+  min-height: 0;
+  padding-right: 2px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
+.app-shell.panel-collapsed .panel {
+  padding: 12px;
+}
+
+.app-shell.panel-collapsed .panel-header {
+  justify-content: center;
+}
+
+.app-shell.panel-collapsed .panel-heading,
+.app-shell.panel-collapsed .status,
+.app-shell.panel-collapsed .panel-content {
+  display: none;
+}
+
+.app-shell.panel-collapsed .panel-toggle svg {
+  transform: rotate(180deg);
 }
 
 .area-control {
@@ -493,19 +576,59 @@ h1 {
 }
 
 @media (max-width: 680px) {
+  .app-shell,
+  .app-shell.panel-collapsed {
+    grid-template-areas:
+      "map"
+      "panel";
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .app-shell {
+    grid-template-rows: minmax(180px, 1fr) auto;
+    transition: grid-template-rows 180ms ease;
+  }
+
+  .app-shell.panel-collapsed {
+    grid-template-rows: minmax(0, 1fr) 60px;
+  }
+
   .map-loading {
-    top: 12px;
+    margin-top: 12px;
   }
 
   .panel {
-    top: auto;
-    right: 12px;
-    bottom: 12px;
-    left: 12px;
-    width: auto;
+    max-height: min(52dvh, 480px);
     padding: 14px;
-    max-height: calc(100dvh - 24px);
-    overflow-y: auto;
+    border-top: 1px solid rgba(216, 221, 229, 0.92);
+    border-right: 0;
+    box-shadow: 0 -8px 28px rgba(24, 34, 44, 0.12);
+  }
+
+  .app-shell.panel-collapsed .panel {
+    height: 60px;
+    padding: 12px;
+  }
+
+  .panel-toggle svg {
+    transform: rotate(-90deg);
+  }
+
+  .app-shell.panel-collapsed .panel-toggle svg {
+    transform: rotate(90deg);
+  }
+
+  .app-shell.panel-collapsed .panel-toggle {
+    width: auto;
+    padding: 0 12px;
+    gap: 6px;
+  }
+
+  .app-shell.panel-collapsed .panel-toggle-label {
+    display: inline;
+    font: inherit;
+    font-size: 0.82rem;
+    font-weight: 800;
   }
 
   .metric-grid {
@@ -514,5 +637,12 @@ h1 {
 
   .selection {
     min-height: 64px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .app-shell,
+  .panel-toggle svg {
+    transition: none;
   }
 }

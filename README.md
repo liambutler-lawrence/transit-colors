@@ -9,6 +9,10 @@ Choose a destination from the panel or click an open station on the map. Set a w
 
 The destination view's time scale is configurable. Set the green-to-yellow transition in minutes; the orange and red transitions follow at 2× and 4× that value.
 
+The control panel occupies its own responsive pane instead of covering the map. It
+can be collapsed into a narrow desktop rail or a compact mobile bar; mobile starts
+collapsed so the map retains nearly the full screen until controls are needed.
+
 ## Stack
 
 - Map renderer: MapLibre GL JS
