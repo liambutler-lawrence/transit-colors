@@ -85,6 +85,7 @@ const map = new maplibregl.Map({
   style: 'vendor/openfreemap-shell.json',
   center: AREAS[initialAreaKey].center,
   zoom: AREAS[initialAreaKey].zoom,
+  maxZoom: 17,
 });
 window.__transitMap = map;
 
@@ -135,6 +136,8 @@ let loadSequence = 0;
 let loadedStations = { type: 'FeatureCollection', features: [] };
 let liveStreetRefreshTimer = null;
 let liveStreetRefreshSequence = 0;
+let liveStreetRefreshInFlight = false;
+let liveStreetRefreshPending = false;
 
 const LIVE_ROAD_CLASSES = new Set([
   'motorway',
@@ -451,6 +454,10 @@ function activeStreetLayerId() {
     : 'street-proximity';
 }
 
+function activeStreetSourceId() {
+  return AREAS[activeAreaKey].liveRoads ? 'live-streets' : 'streets';
+}
+
 function syncStreetColor() {
   const layerId = activeStreetLayerId();
   if (map.getLayer(layerId)) {
@@ -489,7 +496,15 @@ function streetDistanceFromProperties(properties) {
 
 function visibleTiledStreets() {
   const layerId = activeStreetLayerId();
-  if (!streetToggle.checked || !map.getLayer(layerId)) return [];
+  const sourceId = activeStreetSourceId();
+  if (
+    !streetToggle.checked ||
+    !map.getLayer(layerId) ||
+    !map.getSource(sourceId) ||
+    !map.isSourceLoaded(sourceId)
+  ) {
+    return [];
+  }
 
   const byId = new Map();
   for (const feature of map.queryRenderedFeatures({ layers: [layerId] })) {
@@ -499,7 +514,7 @@ function visibleTiledStreets() {
   return [...byId.values()];
 }
 
-function updateViewportStatistics() {
+function updateViewportStatistics(tiledStreets = null) {
   const bounds = map.getBounds();
   const timeStops = timeScaleStops(state.timeScaleMinutes);
   const timeMode = state.destination && state.transitTimes;
@@ -522,7 +537,17 @@ function updateViewportStatistics() {
   }
   stationCountEl.textContent = formatInteger(visibleStationCount);
 
-  const streets = visibleTiledStreets();
+  const sourceId = activeStreetSourceId();
+  if (
+    streetToggle.checked &&
+    (!map.getSource(sourceId) || !map.isSourceLoaded(sourceId))
+  ) {
+    streetCountEl.textContent = '--';
+    nearCountEl.textContent = '--';
+    return;
+  }
+
+  const streets = tiledStreets ?? visibleTiledStreets();
   let nearCount = 0;
   for (const properties of streets) {
     const isNear = timeMode
@@ -1238,37 +1263,51 @@ async function refreshLiveStreetData(refreshSequence, areaSequence) {
     return;
   }
 
-  const roadFeatures = loadedLiveRoads();
-  if (roadFeatures.length === 0) return;
-
-  const activeStations = activeStationCollection().features;
-  updateStatus('Indexing streets');
-
-  if (activeStations.length > 0) {
-    await assignNearestStations(roadFeatures, activeStations);
-  } else {
-    for (const feature of roadFeatures) {
-      feature.properties.d = maxDistanceMeters;
-      feature.properties.s = '';
-    }
-  }
-
-  if (
-    refreshSequence !== liveStreetRefreshSequence ||
-    areaSequence !== loadSequence ||
-    !AREAS[activeAreaKey].liveRoads
-  ) {
+  if (liveStreetRefreshInFlight) {
+    liveStreetRefreshPending = true;
     return;
   }
 
-  map.getSource('live-streets').setData({
-    type: 'FeatureCollection',
-    features: roadFeatures,
-  });
-  syncStreetColor();
-  syncStreetVisibility();
-  updateViewportStatistics();
-  updateStatus(state.destination ? 'Destination set' : 'Ready');
+  liveStreetRefreshInFlight = true;
+  try {
+    const roadFeatures = loadedLiveRoads();
+    if (roadFeatures.length === 0) return;
+
+    const activeStations = activeStationCollection().features;
+    updateStatus('Indexing streets');
+
+    if (activeStations.length > 0) {
+      await assignNearestStations(roadFeatures, activeStations);
+    } else {
+      for (const feature of roadFeatures) {
+        feature.properties.d = maxDistanceMeters;
+        feature.properties.s = '';
+      }
+    }
+
+    if (
+      refreshSequence !== liveStreetRefreshSequence ||
+      areaSequence !== loadSequence ||
+      !AREAS[activeAreaKey].liveRoads
+    ) {
+      return;
+    }
+
+    map.getSource('live-streets').setData({
+      type: 'FeatureCollection',
+      features: roadFeatures,
+    });
+    syncStreetColor();
+    syncStreetVisibility();
+    updateViewportStatistics();
+    updateStatus(state.destination ? 'Destination set' : 'Ready');
+  } finally {
+    liveStreetRefreshInFlight = false;
+    if (liveStreetRefreshPending) {
+      liveStreetRefreshPending = false;
+      scheduleLiveStreetRefresh();
+    }
+  }
 }
 
 function scheduleLiveStreetRefresh() {
@@ -1635,21 +1674,14 @@ map.on('sourcedata', (event) => {
 });
 
 map.on('moveend', () => {
-  updateViewportStatistics();
   scheduleLiveStreetRefresh();
 });
 map.on('idle', () => {
-  updateViewportStatistics();
-  if (AREAS[activeAreaKey].liveRoads && loadingOperation?.type !== 'filter') {
-    loadingCanFinish = true;
-    finishLoading();
-  }
-});
-map.on('render', () => {
-  const layerId = activeStreetLayerId();
-  if (!map.getLayer(layerId)) return;
+  const sourceId = activeStreetSourceId();
+  if (!map.getSource(sourceId) || !map.isSourceLoaded(sourceId)) return;
 
-  const renderedStreets = map.queryRenderedFeatures({ layers: [layerId] });
+  const renderedStreets = visibleTiledStreets();
+  updateViewportStatistics(renderedStreets);
   if (
     window.__transitPerformance.firstStreetRenderMs === null &&
     renderedStreets.length > 0
@@ -1659,13 +1691,10 @@ map.on('render', () => {
   }
 
   if (
-    !AREAS[activeAreaKey].liveRoads &&
     loadingOperation?.type !== 'filter' &&
-    renderedStreets.length > 0 &&
-    (streetSourceLoaded || map.isSourceLoaded('streets'))
+    (renderedStreets.length > 0 || !streetToggle.checked)
   ) {
     streetSourceLoaded = true;
-    updateViewportStatistics();
     loadingCanFinish = true;
     finishLoading();
   }
