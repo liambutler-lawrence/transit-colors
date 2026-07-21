@@ -4,6 +4,7 @@ import {
   WALKING_METERS_PER_MINUTE,
   assignNearestStations,
   attachScheduleGraph,
+  bestStreetTravelTime,
   buildTransitGraph,
   calculateTransitTimes,
   distanceMeters,
@@ -117,11 +118,19 @@ const streets = [
 
 await assignNearestStations(streets, stations, {
   batchSize: 1,
+  candidateCount: 5,
   yieldControl: async () => {},
 });
 assert.equal(streets[0].properties.s, 'a');
 assert.ok(streets[0].properties.d < 30);
 assert.equal(streets[0].properties.s2, 'b');
+await assignNearestStations(streets, stations, {
+  batchSize: 1,
+  propertyKey: 'brtAccess',
+  stationFilter: (feature) => feature.properties.mode === 'brt',
+  yieldControl: async () => {},
+});
+assert.equal(streets[0].properties.brtAccess, 'c-brt');
 
 const graph = buildTransitGraph(stations);
 const transitTimes = calculateTransitTimes(graph, 'd', {
@@ -234,5 +243,29 @@ const firstAvenueMinutes = unionSquareTimes.get('gtfs/mta-subway/L06');
 const bedfordMinutes = unionSquareTimes.get('gtfs/mta-subway/L08');
 assert.ok(bedfordMinutes < 15);
 assert.ok(bedfordMinutes - firstAvenueMinutes < 6);
+
+const bestTrip = bestStreetTravelTime(
+  [
+    { stationId: 'a', distanceMeters: 100, mode: 'subway' },
+    { stationId: 'd', distanceMeters: 500, mode: 'brt' },
+  ],
+  new Map([
+    ['a', 30],
+    ['d', 5],
+  ]),
+);
+assert.equal(bestTrip.stationId, 'd');
+assert.equal(bestTrip.mode, 'brt');
+
+const futureStation = station('future', 'Future', 'subway', [-99.1, 19.43], {
+  status: 'construction',
+});
+assert.equal(buildTransitGraph([...stations, futureStation]).nodeById.has('future'), false);
+assert.equal(
+  buildTransitGraph([...stations, futureStation], { includeFuture: true }).nodeById.has(
+    'future',
+  ),
+  true,
+);
 
 console.log('routing tests passed');

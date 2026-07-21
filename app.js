@@ -3,21 +3,21 @@ import {
   WALKING_METERS_PER_MINUTE,
   assignNearestStations,
   attachScheduleGraph,
+  bestStreetTravelTime,
   buildTransitGraph,
   calculateTransitTimes,
   distanceMeters,
   scheduledWaitForService,
   scheduledWaitForStation,
-  streetTravelTime,
   timeScaleStops,
-} from './routing.js?v=20260721c';
+} from './routing.js?v=20260721d';
 
 const AREAS = {
   cdmx: {
     label: 'Mexico City',
     center: [-99.1332, 19.4326],
     zoom: 10.5,
-    streetTiles: 'data/cdmx-streets.pmtiles',
+    streetTiles: 'data/cdmx-streets.pmtiles?v=20260721c',
     stations: 'data/cdmx-stations.geojson',
     metadata: 'data/cdmx-metadata.json',
     schedules: 'data/cdmx-schedules.json',
@@ -122,6 +122,25 @@ const FUTURE_MODE_DISTANCE_PROPERTIES = {
   monorail: 'fm',
 };
 
+const MODE_ACCESS_PROPERTIES = {
+  subway: 'as',
+  brt: 'ab',
+  light_rail: 'al',
+  cable_car: 'ac',
+  commuter_rail: 'at',
+  regional_rail: 'ar',
+  monorail: 'am',
+};
+
+const FUTURE_MODE_ACCESS_PROPERTIES = {
+  subway: 'us',
+  brt: 'ub',
+  light_rail: 'ul',
+  cable_car: 'uc',
+  commuter_rail: 'ut',
+  regional_rail: 'ur',
+  monorail: 'um',
+};
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
 const statusEl = document.querySelector('#status');
@@ -229,6 +248,8 @@ const futureStationLayers = ['station-points-future', 'station-labels-future'];
 const activeStationModes = new Set();
 const allStationModes = new Set();
 let maxDistanceMeters = 5000;
+let streetAccessStationIds = [];
+let futureStreetAccessStationIds = [];
 let selectedStreetProperties = null;
 let streetSourceLoaded = false;
 let pendingBasemapStyle = null;
@@ -356,28 +377,87 @@ function timeStreetColor(transitTimes, scaleMinutes) {
   const stops = timeScaleStops(scaleMinutes);
   const candidateTimes = [];
 
-  for (let candidateIndex = 0; candidateIndex < 5; candidateIndex += 1) {
-    const suffix = candidateIndex === 0 ? '' : String(candidateIndex + 1);
-    const stationTime = ['match', ['get', `s${suffix}`]];
-    for (const [stationId, minutes] of transitTimes) {
-      stationTime.push(stationId, Number(minutes.toFixed(2)));
+  const appendDirectCandidates = () => {
+    for (let candidateIndex = 0; candidateIndex < 5; candidateIndex += 1) {
+      const suffix = candidateIndex === 0 ? '' : String(candidateIndex + 1);
+      const stationTime = ['match', ['get', `s${suffix}`]];
+      for (const [stationId, minutes] of transitTimes) {
+        stationTime.push(stationId, Number(minutes.toFixed(2)));
+      }
+      stationTime.push(90);
+      candidateTimes.push([
+        '+',
+        [
+          '/',
+          ['to-number', ['coalesce', ['get', `d${suffix}`], 7_200]],
+          WALKING_METERS_PER_MINUTE,
+        ],
+        stationTime,
+      ]);
     }
-    stationTime.push(90);
-    candidateTimes.push([
-      '+',
-      [
-        '/',
-        ['to-number', ['coalesce', ['get', `d${suffix}`], 7_200]],
-        WALKING_METERS_PER_MINUTE,
-      ],
-      stationTime,
-    ]);
+  };
+
+  const appendIndexedCandidates = (
+    distanceProperties,
+    accessProperties,
+    stationIds,
+  ) => {
+    for (const mode of activeStationModes) {
+      const distanceProperty = distanceProperties[mode];
+      const accessProperty = accessProperties[mode];
+      if (!distanceProperty || !accessProperty) continue;
+
+      const stationTime = [
+        'match',
+        ['to-number', ['get', accessProperty], -1],
+      ];
+      for (const [stationIndex, stationId] of stationIds.entries()) {
+        if (state.stationById.get(stationId)?.properties.mode !== mode) continue;
+        const minutes = transitTimes.get(stationId);
+        if (Number.isFinite(minutes)) {
+          stationTime.push(stationIndex, Number(minutes.toFixed(2)));
+        }
+      }
+      stationTime.push(90);
+      candidateTimes.push([
+        '+',
+        [
+          '/',
+          ['to-number', ['get', distanceProperty], maxDistanceMeters],
+          WALKING_METERS_PER_MINUTE,
+        ],
+        stationTime,
+      ]);
+    }
+  };
+
+  appendDirectCandidates();
+  if (!AREAS[activeAreaKey].liveRoads) {
+    appendIndexedCandidates(
+      MODE_DISTANCE_PROPERTIES,
+      MODE_ACCESS_PROPERTIES,
+      streetAccessStationIds,
+    );
+    if (futureStationToggle.checked) {
+      appendIndexedCandidates(
+        FUTURE_MODE_DISTANCE_PROPERTIES,
+        FUTURE_MODE_ACCESS_PROPERTIES,
+        futureStreetAccessStationIds,
+      );
+    }
   }
+
+  const totalTime =
+    candidateTimes.length === 0
+      ? 90
+      : candidateTimes.length === 1
+        ? candidateTimes[0]
+        : ['min', ...candidateTimes];
 
   return [
     'interpolate',
     ['linear'],
-    ['min', ...candidateTimes],
+    totalTime,
     0,
     COLORS.near,
     stops.yellowMinutes,
@@ -561,6 +641,58 @@ function streetDistanceFromProperties(properties) {
   return distance;
 }
 
+function streetAccessCandidates(properties) {
+  const candidates = [];
+
+  for (let candidateIndex = 0; candidateIndex < 5; candidateIndex += 1) {
+    const suffix = candidateIndex === 0 ? '' : String(candidateIndex + 1);
+    const stationId = properties[`s${suffix}`];
+    const distanceMeters = Number(properties[`d${suffix}`]);
+    const mode = state.stationById.get(stationId)?.properties.mode;
+    if (
+      stationId &&
+      Number.isFinite(distanceMeters) &&
+      activeStationModes.has(mode)
+    ) {
+      candidates.push({ stationId, distanceMeters, mode });
+    }
+  }
+
+  const appendCandidates = (distanceProperties, accessProperties, stationIds) => {
+    for (const mode of activeStationModes) {
+      const distanceMeters = Number(properties[distanceProperties[mode]]);
+      const stationIndex = Number(properties[accessProperties[mode]]);
+      const stationId = stationIds[stationIndex];
+      if (!stationId || !Number.isFinite(distanceMeters)) continue;
+      candidates.push({ stationId, distanceMeters, mode });
+    }
+  };
+
+  if (!AREAS[activeAreaKey].liveRoads) {
+    appendCandidates(
+      MODE_DISTANCE_PROPERTIES,
+      MODE_ACCESS_PROPERTIES,
+      streetAccessStationIds,
+    );
+    if (futureStationToggle.checked) {
+      appendCandidates(
+        FUTURE_MODE_DISTANCE_PROPERTIES,
+        FUTURE_MODE_ACCESS_PROPERTIES,
+        futureStreetAccessStationIds,
+      );
+    }
+  }
+
+  return candidates;
+}
+
+function selectedStreetTravelTime(
+  properties,
+  transitTimes = activeAccessTransitTimes(),
+) {
+  return bestStreetTravelTime(streetAccessCandidates(properties), transitTimes);
+}
+
 function visibleTiledStreets() {
   const layerId = activeStreetLayerId();
   const sourceId = activeStreetSourceId();
@@ -619,8 +751,8 @@ function updateViewportStatistics(tiledStreets = null) {
   let nearCount = 0;
   for (const properties of streets) {
     const isNear = timeMode
-      ? streetTravelTime(properties, accessTransitTimes).totalMinutes <=
-        timeStops.orangeMinutes
+      ? (selectedStreetTravelTime(properties, accessTransitTimes)?.totalMinutes ??
+          Number.POSITIVE_INFINITY) <= timeStops.orangeMinutes
       : streetDistanceFromProperties(properties) <= 2500;
     if (isNear) nearCount += 1;
   }
@@ -953,6 +1085,8 @@ function resetDestinationRouting() {
   state.waitMinutesByService.clear();
   state.waitDetailsByStation.clear();
   state.waitDetailsByService.clear();
+  streetAccessStationIds = [];
+  futureStreetAccessStationIds = [];
 
   const nearestOption = document.createElement('option');
   nearestOption.value = '';
@@ -1060,7 +1194,13 @@ function showStreetFeature(props) {
   featureNameEl.textContent = streetName;
 
   if (state.destination && state.transitTimes) {
-    const travel = streetTravelTime(props, activeAccessTransitTimes());
+    const travel = selectedStreetTravelTime(props);
+    if (!travel) {
+      featureSummaryEl.textContent = 'No station types selected';
+      renderDetails([{ label: 'OSM highway', value: props.h }]);
+      return;
+    }
+
     const accessStation = state.stationById.get(travel.stationId)?.properties;
     const serviceKey = state.transitTimes.serviceByStation?.get(travel.stationId);
     const serviceStateKey = serviceKey
@@ -1078,7 +1218,7 @@ function showStreetFeature(props) {
       {
         label: 'Access walk',
         value: `${formatMinutes(travel.walkingMinutes)} (${formatDistance(
-          travel.distance,
+          travel.distanceMeters,
         )})`,
       },
       {
@@ -1160,6 +1300,17 @@ function updateDestinationSummary() {
   }, departing ${departureLabel()}.`;
 }
 
+function rebuildDestinationTransitGraph() {
+  if (!AREAS[activeAreaKey].supportsDestination) return;
+  const baseGraph = buildTransitGraph(loadedStations.features, {
+    includeFuture: futureStationToggle.checked,
+  });
+  state.transitGraph = state.schedules?.graph?.e
+    ? attachScheduleGraph(baseGraph, state.schedules)
+    : baseGraph;
+  applyScheduleContext();
+}
+
 function applyScheduleContext() {
   if (!state.transitGraph) return;
 
@@ -1204,7 +1355,7 @@ function applyScheduleContext() {
         scheduledStationCount,
       )} of ${formatInteger(
         state.transitGraph.nodes.length,
-      )} open station records; the rest use a 4 min estimate.`
+      )} active station records; the rest use a 4 min estimate.`
     : 'Schedule data unavailable; boarding waits use a 4 min estimate.';
 
   if (state.destination) {
@@ -1692,11 +1843,7 @@ function scheduleDestinationSetup(area, stations, sequence) {
     const initializeDestination = () => {
       if (sequence !== loadSequence) return;
       state.schedules = schedules;
-      const baseGraph = buildTransitGraph(stations.features);
-      state.transitGraph = schedules?.graph?.e
-        ? attachScheduleGraph(baseGraph, schedules)
-        : baseGraph;
-      applyScheduleContext();
+      rebuildDestinationTransitGraph();
       renderDestinationOptions(stations.features);
     };
 
@@ -1742,6 +1889,12 @@ async function loadArea(areaKey, { initial = false } = {}) {
     );
 
     loadedStations = stations;
+    streetAccessStationIds = stations.features
+      .filter((feature) => feature.properties.status === 'open')
+      .map((feature) => feature.properties.id);
+    futureStreetAccessStationIds = stations.features
+      .filter((feature) => feature.properties.status !== 'open')
+      .map((feature) => feature.properties.id);
     renderMetadata(metadata);
     installMapData(stations);
     applyMapBounds(metadata);
@@ -1804,6 +1957,7 @@ stationToggle.addEventListener('change', () => {
 futureStationToggle.addEventListener('change', () => {
   runMapUpdate('Updating layers', () => {
     syncStationVisibility();
+    rebuildDestinationTransitGraph();
     if (AREAS[activeAreaKey].liveRoads) {
       scheduleLiveStreetRefresh();
     } else {

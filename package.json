@@ -5,7 +5,7 @@
   "type": "module",
   "scripts": {
     "build:vendor": "node scripts/copy-vendor-assets.mjs",
-    "build:data:cdmx": "node scripts/build-cdmx-data.mjs && node scripts/build-cdmx-tiles.mjs",
+    "build:data:cdmx": "node scripts/build-cdmx-data.mjs && node scripts/build-street-access.mjs && node scripts/build-cdmx-tiles.mjs",
     "build:tiles:cdmx": "node scripts/build-cdmx-tiles.mjs",
     "build:data:nyc": "node scripts/build-nyc-data.mjs",
     "build:data:access": "node scripts/build-street-access.mjs",

@@ -38,6 +38,24 @@ const FUTURE_MODE_DISTANCE_PROPERTIES = {
   regional_rail: 'fr',
   monorail: 'fm',
 };
+const MODE_ACCESS_PROPERTIES = {
+  subway: 'as',
+  brt: 'ab',
+  light_rail: 'al',
+  cable_car: 'ac',
+  commuter_rail: 'at',
+  regional_rail: 'ar',
+  monorail: 'am',
+};
+const FUTURE_MODE_ACCESS_PROPERTIES = {
+  subway: 'us',
+  brt: 'ub',
+  light_rail: 'ul',
+  cable_car: 'uc',
+  commuter_rail: 'ut',
+  regional_rail: 'ur',
+  monorail: 'um',
+};
 const STREET_MIN_ZOOM = {
   motorway: 8,
   trunk: 8,
@@ -92,6 +110,20 @@ function validateData(features, distanceData, streetAccess) {
       throw new Error(
         `Street access candidate ${candidateIndex + 1} does not match the street feature collection.`,
       );
+    }
+  }
+
+  for (const mode of MODE_KEYS) {
+    const indexes = streetAccess.station_indexes_by_mode?.[mode];
+    if (!indexes || indexes.length !== features.length) {
+      throw new Error(`Invalid open street access data for station mode: ${mode}.`);
+    }
+  }
+
+  for (const mode of Object.keys(distanceData.future_distances_by_mode ?? {})) {
+    const indexes = streetAccess.future_station_indexes_by_mode?.[mode];
+    if (!indexes || indexes.length !== features.length) {
+      throw new Error(`Invalid future street access data for station mode: ${mode}.`);
     }
   }
 }
@@ -168,6 +200,8 @@ async function buildTippecanoeInput(
           distancesByMode[mode][featureIndex],
           maxDistance,
         );
+        properties[MODE_ACCESS_PROPERTIES[mode]] =
+          streetAccess.station_indexes_by_mode[mode][featureIndex];
       }
 
       for (const [mode, distances] of Object.entries(futureDistancesByMode)) {
@@ -176,6 +210,8 @@ async function buildTippecanoeInput(
           throw new Error(`Invalid future street distance data for station mode: ${mode}.`);
         }
         properties[property] = tileDistance(distances[featureIndex], maxDistance);
+        properties[FUTURE_MODE_ACCESS_PROPERTIES[mode]] =
+          streetAccess.future_station_indexes_by_mode[mode][featureIndex];
       }
 
       await writeLine(output, {

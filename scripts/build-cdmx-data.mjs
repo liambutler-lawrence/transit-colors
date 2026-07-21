@@ -592,6 +592,7 @@ function stationCandidates(projectedLine, stationGrid) {
 function nearestStationDistancesMeters(lineCoordinates, stationGrid) {
   let bestDistanceSquared = Number.POSITIVE_INFINITY;
   const bestDistanceByMode = MODE_KEYS.map(() => Number.POSITIVE_INFINITY);
+  const bestStationIndexByMode = MODE_KEYS.map(() => -1);
   let bestStationIndex = -1;
   const projectedLine = lineCoordinates.map(([lon, lat]) => project(lon, lat));
   const stations = stationCandidates(projectedLine, stationGrid);
@@ -617,6 +618,7 @@ function nearestStationDistancesMeters(lineCoordinates, stationGrid) {
         distanceSquared < bestDistanceByMode[station.modeIndex]
       ) {
         bestDistanceByMode[station.modeIndex] = distanceSquared;
+        bestStationIndexByMode[station.modeIndex] = station.index;
       }
     }
   }
@@ -625,6 +627,7 @@ function nearestStationDistancesMeters(lineCoordinates, stationGrid) {
     nearest: Math.sqrt(bestDistanceSquared),
     byMode: bestDistanceByMode.map((distanceSquared) => Math.sqrt(distanceSquared)),
     stationIndex: bestStationIndex,
+    stationIndexByMode: bestStationIndexByMode,
   };
 }
 
@@ -972,6 +975,12 @@ function buildStreetFeatures(elements, openStationFeatures, futureStationFeature
   const futureModeDistances = Object.fromEntries(
     futureModes.map((mode) => [mode, []]),
   );
+  const modeAccessStationIndexes = Object.fromEntries(
+    MODE_KEYS.map((mode) => [mode, []]),
+  );
+  const futureModeAccessStationIndexes = Object.fromEntries(
+    futureModes.map((mode) => [mode, []]),
+  );
   const accessStationIndexes = [];
 
   elements.forEach((element, index) => {
@@ -1000,6 +1009,9 @@ function buildStreetFeatures(elements, openStationFeatures, futureStationFeature
       modeDistances[mode].push(
         distance <= MAX_DISTANCE_M ? Math.round(distance) : OVER_RANGE_DISTANCE_M,
       );
+      modeAccessStationIndexes[mode].push(
+        distances.stationIndexByMode[modeIndex],
+      );
 
       if (futureModeDistances[mode]) {
         const futureDistance = futureDistances.byMode[modeIndex];
@@ -1007,6 +1019,9 @@ function buildStreetFeatures(elements, openStationFeatures, futureStationFeature
           futureDistance <= MAX_DISTANCE_M
             ? Math.round(futureDistance)
             : OVER_RANGE_DISTANCE_M,
+        );
+        futureModeAccessStationIndexes[mode].push(
+          futureDistances.stationIndexByMode[modeIndex],
         );
       }
     }
@@ -1016,7 +1031,14 @@ function buildStreetFeatures(elements, openStationFeatures, futureStationFeature
     }
   });
 
-  return { features, modeDistances, futureModeDistances, accessStationIndexes };
+  return {
+    features,
+    modeDistances,
+    futureModeDistances,
+    accessStationIndexes,
+    modeAccessStationIndexes,
+    futureModeAccessStationIndexes,
+  };
 }
 
 function histogram(features) {
@@ -1140,8 +1162,13 @@ async function main() {
     },
     street_access_schema: {
       station_ids: 'open station IDs in index order',
+      future_station_ids: 'future station IDs in index order',
       street_station_indexes:
         'nearest open station index for each feature in cdmx-streets.geojson',
+      station_indexes_by_mode:
+        'nearest open station index by mode for each street feature',
+      future_station_indexes_by_mode:
+        'nearest future station index by mode for each street feature',
     },
     sources: [
       'OpenStreetMap contributors',
@@ -1160,7 +1187,13 @@ async function main() {
   });
   await writeJson(resolve(dataDir, 'cdmx-street-access.json'), {
     station_ids: openStationFeatures.map((feature) => feature.properties.id),
+    future_station_ids: futureStationFeatures.map(
+      (feature) => feature.properties.id,
+    ),
     street_station_indexes: streetBuild.accessStationIndexes,
+    station_indexes_by_mode: streetBuild.modeAccessStationIndexes,
+    future_station_indexes_by_mode:
+      streetBuild.futureModeAccessStationIndexes,
   });
   await writeJson(resolve(dataDir, 'cdmx-metadata.json'), metadata);
 
