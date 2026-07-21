@@ -63,7 +63,10 @@ Future/planned status is based on:
 - OSM `opening_date` values later than the generation date
 - Narrow network-level overrides for known not-yet-open systems whose OSM tags are incomplete, currently Mexicable Línea 3 and Tren Ligero Texcoco-La Paz
 
-Street color is computed from the nearest open station and clamped to `0-5000m`.
+Street color is computed from the nearest selected open-station mode and clamped to
+`0-5000m`. Per-mode distances live in the compact companion file
+`data/cdmx-street-mode-distances.json`, allowing the map gradient to update without
+reloading the street geometry.
 
 ## Deployment
 

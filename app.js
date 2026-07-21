@@ -1,5 +1,6 @@
 const DATASETS = {
   streets: 'data/cdmx-streets.geojson',
+  streetModeDistances: 'data/cdmx-street-mode-distances.json',
   stations: 'data/cdmx-stations.geojson',
   metadata: 'data/cdmx-metadata.json',
 };
@@ -32,6 +33,16 @@ const MODE_COLORS = {
   monorail: '#111827',
 };
 
+const MODE_DISTANCE_PROPERTIES = {
+  subway: 'ds',
+  brt: 'db',
+  light_rail: 'dl',
+  cable_car: 'dc',
+  commuter_rail: 'dt',
+  regional_rail: 'dr',
+  monorail: 'dm',
+};
+
 const map = new maplibregl.Map({
   container: 'map',
   style: 'https://tiles.openfreemap.org/styles/liberty',
@@ -53,20 +64,6 @@ const featureMetadataEl = document.querySelector('#feature-metadata');
 const streetToggle = document.querySelector('#toggle-streets');
 const stationToggle = document.querySelector('#toggle-stations');
 const futureStationToggle = document.querySelector('#toggle-future-stations');
-
-const streetColor = [
-  'interpolate',
-  ['linear'],
-  ['get', 'd'],
-  0,
-  COLORS.near,
-  1000,
-  COLORS.midNear,
-  2500,
-  COLORS.midFar,
-  5000,
-  COLORS.far,
-];
 
 const stationColor = [
   'match',
@@ -92,6 +89,13 @@ const openStationFilter = ['==', ['get', 'status'], 'open'];
 const futureStationFilter = ['!=', ['get', 'status'], 'open'];
 const openStationLayers = ['station-points-open', 'station-labels-open'];
 const futureStationLayers = ['station-points-future', 'station-labels-future'];
+const activeStationModes = new Set();
+const allStationModes = new Set();
+let maxDistanceMeters = 5000;
+let allModesNearCount = 0;
+let streetFeatureCount = 0;
+let streetModeDistances = {};
+let selectedStreetProperties = null;
 
 function formatInteger(value) {
   return new Intl.NumberFormat('en-US').format(value);
@@ -134,6 +138,117 @@ function syncStationVisibility() {
   }
 }
 
+function filterByActiveModes(statusFilter) {
+  const activeModes = [...activeStationModes];
+
+  if (activeModes.length === 0) {
+    return ['all', statusFilter, ['==', ['get', 'mode'], '__none__']];
+  }
+
+  return [
+    'all',
+    statusFilter,
+    ['in', ['get', 'mode'], ['literal', activeModes]],
+  ];
+}
+
+function syncStationFilters() {
+  for (const layerId of openStationLayers) {
+    if (map.getLayer(layerId)) {
+      map.setFilter(layerId, filterByActiveModes(openStationFilter));
+    }
+  }
+
+  for (const layerId of futureStationLayers) {
+    if (map.getLayer(layerId)) {
+      map.setFilter(layerId, filterByActiveModes(futureStationFilter));
+    }
+  }
+}
+
+function streetDistanceExpression() {
+  if (activeStationModes.size === allStationModes.size) {
+    return ['get', 'd'];
+  }
+
+  const modeDistances = [...activeStationModes]
+    .map((mode) => MODE_DISTANCE_PROPERTIES[mode])
+    .filter(Boolean)
+    .map((property) => ['to-number', ['get', property], maxDistanceMeters]);
+
+  if (modeDistances.length === 0) return maxDistanceMeters;
+  if (modeDistances.length === 1) return modeDistances[0];
+  return ['min', ...modeDistances];
+}
+
+function streetColorExpression() {
+  return [
+    'interpolate',
+    ['linear'],
+    streetDistanceExpression(),
+    0,
+    COLORS.near,
+    1000,
+    COLORS.midNear,
+    2500,
+    COLORS.midFar,
+    maxDistanceMeters,
+    COLORS.far,
+  ];
+}
+
+function syncStreetColor() {
+  if (map.getLayer('street-proximity')) {
+    map.setPaintProperty('street-proximity', 'line-color', streetColorExpression());
+  }
+}
+
+function syncNearCount() {
+  if (activeStationModes.size === allStationModes.size) {
+    nearCountEl.textContent = formatInteger(allModesNearCount);
+    return;
+  }
+
+  const selectedDistanceArrays = [...activeStationModes]
+    .map((mode) => streetModeDistances[mode])
+    .filter(Boolean);
+  let nearCount = 0;
+
+  for (let featureIndex = 0; featureIndex < streetFeatureCount; featureIndex += 1) {
+    if (selectedDistanceArrays.some((distances) => distances[featureIndex] <= 2500)) {
+      nearCount += 1;
+    }
+  }
+
+  nearCountEl.textContent = formatInteger(nearCount);
+}
+
+function attachStreetModeDistances(streets, distanceData) {
+  const features = streets.features ?? [];
+  const distancesByMode = distanceData.distances_by_mode ?? {};
+
+  if (distanceData.feature_count !== features.length) {
+    throw new Error(
+      `Street mode distances have ${distanceData.feature_count} features; expected ${features.length}.`,
+    );
+  }
+
+  maxDistanceMeters = distanceData.max_distance_m ?? maxDistanceMeters;
+  streetFeatureCount = features.length;
+  streetModeDistances = distancesByMode;
+
+  for (const [mode, distances] of Object.entries(distancesByMode)) {
+    const property = MODE_DISTANCE_PROPERTIES[mode];
+    if (!property || distances.length !== features.length) {
+      throw new Error(`Invalid street distance data for station mode: ${mode}.`);
+    }
+
+    for (let featureIndex = 0; featureIndex < features.length; featureIndex += 1) {
+      features[featureIndex].properties[property] = distances[featureIndex];
+    }
+  }
+}
+
 function updateStatus(label, isError = false) {
   statusEl.textContent = label;
   statusEl.classList.toggle('error', isError);
@@ -145,21 +260,37 @@ function renderMetadata(metadata) {
   const futureStationCount = metadata.future_station_count ?? 0;
   const nearCount = metadata.histogram?.under_2500_m ?? 0;
 
+  maxDistanceMeters = metadata.max_distance_m ?? maxDistanceMeters;
+  allModesNearCount = nearCount;
+
   streetCountEl.textContent = formatInteger(streetCount);
   stationCountEl.textContent = formatInteger(stationCount);
   nearCountEl.textContent = formatInteger(nearCount);
 
   const stationModes = metadata.station_modes_open ?? metadata.station_modes ?? {};
+  const sortedStationModes = Object.entries(stationModes).sort((a, b) => b[1] - a[1]);
+
+  activeStationModes.clear();
+  allStationModes.clear();
+  for (const [mode] of sortedStationModes) {
+    activeStationModes.add(mode);
+    allStationModes.add(mode);
+  }
+
   stationBreakdownEl.replaceChildren(
-    ...Object.entries(stationModes)
-      .sort((a, b) => b[1] - a[1])
-      .map(([mode, count]) => {
-        const item = document.createElement('span');
-        item.className = 'mode-pill';
-        item.style.setProperty('--mode-color', MODE_COLORS[mode] ?? '#18222c');
-        item.textContent = `${MODE_LABELS[mode] ?? mode}: ${formatInteger(count)}`;
-        return item;
-      }),
+    ...sortedStationModes.map(([mode, count]) => {
+      const label = MODE_LABELS[mode] ?? mode;
+      const item = document.createElement('button');
+      item.type = 'button';
+      item.className = 'mode-pill';
+      item.dataset.mode = mode;
+      item.setAttribute('aria-pressed', 'true');
+      item.setAttribute('aria-label', `${label} stations: ${formatInteger(count)}`);
+      item.title = `Hide ${label} stations`;
+      item.style.setProperty('--mode-color', MODE_COLORS[mode] ?? '#18222c');
+      item.textContent = `${label}: ${formatInteger(count)}`;
+      return item;
+    }),
     ...[
       futureStationCount > 0
         ? (() => {
@@ -173,6 +304,32 @@ function renderMetadata(metadata) {
     ].filter(Boolean),
   );
 }
+
+stationBreakdownEl.addEventListener('click', (event) => {
+  const button = event.target.closest('.mode-pill[data-mode]');
+  if (!button || !stationBreakdownEl.contains(button)) return;
+
+  const { mode } = button.dataset;
+  const isActive = button.getAttribute('aria-pressed') === 'true';
+  const nextActive = !isActive;
+
+  button.setAttribute('aria-pressed', String(nextActive));
+  button.title = `${nextActive ? 'Hide' : 'Show'} ${MODE_LABELS[mode] ?? mode} stations`;
+
+  if (nextActive) {
+    activeStationModes.add(mode);
+  } else {
+    activeStationModes.delete(mode);
+  }
+
+  syncStationFilters();
+  syncStreetColor();
+  syncNearCount();
+
+  if (selectedStreetProperties) {
+    showStreetFeature(selectedStreetProperties);
+  }
+});
 
 function metadataBounds(metadata) {
   const bounds = metadata.bbox;
@@ -230,15 +387,38 @@ function renderDetails(details) {
 
 function showStreetFeature(props) {
   const streetName = props.n || props.h || 'Unnamed street';
+  selectedStreetProperties = props;
   selectionTypeEl.textContent = 'Selected street';
   featureNameEl.textContent = streetName;
-  featureSummaryEl.textContent = `${formatDistance(props.d)} from nearest station`;
+
+  if (activeStationModes.size === 0) {
+    featureSummaryEl.textContent = 'No station types selected';
+  } else {
+    let distance = Number.POSITIVE_INFINITY;
+
+    if (activeStationModes.size === allStationModes.size) {
+      distance = Number(props.d);
+    } else {
+      for (const mode of activeStationModes) {
+        const value = Number(props[MODE_DISTANCE_PROPERTIES[mode]]);
+        if (Number.isFinite(value)) distance = Math.min(distance, value);
+      }
+    }
+
+    const distanceLabel =
+      !Number.isFinite(distance) || distance > maxDistanceMeters
+        ? `More than ${formatDistance(maxDistanceMeters)}`
+        : formatDistance(distance);
+    featureSummaryEl.textContent = `${distanceLabel} from nearest selected station`;
+  }
+
   renderDetails([
     { label: 'OSM highway', value: props.h },
   ]);
 }
 
 function showStationFeature(props) {
+  selectedStreetProperties = null;
   selectionTypeEl.textContent = 'Selected station';
   featureNameEl.textContent = props.name || 'Unnamed station';
   featureSummaryEl.textContent = props.system || MODE_LABELS[props.mode] || 'Transit station';
@@ -309,12 +489,14 @@ function installHover() {
 
 async function initialize() {
   try {
-    const [streets, stations, metadata] = await Promise.all([
+    const [streets, streetModeDistanceData, stations, metadata] = await Promise.all([
       fetchJson(DATASETS.streets),
+      fetchJson(DATASETS.streetModeDistances),
       fetchJson(DATASETS.stations),
       fetchJson(DATASETS.metadata),
     ]);
 
+    attachStreetModeDistances(streets, streetModeDistanceData);
     renderMetadata(metadata);
     applyMapBounds(metadata);
 
@@ -338,7 +520,7 @@ async function initialize() {
         type: 'line',
         source: 'streets',
         paint: {
-          'line-color': streetColor,
+          'line-color': streetColorExpression(),
           'line-width': [
             'interpolate',
             ['linear'],
@@ -436,6 +618,7 @@ async function initialize() {
     });
 
     installHover();
+    syncStationFilters();
     syncStationVisibility();
     updateStatus('Ready');
   } catch (error) {
