@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import {
   WALKING_METERS_PER_MINUTE,
   assignNearestStations,
+  bestStreetTravelTime,
   buildTransitGraph,
   calculateTransitTimes,
   distanceMeters,
@@ -102,6 +103,13 @@ await assignNearestStations(streets, stations, {
 });
 assert.equal(streets[0].properties.s, 'a');
 assert.ok(streets[0].properties.d < 30);
+await assignNearestStations(streets, stations, {
+  batchSize: 1,
+  propertyKey: 'brtAccess',
+  stationFilter: (feature) => feature.properties.mode === 'brt',
+  yieldControl: async () => {},
+});
+assert.equal(streets[0].properties.brtAccess, 'c-brt');
 
 const graph = buildTransitGraph(stations);
 const transitTimes = calculateTransitTimes(graph, 'd', {
@@ -113,5 +121,29 @@ assert.ok(transitTimes.get('a') > transitTimes.get('c-brt'));
 const trip = streetTravelTime(streets[0].properties, transitTimes);
 assert.equal(trip.walkingMinutes, streets[0].properties.d / WALKING_METERS_PER_MINUTE);
 assert.ok(trip.totalMinutes > trip.walkingMinutes);
+
+const bestTrip = bestStreetTravelTime(
+  [
+    { stationId: 'a', distanceMeters: 100, mode: 'subway' },
+    { stationId: 'd', distanceMeters: 500, mode: 'brt' },
+  ],
+  new Map([
+    ['a', 30],
+    ['d', 5],
+  ]),
+);
+assert.equal(bestTrip.stationId, 'd');
+assert.equal(bestTrip.mode, 'brt');
+
+const futureStation = station('future', 'Future', 'subway', [-99.1, 19.43], {
+  status: 'construction',
+});
+assert.equal(buildTransitGraph([...stations, futureStation]).nodeById.has('future'), false);
+assert.equal(
+  buildTransitGraph([...stations, futureStation], { includeFuture: true }).nodeById.has(
+    'future',
+  ),
+  true,
+);
 
 console.log('routing tests passed');
