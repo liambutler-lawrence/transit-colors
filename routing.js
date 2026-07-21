@@ -224,17 +224,25 @@ function defaultYield() {
 }
 
 /**
- * Adds the stable ID and distance of each street's nearest open station to
- * `properties.s` and `properties.d`. Existing precomputed distances are used
- * to keep the spatial search small.
+ * Adds the stable ID and optional distance of each street's nearest matching
+ * station. Existing precomputed distances are used to keep the spatial search
+ * small.
  */
 export async function assignNearestStations(
   streetFeatures,
   stationFeatures,
-  { batchSize = 5_000, onProgress = () => {}, yieldControl = defaultYield } = {},
+  {
+    batchSize = 5_000,
+    distanceForFeature = (feature) => feature.properties.d,
+    onProgress = () => {},
+    propertyKey = 's',
+    distancePropertyKey = propertyKey === 's' ? 'd' : null,
+    stationFilter = (feature) => feature.properties.status === 'open',
+    yieldControl = defaultYield,
+  } = {},
 ) {
-  const openStations = stationFeatures
-    .filter((feature) => feature.properties.status === 'open')
+  const matchingStations = stationFeatures
+    .filter(stationFilter)
     .map((feature) => {
       const coordinates = feature.geometry.coordinates;
       return {
@@ -244,19 +252,19 @@ export async function assignNearestStations(
       };
     });
 
-  if (openStations.length === 0) {
-    throw new Error('No open stations are available for street access calculations.');
+  if (matchingStations.length === 0) {
+    throw new Error('No stations are available for street access calculations.');
   }
 
   const referenceLatitude =
-    openStations.reduce((sum, station) => sum + station.coordinates[1], 0) /
-    openStations.length;
-  for (const station of openStations) {
+    matchingStations.reduce((sum, station) => sum + station.coordinates[1], 0) /
+    matchingStations.length;
+  for (const station of matchingStations) {
     station.projected = projectCoordinate(station.coordinates, referenceLatitude);
   }
 
   const cellSize = 2_000;
-  const grid = stationGrid(openStations, cellSize);
+  const grid = stationGrid(matchingStations, cellSize);
 
   for (let index = 0; index < streetFeatures.length; index += 1) {
     const feature = streetFeatures[index];
@@ -267,7 +275,7 @@ export async function assignNearestStations(
       projectCoordinate(coordinate, referenceLatitude),
     );
     const bounds = lineBounds(projectedLine);
-    let padding = Math.max(500, Number(feature.properties.d) + 500 || 5_500);
+    let padding = Math.max(500, Number(distanceForFeature(feature, index)) + 500 || 5_500);
     let candidates = [];
     let bestStation = null;
     let bestDistanceSquared = Number.POSITIVE_INFINITY;
@@ -298,8 +306,12 @@ export async function assignNearestStations(
     }
 
     if (bestStation) {
-      feature.properties.s = bestStation.id;
-      feature.properties.d = Math.round(Math.sqrt(bestDistanceSquared));
+      feature.properties[propertyKey] = bestStation.id;
+      if (distancePropertyKey) {
+        feature.properties[distancePropertyKey] = Math.round(
+          Math.sqrt(bestDistanceSquared),
+        );
+      }
     }
 
     if ((index + 1) % batchSize === 0) {
@@ -363,9 +375,12 @@ function addUndirectedEdge(adjacency, from, to, minutes) {
  * geography. Ride times are estimates because the source does not contain a
  * published timetable.
  */
-export function buildTransitGraph(stationFeatures) {
+export function buildTransitGraph(stationFeatures, { includeFuture = false } = {}) {
   const nodes = stationFeatures
-    .filter((feature) => feature.properties.status === 'open')
+    .filter(
+      (feature) =>
+        feature.properties.status === 'open' || includeFuture,
+    )
     .map((feature) => ({
       id: feature.properties.id,
       name: feature.properties.name,
@@ -558,4 +573,26 @@ export function streetTravelTime(properties, transitTimes) {
     transitMinutes,
     totalMinutes: walkingMinutes + transitMinutes,
   };
+}
+
+export function bestStreetTravelTime(accessCandidates, transitTimes) {
+  let best = null;
+
+  for (const candidate of accessCandidates) {
+    const distanceMeters = Number(candidate.distanceMeters);
+    if (!Number.isFinite(distanceMeters) || !candidate.stationId) continue;
+
+    const walkingMinutes = distanceMeters / WALKING_METERS_PER_MINUTE;
+    const transitMinutes = transitTimes.get(candidate.stationId) ?? 90;
+    const travel = {
+      ...candidate,
+      walkingMinutes,
+      transitMinutes,
+      totalMinutes: walkingMinutes + transitMinutes,
+    };
+
+    if (!best || travel.totalMinutes < best.totalMinutes) best = travel;
+  }
+
+  return best;
 }
