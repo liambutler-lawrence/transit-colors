@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import {
+  WALKING_METERS_PER_MINUTE,
   assignNearestStations,
   buildTransitGraph,
   calculateTransitTimes,
@@ -100,6 +101,7 @@ await assignNearestStations(streets, stations, {
   yieldControl: async () => {},
 });
 assert.equal(streets[0].properties.s, 'a');
+assert.ok(streets[0].properties.d < 30);
 
 const graph = buildTransitGraph(stations);
 const transitTimes = calculateTransitTimes(graph, 'd', {
@@ -109,7 +111,7 @@ assert.equal(transitTimes.get('d'), 0);
 assert.ok(transitTimes.get('a') > transitTimes.get('c-brt'));
 
 const trip = streetTravelTime(streets[0].properties, transitTimes);
-assert.equal(trip.walkingMinutes, 0.25);
+assert.equal(trip.walkingMinutes, streets[0].properties.d / WALKING_METERS_PER_MINUTE);
 assert.ok(trip.totalMinutes > trip.walkingMinutes);
 
 console.log('routing tests passed');
