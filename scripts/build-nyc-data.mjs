@@ -326,6 +326,7 @@ async function buildFeedData(feed) {
     calendarText,
     calendarDatesText,
     frequenciesText,
+    transfersText,
   ] = await Promise.all([
     unzipText(zipPath, 'stops.txt'),
     unzipText(zipPath, 'routes.txt'),
@@ -334,6 +335,7 @@ async function buildFeedData(feed) {
     unzipText(zipPath, 'calendar.txt', false),
     unzipText(zipPath, 'calendar_dates.txt', false),
     unzipText(zipPath, 'frequencies.txt', false),
+    unzipText(zipPath, 'transfers.txt', false),
   ]);
   const stops = parseCsv(stopsText);
   const routes = parseCsv(routesText);
@@ -380,6 +382,7 @@ async function buildFeedData(feed) {
 
   const scheduleProfiles = new Map();
   const routeNamesByStation = new Map();
+  const tripStops = new Map();
 
   for (const stopTime of stopTimes) {
     const trip = tripById.get(stopTime.trip_id);
@@ -392,6 +395,7 @@ async function buildFeedData(feed) {
     if (!route) continue;
 
     const routeKey = `${feed.key}/${route.route_id}`;
+    const serviceKey = `${routeKey}/${trip.direction_id || '0'}`;
     const routeName = route.route_short_name || route.route_long_name || route.route_id;
     const routeNames = routeNamesByStation.get(stationStopId) ?? new Set();
     routeNames.add(routeName);
@@ -401,8 +405,11 @@ async function buildFeedData(feed) {
     const profile = scheduleProfiles.get(stationId) ?? {
       routes: new Set(),
       departures: Array.from({ length: 7 }, () => []),
+      services: new Map(),
     };
     profile.routes.add(routeKey);
+    const serviceDepartures = profile.services.get(serviceKey) ??
+      Array.from({ length: 7 }, () => []);
     const weekdays = weekdaysByService.get(trip.service_id) ?? new Set([0, 1, 2, 3, 4]);
     const frequencies = frequenciesByTrip.get(trip.trip_id);
     const times = [];
@@ -423,8 +430,77 @@ async function buildFeedData(feed) {
       times.push(departure);
     }
 
-    for (const weekday of weekdays) profile.departures[weekday].push(...times);
+    for (const weekday of weekdays) {
+      profile.departures[weekday].push(...times);
+      serviceDepartures[weekday].push(...times);
+    }
+    profile.services.set(serviceKey, serviceDepartures);
     scheduleProfiles.set(stationId, profile);
+
+    const entries = tripStops.get(trip.trip_id) ?? [];
+    entries.push({
+      stationId,
+      sequence: Number(stopTime.stop_sequence),
+      arrival: parseGtfsTime(stopTime.arrival_time || stopTime.departure_time),
+      departure,
+      serviceKey,
+    });
+    tripStops.set(trip.trip_id, entries);
+  }
+
+  const rideSamples = new Map();
+  for (const entries of tripStops.values()) {
+    entries.sort((first, second) => first.sequence - second.sequence);
+    let previous = null;
+    for (const entry of entries) {
+      if (!previous) {
+        previous = entry;
+        continue;
+      }
+      if (entry.stationId === previous.stationId) {
+        previous = entry;
+        continue;
+      }
+      const minutes = entry.arrival - previous.departure;
+      if (Number.isFinite(minutes) && minutes > 0 && minutes <= 180) {
+        const key = `${previous.stationId}\u0000${entry.stationId}\u0000${entry.serviceKey}`;
+        const samples = rideSamples.get(key) ?? [];
+        samples.push(minutes);
+        rideSamples.set(key, samples);
+      }
+      previous = entry;
+    }
+  }
+
+  const rideEdges = {};
+  for (const [key, samples] of rideSamples) {
+    const [fromStationId, toStationId, serviceKey] = key.split('\u0000');
+    const minutes = median(samples);
+    if (!Number.isFinite(minutes)) continue;
+    (rideEdges[fromStationId] ??= []).push([
+      toStationId,
+      Number(minutes.toFixed(2)),
+      serviceKey,
+    ]);
+  }
+
+  const transferEdges = {};
+  for (const transfer of parseCsv(transfersText)) {
+    if (transfer.transfer_type === '3') continue;
+    const fromStopId = stationIdByStopId.get(transfer.from_stop_id);
+    const toStopId = stationIdByStopId.get(transfer.to_stop_id);
+    if (!stationStopIds.has(fromStopId) || !stationStopIds.has(toStopId)) continue;
+    const fromStationId = `gtfs/${feed.key}/${fromStopId}`;
+    const toStationId = `gtfs/${feed.key}/${toStopId}`;
+    if (fromStationId === toStationId) continue;
+    const publishedMinutes = Number(transfer.min_transfer_time) / 60;
+    const minutes = Number.isFinite(publishedMinutes) && publishedMinutes > 0
+      ? publishedMinutes
+      : 3;
+    (transferEdges[fromStationId] ??= []).push([
+      toStationId,
+      Number(minutes.toFixed(2)),
+    ]);
   }
 
   const features = stationRows(stops)
@@ -442,6 +518,14 @@ async function buildFeedData(feed) {
       {
         r: [...profile.routes].sort(),
         d: profile.departures.map(departureWindows),
+        p: Object.fromEntries(
+          [...profile.services]
+            .sort(([first], [second]) => first.localeCompare(second))
+            .map(([serviceKey, departures]) => [
+              serviceKey,
+              departures.map(departureWindows),
+            ]),
+        ),
       },
     ]),
   );
@@ -461,7 +545,12 @@ async function buildFeedData(feed) {
   );
 
   console.log(`Built ${features.length.toLocaleString()} ${feed.name} stations.`);
-  return { features, schedules, routes: routeMetadata };
+  return {
+    features,
+    schedules,
+    routes: routeMetadata,
+    graph: { e: rideEdges, t: transferEdges },
+  };
 }
 
 function dedupeStations(features) {
@@ -569,6 +658,8 @@ async function main() {
   const stationIds = new Set(stationFeatures.map((feature) => feature.properties.id));
   const schedules = Object.assign({}, ...feedData.map((feed) => feed.schedules));
   const routes = Object.assign({}, ...feedData.map((feed) => feed.routes));
+  const graphEdges = Object.assign({}, ...feedData.map((feed) => feed.graph.e));
+  const graphTransfers = Object.assign({}, ...feedData.map((feed) => feed.graph.t));
   await writeJson(resolve(dataDir, 'nyc-schedules.json'), {
     source: 'MTA, NJ Transit, and PATH static GTFS',
     timezone: 'America/New_York',
@@ -577,6 +668,26 @@ async function main() {
       Object.entries(schedules).filter(([stationId]) => stationIds.has(stationId)),
     ),
     routes,
+    graph: {
+      e: Object.fromEntries(
+        Object.entries(graphEdges)
+          .filter(([stationId]) => stationIds.has(stationId))
+          .map(([stationId, edges]) => [
+            stationId,
+            edges.filter(([toStationId]) => stationIds.has(toStationId)),
+          ])
+          .filter(([, edges]) => edges.length > 0),
+      ),
+      t: Object.fromEntries(
+        Object.entries(graphTransfers)
+          .filter(([stationId]) => stationIds.has(stationId))
+          .map(([stationId, edges]) => [
+            stationId,
+            edges.filter(([toStationId]) => stationIds.has(toStationId)),
+          ])
+          .filter(([, edges]) => edges.length > 0),
+      ),
+    },
   });
 
   console.log(`Wrote ${stationFeatures.length.toLocaleString()} stations to data/nyc-stations.geojson.`);

@@ -1,7 +1,6 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { tmpdir } from 'node:os';
-import { basename, dirname, join, resolve } from 'node:path';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { distanceMeters } from '../routing.js';
@@ -9,10 +8,12 @@ import { distanceMeters } from '../routing.js';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, '..');
 const dataDir = resolve(rootDir, 'data');
+const cacheDir = resolve(dataDir, '.gtfs-cache');
 const DEFAULT_GTFS_URL =
   'https://datos.cdmx.gob.mx/dataset/75538d96-3ade-4bc5-ae7d-d85595e4522d/resource/32ed1b6b-41cd-49b3-b7f0-b57acb0eb819/download/gtfs.zip';
 const GTFS_URL = process.env.GTFS_URL ?? DEFAULT_GTFS_URL;
 const inputPath = process.argv[2] ? resolve(process.argv[2]) : null;
+const REFRESH_GTFS_CACHE = process.env.REFRESH_GTFS_CACHE === '1';
 
 const AGENCY_MODES = {
   METRO: 'subway',
@@ -80,11 +81,16 @@ function parseCsv(text) {
   );
 }
 
-function readZipEntry(zipPath, entryName) {
-  return execFileSync('unzip', ['-p', zipPath, entryName], {
-    encoding: 'utf8',
-    maxBuffer: 64 * 1024 * 1024,
-  });
+function readZipEntry(zipPath, entryName, required = true) {
+  try {
+    return execFileSync('unzip', ['-p', zipPath, entryName], {
+      encoding: 'utf8',
+      maxBuffer: 256 * 1024 * 1024,
+    });
+  } catch (error) {
+    if (!required) return '';
+    throw error;
+  }
 }
 
 function timeToMinutes(value) {
@@ -141,36 +147,51 @@ function compactWindow(window) {
   return window.map((value) => Number(value.toFixed(2)));
 }
 
+function median(values) {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((first, second) => first - second);
+  const middle = Math.floor(sorted.length / 2);
+  return sorted.length % 2 === 0
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[middle];
+}
+
 async function downloadFeed() {
-  const temporaryDirectory = await mkdtemp(join(tmpdir(), 'transit-colors-gtfs-'));
-  const zipPath = join(temporaryDirectory, 'gtfs.zip');
+  await mkdir(cacheDir, { recursive: true });
+  const zipPath = resolve(cacheDir, 'cdmx.zip');
+  if (!REFRESH_GTFS_CACHE) {
+    try {
+      await readFile(zipPath);
+      console.log('Loaded official CDMX GTFS from cache.');
+      return zipPath;
+    } catch {
+      // Cache miss; download below.
+    }
+  }
   console.log(`Downloading official GTFS feed from ${GTFS_URL}...`);
   const response = await fetch(GTFS_URL);
   if (!response.ok) {
     throw new Error(`GTFS download failed: ${response.status}`);
   }
   await writeFile(zipPath, Buffer.from(await response.arrayBuffer()));
-  return { zipPath, temporaryDirectory };
+  return zipPath;
 }
 
 async function main() {
-  let temporaryDirectory = null;
   let zipPath = inputPath;
 
   if (!zipPath) {
-    const download = await downloadFeed();
-    zipPath = download.zipPath;
-    temporaryDirectory = download.temporaryDirectory;
+    zipPath = await downloadFeed();
   }
 
-  try {
-    console.log(`Reading ${basename(zipPath)}...`);
+  console.log(`Reading ${basename(zipPath)}...`);
     const routes = parseCsv(readZipEntry(zipPath, 'routes.txt'));
     const calendars = parseCsv(readZipEntry(zipPath, 'calendar.txt'));
     const trips = parseCsv(readZipEntry(zipPath, 'trips.txt'));
     const frequencies = parseCsv(readZipEntry(zipPath, 'frequencies.txt'));
     const stopTimes = parseCsv(readZipEntry(zipPath, 'stop_times.txt'));
     const stops = parseCsv(readZipEntry(zipPath, 'stops.txt'));
+    const transfers = parseCsv(readZipEntry(zipPath, 'transfers.txt', false));
 
     const routeById = new Map();
     for (const route of routes) {
@@ -203,23 +224,55 @@ async function main() {
       frequenciesByTrip.get(frequency.trip_id).push({ start, end, headway });
     }
 
+    const firstDepartureByTrip = new Map();
+    const routesByStop = new Map();
+    const graphStopsByTrip = new Map();
+    for (const stopTime of stopTimes) {
+      const trip = tripById.get(stopTime.trip_id);
+      if (!trip) continue;
+      const departure = timeToMinutes(
+        stopTime.departure_time || stopTime.arrival_time,
+      );
+      if (!firstDepartureByTrip.has(stopTime.trip_id) && Number.isFinite(departure)) {
+        firstDepartureByTrip.set(stopTime.trip_id, departure);
+      }
+      const stopRoutes = routesByStop.get(stopTime.stop_id) ?? new Set();
+      stopRoutes.add(trip.route_id);
+      routesByStop.set(stopTime.stop_id, stopRoutes);
+      const tripStops = graphStopsByTrip.get(stopTime.trip_id) ?? [];
+      tripStops.push({
+        stopId: stopTime.stop_id,
+        sequence: Number(stopTime.stop_sequence),
+        arrival: timeToMinutes(stopTime.arrival_time || stopTime.departure_time),
+        departure,
+        serviceKey: `${trip.route_id}/${trip.direction_id || '0'}`,
+      });
+      graphStopsByTrip.set(stopTime.trip_id, tripStops);
+    }
+
     const schedulesByStop = new Map();
     for (const stopTime of stopTimes) {
       const trip = tripById.get(stopTime.trip_id);
       const tripFrequencies = frequenciesByTrip.get(stopTime.trip_id);
       if (!trip || !tripFrequencies) continue;
       const calendar = calendarById.get(trip.service_id);
-      const offset = timeToMinutes(stopTime.departure_time || stopTime.arrival_time);
+      const departure = timeToMinutes(stopTime.departure_time || stopTime.arrival_time);
+      const firstDeparture = firstDepartureByTrip.get(stopTime.trip_id);
+      const offset = departure - firstDeparture;
       if (!calendar || !Number.isFinite(offset)) continue;
 
       if (!schedulesByStop.has(stopTime.stop_id)) {
         schedulesByStop.set(stopTime.stop_id, {
           routes: new Set(),
           days: DAY_COLUMNS.map(() => new Map()),
+          services: new Map(),
         });
       }
       const stopSchedule = schedulesByStop.get(stopTime.stop_id);
       stopSchedule.routes.add(trip.route_id);
+      const serviceKey = `${trip.route_id}/${trip.direction_id || '0'}`;
+      const serviceDays = stopSchedule.services.get(serviceKey) ??
+        DAY_COLUMNS.map(() => new Map());
 
       for (const frequency of tripFrequencies) {
         for (let day = 0; day < calendar.length; day += 1) {
@@ -229,23 +282,27 @@ async function main() {
             frequency.end + offset,
             frequency.headway,
           ];
-          stopSchedule.days[day].set(window.map((value) => value.toFixed(2)).join(','), window);
+          const windowKey = window.map((value) => value.toFixed(2)).join(',');
+          stopSchedule.days[day].set(windowKey, window);
+          serviceDays[day].set(windowKey, window);
         }
       }
+      stopSchedule.services.set(serviceKey, serviceDays);
     }
 
-    const scheduledStops = stops
-      .filter((stop) => schedulesByStop.has(stop.stop_id))
+    const transitStops = stops
+      .filter((stop) => routesByStop.has(stop.stop_id))
       .map((stop) => {
-        const schedule = schedulesByStop.get(stop.stop_id);
+        const routeIds = routesByStop.get(stop.stop_id);
         const modes = new Set(
-          [...schedule.routes].map((routeId) => routeById.get(routeId)?.mode).filter(Boolean),
+          [...routeIds].map((routeId) => routeById.get(routeId)?.mode).filter(Boolean),
         );
         return {
           id: stop.stop_id,
           name: stop.stop_name,
           coordinates: [Number(stop.stop_lon), Number(stop.stop_lat)],
-          schedule,
+          schedule: schedulesByStop.get(stop.stop_id),
+          routeIds,
           modes,
         };
       })
@@ -258,10 +315,11 @@ async function main() {
       (feature) => feature.properties.status === 'open',
     );
     const stationProfiles = {};
+    const stationIdByGtfsStopId = new Map();
 
     for (const station of openStations) {
       const properties = station.properties;
-      const nearbyStops = scheduledStops
+      const nearbyStops = transitStops
         .filter((stop) => stop.modes.has(properties.mode))
         .map((stop) => ({
           stop,
@@ -281,16 +339,36 @@ async function main() {
       );
       const routeIds = new Set();
       const days = DAY_COLUMNS.map(() => new Map());
+      const services = new Map();
 
-      for (const { stop } of matches) {
+      for (const { stop, meters } of matches) {
+        const existingMatch = stationIdByGtfsStopId.get(stop.id);
+        if (!existingMatch || meters < existingMatch.meters) {
+          stationIdByGtfsStopId.set(stop.id, {
+            stationId: properties.id,
+            meters,
+          });
+        }
+        if (!stop.schedule) continue;
         for (const routeId of stop.schedule.routes) routeIds.add(routeId);
         for (let day = 0; day < DAY_COLUMNS.length; day += 1) {
           for (const [key, window] of stop.schedule.days[day]) {
             days[day].set(key, window);
           }
         }
+        for (const [serviceKey, serviceDays] of stop.schedule.services) {
+          const mergedDays = services.get(serviceKey) ??
+            DAY_COLUMNS.map(() => new Map());
+          for (let day = 0; day < DAY_COLUMNS.length; day += 1) {
+            for (const [key, window] of serviceDays[day]) {
+              mergedDays[day].set(key, window);
+            }
+          }
+          services.set(serviceKey, mergedDays);
+        }
       }
 
+      if (routeIds.size === 0) continue;
       stationProfiles[properties.id] = {
         r: [...routeIds].sort(),
         d: days.map((windows) =>
@@ -298,7 +376,77 @@ async function main() {
             .sort((first, second) => first[0] - second[0] || first[2] - second[2])
             .map(compactWindow),
         ),
+        p: Object.fromEntries(
+          [...services]
+            .sort(([first], [second]) => first.localeCompare(second))
+            .map(([serviceKey, serviceDays]) => [
+              serviceKey,
+              serviceDays.map((windows) =>
+                [...windows.values()]
+                  .sort(
+                    (first, second) =>
+                      first[0] - second[0] || first[2] - second[2],
+                  )
+                  .map(compactWindow),
+              ),
+            ]),
+        ),
       };
+    }
+
+    const rideSamples = new Map();
+    for (const tripStops of graphStopsByTrip.values()) {
+      tripStops.sort((first, second) => first.sequence - second.sequence);
+      let previous = null;
+      for (const tripStop of tripStops) {
+        const stationId = stationIdByGtfsStopId.get(tripStop.stopId)?.stationId;
+        if (!stationId) continue;
+        const entry = { ...tripStop, stationId };
+        if (!previous) {
+          previous = entry;
+          continue;
+        }
+        if (entry.stationId === previous.stationId) {
+          previous = entry;
+          continue;
+        }
+        const minutes = entry.arrival - previous.departure;
+        if (Number.isFinite(minutes) && minutes > 0 && minutes <= 180) {
+          const key = `${previous.stationId}\u0000${entry.stationId}\u0000${entry.serviceKey}`;
+          const samples = rideSamples.get(key) ?? [];
+          samples.push(minutes);
+          rideSamples.set(key, samples);
+        }
+        previous = entry;
+      }
+    }
+
+    const rideEdges = {};
+    for (const [key, samples] of rideSamples) {
+      const [fromStationId, toStationId, serviceKey] = key.split('\u0000');
+      const minutes = median(samples);
+      if (!Number.isFinite(minutes)) continue;
+      (rideEdges[fromStationId] ??= []).push([
+        toStationId,
+        Number(minutes.toFixed(2)),
+        serviceKey,
+      ]);
+    }
+
+    const transferEdges = {};
+    for (const transfer of transfers) {
+      if (transfer.transfer_type === '3') continue;
+      const fromStationId = stationIdByGtfsStopId.get(transfer.from_stop_id)?.stationId;
+      const toStationId = stationIdByGtfsStopId.get(transfer.to_stop_id)?.stationId;
+      if (!fromStationId || !toStationId || fromStationId === toStationId) continue;
+      const publishedMinutes = Number(transfer.min_transfer_time) / 60;
+      const minutes = Number.isFinite(publishedMinutes) && publishedMinutes > 0
+        ? publishedMinutes
+        : 3;
+      (transferEdges[fromStationId] ??= []).push([
+        toStationId,
+        Number(minutes.toFixed(2)),
+      ]);
     }
 
     const routeProfiles = Object.fromEntries(
@@ -327,6 +475,7 @@ async function main() {
       open_station_count: openStations.length,
       routes: routeProfiles,
       stations: stationProfiles,
+      graph: { e: rideEdges, t: transferEdges },
     };
 
     await writeFile(
@@ -337,11 +486,6 @@ async function main() {
     console.log(
       `Wrote data/cdmx-schedules.json with ${output.matched_station_count.toLocaleString()} matched OSM station records and ${Object.keys(routeProfiles).length.toLocaleString()} routes.`,
     );
-  } finally {
-    if (temporaryDirectory) {
-      await rm(temporaryDirectory, { recursive: true, force: true });
-    }
-  }
 }
 
 main().catch((error) => {
