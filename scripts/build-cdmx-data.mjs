@@ -953,21 +953,32 @@ function lineCoordinates(element) {
   return coordinates.length >= 2 ? coordinates : null;
 }
 
-function buildStreetFeatures(elements, stationFeatures) {
-  if (stationFeatures.length === 0) {
+function buildStreetFeatures(elements, openStationFeatures, futureStationFeatures) {
+  if (openStationFeatures.length === 0) {
     throw new Error('No station features found; cannot compute street distances.');
   }
 
-  const stationGrid = buildStationGrid(stationFeatures);
+  const openStationGrid = buildStationGrid(openStationFeatures);
+  const futureStationGrid = buildStationGrid(futureStationFeatures);
+  const futureModes = MODE_KEYS.filter((mode) =>
+    futureStationFeatures.some((feature) => feature.properties.mode === mode),
+  );
   const features = [];
   const modeDistances = Object.fromEntries(MODE_KEYS.map((mode) => [mode, []]));
+  const futureModeDistances = Object.fromEntries(
+    futureModes.map((mode) => [mode, []]),
+  );
 
   elements.forEach((element, index) => {
     const coordinates = lineCoordinates(element);
     if (!coordinates) return;
 
     const tags = element.tags ?? {};
-    const distances = nearestStationDistancesMeters(coordinates, stationGrid);
+    const distances = nearestStationDistancesMeters(coordinates, openStationGrid);
+    const futureDistances = nearestStationDistancesMeters(
+      coordinates,
+      futureStationGrid,
+    );
 
     features.push({
       type: 'Feature',
@@ -983,6 +994,15 @@ function buildStreetFeatures(elements, stationFeatures) {
       modeDistances[mode].push(
         distance <= MAX_DISTANCE_M ? Math.round(distance) : OVER_RANGE_DISTANCE_M,
       );
+
+      if (futureModeDistances[mode]) {
+        const futureDistance = futureDistances.byMode[modeIndex];
+        futureModeDistances[mode].push(
+          futureDistance <= MAX_DISTANCE_M
+            ? Math.round(futureDistance)
+            : OVER_RANGE_DISTANCE_M,
+        );
+      }
     }
 
     if ((index + 1) % 5000 === 0) {
@@ -990,7 +1010,7 @@ function buildStreetFeatures(elements, stationFeatures) {
     }
   });
 
-  return { features, modeDistances };
+  return { features, modeDistances, futureModeDistances };
 }
 
 function histogram(features) {
@@ -1073,9 +1093,14 @@ async function main() {
   );
 
   const streetElements = await fetchTiledElements('street', streetQuery, dataBounds);
-  const { features: streetFeatures, modeDistances } = buildStreetFeatures(
+  const {
+    features: streetFeatures,
+    modeDistances,
+    futureModeDistances,
+  } = buildStreetFeatures(
     streetElements,
     openStationFeatures,
+    futureStationFeatures,
   );
   console.log(`Built ${streetFeatures.length.toLocaleString()} street features.`);
 
@@ -1095,7 +1120,7 @@ async function main() {
     station_modes_open: propertyCounts(openStationFeatures, 'mode'),
     station_modes_future: propertyCounts(futureStationFeatures, 'mode'),
     station_statuses: propertyCounts(stationFeatures, 'status'),
-    distance_station_scope: 'open stations only',
+    distance_station_scope: 'open stations by default; future stations when enabled',
     street_mode_distance_file: 'data/cdmx-street-mode-distances.json',
     street_mode_distance_over_range_value: OVER_RANGE_DISTANCE_M,
     future_station_rules: FUTURE_NETWORK_RULES.map((rule) => ({
@@ -1123,6 +1148,7 @@ async function main() {
     max_distance_m: MAX_DISTANCE_M,
     over_range_value: OVER_RANGE_DISTANCE_M,
     distances_by_mode: modeDistances,
+    future_distances_by_mode: futureModeDistances,
   });
   await writeJson(resolve(dataDir, 'cdmx-metadata.json'), metadata);
 
