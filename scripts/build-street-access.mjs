@@ -22,6 +22,7 @@ const stationIndexes = new Map(
 
 await assignNearestStations(streets.features, stations.features, {
   batchSize: 25_000,
+  candidateCount: 5,
   onProgress(completed, total) {
     console.log(
       `Matched ${completed.toLocaleString()} of ${total.toLocaleString()} streets.`,
@@ -30,17 +31,30 @@ await assignNearestStations(streets.features, stations.features, {
   yieldControl: async () => {},
 });
 
-const streetStationIndexes = streets.features.map((feature) =>
-  stationIndexes.get(feature.properties.s),
-);
-if (streetStationIndexes.some((index) => !Number.isInteger(index))) {
-  throw new Error('At least one street could not be matched to an open station.');
-}
-
 const output = {
   station_ids: openStations.map((feature) => feature.properties.id),
-  street_station_indexes: streetStationIndexes,
 };
+
+for (let candidateIndex = 0; candidateIndex < 5; candidateIndex += 1) {
+  const suffix = candidateIndex === 0 ? '' : `_${candidateIndex + 1}`;
+  const propertySuffix = candidateIndex === 0 ? '' : String(candidateIndex + 1);
+  const indexes = streets.features.map((feature) =>
+    stationIndexes.get(feature.properties[`s${propertySuffix}`]),
+  );
+  const distances = streets.features.map((feature) =>
+    feature.properties[`d${propertySuffix}`],
+  );
+  if (
+    indexes.some((index) => !Number.isInteger(index)) ||
+    distances.some((distance) => !Number.isFinite(distance))
+  ) {
+    throw new Error(
+      `At least one street is missing access-station candidate ${candidateIndex + 1}.`,
+    );
+  }
+  output[`street_station_indexes${suffix}`] = indexes;
+  output[`street_station_distances${suffix}`] = distances;
+}
 
 await writeFile(
   resolve(dataDir, 'cdmx-street-access.json'),

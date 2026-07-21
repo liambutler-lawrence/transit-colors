@@ -87,6 +87,47 @@ export function scheduledWaitForStation(
   };
 }
 
+/**
+ * Returns the expected wait for one route and direction at a station. Newer
+ * schedule files store these profiles in `p`; older files fall back to the
+ * station-wide profile so deployments remain backwards compatible.
+ */
+export function scheduledWaitForService(
+  schedules,
+  stationId,
+  serviceKey,
+  weekday,
+  minuteOfDay,
+  fallbackMinutes = DEFAULT_ESTIMATED_WAIT_MINUTES,
+) {
+  const stationProfile = schedules?.stations?.[stationId];
+  const serviceDays = stationProfile?.p?.[serviceKey];
+  if (!Array.isArray(serviceDays)) {
+    return scheduledWaitForStation(
+      schedules,
+      stationId,
+      weekday,
+      minuteOfDay,
+      fallbackMinutes,
+    );
+  }
+
+  return scheduledWaitForStation(
+    {
+      stations: {
+        [stationId]: {
+          r: [serviceKey],
+          d: serviceDays,
+        },
+      },
+    },
+    stationId,
+    weekday,
+    minuteOfDay,
+    fallbackMinutes,
+  );
+}
+
 const MODE_SPEED_KMH = {
   subway: 32,
   brt: 20,
@@ -224,14 +265,20 @@ function defaultYield() {
 }
 
 /**
- * Adds the stable ID and distance of each street's nearest open station to
- * `properties.s` and `properties.d`. Existing precomputed distances are used
- * to keep the spatial search small.
+ * Adds the stable IDs and distances of each street's nearest open stations to
+ * `properties.s`/`d`, `s2`/`d2`, etc. Multiple candidates let destination
+ * routing choose the quickest walk + transit combination rather than forcing
+ * every street to use its geographically nearest station.
  */
 export async function assignNearestStations(
   streetFeatures,
   stationFeatures,
-  { batchSize = 5_000, onProgress = () => {}, yieldControl = defaultYield } = {},
+  {
+    batchSize = 5_000,
+    candidateCount = 5,
+    onProgress = () => {},
+    yieldControl = defaultYield,
+  } = {},
 ) {
   const openStations = stationFeatures
     .filter((feature) => feature.properties.status === 'open')
@@ -269,37 +316,45 @@ export async function assignNearestStations(
     const bounds = lineBounds(projectedLine);
     let padding = Math.max(500, Number(feature.properties.d) + 500 || 5_500);
     let candidates = [];
-    let bestStation = null;
-    let bestDistanceSquared = Number.POSITIVE_INFINITY;
+    let nearestStations = [];
 
     // Distances over the data cap need a wider search. Once the best point is
     // inside the padding radius, a point outside the search bounds cannot win.
     for (let attempt = 0; attempt < 8; attempt += 1) {
       candidates = grid.candidates(bounds, padding);
-      bestStation = null;
-      bestDistanceSquared = Number.POSITIVE_INFINITY;
-
-      for (const station of candidates) {
+      nearestStations = candidates.map((station) => {
+        let distanceSquared = Number.POSITIVE_INFINITY;
         for (let segmentIndex = 0; segmentIndex < projectedLine.length - 1; segmentIndex += 1) {
-          const distanceSquared = pointToSegmentDistanceSquared(
+          distanceSquared = Math.min(distanceSquared, pointToSegmentDistanceSquared(
             station.projected,
             projectedLine[segmentIndex],
             projectedLine[segmentIndex + 1],
-          );
-          if (distanceSquared < bestDistanceSquared) {
-            bestDistanceSquared = distanceSquared;
-            bestStation = station;
-          }
+          ));
         }
-      }
+        return { station, distanceSquared };
+      }).sort((first, second) => first.distanceSquared - second.distanceSquared);
 
-      if (bestStation && Math.sqrt(bestDistanceSquared) <= padding) break;
+      const lastRequired = nearestStations[Math.min(candidateCount, nearestStations.length) - 1];
+      if (
+        nearestStations.length >= Math.min(candidateCount, openStations.length) &&
+        lastRequired &&
+        Math.sqrt(lastRequired.distanceSquared) <= padding
+      ) break;
       padding *= 2;
     }
 
-    if (bestStation) {
-      feature.properties.s = bestStation.id;
-      feature.properties.d = Math.round(Math.sqrt(bestDistanceSquared));
+    for (let candidateIndex = 0; candidateIndex < candidateCount; candidateIndex += 1) {
+      const suffix = candidateIndex === 0 ? '' : String(candidateIndex + 1);
+      const candidate = nearestStations[candidateIndex];
+      if (candidate) {
+        feature.properties[`s${suffix}`] = candidate.station.id;
+        feature.properties[`d${suffix}`] = Math.round(
+          Math.sqrt(candidate.distanceSquared),
+        );
+      } else {
+        delete feature.properties[`s${suffix}`];
+        delete feature.properties[`d${suffix}`];
+      }
     }
 
     if ((index + 1) % batchSize === 0) {
@@ -456,6 +511,92 @@ export function buildTransitGraph(stationFeatures) {
   return { nodes, nodeById, adjacency };
 }
 
+function routeStateKey(stationId, serviceKey) {
+  return `${stationId}\u0000${serviceKey}`;
+}
+
+function addReverseTransfer(reverseTransfers, from, to, minutes) {
+  if (!reverseTransfers.has(to)) reverseTransfers.set(to, new Map());
+  const existing = reverseTransfers.get(to).get(from);
+  if (existing === undefined || minutes < existing) {
+    reverseTransfers.get(to).set(from, minutes);
+  }
+}
+
+/**
+ * Attaches GTFS-derived ride and transfer edges to the station graph. Ride
+ * edges preserve route + direction, which is required to charge a fresh wait
+ * only when a passenger actually boards or changes service.
+ */
+export function attachScheduleGraph(graph, schedules) {
+  const ridePredecessors = new Map();
+  const servicesByStation = new Map(graph.nodes.map((node) => [node.id, new Set()]));
+  const reverseTransfers = new Map(
+    graph.nodes.map((node) => [node.id, new Map()]),
+  );
+  const stationIds = new Set(graph.nodes.map((node) => node.id));
+
+  for (const [fromStationId, edges] of Object.entries(schedules?.graph?.e ?? {})) {
+    if (!stationIds.has(fromStationId)) continue;
+    for (const [toStationId, rawMinutes, serviceKey] of edges ?? []) {
+      const minutes = Number(rawMinutes);
+      if (
+        !stationIds.has(toStationId) ||
+        !serviceKey ||
+        !Number.isFinite(minutes) ||
+        minutes <= 0
+      ) continue;
+      servicesByStation.get(fromStationId).add(serviceKey);
+      servicesByStation.get(toStationId).add(serviceKey);
+      const destinationState = routeStateKey(toStationId, serviceKey);
+      const predecessors = ridePredecessors.get(destinationState) ?? [];
+      predecessors.push([fromStationId, minutes]);
+      ridePredecessors.set(destinationState, predecessors);
+    }
+  }
+
+  for (const [fromStationId, edges] of Object.entries(schedules?.graph?.t ?? {})) {
+    if (!stationIds.has(fromStationId)) continue;
+    for (const [toStationId, rawMinutes] of edges ?? []) {
+      const minutes = Number(rawMinutes);
+      if (!stationIds.has(toStationId) || !Number.isFinite(minutes) || minutes < 0) {
+        continue;
+      }
+      addReverseTransfer(reverseTransfers, fromStationId, toStationId, minutes);
+    }
+  }
+
+  // Cross-feed complexes (for example subway ↔ commuter rail) do not always
+  // publish transfers in one GTFS archive. Add only plausible pedestrian
+  // links here; route geometry is never inferred from proximity.
+  for (let firstIndex = 0; firstIndex < graph.nodes.length; firstIndex += 1) {
+    const first = graph.nodes[firstIndex];
+    for (let secondIndex = firstIndex + 1; secondIndex < graph.nodes.length; secondIndex += 1) {
+      const second = graph.nodes[secondIndex];
+      const meters = distanceMeters(first.coordinates, second.coordinates);
+      const sameNamedPlace =
+        first.normalizedName &&
+        first.normalizedName === second.normalizedName &&
+        meters <= 900;
+      if (!sameNamedPlace && meters > 250) continue;
+      const minutes = sameNamedPlace
+        ? Math.max(0.35, meters / WALKING_METERS_PER_MINUTE)
+        : DEFAULT_TRANSFER_MINUTES + meters / WALKING_METERS_PER_MINUTE;
+      addReverseTransfer(reverseTransfers, first.id, second.id, minutes);
+      addReverseTransfer(reverseTransfers, second.id, first.id, minutes);
+    }
+  }
+
+  return {
+    ...graph,
+    scheduleGraph: {
+      ridePredecessors,
+      reverseTransfers,
+      servicesByStation,
+    },
+  };
+}
+
 class MinHeap {
   constructor() {
     this.items = [];
@@ -501,18 +642,29 @@ class MinHeap {
 export function calculateTransitTimes(
   graph,
   destinationId,
-  { waitMinutesByStation = new Map() } = {},
+  { waitMinutesByStation = new Map(), waitMinutesByService = new Map() } = {},
 ) {
-  if (!graph.nodeById.has(destinationId)) {
-    throw new Error(`Unknown destination station: ${destinationId}`);
+  const destinationIds = Array.isArray(destinationId) ? destinationId : [destinationId];
+  const validDestinationIds = destinationIds.filter((id) => graph.nodeById.has(id));
+  if (validDestinationIds.length === 0) {
+    throw new Error(`Unknown destination station: ${destinationIds.join(', ')}`);
+  }
+
+  if (graph.scheduleGraph) {
+    return calculateScheduledTransitTimes(graph, validDestinationIds, {
+      waitMinutesByStation,
+      waitMinutesByService,
+    });
   }
 
   const minutesByStation = new Map(
     graph.nodes.map((node) => [node.id, Number.POSITIVE_INFINITY]),
   );
   const queue = new MinHeap();
-  minutesByStation.set(destinationId, 0);
-  queue.push({ id: destinationId, minutes: 0 });
+  for (const id of validDestinationIds) {
+    minutesByStation.set(id, 0);
+    queue.push({ id, minutes: 0 });
+  }
 
   while (queue.items.length > 0) {
     const current = queue.pop();
@@ -526,7 +678,6 @@ export function calculateTransitTimes(
     }
   }
 
-  const destination = graph.nodeById.get(destinationId);
   for (const node of graph.nodes) {
     const minutes = minutesByStation.get(node.id);
     if (Number.isFinite(minutes)) {
@@ -538,24 +689,107 @@ export function calculateTransitTimes(
       continue;
     }
 
-    // Disconnected or incomplete OSM route membership falls back to a clearly
-    // approximate cross-network trip instead of making the street uncolorable.
-    const directMeters = distanceMeters(node.coordinates, destination.coordinates);
-    const waitMinutes =
-      waitMinutesByStation.get(node.id) ?? DEFAULT_ESTIMATED_WAIT_MINUTES;
-    minutesByStation.set(node.id, 6 + waitMinutes + directMeters / 300);
+    minutesByStation.set(node.id, 90);
   }
 
   return minutesByStation;
 }
 
-export function streetTravelTime(properties, transitTimes) {
-  const walkingMinutes = Number(properties.d) / WALKING_METERS_PER_MINUTE;
-  const transitMinutes = transitTimes.get(properties.s) ?? 90;
+function calculateScheduledTransitTimes(
+  graph,
+  destinationIds,
+  { waitMinutesByStation, waitMinutesByService },
+) {
+  const { ridePredecessors, reverseTransfers, servicesByStation } =
+    graph.scheduleGraph;
+  const baseMinutes = new Map(
+    graph.nodes.map((node) => [node.id, Number.POSITIVE_INFINITY]),
+  );
+  const routeMinutes = new Map();
+  const serviceByStation = new Map();
+  const queue = new MinHeap();
 
-  return {
-    walkingMinutes,
-    transitMinutes,
-    totalMinutes: walkingMinutes + transitMinutes,
+  const relaxBase = (stationId, minutes, serviceKey = null) => {
+    if (minutes >= (baseMinutes.get(stationId) ?? Number.POSITIVE_INFINITY)) return;
+    baseMinutes.set(stationId, minutes);
+    if (serviceKey) serviceByStation.set(stationId, serviceKey);
+    queue.push({ id: stationId, kind: 'base', minutes });
+  };
+  const relaxRoute = (stationId, serviceKey, minutes) => {
+    const key = routeStateKey(stationId, serviceKey);
+    if (minutes >= (routeMinutes.get(key) ?? Number.POSITIVE_INFINITY)) return;
+    routeMinutes.set(key, minutes);
+    queue.push({ id: stationId, serviceKey, kind: 'route', minutes });
+  };
+
+  for (const stationId of destinationIds) relaxBase(stationId, 0);
+
+  while (queue.items.length > 0) {
+    const current = queue.pop();
+    if (current.kind === 'base') {
+      if (current.minutes !== baseMinutes.get(current.id)) continue;
+
+      // Reverse of alighting: reaching a platform from the destination-side
+      // station concourse is free.
+      for (const serviceKey of servicesByStation.get(current.id) ?? []) {
+        relaxRoute(current.id, serviceKey, current.minutes);
+      }
+      for (const [fromStationId, transferMinutes] of
+        reverseTransfers.get(current.id) ?? []) {
+        relaxBase(fromStationId, current.minutes + transferMinutes);
+      }
+      continue;
+    }
+
+    const currentKey = routeStateKey(current.id, current.serviceKey);
+    if (current.minutes !== routeMinutes.get(currentKey)) continue;
+
+    // Reverse of boarding. This is evaluated once at every actual boarding,
+    // including after a transfer to another service.
+    const serviceWait =
+      waitMinutesByService.get(currentKey) ??
+      waitMinutesByStation.get(current.id) ??
+      DEFAULT_ESTIMATED_WAIT_MINUTES;
+    relaxBase(current.id, current.minutes + serviceWait, current.serviceKey);
+
+    for (const [fromStationId, rideMinutes] of
+      ridePredecessors.get(currentKey) ?? []) {
+      relaxRoute(fromStationId, current.serviceKey, current.minutes + rideMinutes);
+    }
+  }
+
+  for (const [stationId, minutes] of baseMinutes) {
+    if (!Number.isFinite(minutes)) baseMinutes.set(stationId, 90);
+  }
+  baseMinutes.serviceByStation = serviceByStation;
+  return baseMinutes;
+}
+
+export function streetTravelTime(properties, transitTimes, candidateCount = 5) {
+  let best = null;
+
+  for (let candidateIndex = 0; candidateIndex < candidateCount; candidateIndex += 1) {
+    const suffix = candidateIndex === 0 ? '' : String(candidateIndex + 1);
+    const stationId = properties[`s${suffix}`];
+    const distance = Number(properties[`d${suffix}`]);
+    if (!stationId || !Number.isFinite(distance)) continue;
+    const walkingMinutes = distance / WALKING_METERS_PER_MINUTE;
+    const transitMinutes = transitTimes.get(stationId) ?? 90;
+    const candidate = {
+      stationId,
+      distance,
+      walkingMinutes,
+      transitMinutes,
+      totalMinutes: walkingMinutes + transitMinutes,
+    };
+    if (!best || candidate.totalMinutes < best.totalMinutes) best = candidate;
+  }
+
+  return best ?? {
+    stationId: null,
+    distance: Number.POSITIVE_INFINITY,
+    walkingMinutes: Number.POSITIVE_INFINITY,
+    transitMinutes: 90,
+    totalMinutes: Number.POSITIVE_INFINITY,
   };
 }

@@ -78,12 +78,21 @@ function validateData(features, distanceData, streetAccess) {
     }
   }
 
-  if (
-    !Array.isArray(streetAccess.station_ids) ||
-    !Array.isArray(streetAccess.street_station_indexes) ||
-    streetAccess.street_station_indexes.length !== features.length
-  ) {
-    throw new Error('Street access data does not match the street feature collection.');
+  if (!Array.isArray(streetAccess.station_ids)) {
+    throw new Error('Street access station IDs are missing.');
+  }
+  for (let candidateIndex = 0; candidateIndex < 5; candidateIndex += 1) {
+    const suffix = candidateIndex === 0 ? '' : `_${candidateIndex + 1}`;
+    if (
+      !Array.isArray(streetAccess[`street_station_indexes${suffix}`]) ||
+      streetAccess[`street_station_indexes${suffix}`].length !== features.length ||
+      !Array.isArray(streetAccess[`street_station_distances${suffix}`]) ||
+      streetAccess[`street_station_distances${suffix}`].length !== features.length
+    ) {
+      throw new Error(
+        `Street access candidate ${candidateIndex + 1} does not match the street feature collection.`,
+      );
+    }
   }
 }
 
@@ -139,12 +148,20 @@ async function buildTippecanoeInput(
     for (const [featureIndex, feature] of features.entries()) {
       const properties = {
         ...feature.properties,
-        d: tileDistance(feature.properties.d, maxDistance),
         i: featureIndex,
-        s: streetAccess.station_ids[
-          streetAccess.street_station_indexes[featureIndex]
-        ],
       };
+
+      for (let candidateIndex = 0; candidateIndex < 5; candidateIndex += 1) {
+        const suffix = candidateIndex === 0 ? '' : String(candidateIndex + 1);
+        const dataSuffix = candidateIndex === 0 ? '' : `_${candidateIndex + 1}`;
+        properties[`s${suffix}`] = streetAccess.station_ids[
+          streetAccess[`street_station_indexes${dataSuffix}`][featureIndex]
+        ];
+        properties[`d${suffix}`] = tileDistance(
+          streetAccess[`street_station_distances${dataSuffix}`][featureIndex],
+          maxDistance,
+        );
+      }
 
       for (const [mode, property] of Object.entries(MODE_DISTANCE_PROPERTIES)) {
         properties[property] = tileDistance(
