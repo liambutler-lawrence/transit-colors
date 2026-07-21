@@ -11,7 +11,7 @@
   </head>
   <body>
     <main class="app-shell">
-      <div id="map" aria-label="Transit proximity map"></div>
+      <div id="map" aria-label="Transit access map"></div>
 
       <section class="panel" aria-label="Map details">
         <div class="panel-header">
@@ -38,20 +38,73 @@
             <strong id="station-count">--</strong>
           </div>
           <div class="metric">
-            <span class="metric-label">Within 2.5 km</span>
+            <span id="near-count-label" class="metric-label">Within 2.5 km</span>
             <strong id="near-count">--</strong>
           </div>
         </div>
 
-        <div class="legend" aria-label="Distance legend">
+        <div id="legend" class="legend" aria-label="Distance legend">
           <div class="legend-bar"></div>
-          <div class="legend-labels">
+          <div id="legend-labels" class="legend-labels">
             <span>0 km</span>
             <span>1</span>
             <span>2.5</span>
             <span>5 km</span>
           </div>
         </div>
+
+        <div class="destination-control">
+          <label for="destination-select">Destination station</label>
+          <select id="destination-select" disabled>
+            <option value="">Nearest station only</option>
+          </select>
+          <p id="destination-summary">
+            Choose a station here or click an open station on the map.
+          </p>
+        </div>
+
+        <fieldset class="departure-control">
+          <legend>Departure</legend>
+          <div class="departure-inputs">
+            <label>
+              <span>Day</span>
+              <select id="schedule-day">
+                <option value="0">Monday</option>
+                <option value="1">Tuesday</option>
+                <option value="2">Wednesday</option>
+                <option value="3">Thursday</option>
+                <option value="4">Friday</option>
+                <option value="5">Saturday</option>
+                <option value="6">Sunday</option>
+              </select>
+            </label>
+            <label>
+              <span>Time</span>
+              <input id="schedule-time" type="time" step="300" />
+            </label>
+          </div>
+          <p id="schedule-summary">Loading official weekly schedules…</p>
+        </fieldset>
+
+        <fieldset class="time-scale-control">
+          <legend>Time color scale</legend>
+          <div class="time-scale-input">
+            <label for="time-scale-minutes">Green → yellow at</label>
+            <input
+              id="time-scale-minutes"
+              type="number"
+              min="1"
+              max="120"
+              step="5"
+              value="15"
+              inputmode="numeric"
+            />
+            <span>min</span>
+          </div>
+          <p id="time-scale-summary">
+            Yellow at 15 min, orange at 30 min, and red at 60 min.
+          </p>
+        </fieldset>
 
         <div class="toggles" aria-label="Layer controls">
           <label>

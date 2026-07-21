@@ -537,13 +537,14 @@ function pointToSegmentDistanceSquared(point, segmentStart, segmentEnd) {
 function buildStationGrid(stationFeatures) {
   const cells = new Map();
 
-  for (const feature of stationFeatures) {
+  for (const [index, feature] of stationFeatures.entries()) {
     const [lon, lat] = feature.geometry.coordinates;
     const projected = project(lon, lat);
     const cellX = Math.floor(projected.x / MAX_DISTANCE_M);
     const cellY = Math.floor(projected.y / MAX_DISTANCE_M);
     const key = `${cellX},${cellY}`;
     const station = {
+      index,
       projected,
       modeIndex: MODE_KEYS.indexOf(feature.properties.mode),
     };
@@ -591,6 +592,7 @@ function stationCandidates(projectedLine, stationGrid) {
 function nearestStationDistancesMeters(lineCoordinates, stationGrid) {
   let bestDistanceSquared = Number.POSITIVE_INFINITY;
   const bestDistanceByMode = MODE_KEYS.map(() => Number.POSITIVE_INFINITY);
+  let bestStationIndex = -1;
   const projectedLine = lineCoordinates.map(([lon, lat]) => project(lon, lat));
   const stations = stationCandidates(projectedLine, stationGrid);
 
@@ -607,6 +609,7 @@ function nearestStationDistancesMeters(lineCoordinates, stationGrid) {
 
       if (distanceSquared < bestDistanceSquared) {
         bestDistanceSquared = distanceSquared;
+        bestStationIndex = station.index;
       }
 
       if (
@@ -621,6 +624,7 @@ function nearestStationDistancesMeters(lineCoordinates, stationGrid) {
   return {
     nearest: Math.sqrt(bestDistanceSquared),
     byMode: bestDistanceByMode.map((distanceSquared) => Math.sqrt(distanceSquared)),
+    stationIndex: bestStationIndex,
   };
 }
 
@@ -968,6 +972,7 @@ function buildStreetFeatures(elements, openStationFeatures, futureStationFeature
   const futureModeDistances = Object.fromEntries(
     futureModes.map((mode) => [mode, []]),
   );
+  const accessStationIndexes = [];
 
   elements.forEach((element, index) => {
     const coordinates = lineCoordinates(element);
@@ -988,6 +993,7 @@ function buildStreetFeatures(elements, openStationFeatures, futureStationFeature
       },
       properties: compactProperties(tags, distances.nearest),
     });
+    accessStationIndexes.push(distances.stationIndex);
 
     for (const [modeIndex, mode] of MODE_KEYS.entries()) {
       const distance = distances.byMode[modeIndex];
@@ -1010,7 +1016,7 @@ function buildStreetFeatures(elements, openStationFeatures, futureStationFeature
     }
   });
 
-  return { features, modeDistances, futureModeDistances };
+  return { features, modeDistances, futureModeDistances, accessStationIndexes };
 }
 
 function histogram(features) {
@@ -1093,15 +1099,12 @@ async function main() {
   );
 
   const streetElements = await fetchTiledElements('street', streetQuery, dataBounds);
-  const {
-    features: streetFeatures,
-    modeDistances,
-    futureModeDistances,
-  } = buildStreetFeatures(
+  const streetBuild = buildStreetFeatures(
     streetElements,
     openStationFeatures,
     futureStationFeatures,
   );
+  const streetFeatures = streetBuild.features;
   console.log(`Built ${streetFeatures.length.toLocaleString()} street features.`);
 
   const metadata = {
@@ -1135,6 +1138,11 @@ async function main() {
       n: 'OpenStreetMap street name',
       o: '1 when true distance is over max_distance_m',
     },
+    street_access_schema: {
+      station_ids: 'open station IDs in index order',
+      street_station_indexes:
+        'nearest open station index for each feature in cdmx-streets.geojson',
+    },
     sources: [
       'OpenStreetMap contributors',
       'Overpass API',
@@ -1147,14 +1155,19 @@ async function main() {
     feature_count: streetFeatures.length,
     max_distance_m: MAX_DISTANCE_M,
     over_range_value: OVER_RANGE_DISTANCE_M,
-    distances_by_mode: modeDistances,
-    future_distances_by_mode: futureModeDistances,
+    distances_by_mode: streetBuild.modeDistances,
+    future_distances_by_mode: streetBuild.futureModeDistances,
+  });
+  await writeJson(resolve(dataDir, 'cdmx-street-access.json'), {
+    station_ids: openStationFeatures.map((feature) => feature.properties.id),
+    street_station_indexes: streetBuild.accessStationIndexes,
   });
   await writeJson(resolve(dataDir, 'cdmx-metadata.json'), metadata);
 
   console.log('Wrote data/cdmx-stations.geojson');
   console.log('Wrote data/cdmx-streets.geojson');
   console.log('Wrote data/cdmx-street-mode-distances.json');
+  console.log('Wrote data/cdmx-street-access.json');
   console.log('Wrote data/cdmx-metadata.json');
 }
 
