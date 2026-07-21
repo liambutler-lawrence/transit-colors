@@ -5,7 +5,9 @@
   "type": "module",
   "scripts": {
     "build:data:cdmx": "node scripts/build-cdmx-data.mjs",
+    "build:data:nyc": "node scripts/build-nyc-data.mjs",
+    "build:data": "npm run build:data:cdmx && npm run build:data:nyc",
     "dev": "python3 -m http.server 5173",
-    "check": "node --check scripts/build-cdmx-data.mjs && node --check app.js"
+    "check": "node --check scripts/build-cdmx-data.mjs && node --check scripts/build-nyc-data.mjs && node --check app.js"
   }
 }

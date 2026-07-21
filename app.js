@@ -1,9 +1,29 @@
-const DATASETS = {
-  streets: 'data/cdmx-streets.geojson',
-  streetModeDistances: 'data/cdmx-street-mode-distances.json',
-  stations: 'data/cdmx-stations.geojson',
-  metadata: 'data/cdmx-metadata.json',
+const AREAS = {
+  cdmx: {
+    label: 'Mexico City',
+    center: [-99.1332, 19.4326],
+    zoom: 10.5,
+    streets: 'data/cdmx-streets.geojson',
+    streetModeDistances: 'data/cdmx-street-mode-distances.json',
+    stations: 'data/cdmx-stations.geojson',
+    metadata: 'data/cdmx-metadata.json',
+    buildCommand: 'npm run build:data:cdmx',
+  },
+  nyc: {
+    label: 'New York City metro',
+    center: [-73.98, 40.75],
+    zoom: 9.5,
+    streets: null,
+    streetModeDistances: null,
+    liveRoads: true,
+    stations: 'data/nyc-stations.geojson',
+    metadata: 'data/nyc-metadata.json',
+    buildCommand: 'npm run build:data:nyc',
+  },
 };
+
+const requestedAreaKey = new URLSearchParams(window.location.search).get('area');
+const initialAreaKey = Object.hasOwn(AREAS, requestedAreaKey) ? requestedAreaKey : 'cdmx';
 
 const COLORS = {
   near: '#0aa66a',
@@ -56,8 +76,8 @@ const FUTURE_MODE_DISTANCE_PROPERTIES = {
 const map = new maplibregl.Map({
   container: 'map',
   style: 'https://tiles.openfreemap.org/styles/liberty',
-  center: [-99.1332, 19.4326],
-  zoom: 10.5,
+  center: AREAS[initialAreaKey].center,
+  zoom: AREAS[initialAreaKey].zoom,
 });
 
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
@@ -74,6 +94,14 @@ const featureMetadataEl = document.querySelector('#feature-metadata');
 const streetToggle = document.querySelector('#toggle-streets');
 const stationToggle = document.querySelector('#toggle-stations');
 const futureStationToggle = document.querySelector('#toggle-future-stations');
+const areaSelect = document.querySelector('#metro-area');
+const mapEl = document.querySelector('#map');
+
+let activeAreaKey = initialAreaKey;
+let loadSequence = 0;
+let activeProjectedStations = [];
+let loadedStations = { type: 'FeatureCollection', features: [] };
+const liveStreetLayerIds = [];
 
 const stationColor = [
   'match',
@@ -108,6 +136,7 @@ let futureStreetModeDistances = {};
 let streetFeatureBounds = null;
 let stationStatistics = [];
 let selectedStreetProperties = null;
+let selectedLiveStreetFeature = null;
 
 function formatInteger(value) {
   return new Intl.NumberFormat('en-US').format(value);
@@ -222,8 +251,35 @@ function streetColorExpression() {
   ];
 }
 
+function activeStationCollection() {
+  return {
+    type: 'FeatureCollection',
+    features: (loadedStations.features ?? []).filter(
+      (feature) =>
+        activeStationModes.has(feature.properties.mode) &&
+        (feature.properties.status === 'open' || futureStationToggle.checked),
+    ),
+  };
+}
+
+function updateActiveProjectedStations(stations) {
+  activeProjectedStations = stations.features.map((feature) =>
+    projectCoordinate(feature.geometry.coordinates),
+  );
+}
+
 function syncStreetColor() {
-  if (map.getLayer('street-proximity')) {
+  if (AREAS[activeAreaKey].liveRoads) {
+    const activeStations = activeStationCollection();
+    updateActiveProjectedStations(activeStations);
+    const color = liveStreetColor(activeStations);
+
+    for (const layerId of liveStreetLayerIds) {
+      if (map.getLayer(layerId)) {
+        map.setPaintProperty(layerId, 'line-color', color);
+      }
+    }
+  } else if (map.getLayer('street-proximity')) {
     map.setPaintProperty('street-proximity', 'line-color', streetColorExpression());
   }
 }
@@ -246,7 +302,9 @@ function selectedDistanceArrays() {
 
 function initializeStatisticsData(streets, stations) {
   const streetFeatures = streets.features ?? [];
-  streetFeatureBounds = new Float64Array(streetFeatures.length * 4);
+  streetFeatureBounds = streetFeatures.length
+    ? new Float64Array(streetFeatures.length * 4)
+    : null;
 
   for (const [featureIndex, feature] of streetFeatures.entries()) {
     const coordinates = feature.geometry?.coordinates ?? [];
@@ -277,8 +335,6 @@ function initializeStatisticsData(streets, stations) {
 }
 
 function updateViewportStatistics() {
-  if (!streetFeatureBounds) return;
-
   const bounds = map.getBounds();
   const west = bounds.getWest();
   const south = bounds.getSouth();
@@ -288,7 +344,7 @@ function updateViewportStatistics() {
   let visibleStreetCount = 0;
   let nearCount = 0;
 
-  if (streetToggle.checked) {
+  if (streetToggle.checked && streetFeatureBounds) {
     for (let featureIndex = 0; featureIndex < streetFeatureCount; featureIndex += 1) {
       const offset = featureIndex * 4;
       const isInView =
@@ -327,9 +383,15 @@ function updateViewportStatistics() {
     }
   }
 
-  streetCountEl.textContent = formatInteger(visibleStreetCount);
+  if (AREAS[activeAreaKey].liveRoads) {
+    streetCountEl.textContent = streetToggle.checked ? 'Live' : '0';
+    nearCountEl.textContent = streetToggle.checked ? 'Live' : '0';
+  } else {
+    streetCountEl.textContent = formatInteger(visibleStreetCount);
+    nearCountEl.textContent = formatInteger(nearCount);
+  }
+
   stationCountEl.textContent = formatInteger(visibleStationCount);
-  nearCountEl.textContent = formatInteger(nearCount);
 }
 
 function attachStreetModeDistances(streets, distanceData) {
@@ -369,6 +431,15 @@ function attachStreetModeDistances(streets, distanceData) {
   );
 }
 
+function syncStreetVisibility() {
+  const visible = streetToggle.checked;
+  setLayerVisibility('street-proximity', visible && !AREAS[activeAreaKey].liveRoads);
+
+  for (const layerId of liveStreetLayerIds) {
+    setLayerVisibility(layerId, visible && AREAS[activeAreaKey].liveRoads);
+  }
+}
+
 function updateStatus(label, isError = false) {
   statusEl.textContent = label;
   statusEl.classList.toggle('error', isError);
@@ -377,13 +448,16 @@ function updateStatus(label, isError = false) {
 function renderMetadata(metadata) {
   const streetCount = metadata.street_count ?? 0;
   const stationCount = metadata.open_station_count ?? metadata.station_count ?? 0;
+  const futureStationCount = metadata.future_station_count ?? 0;
   const nearCount = metadata.histogram?.under_2500_m ?? 0;
 
   maxDistanceMeters = metadata.max_distance_m ?? maxDistanceMeters;
 
-  streetCountEl.textContent = formatInteger(streetCount);
+  streetCountEl.textContent = metadata.street_count == null ? 'Live' : formatInteger(streetCount);
   stationCountEl.textContent = formatInteger(stationCount);
-  nearCountEl.textContent = formatInteger(nearCount);
+  nearCountEl.textContent = metadata.histogram ? formatInteger(nearCount) : 'Live';
+  futureStationToggle.disabled = futureStationCount === 0;
+  if (futureStationCount === 0) futureStationToggle.checked = false;
 
   const stationModes = metadata.station_modes_open ?? metadata.station_modes ?? {};
   const sortedStationModes = Object.entries(stationModes).sort((a, b) => b[1] - a[1]);
@@ -435,6 +509,8 @@ stationBreakdownEl.addEventListener('click', (event) => {
 
   if (selectedStreetProperties) {
     showStreetFeature(selectedStreetProperties);
+  } else if (selectedLiveStreetFeature) {
+    showLiveStreetFeature(selectedLiveStreetFeature);
   }
 });
 
@@ -462,6 +538,7 @@ function applyMapBounds(metadata) {
 
   const leftPadding = window.innerWidth >= 760 ? 360 : 48;
 
+  map.setMaxBounds(null);
   map.setMaxBounds(bounds);
   map.fitBounds(bounds, {
     padding: {
@@ -472,6 +549,30 @@ function applyMapBounds(metadata) {
     },
     duration: 0,
   });
+}
+
+function resetSelection() {
+  selectedStreetProperties = null;
+  selectedLiveStreetFeature = null;
+  selectionTypeEl.textContent = 'Selected feature';
+  featureNameEl.textContent = 'None';
+  featureSummaryEl.textContent = 'Hover a highlighted street or station';
+  featureMetadataEl.replaceChildren();
+}
+
+function updateAreaChrome(areaKey) {
+  const area = AREAS[areaKey];
+  areaSelect.value = areaKey;
+  document.title = `Transit Colors — ${area.label}`;
+  mapEl.setAttribute('aria-label', `${area.label} transit proximity map`);
+
+  const url = new URL(window.location.href);
+  if (areaKey === 'cdmx') {
+    url.searchParams.delete('area');
+  } else {
+    url.searchParams.set('area', areaKey);
+  }
+  window.history.replaceState({}, '', url);
 }
 
 function renderDetails(details) {
@@ -495,6 +596,7 @@ function renderDetails(details) {
 function showStreetFeature(props) {
   const streetName = props.n || props.h || 'Unnamed street';
   selectedStreetProperties = props;
+  selectedLiveStreetFeature = null;
   selectionTypeEl.textContent = 'Selected street';
   featureNameEl.textContent = streetName;
 
@@ -531,8 +633,74 @@ function showStreetFeature(props) {
   ]);
 }
 
+function projectCoordinate([lon, lat]) {
+  return {
+    x: lon * 111_320 * Math.cos((40.75 * Math.PI) / 180),
+    y: lat * 111_320,
+  };
+}
+
+function pointToSegmentDistance(point, start, end) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  if (dx === 0 && dy === 0) return Math.hypot(point.x - start.x, point.y - start.y);
+
+  const t = Math.max(
+    0,
+    Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy)),
+  );
+  return Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy));
+}
+
+function geometryLines(geometry) {
+  if (geometry?.type === 'LineString') return [geometry.coordinates];
+  if (geometry?.type === 'MultiLineString') return geometry.coordinates;
+  return [];
+}
+
+function liveStreetDistance(geometry) {
+  let best = Number.POSITIVE_INFINITY;
+
+  for (const line of geometryLines(geometry)) {
+    const projectedLine = line.map(projectCoordinate);
+    for (let index = 0; index < projectedLine.length - 1; index += 1) {
+      for (const station of activeProjectedStations) {
+        best = Math.min(
+          best,
+          pointToSegmentDistance(station, projectedLine[index], projectedLine[index + 1]),
+        );
+      }
+    }
+  }
+
+  return best;
+}
+
+function showLiveStreetFeature(feature) {
+  const props = feature.properties ?? {};
+  const streetName = props.name || props['name:latin'] || props.class || 'Unnamed street';
+  selectedStreetProperties = null;
+  selectedLiveStreetFeature = feature;
+  selectionTypeEl.textContent = 'Selected street';
+  featureNameEl.textContent = streetName;
+
+  if (activeStationModes.size === 0) {
+    featureSummaryEl.textContent = 'No station types selected';
+  } else {
+    const distance = liveStreetDistance(feature.geometry);
+    const distanceLabel =
+      !Number.isFinite(distance) || distance > maxDistanceMeters
+        ? `More than ${formatDistance(maxDistanceMeters)}`
+        : formatDistance(distance);
+    featureSummaryEl.textContent = `${distanceLabel} from nearest selected station`;
+  }
+
+  renderDetails([{ label: 'Road class', value: props.class }]);
+}
+
 function showStationFeature(props) {
   selectedStreetProperties = null;
+  selectedLiveStreetFeature = null;
   selectionTypeEl.textContent = 'Selected station';
   featureNameEl.textContent = props.name || 'Unnamed station';
   featureSummaryEl.textContent = props.system || MODE_LABELS[props.mode] || 'Transit station';
@@ -545,7 +713,7 @@ function showStationFeature(props) {
     { label: 'Route', value: props.route_name || props.route_relation },
     { label: 'Stop tag', value: props.highway || props.public_transport },
     { label: 'Opening', value: props.opening_date },
-    { label: 'OSM', value: props.id },
+    { label: props.id?.startsWith('gtfs/') ? 'GTFS' : 'OSM', value: props.id },
   ]);
 }
 
@@ -601,151 +769,276 @@ function installHover() {
   }
 }
 
-async function initialize() {
-  try {
-    const [streets, streetModeDistanceData, stations, metadata] = await Promise.all([
-      fetchJson(DATASETS.streets),
-      fetchJson(DATASETS.streetModeDistances),
-      fetchJson(DATASETS.stations),
-      fetchJson(DATASETS.metadata),
-    ]);
+function liveStreetColor(stations) {
+  const stationCoordinates = stations.features.map((feature) => feature.geometry.coordinates);
+  const stationGeometry = {
+    type: 'MultiPoint',
+    coordinates: stationCoordinates.length > 0 ? stationCoordinates : [[0, 0]],
+  };
 
-    attachStreetModeDistances(streets, streetModeDistanceData);
-    initializeStatisticsData(streets, stations);
-    renderMetadata(metadata);
-    applyMapBounds(metadata);
+  return [
+    'interpolate',
+    ['linear'],
+    ['distance', stationGeometry],
+    0,
+    COLORS.near,
+    1000,
+    COLORS.midNear,
+    2500,
+    COLORS.midFar,
+    maxDistanceMeters,
+    COLORS.far,
+  ];
+}
 
-    const labelLayerId = firstSymbolLayerId();
+function isStreetStyleLayer(layer) {
+  return (
+    layer.type === 'line' &&
+    layer['source-layer'] === 'transportation' &&
+    /^(road|bridge|tunnel)_/.test(layer.id) &&
+    !/(casing|rail|hatching|path|pedestrian)/.test(layer.id)
+  );
+}
 
-    map.addSource('streets', {
-      type: 'geojson',
-      data: streets,
-      generateId: true,
-    });
+function installLiveStreetHover(layerId) {
+  map.on('mousemove', layerId, (event) => {
+    const feature = event.features?.[0];
+    if (!feature) return;
+    showLiveStreetFeature(feature);
+    map.getCanvas().style.cursor = 'pointer';
+  });
+  map.on('mouseleave', layerId, () => {
+    map.getCanvas().style.cursor = '';
+  });
+  map.on('click', layerId, (event) => {
+    const feature = event.features?.[0];
+    if (feature) showLiveStreetFeature(feature);
+  });
+}
 
-    map.addSource('stations', {
-      type: 'geojson',
-      data: stations,
-      generateId: true,
-    });
+function installLiveStreetLayers(stations) {
+  const color = liveStreetColor(stations);
 
+  if (liveStreetLayerIds.length > 0) {
+    for (const layerId of liveStreetLayerIds) {
+      map.setPaintProperty(layerId, 'line-color', color);
+    }
+    return;
+  }
+
+  const labelLayerId = firstSymbolLayerId();
+  const streetLayers = map.getStyle().layers.filter(isStreetStyleLayer);
+
+  for (const layer of streetLayers) {
+    const layerId = `transit-${layer.id}`;
     map.addLayer(
       {
-        id: 'street-proximity',
+        id: layerId,
         type: 'line',
-        source: 'streets',
+        source: layer.source,
+        'source-layer': layer['source-layer'],
+        ...(layer.minzoom == null ? {} : { minzoom: layer.minzoom }),
+        ...(layer.maxzoom == null ? {} : { maxzoom: layer.maxzoom }),
+        ...(layer.filter == null ? {} : { filter: layer.filter }),
+        layout: {
+          ...(layer.layout ?? {}),
+          visibility: 'none',
+        },
         paint: {
-          'line-color': streetColorExpression(),
-          'line-width': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            9,
-            0.75,
-            12,
-            1.8,
-            15,
-            4.2,
-          ],
-          'line-opacity': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            1,
-            0.78,
-          ],
+          'line-color': color,
+          'line-opacity': 0.8,
+          'line-width': layer.paint?.['line-width'] ?? 1,
         },
       },
       labelLayerId,
     );
+    liveStreetLayerIds.push(layerId);
+    installLiveStreetHover(layerId);
+  }
+}
 
-    map.addLayer({
-      id: 'station-points-open',
-      type: 'circle',
-      source: 'stations',
-      filter: openStationFilter,
+function installMapData(streets, stations, useLiveRoads) {
+  const existingStreets = map.getSource('streets');
+  const existingStations = map.getSource('stations');
+
+  if (existingStreets && existingStations) {
+    existingStreets.setData(streets ?? { type: 'FeatureCollection', features: [] });
+    existingStations.setData(stations);
+    if (useLiveRoads) installLiveStreetLayers(stations);
+    return;
+  }
+
+  const labelLayerId = firstSymbolLayerId();
+
+  map.addSource('streets', {
+    type: 'geojson',
+    data: streets ?? { type: 'FeatureCollection', features: [] },
+    generateId: true,
+  });
+
+  map.addSource('stations', {
+    type: 'geojson',
+    data: stations,
+    generateId: true,
+  });
+
+  map.addLayer(
+    {
+      id: 'street-proximity',
+      type: 'line',
+      source: 'streets',
       paint: {
-        'circle-color': stationColor,
-        'circle-stroke-color': '#18222c',
-        'circle-stroke-width': 1.5,
-        'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3, 13, 6],
+        'line-color': streetColorExpression(),
+        'line-width': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          9,
+          0.75,
+          12,
+          1.8,
+          15,
+          4.2,
+        ],
+        'line-opacity': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          1,
+          0.78,
+        ],
       },
-    });
+    },
+    labelLayerId,
+  );
 
-    map.addLayer({
-      id: 'station-points-future',
-      type: 'circle',
-      source: 'stations',
-      filter: futureStationFilter,
-      layout: {
-        visibility: 'none',
-      },
-      paint: {
-        'circle-color': stationColor,
-        'circle-opacity': 0.42,
-        'circle-stroke-color': COLORS.future,
-        'circle-stroke-width': 2,
-        'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3.5, 13, 7],
-      },
-    });
+  map.addLayer({
+    id: 'station-points-open',
+    type: 'circle',
+    source: 'stations',
+    filter: openStationFilter,
+    paint: {
+      'circle-color': stationColor,
+      'circle-stroke-color': '#18222c',
+      'circle-stroke-width': 1.5,
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3, 13, 6],
+    },
+  });
 
-    map.addLayer({
-      id: 'station-labels-open',
-      type: 'symbol',
-      source: 'stations',
-      filter: openStationFilter,
-      minzoom: 11.4,
-      layout: {
-        'text-field': ['get', 'name'],
-        'text-size': ['interpolate', ['linear'], ['zoom'], 11.4, 10, 15, 13],
-        'text-offset': [0, 1.2],
-        'text-anchor': 'top',
-        'text-allow-overlap': false,
-        'text-optional': true,
-      },
-      paint: {
-        'text-color': '#18222c',
-        'text-halo-color': '#ffffff',
-        'text-halo-width': 1.2,
-      },
-    });
+  map.addLayer({
+    id: 'station-points-future',
+    type: 'circle',
+    source: 'stations',
+    filter: futureStationFilter,
+    layout: {
+      visibility: 'none',
+    },
+    paint: {
+      'circle-color': stationColor,
+      'circle-opacity': 0.42,
+      'circle-stroke-color': COLORS.future,
+      'circle-stroke-width': 2,
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3.5, 13, 7],
+    },
+  });
 
-    map.addLayer({
-      id: 'station-labels-future',
-      type: 'symbol',
-      source: 'stations',
-      filter: futureStationFilter,
-      minzoom: 10.8,
-      layout: {
-        visibility: 'none',
-        'text-field': ['concat', ['get', 'name'], ' (future)'],
-        'text-size': ['interpolate', ['linear'], ['zoom'], 10.8, 10, 15, 13],
-        'text-offset': [0, 1.25],
-        'text-anchor': 'top',
-        'text-allow-overlap': false,
-        'text-optional': true,
-      },
-      paint: {
-        'text-color': '#334155',
-        'text-halo-color': '#ffffff',
-        'text-halo-width': 1.2,
-        'text-opacity': 0.8,
-      },
-    });
+  map.addLayer({
+    id: 'station-labels-open',
+    type: 'symbol',
+    source: 'stations',
+    filter: openStationFilter,
+    minzoom: 11.4,
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 11.4, 10, 15, 13],
+      'text-offset': [0, 1.2],
+      'text-anchor': 'top',
+      'text-allow-overlap': false,
+      'text-optional': true,
+    },
+    paint: {
+      'text-color': '#18222c',
+      'text-halo-color': '#ffffff',
+      'text-halo-width': 1.2,
+    },
+  });
 
-    installHover();
+  map.addLayer({
+    id: 'station-labels-future',
+    type: 'symbol',
+    source: 'stations',
+    filter: futureStationFilter,
+    minzoom: 10.8,
+    layout: {
+      visibility: 'none',
+      'text-field': ['concat', ['get', 'name'], ' (future)'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 10.8, 10, 15, 13],
+      'text-offset': [0, 1.25],
+      'text-anchor': 'top',
+      'text-allow-overlap': false,
+      'text-optional': true,
+    },
+    paint: {
+      'text-color': '#334155',
+      'text-halo-color': '#ffffff',
+      'text-halo-width': 1.2,
+      'text-opacity': 0.8,
+    },
+  });
+
+  installHover();
+  if (useLiveRoads) installLiveStreetLayers(stations);
+}
+
+async function loadArea(areaKey) {
+  const area = AREAS[areaKey];
+  const sequence = ++loadSequence;
+
+  activeAreaKey = areaKey;
+  updateAreaChrome(areaKey);
+  resetSelection();
+  updateStatus('Loading');
+
+  try {
+    const [streets, streetModeDistanceData, stations, metadata] = await Promise.all([
+      area.streets
+        ? fetchJson(area.streets)
+        : Promise.resolve({ type: 'FeatureCollection', features: [] }),
+      area.streetModeDistances ? fetchJson(area.streetModeDistances) : Promise.resolve(null),
+      fetchJson(area.stations),
+      fetchJson(area.metadata),
+    ]);
+
+    if (sequence !== loadSequence) return;
+
+    if (streetModeDistanceData) {
+      attachStreetModeDistances(streets, streetModeDistanceData);
+    } else {
+      streetFeatureCount = 0;
+      streetModeDistances = {};
+      futureStreetModeDistances = {};
+    }
+
+    loadedStations = stations;
+    initializeStatisticsData(streets, stations);
+    renderMetadata(metadata);
+    applyMapBounds(metadata);
+    installMapData(streets, stations, area.liveRoads);
     syncStationFilters();
+    syncStreetColor();
+    syncStreetVisibility();
     syncStationVisibility();
     updateViewportStatistics();
     updateStatus('Ready');
   } catch (error) {
+    if (sequence !== loadSequence) return;
     console.error(error);
     updateStatus('Data missing', true);
-    featureSummaryEl.textContent = 'Run npm run build:data:cdmx, then refresh.';
+    featureSummaryEl.textContent = `Run ${area.buildCommand}, then refresh.`;
   }
 }
 
 streetToggle.addEventListener('change', () => {
-  setLayerVisibility('street-proximity', streetToggle.checked);
+  syncStreetVisibility();
   updateViewportStatistics();
 });
 
@@ -761,8 +1054,15 @@ futureStationToggle.addEventListener('change', () => {
 
   if (selectedStreetProperties) {
     showStreetFeature(selectedStreetProperties);
+  } else if (selectedLiveStreetFeature) {
+    showLiveStreetFeature(selectedLiveStreetFeature);
   }
 });
 
 map.on('moveend', updateViewportStatistics);
-map.on('load', initialize);
+areaSelect.addEventListener('change', () => {
+  const areaKey = areaSelect.value;
+  if (areaKey !== activeAreaKey) loadArea(areaKey);
+});
+
+map.on('load', () => loadArea(initialAreaKey));

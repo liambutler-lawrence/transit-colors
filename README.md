@@ -1,6 +1,6 @@
 # Transit Colors
 
-Static POC that overlays CDMX streets with a color gradient based on distance to the nearest open transit station.
+Static POC that colors streets by distance to the nearest open transit station. The map supports the Mexico City and New York City metropolitan areas.
 
 ## Stack
 
@@ -11,11 +11,14 @@ Static POC that overlays CDMX streets with a color gradient based on distance to
 
 ## Local Development
 
-Generate CDMX data:
+Generate data for either metro area:
 
 ```sh
 npm run build:data:cdmx
+npm run build:data:nyc
 ```
+
+Run both builders with `npm run build:data`.
 
 Serve the static site:
 
@@ -25,7 +28,7 @@ npm run dev
 
 Open `http://localhost:5173`.
 
-## Data Notes
+## CDMX Data Notes
 
 The data script fetches CDMX roads and station-like transit features from Overpass once, then writes static GeoJSON into `data/`.
 
@@ -68,6 +71,22 @@ Street color is computed from the nearest selected open-station mode and clamped
 `data/cdmx-street-mode-distances.json`, allowing the map gradient to update without
 reloading the street geometry. Enabling the top-level Future control also includes
 future/planned stations from the currently selected modes in the gradient.
+
+## NYC Metro Data Notes
+
+The NYC builder combines current static GTFS station data for:
+
+- MTA New York City Subway and Staten Island Railway
+- Long Island Rail Road
+- Metro-North Railroad
+- NJ Transit commuter rail and light rail
+- PATH
+
+The committed dataset is clipped to the regional transit footprint from `40.0-41.9° N` and `74.8-71.8° W`, which includes the outer commuter-rail branches while excluding NJ Transit service outside the NYC region.
+
+Unlike the precomputed CDMX street file, NYC street distances are evaluated in the browser against OpenFreeMap's OpenStreetMap vector roads using MapLibre's `distance` expression. This keeps the NYC addition small while preserving the same `0-5000m` color scale. The metadata displays `Live` for street totals and proximity counts because those roads are loaded as viewport-based vector tiles rather than a fixed GeoJSON collection.
+
+Downloaded GTFS archives are cached in `data/.gtfs-cache/`. Set `REFRESH_GTFS_CACHE=1` to force a refresh.
 
 ## Deployment
 

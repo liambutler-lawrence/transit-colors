@@ -61,12 +61,26 @@ body {
   gap: 16px;
 }
 
-.kicker {
+.area-control {
+  display: flex;
+  align-items: center;
+  gap: 7px;
   margin: 0 0 4px;
   color: #256b62;
   font-size: 0.78rem;
   font-weight: 800;
   text-transform: uppercase;
+}
+
+.area-control select {
+  max-width: 170px;
+  padding: 3px 24px 3px 7px;
+  border: 1px solid #b9d5d0;
+  border-radius: 6px;
+  color: #1d4f49;
+  background: #f2faf8;
+  font: inherit;
+  text-transform: none;
 }
 
 h1 {
@@ -173,6 +187,10 @@ h1 {
   width: 16px;
   height: 16px;
   accent-color: #147b6f;
+}
+
+.toggles label:has(input:disabled) {
+  opacity: 0.52;
 }
 
 .station-breakdown {
