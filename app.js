@@ -82,6 +82,7 @@ const map = new maplibregl.Map({
   style: 'vendor/openfreemap-shell.json',
   center: AREAS[initialAreaKey].center,
   zoom: AREAS[initialAreaKey].zoom,
+  maxZoom: 17,
 });
 window.__transitMap = map;
 
@@ -472,7 +473,14 @@ function streetDistanceFromProperties(properties) {
 }
 
 function visibleTiledStreets() {
-  if (!streetToggle.checked || !map.getLayer('street-proximity')) return [];
+  if (
+    !streetToggle.checked ||
+    !map.getLayer('street-proximity') ||
+    !map.getSource('streets') ||
+    !map.isSourceLoaded('streets')
+  ) {
+    return [];
+  }
 
   const byId = new Map();
   for (const feature of map.queryRenderedFeatures({ layers: ['street-proximity'] })) {
@@ -482,7 +490,7 @@ function visibleTiledStreets() {
   return [...byId.values()];
 }
 
-function updateViewportStatistics() {
+function updateViewportStatistics(tiledStreets = null) {
   const bounds = map.getBounds();
   const timeStops = timeScaleStops(state.timeScaleMinutes);
   const timeMode =
@@ -513,7 +521,13 @@ function updateViewportStatistics() {
     return;
   }
 
-  const streets = visibleTiledStreets();
+  if (streetToggle.checked && !map.isSourceLoaded('streets')) {
+    streetCountEl.textContent = '--';
+    nearCountEl.textContent = '--';
+    return;
+  }
+
+  const streets = tiledStreets ?? visibleTiledStreets();
   let nearCount = 0;
   for (const properties of streets) {
     const isNear = timeMode
@@ -1622,20 +1636,21 @@ map.on('sourcedata', (event) => {
   }
 });
 
-map.on('moveend', updateViewportStatistics);
 map.on('idle', () => {
-  updateViewportStatistics();
-  if (AREAS[activeAreaKey].liveRoads && loadingOperation?.type !== 'filter') {
-    loadingCanFinish = true;
-    finishLoading();
+  if (AREAS[activeAreaKey].liveRoads) {
+    updateViewportStatistics();
+    if (loadingOperation?.type !== 'filter') {
+      loadingCanFinish = true;
+      finishLoading();
+    }
+    return;
   }
-});
-map.on('render', () => {
-  if (!map.getLayer('street-proximity')) return;
 
-  const renderedStreets = AREAS[activeAreaKey].liveRoads
-    ? []
-    : map.queryRenderedFeatures({ layers: ['street-proximity'] });
+  if (!map.getSource('streets') || !map.isSourceLoaded('streets')) return;
+
+  const renderedStreets = visibleTiledStreets();
+  updateViewportStatistics(renderedStreets);
+
   if (
     window.__transitPerformance.firstStreetRenderMs === null &&
     renderedStreets.length > 0
@@ -1645,13 +1660,10 @@ map.on('render', () => {
   }
 
   if (
-    !AREAS[activeAreaKey].liveRoads &&
     loadingOperation?.type !== 'filter' &&
-    renderedStreets.length > 0 &&
-    (streetSourceLoaded || map.isSourceLoaded('streets'))
+    (renderedStreets.length > 0 || !streetToggle.checked)
   ) {
     streetSourceLoaded = true;
-    updateViewportStatistics();
     loadingCanFinish = true;
     finishLoading();
   }
