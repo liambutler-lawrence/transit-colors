@@ -183,6 +183,7 @@ h1 {
 }
 
 .mode-pill {
+  appearance: none;
   display: inline-flex;
   align-items: center;
   gap: 6px;
@@ -192,8 +193,16 @@ h1 {
   border-radius: 999px;
   background: #ffffff;
   color: var(--ink);
+  cursor: pointer;
+  font-family: inherit;
   font-size: 0.72rem;
   font-weight: 750;
+  line-height: normal;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease,
+    opacity 120ms ease;
 }
 
 .mode-pill::before {
@@ -204,9 +213,30 @@ h1 {
   content: "";
 }
 
+.mode-pill[data-mode]:hover {
+  border-color: #aeb7c3;
+  background: #f8fafb;
+}
+
+.mode-pill[data-mode]:focus-visible {
+  outline: 3px solid rgba(20, 123, 111, 0.28);
+  outline-offset: 2px;
+}
+
+.mode-pill[data-mode][aria-pressed="false"] {
+  background: #f1f3f5;
+  color: var(--muted);
+  opacity: 0.58;
+}
+
+.mode-pill[data-mode][aria-pressed="false"]::before {
+  filter: grayscale(1);
+}
+
 .future-mode-pill {
   border-style: dashed;
   color: #334155;
+  cursor: default;
 }
 
 .selection {

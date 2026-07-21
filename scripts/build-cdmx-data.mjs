@@ -5,7 +5,10 @@ import { fileURLToPath } from 'node:url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, '..');
 const dataDir = resolve(rootDir, 'data');
-const cacheDir = resolve(dataDir, '.overpass-cache');
+const cacheDir = resolve(
+  rootDir,
+  process.env.OVERPASS_CACHE_DIR ?? 'data/.overpass-cache',
+);
 
 const OVERPASS_URL = process.env.OVERPASS_URL ?? 'https://overpass-api.de/api/interpreter';
 const MAX_DISTANCE_M = Number.parseInt(process.env.MAX_DISTANCE_M ?? '5000', 10);
@@ -106,6 +109,8 @@ const MODE_LABELS = {
   regional_rail: 'Regional rail',
   monorail: 'Monorail',
 };
+const MODE_KEYS = Object.keys(MODE_LABELS);
+const OVER_RANGE_DISTANCE_M = MAX_DISTANCE_M + 1;
 
 const FUTURE_NETWORK_RULES = [
   {
@@ -529,9 +534,65 @@ function pointToSegmentDistanceSquared(point, segmentStart, segmentEnd) {
   return px * px + py * py;
 }
 
-function nearestStationDistanceMeters(lineCoordinates, stations) {
+function buildStationGrid(stationFeatures) {
+  const cells = new Map();
+
+  for (const feature of stationFeatures) {
+    const [lon, lat] = feature.geometry.coordinates;
+    const projected = project(lon, lat);
+    const cellX = Math.floor(projected.x / MAX_DISTANCE_M);
+    const cellY = Math.floor(projected.y / MAX_DISTANCE_M);
+    const key = `${cellX},${cellY}`;
+    const station = {
+      projected,
+      modeIndex: MODE_KEYS.indexOf(feature.properties.mode),
+    };
+
+    if (cells.has(key)) {
+      cells.get(key).push(station);
+    } else {
+      cells.set(key, [station]);
+    }
+  }
+
+  return cells;
+}
+
+function stationCandidates(projectedLine, stationGrid) {
+  const bounds = projectedLine.reduce(
+    (result, point) => ({
+      minX: Math.min(result.minX, point.x),
+      minY: Math.min(result.minY, point.y),
+      maxX: Math.max(result.maxX, point.x),
+      maxY: Math.max(result.maxY, point.y),
+    }),
+    {
+      minX: Number.POSITIVE_INFINITY,
+      minY: Number.POSITIVE_INFINITY,
+      maxX: Number.NEGATIVE_INFINITY,
+      maxY: Number.NEGATIVE_INFINITY,
+    },
+  );
+  const minCellX = Math.floor((bounds.minX - MAX_DISTANCE_M) / MAX_DISTANCE_M);
+  const minCellY = Math.floor((bounds.minY - MAX_DISTANCE_M) / MAX_DISTANCE_M);
+  const maxCellX = Math.floor((bounds.maxX + MAX_DISTANCE_M) / MAX_DISTANCE_M);
+  const maxCellY = Math.floor((bounds.maxY + MAX_DISTANCE_M) / MAX_DISTANCE_M);
+  const candidates = [];
+
+  for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+    for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
+      candidates.push(...(stationGrid.get(`${cellX},${cellY}`) ?? []));
+    }
+  }
+
+  return candidates;
+}
+
+function nearestStationDistancesMeters(lineCoordinates, stationGrid) {
   let bestDistanceSquared = Number.POSITIVE_INFINITY;
+  const bestDistanceByMode = MODE_KEYS.map(() => Number.POSITIVE_INFINITY);
   const projectedLine = lineCoordinates.map(([lon, lat]) => project(lon, lat));
+  const stations = stationCandidates(projectedLine, stationGrid);
 
   for (let i = 0; i < projectedLine.length - 1; i += 1) {
     const segmentStart = projectedLine[i];
@@ -547,10 +608,20 @@ function nearestStationDistanceMeters(lineCoordinates, stations) {
       if (distanceSquared < bestDistanceSquared) {
         bestDistanceSquared = distanceSquared;
       }
+
+      if (
+        station.modeIndex >= 0 &&
+        distanceSquared < bestDistanceByMode[station.modeIndex]
+      ) {
+        bestDistanceByMode[station.modeIndex] = distanceSquared;
+      }
     }
   }
 
-  return Math.sqrt(bestDistanceSquared);
+  return {
+    nearest: Math.sqrt(bestDistanceSquared),
+    byMode: bestDistanceByMode.map((distanceSquared) => Math.sqrt(distanceSquared)),
+  };
 }
 
 function compactProperties(tags, distanceMeters) {
@@ -883,25 +954,20 @@ function lineCoordinates(element) {
 }
 
 function buildStreetFeatures(elements, stationFeatures) {
-  const stations = stationFeatures.map((feature) => {
-    const [lon, lat] = feature.geometry.coordinates;
-    return {
-      projected: project(lon, lat),
-    };
-  });
-
-  if (stations.length === 0) {
+  if (stationFeatures.length === 0) {
     throw new Error('No station features found; cannot compute street distances.');
   }
 
+  const stationGrid = buildStationGrid(stationFeatures);
   const features = [];
+  const modeDistances = Object.fromEntries(MODE_KEYS.map((mode) => [mode, []]));
 
   elements.forEach((element, index) => {
     const coordinates = lineCoordinates(element);
     if (!coordinates) return;
 
     const tags = element.tags ?? {};
-    const distanceMeters = nearestStationDistanceMeters(coordinates, stations);
+    const distances = nearestStationDistancesMeters(coordinates, stationGrid);
 
     features.push({
       type: 'Feature',
@@ -909,15 +975,22 @@ function buildStreetFeatures(elements, stationFeatures) {
         type: 'LineString',
         coordinates,
       },
-      properties: compactProperties(tags, distanceMeters),
+      properties: compactProperties(tags, distances.nearest),
     });
+
+    for (const [modeIndex, mode] of MODE_KEYS.entries()) {
+      const distance = distances.byMode[modeIndex];
+      modeDistances[mode].push(
+        distance <= MAX_DISTANCE_M ? Math.round(distance) : OVER_RANGE_DISTANCE_M,
+      );
+    }
 
     if ((index + 1) % 5000 === 0) {
       console.log(`Processed ${(index + 1).toLocaleString()} street elements...`);
     }
   });
 
-  return features;
+  return { features, modeDistances };
 }
 
 function histogram(features) {
@@ -1000,7 +1073,10 @@ async function main() {
   );
 
   const streetElements = await fetchTiledElements('street', streetQuery, dataBounds);
-  const streetFeatures = buildStreetFeatures(streetElements, openStationFeatures);
+  const { features: streetFeatures, modeDistances } = buildStreetFeatures(
+    streetElements,
+    openStationFeatures,
+  );
   console.log(`Built ${streetFeatures.length.toLocaleString()} street features.`);
 
   const metadata = {
@@ -1020,6 +1096,8 @@ async function main() {
     station_modes_future: propertyCounts(futureStationFeatures, 'mode'),
     station_statuses: propertyCounts(stationFeatures, 'status'),
     distance_station_scope: 'open stations only',
+    street_mode_distance_file: 'data/cdmx-street-mode-distances.json',
+    street_mode_distance_over_range_value: OVER_RANGE_DISTANCE_M,
     future_station_rules: FUTURE_NETWORK_RULES.map((rule) => ({
       pattern: String(rule.pattern),
       status_detail: rule.status_detail,
@@ -1040,10 +1118,17 @@ async function main() {
 
   await writeJson(resolve(dataDir, 'cdmx-stations.geojson'), featureCollection(stationFeatures));
   await writeJson(resolve(dataDir, 'cdmx-streets.geojson'), featureCollection(streetFeatures));
+  await writeJson(resolve(dataDir, 'cdmx-street-mode-distances.json'), {
+    feature_count: streetFeatures.length,
+    max_distance_m: MAX_DISTANCE_M,
+    over_range_value: OVER_RANGE_DISTANCE_M,
+    distances_by_mode: modeDistances,
+  });
   await writeJson(resolve(dataDir, 'cdmx-metadata.json'), metadata);
 
   console.log('Wrote data/cdmx-stations.geojson');
   console.log('Wrote data/cdmx-streets.geojson');
+  console.log('Wrote data/cdmx-street-mode-distances.json');
   console.log('Wrote data/cdmx-metadata.json');
 }
 
