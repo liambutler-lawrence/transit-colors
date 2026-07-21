@@ -537,13 +537,14 @@ function pointToSegmentDistanceSquared(point, segmentStart, segmentEnd) {
 function buildStationGrid(stationFeatures) {
   const cells = new Map();
 
-  for (const feature of stationFeatures) {
+  for (const [index, feature] of stationFeatures.entries()) {
     const [lon, lat] = feature.geometry.coordinates;
     const projected = project(lon, lat);
     const cellX = Math.floor(projected.x / MAX_DISTANCE_M);
     const cellY = Math.floor(projected.y / MAX_DISTANCE_M);
     const key = `${cellX},${cellY}`;
     const station = {
+      index,
       projected,
       modeIndex: MODE_KEYS.indexOf(feature.properties.mode),
     };
@@ -591,6 +592,7 @@ function stationCandidates(projectedLine, stationGrid) {
 function nearestStationDistancesMeters(lineCoordinates, stationGrid) {
   let bestDistanceSquared = Number.POSITIVE_INFINITY;
   const bestDistanceByMode = MODE_KEYS.map(() => Number.POSITIVE_INFINITY);
+  let bestStationIndex = -1;
   const projectedLine = lineCoordinates.map(([lon, lat]) => project(lon, lat));
   const stations = stationCandidates(projectedLine, stationGrid);
 
@@ -607,6 +609,7 @@ function nearestStationDistancesMeters(lineCoordinates, stationGrid) {
 
       if (distanceSquared < bestDistanceSquared) {
         bestDistanceSquared = distanceSquared;
+        bestStationIndex = station.index;
       }
 
       if (
@@ -621,6 +624,7 @@ function nearestStationDistancesMeters(lineCoordinates, stationGrid) {
   return {
     nearest: Math.sqrt(bestDistanceSquared),
     byMode: bestDistanceByMode.map((distanceSquared) => Math.sqrt(distanceSquared)),
+    stationIndex: bestStationIndex,
   };
 }
 
@@ -953,21 +957,33 @@ function lineCoordinates(element) {
   return coordinates.length >= 2 ? coordinates : null;
 }
 
-function buildStreetFeatures(elements, stationFeatures) {
-  if (stationFeatures.length === 0) {
+function buildStreetFeatures(elements, openStationFeatures, futureStationFeatures) {
+  if (openStationFeatures.length === 0) {
     throw new Error('No station features found; cannot compute street distances.');
   }
 
-  const stationGrid = buildStationGrid(stationFeatures);
+  const openStationGrid = buildStationGrid(openStationFeatures);
+  const futureStationGrid = buildStationGrid(futureStationFeatures);
+  const futureModes = MODE_KEYS.filter((mode) =>
+    futureStationFeatures.some((feature) => feature.properties.mode === mode),
+  );
   const features = [];
   const modeDistances = Object.fromEntries(MODE_KEYS.map((mode) => [mode, []]));
+  const futureModeDistances = Object.fromEntries(
+    futureModes.map((mode) => [mode, []]),
+  );
+  const accessStationIndexes = [];
 
   elements.forEach((element, index) => {
     const coordinates = lineCoordinates(element);
     if (!coordinates) return;
 
     const tags = element.tags ?? {};
-    const distances = nearestStationDistancesMeters(coordinates, stationGrid);
+    const distances = nearestStationDistancesMeters(coordinates, openStationGrid);
+    const futureDistances = nearestStationDistancesMeters(
+      coordinates,
+      futureStationGrid,
+    );
 
     features.push({
       type: 'Feature',
@@ -977,12 +993,22 @@ function buildStreetFeatures(elements, stationFeatures) {
       },
       properties: compactProperties(tags, distances.nearest),
     });
+    accessStationIndexes.push(distances.stationIndex);
 
     for (const [modeIndex, mode] of MODE_KEYS.entries()) {
       const distance = distances.byMode[modeIndex];
       modeDistances[mode].push(
         distance <= MAX_DISTANCE_M ? Math.round(distance) : OVER_RANGE_DISTANCE_M,
       );
+
+      if (futureModeDistances[mode]) {
+        const futureDistance = futureDistances.byMode[modeIndex];
+        futureModeDistances[mode].push(
+          futureDistance <= MAX_DISTANCE_M
+            ? Math.round(futureDistance)
+            : OVER_RANGE_DISTANCE_M,
+        );
+      }
     }
 
     if ((index + 1) % 5000 === 0) {
@@ -990,7 +1016,7 @@ function buildStreetFeatures(elements, stationFeatures) {
     }
   });
 
-  return { features, modeDistances };
+  return { features, modeDistances, futureModeDistances, accessStationIndexes };
 }
 
 function histogram(features) {
@@ -1073,10 +1099,12 @@ async function main() {
   );
 
   const streetElements = await fetchTiledElements('street', streetQuery, dataBounds);
-  const { features: streetFeatures, modeDistances } = buildStreetFeatures(
+  const streetBuild = buildStreetFeatures(
     streetElements,
     openStationFeatures,
+    futureStationFeatures,
   );
+  const streetFeatures = streetBuild.features;
   console.log(`Built ${streetFeatures.length.toLocaleString()} street features.`);
 
   const metadata = {
@@ -1095,7 +1123,7 @@ async function main() {
     station_modes_open: propertyCounts(openStationFeatures, 'mode'),
     station_modes_future: propertyCounts(futureStationFeatures, 'mode'),
     station_statuses: propertyCounts(stationFeatures, 'status'),
-    distance_station_scope: 'open stations only',
+    distance_station_scope: 'open stations by default; future stations when enabled',
     street_mode_distance_file: 'data/cdmx-street-mode-distances.json',
     street_mode_distance_over_range_value: OVER_RANGE_DISTANCE_M,
     future_station_rules: FUTURE_NETWORK_RULES.map((rule) => ({
@@ -1110,6 +1138,11 @@ async function main() {
       n: 'OpenStreetMap street name',
       o: '1 when true distance is over max_distance_m',
     },
+    street_access_schema: {
+      station_ids: 'open station IDs in index order',
+      street_station_indexes:
+        'nearest open station index for each feature in cdmx-streets.geojson',
+    },
     sources: [
       'OpenStreetMap contributors',
       'Overpass API',
@@ -1122,13 +1155,19 @@ async function main() {
     feature_count: streetFeatures.length,
     max_distance_m: MAX_DISTANCE_M,
     over_range_value: OVER_RANGE_DISTANCE_M,
-    distances_by_mode: modeDistances,
+    distances_by_mode: streetBuild.modeDistances,
+    future_distances_by_mode: streetBuild.futureModeDistances,
+  });
+  await writeJson(resolve(dataDir, 'cdmx-street-access.json'), {
+    station_ids: openStationFeatures.map((feature) => feature.properties.id),
+    street_station_indexes: streetBuild.accessStationIndexes,
   });
   await writeJson(resolve(dataDir, 'cdmx-metadata.json'), metadata);
 
   console.log('Wrote data/cdmx-stations.geojson');
   console.log('Wrote data/cdmx-streets.geojson');
   console.log('Wrote data/cdmx-street-mode-distances.json');
+  console.log('Wrote data/cdmx-street-access.json');
   console.log('Wrote data/cdmx-metadata.json');
 }
 

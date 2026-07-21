@@ -7,8 +7,13 @@
     "build:vendor": "node scripts/copy-vendor-assets.mjs",
     "build:data:cdmx": "node scripts/build-cdmx-data.mjs && node scripts/build-cdmx-tiles.mjs",
     "build:tiles:cdmx": "node scripts/build-cdmx-tiles.mjs",
+    "build:data:nyc": "node scripts/build-nyc-data.mjs",
+    "build:data:access": "node scripts/build-street-access.mjs",
+    "build:data:schedules": "node scripts/build-gtfs-schedules.mjs",
+    "build:data": "npm run build:data:cdmx && npm run build:data:schedules && npm run build:data:nyc",
     "dev": "node scripts/serve.mjs",
-    "check": "node --check scripts/build-cdmx-data.mjs && node --check scripts/build-cdmx-tiles.mjs && node --check scripts/copy-vendor-assets.mjs && node --check scripts/serve.mjs && node --check app.js"
+    "check": "node --check scripts/build-cdmx-data.mjs && node --check scripts/build-cdmx-tiles.mjs && node --check scripts/build-nyc-data.mjs && node --check scripts/build-street-access.mjs && node --check scripts/build-gtfs-schedules.mjs && node --check scripts/copy-vendor-assets.mjs && node --check scripts/serve.mjs && node --check routing.js && node --check app.js && node routing.test.mjs",
+    "test": "node routing.test.mjs"
   },
   "devDependencies": {
     "maplibre-gl": "5.13.0",

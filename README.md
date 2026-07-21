@@ -1,28 +1,44 @@
 # Transit Colors
 
-Static POC that overlays CDMX streets with a color gradient based on distance to the nearest open transit station.
+Static POC for the Mexico City and New York City metropolitan areas. It overlays streets with:
+
+- A color gradient based on distance to the nearest selected transit modes in either metro area.
+- In Mexico City, schedule-adjusted travel time to a selected station, including the access walk, expected boarding wait, and estimated ride through the transit network.
+
+For Mexico City, choose a destination from the panel or click an open station on the map. Set a weekday and departure time to apply published service windows and headways. Select “Nearest station only” to return to the distance view.
+
+The destination view's time scale is configurable. Set the green-to-yellow transition in minutes; the orange and red transitions follow at 2× and 4× that value.
 
 ## Stack
 
 - Map renderer: MapLibre GL JS
 - Basemap: OpenFreeMap
-- Source data: OpenStreetMap via Overpass API
+- Source data: OpenStreetMap via Overpass API and the official SEMOVI GTFS feed
 - Hosting target: GitHub Pages
 
 ## Local Development
 
-Generate CDMX data:
+Generate data for either metro area:
 
 ```sh
 brew install tippecanoe
 npm install
 npm run build:data:cdmx
+npm run build:data:nyc
 ```
 
 `build:data:cdmx` refreshes the source GeoJSON and then creates the browser-facing
 PMTiles archive. To rebuild only the archive from existing source data, run
 `npm run build:tiles:cdmx`. Pinned browser libraries and the local OpenFreeMap
 style snapshot can be refreshed with `npm run build:vendor`.
+
+Refresh schedule data from the official SEMOVI GTFS feed after generating stations:
+
+```sh
+npm run build:data:schedules
+```
+
+Run both area builders and refresh the CDMX schedule snapshot with `npm run build:data`.
 
 Serve the static site:
 
@@ -32,7 +48,7 @@ npm run dev
 
 Open `http://localhost:5173`.
 
-## Data Notes
+## CDMX Data Notes
 
 The data script fetches CDMX roads and station-like transit features from Overpass once, then writes static GeoJSON into `data/`.
 
@@ -75,7 +91,8 @@ Street color is computed from the nearest selected open-station mode and clamped
 `data/cdmx-street-mode-distances.json`; the browser reads those values from
 `data/cdmx-streets.pmtiles` in 50m display increments. The archive uses a road-class
 zoom hierarchy so overview maps load major roads first and add local streets as the
-user zooms in.
+user zooms in. Enabling the top-level Future control also includes future/planned
+stations from the currently selected modes in the gradient.
 
 ## Performance
 
@@ -97,9 +114,40 @@ The optimized path:
 
 Cold-cache headless Chrome checks with software WebGL on July 21, 2026 completed in:
 
-- initial interactive street render: 518-627ms end to end;
-- station-mode filter update: 19-71ms;
-- uncached zoom/area update: 18-69ms.
+- CDMX initial interactive street render: 624-735ms across three final runs;
+- NYC direct initial load: 314ms;
+- station-mode filter update: 65ms;
+- CDMX → NYC area switch: 229ms;
+- NYC → CDMX area switch, including fresh street-tile ranges: 524ms;
+- destination selection and schedule-aware recolor: 39ms.
+
+Destination graph construction and its schedule/options setup run during idle time
+after the initial map becomes interactive, keeping that optional work off the
+startup critical path.
+
+## NYC Metro Data Notes
+
+The NYC builder combines current static GTFS station data for:
+
+- MTA New York City Subway and Staten Island Railway
+- Long Island Rail Road
+- Metro-North Railroad
+- NJ Transit commuter rail and light rail
+- PATH
+
+The committed dataset is clipped to the regional transit footprint from `40.0-41.9° N` and `74.8-71.8° W`, which includes the outer commuter-rail branches while excluding NJ Transit service outside the NYC region.
+
+Unlike the precomputed CDMX street file, NYC street distances are evaluated in the browser against OpenFreeMap's OpenStreetMap vector roads using MapLibre's `distance` expression. This keeps the NYC addition small while preserving the same `0-5000m` color scale. The metadata displays `Live` for street totals and proximity counts because those roads are loaded as viewport-based vector tiles rather than a fixed GeoJSON collection.
+
+Downloaded GTFS archives are cached in `data/.gtfs-cache/`. Set `REFRESH_GTFS_CACHE=1` to force a refresh.
+
+`data/cdmx-street-access.json` stores the nearest-station index for every street. It is generated alongside the other data by `npm run build:data:cdmx`; `npm run build:data:access` can regenerate only this sidecar from the checked-in station and street files.
+
+`data/cdmx-schedules.json` is generated from the [official CDMX GTFS dataset](https://datos.cdmx.gob.mx/tr/dataset/gtfs). The checked-in snapshot was matched to 765 of 1,001 open OSM station records. It covers Metro, Metrobús, Tren Ligero, Cablebús, Tren Suburbano, Tren Interurbano, and the elevated Trolebús corridors present in that feed. Unmatched records, including systems outside the feed, use a clearly labeled four-minute boarding-wait estimate.
+
+For a selected weekday and time, the app uses the GTFS frequency windows at each matched stop. During service, expected wait is half the published headway; outside service, the calculation waits until the next weekly service window. Overnight times above 24:00 are supported. Because the current feed's absolute calendar end dates are stale for most services, the builder deliberately uses its recurring weekday flags and does not claim date-specific exceptions.
+
+Destination travel times remain schedule-adjusted estimates, not exact journey-planner or live-routing results. The ride and transfer portion comes from a lightweight graph built from OSM route metadata, station mode, nearby transfers, and average speeds. The schedule changes the initial boarding wait; transfer waits, real-time disruptions, traffic, and holiday exceptions are not modeled. The street access walk uses the existing nearest-station distance at 80 m/min.
 
 ## Deployment
 

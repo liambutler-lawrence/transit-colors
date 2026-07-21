@@ -5,3 +5,4 @@ node_modules/
 npm-debug.log*
 data/.overpass-cache/
 data/.cdmx-streets.ndjson
+data/.gtfs-cache/

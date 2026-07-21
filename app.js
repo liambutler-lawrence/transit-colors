@@ -1,9 +1,40 @@
-const DATASETS = {
-  basemapStyle: 'vendor/openfreemap-liberty.json',
-  streetTiles: 'data/cdmx-streets.pmtiles',
-  stations: 'data/cdmx-stations.geojson',
-  metadata: 'data/cdmx-metadata.json',
+import {
+  DEFAULT_TIME_SCALE_MINUTES,
+  WALKING_METERS_PER_MINUTE,
+  buildTransitGraph,
+  calculateTransitTimes,
+  scheduledWaitForStation,
+  streetTravelTime,
+  timeScaleStops,
+} from './routing.js';
+
+const AREAS = {
+  cdmx: {
+    label: 'Mexico City',
+    center: [-99.1332, 19.4326],
+    zoom: 10.5,
+    streetTiles: 'data/cdmx-streets.pmtiles',
+    stations: 'data/cdmx-stations.geojson',
+    metadata: 'data/cdmx-metadata.json',
+    schedules: 'data/cdmx-schedules.json',
+    supportsDestination: true,
+    buildCommand: 'npm run build:data:cdmx',
+  },
+  nyc: {
+    label: 'New York City metro',
+    center: [-73.98, 40.75],
+    zoom: 9.5,
+    liveRoads: true,
+    stations: 'data/nyc-stations.geojson',
+    metadata: 'data/nyc-metadata.json',
+    schedules: null,
+    supportsDestination: false,
+    buildCommand: 'npm run build:data:nyc',
+  },
 };
+
+const requestedAreaKey = new URLSearchParams(window.location.search).get('area');
+const initialAreaKey = Object.hasOwn(AREAS, requestedAreaKey) ? requestedAreaKey : 'cdmx';
 
 const COLORS = {
   near: '#0aa66a',
@@ -49,10 +80,20 @@ maplibregl.addProtocol('pmtiles', pmtilesProtocol.tile);
 const map = new maplibregl.Map({
   container: 'map',
   style: 'vendor/openfreemap-shell.json',
-  center: [-99.1332, 19.4326],
-  zoom: 10.5,
+  center: AREAS[initialAreaKey].center,
+  zoom: AREAS[initialAreaKey].zoom,
 });
 window.__transitMap = map;
+
+const FUTURE_MODE_DISTANCE_PROPERTIES = {
+  subway: 'fs',
+  brt: 'fb',
+  light_rail: 'fl',
+  cable_car: 'fc',
+  commuter_rail: 'ft',
+  regional_rail: 'fr',
+  monorail: 'fm',
+};
 
 map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
 
@@ -63,7 +104,20 @@ const mapLoadingLabelEl = document.querySelector('#map-loading-label');
 const streetCountEl = document.querySelector('#street-count');
 const stationCountEl = document.querySelector('#station-count');
 const nearCountEl = document.querySelector('#near-count');
+const nearCountLabelEl = document.querySelector('#near-count-label');
+const legendEl = document.querySelector('#legend');
+const legendLabelsEl = document.querySelector('#legend-labels');
 const stationBreakdownEl = document.querySelector('#station-breakdown');
+const destinationSelect = document.querySelector('#destination-select');
+const destinationSummaryEl = document.querySelector('#destination-summary');
+const scheduleDaySelect = document.querySelector('#schedule-day');
+const scheduleTimeInput = document.querySelector('#schedule-time');
+const scheduleSummaryEl = document.querySelector('#schedule-summary');
+const timeScaleInput = document.querySelector('#time-scale-minutes');
+const timeScaleSummaryEl = document.querySelector('#time-scale-summary');
+const destinationControlEl = document.querySelector('.destination-control');
+const departureControlEl = document.querySelector('.departure-control');
+const timeScaleControlEl = document.querySelector('.time-scale-control');
 const selectionTypeEl = document.querySelector('#selection-type');
 const featureNameEl = document.querySelector('#feature-name');
 const featureSummaryEl = document.querySelector('#feature-summary');
@@ -71,6 +125,13 @@ const featureMetadataEl = document.querySelector('#feature-metadata');
 const streetToggle = document.querySelector('#toggle-streets');
 const stationToggle = document.querySelector('#toggle-stations');
 const futureStationToggle = document.querySelector('#toggle-future-stations');
+const areaSelect = document.querySelector('#metro-area');
+
+let activeAreaKey = initialAreaKey;
+let loadSequence = 0;
+let activeProjectedStations = [];
+let loadedStations = { type: 'FeatureCollection', features: [] };
+const liveStreetLayerIds = [];
 
 const stationColor = [
   'match',
@@ -94,18 +155,25 @@ const stationColor = [
 
 const openStationFilter = ['==', ['get', 'status'], 'open'];
 const futureStationFilter = ['!=', ['get', 'status'], 'open'];
-const openStationLayers = ['station-points-open', 'station-labels-open'];
+const openStationLayers = [
+  'station-points-open',
+  'station-destination',
+  'station-labels-open',
+];
+const filterableOpenStationLayers = [
+  'station-points-open',
+  'station-labels-open',
+];
 const futureStationLayers = ['station-points-future', 'station-labels-future'];
 const activeStationModes = new Set();
 const allStationModes = new Set();
 let maxDistanceMeters = 5000;
-let allModesNearCount = 0;
-let nearCountModeOrder = Object.keys(MODE_DISTANCE_PROPERTIES);
-let nearCountsByModeSelection = {};
 let selectedStreetProperties = null;
+let selectedLiveStreetFeature = null;
 let streetSourceLoaded = false;
 let pendingBasemapStyle = null;
 let basemapInstallScheduled = false;
+let basemapInstalled = false;
 let loadingOperation = {
   type: 'initial',
   label: 'Loading map',
@@ -124,6 +192,31 @@ window.__transitPerformance = {
   operations: [],
 };
 
+const state = {
+  metadata: null,
+  stationById: new Map(),
+  transitGraph: null,
+  transitTimes: null,
+  destination: null,
+  destinationChoiceByStationId: new Map(),
+  schedules: null,
+  scheduleWeekday: 0,
+  scheduleMinute: 8 * 60,
+  waitMinutesByStation: new Map(),
+  waitDetailsByStation: new Map(),
+  timeScaleMinutes: DEFAULT_TIME_SCALE_MINUTES,
+};
+
+const WEEKDAY_LABELS = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday',
+];
+
 function formatInteger(value) {
   return new Intl.NumberFormat('en-US').format(value);
 }
@@ -132,6 +225,87 @@ function formatDistance(meters) {
   if (!Number.isFinite(meters)) return '--';
   if (meters < 950) return `${Math.round(meters)} m`;
   return `${(meters / 1000).toFixed(1)} km`;
+}
+
+function formatMinutes(minutes) {
+  if (!Number.isFinite(minutes)) return '--';
+  if (minutes < 10) return `${Math.round(minutes)} min`;
+  if (minutes >= 90) {
+    const roundedMinutes = Math.round(minutes / 5) * 5;
+    const hours = Math.floor(roundedMinutes / 60);
+    const remainder = roundedMinutes % 60;
+    return remainder > 0 ? `${hours} hr ${remainder} min` : `${hours} hr`;
+  }
+  return `${Math.round(minutes / 5) * 5} min`;
+}
+
+function formatTimeInput(minutes) {
+  const hours = Math.floor(minutes / 60);
+  const remainder = Math.round(minutes % 60);
+  return `${String(hours).padStart(2, '0')}:${String(remainder).padStart(2, '0')}`;
+}
+
+function currentMexicoCityDeparture() {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat('en-US', {
+      timeZone: 'America/Mexico_City',
+      weekday: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+      hourCycle: 'h23',
+    })
+      .formatToParts(new Date())
+      .filter((part) => part.type !== 'literal')
+      .map((part) => [part.type, part.value]),
+  );
+  const weekdayByShortName = {
+    Mon: 0,
+    Tue: 1,
+    Wed: 2,
+    Thu: 3,
+    Fri: 4,
+    Sat: 5,
+    Sun: 6,
+  };
+
+  return {
+    weekday: weekdayByShortName[parts.weekday] ?? 0,
+    minute: Number(parts.hour) * 60 + Number(parts.minute),
+  };
+}
+
+function departureLabel() {
+  return `${WEEKDAY_LABELS[state.scheduleWeekday]} at ${formatTimeInput(
+    state.scheduleMinute,
+  )}`;
+}
+
+function timeStreetColor(transitTimes, scaleMinutes) {
+  const stops = timeScaleStops(scaleMinutes);
+  const stationTime = ['match', ['get', 's']];
+
+  for (const [stationId, minutes] of transitTimes) {
+    stationTime.push(stationId, Number(minutes.toFixed(2)));
+  }
+  stationTime.push(90);
+
+  return [
+    'interpolate',
+    ['linear'],
+    [
+      '+',
+      ['/', ['to-number', ['get', 'd']], WALKING_METERS_PER_MINUTE],
+      stationTime,
+    ],
+    0,
+    COLORS.near,
+    stops.yellowMinutes,
+    COLORS.midNear,
+    stops.orangeMinutes,
+    COLORS.midFar,
+    stops.redMinutes,
+    COLORS.far,
+  ];
 }
 
 async function fetchJson(url) {
@@ -180,7 +354,7 @@ function filterByActiveModes(statusFilter) {
 }
 
 function syncStationFilters() {
-  for (const layerId of openStationLayers) {
+  for (const layerId of filterableOpenStationLayers) {
     if (map.getLayer(layerId)) {
       map.setFilter(layerId, filterByActiveModes(openStationFilter));
     }
@@ -194,13 +368,26 @@ function syncStationFilters() {
 }
 
 function streetDistanceExpression() {
-  if (activeStationModes.size === allStationModes.size) {
+  if (
+    activeStationModes.size === allStationModes.size &&
+    !futureStationToggle.checked
+  ) {
     return ['get', 'd'];
   }
 
-  const modeDistances = [...activeStationModes]
+  const distanceProperties = [...activeStationModes]
     .map((mode) => MODE_DISTANCE_PROPERTIES[mode])
-    .filter(Boolean)
+    .filter(Boolean);
+
+  if (futureStationToggle.checked) {
+    distanceProperties.push(
+      ...[...activeStationModes]
+        .map((mode) => FUTURE_MODE_DISTANCE_PROPERTIES[mode])
+        .filter(Boolean),
+    );
+  }
+
+  const modeDistances = distanceProperties
     .map((property) => ['to-number', ['get', property], maxDistanceMeters]);
 
   if (modeDistances.length === 0) return maxDistanceMeters;
@@ -224,21 +411,132 @@ function streetColorExpression() {
   ];
 }
 
+function activeStationCollection() {
+  return {
+    type: 'FeatureCollection',
+    features: (loadedStations.features ?? []).filter(
+      (feature) =>
+        activeStationModes.has(feature.properties.mode) &&
+        (feature.properties.status === 'open' || futureStationToggle.checked),
+    ),
+  };
+}
+
+function updateActiveProjectedStations(stations) {
+  activeProjectedStations = stations.features.map((feature) =>
+    projectCoordinate(feature.geometry.coordinates),
+  );
+}
+
 function syncStreetColor() {
-  if (map.getLayer('street-proximity')) {
-    map.setPaintProperty('street-proximity', 'line-color', streetColorExpression());
+  if (AREAS[activeAreaKey].liveRoads) {
+    const activeStations = activeStationCollection();
+    updateActiveProjectedStations(activeStations);
+    const color = liveStreetColor(activeStations);
+
+    for (const layerId of liveStreetLayerIds) {
+      if (map.getLayer(layerId)) {
+        map.setPaintProperty(layerId, 'line-color', color);
+      }
+    }
+  } else if (map.getLayer('street-proximity')) {
+    map.setPaintProperty(
+      'street-proximity',
+      'line-color',
+      state.destination && state.transitTimes
+        ? timeStreetColor(state.transitTimes, state.timeScaleMinutes)
+        : streetColorExpression(),
+    );
   }
 }
 
-function syncNearCount() {
-  const selectionKey = nearCountModeOrder
-    .filter((mode) => activeStationModes.has(mode))
-    .join(',');
-  const nearCount = nearCountsByModeSelection[selectionKey];
+function streetDistanceFromProperties(properties) {
+  const distanceProperties = [...activeStationModes]
+    .map((mode) => MODE_DISTANCE_PROPERTIES[mode])
+    .filter(Boolean);
 
-  nearCountEl.textContent = Number.isFinite(nearCount)
-    ? formatInteger(nearCount)
-    : formatInteger(allModesNearCount);
+  if (futureStationToggle.checked) {
+    distanceProperties.push(
+      ...[...activeStationModes]
+        .map((mode) => FUTURE_MODE_DISTANCE_PROPERTIES[mode])
+        .filter(Boolean),
+    );
+  }
+
+  let distance = Number.POSITIVE_INFINITY;
+  for (const property of distanceProperties) {
+    const value = Number(properties[property]);
+    if (Number.isFinite(value)) distance = Math.min(distance, value);
+  }
+  return distance;
+}
+
+function visibleTiledStreets() {
+  if (!streetToggle.checked || !map.getLayer('street-proximity')) return [];
+
+  const byId = new Map();
+  for (const feature of map.queryRenderedFeatures({ layers: ['street-proximity'] })) {
+    const key = feature.properties?.i ?? feature.id;
+    if (key !== undefined && !byId.has(key)) byId.set(key, feature.properties ?? {});
+  }
+  return [...byId.values()];
+}
+
+function updateViewportStatistics() {
+  const bounds = map.getBounds();
+  const timeStops = timeScaleStops(state.timeScaleMinutes);
+  const timeMode =
+    !AREAS[activeAreaKey].liveRoads && state.destination && state.transitTimes;
+
+  let visibleStationCount = 0;
+  if (stationToggle.checked) {
+    for (const feature of loadedStations.features ?? []) {
+      const [lon, lat] = feature.geometry?.coordinates ?? [];
+      const properties = feature.properties ?? {};
+      const statusVisible =
+        properties.status === 'open' || futureStationToggle.checked;
+      if (
+        statusVisible &&
+        activeStationModes.has(properties.mode) &&
+        bounds.contains([lon, lat])
+      ) {
+        visibleStationCount += 1;
+      }
+    }
+  }
+  stationCountEl.textContent = formatInteger(visibleStationCount);
+
+  if (AREAS[activeAreaKey].liveRoads) {
+    nearCountLabelEl.textContent = 'Within 2.5 km';
+    streetCountEl.textContent = streetToggle.checked ? 'Live' : '0';
+    nearCountEl.textContent = streetToggle.checked ? 'Live' : '0';
+    return;
+  }
+
+  const streets = visibleTiledStreets();
+  let nearCount = 0;
+  for (const properties of streets) {
+    const isNear = timeMode
+      ? streetTravelTime(properties, state.transitTimes).totalMinutes <=
+        timeStops.orangeMinutes
+      : streetDistanceFromProperties(properties) <= 2500;
+    if (isNear) nearCount += 1;
+  }
+
+  nearCountLabelEl.textContent = timeMode
+    ? `Within ${timeStops.orangeMinutes} min`
+    : 'Within 2.5 km';
+  streetCountEl.textContent = formatInteger(streets.length);
+  nearCountEl.textContent = formatInteger(nearCount);
+}
+
+function syncStreetVisibility() {
+  const visible = streetToggle.checked;
+  setLayerVisibility('street-proximity', visible && !AREAS[activeAreaKey].liveRoads);
+
+  for (const layerId of liveStreetLayerIds) {
+    setLayerVisibility(layerId, visible && AREAS[activeAreaKey].liveRoads);
+  }
 }
 
 function updateStatus(label, { isError = false, isLoading = false } = {}) {
@@ -302,6 +600,11 @@ function installBasemap() {
         map.addLayer(layer, beforeLayer);
       }
     }
+    basemapInstalled = true;
+    if (AREAS[activeAreaKey].liveRoads) {
+      installLiveStreetLayers(loadedStations);
+      syncStreetVisibility();
+    }
   } catch (error) {
     console.error('Basemap could not be installed.', error);
   } finally {
@@ -327,6 +630,31 @@ function runMapUpdate(label, callback) {
   });
 }
 
+function setLegend(mode) {
+  const stops = timeScaleStops(state.timeScaleMinutes);
+  const labels =
+    mode === 'time'
+      ? [
+          '0 min',
+          String(stops.yellowMinutes),
+          String(stops.orangeMinutes),
+          `${stops.redMinutes}+ min`,
+        ]
+      : ['0 km', '1', '2.5', '5 km'];
+  legendEl.setAttribute(
+    'aria-label',
+    mode === 'time' ? 'Estimated travel time legend' : 'Distance legend',
+  );
+  legendEl.classList.toggle('time', mode === 'time');
+  legendLabelsEl.replaceChildren(
+    ...labels.map((label) => {
+      const item = document.createElement('span');
+      item.textContent = label;
+      return item;
+    }),
+  );
+}
+
 function renderMetadata(metadata) {
   const streetCount = metadata.street_count ?? 0;
   const stationCount = metadata.open_station_count ?? metadata.station_count ?? 0;
@@ -334,14 +662,12 @@ function renderMetadata(metadata) {
   const nearCount = metadata.histogram?.under_2500_m ?? 0;
 
   maxDistanceMeters = metadata.max_distance_m ?? maxDistanceMeters;
-  allModesNearCount = nearCount;
-  nearCountModeOrder =
-    metadata.near_count_mode_order ?? Object.keys(MODE_DISTANCE_PROPERTIES);
-  nearCountsByModeSelection = metadata.near_counts_by_mode_selection ?? {};
 
-  streetCountEl.textContent = formatInteger(streetCount);
+  streetCountEl.textContent = metadata.street_count == null ? 'Live' : formatInteger(streetCount);
   stationCountEl.textContent = formatInteger(stationCount);
-  nearCountEl.textContent = formatInteger(nearCount);
+  nearCountEl.textContent = metadata.histogram ? formatInteger(nearCount) : 'Live';
+  futureStationToggle.disabled = futureStationCount === 0;
+  if (futureStationCount === 0) futureStationToggle.checked = false;
 
   const stationModes = metadata.station_modes_open ?? metadata.station_modes ?? {};
   const sortedStationModes = Object.entries(stationModes).sort((a, b) => b[1] - a[1]);
@@ -367,17 +693,6 @@ function renderMetadata(metadata) {
       item.textContent = `${label}: ${formatInteger(count)}`;
       return item;
     }),
-    ...[
-      futureStationCount > 0
-        ? (() => {
-            const item = document.createElement('span');
-            item.className = 'mode-pill future-mode-pill';
-            item.style.setProperty('--mode-color', COLORS.future);
-            item.textContent = `Future: ${formatInteger(futureStationCount)}`;
-            return item;
-          })()
-        : null,
-    ].filter(Boolean),
   );
 }
 
@@ -401,13 +716,87 @@ stationBreakdownEl.addEventListener('click', (event) => {
   runMapUpdate('Updating filter', () => {
     syncStationFilters();
     syncStreetColor();
-    syncNearCount();
+    updateViewportStatistics();
 
     if (selectedStreetProperties) {
       showStreetFeature(selectedStreetProperties);
+    } else if (selectedLiveStreetFeature) {
+      showLiveStreetFeature(selectedLiveStreetFeature);
     }
   });
 });
+
+function renderDestinationOptions(stationFeatures) {
+  const nearestOption = document.createElement('option');
+  nearestOption.value = '';
+  nearestOption.textContent = 'Nearest station only';
+  destinationSelect.replaceChildren(nearestOption);
+  state.destinationChoiceByStationId.clear();
+
+  const destinationChoices = new Map();
+  const openStations = stationFeatures
+    .filter((feature) => feature.properties.status === 'open')
+    .filter((feature) => feature.properties.name)
+    .sort((first, second) =>
+      (first.properties.name || 'Unnamed station').localeCompare(
+        second.properties.name || 'Unnamed station',
+        'es',
+      ),
+    );
+
+  for (const feature of openStations) {
+    const properties = feature.properties;
+    const key = `${properties.name
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLowerCase()}|${properties.mode}`;
+    const representative = destinationChoices.get(key) ?? feature;
+    destinationChoices.set(key, representative);
+    state.destinationChoiceByStationId.set(
+      properties.id,
+      representative.properties.id,
+    );
+  }
+
+  const options = [...destinationChoices.values()].map((feature) => {
+    const option = document.createElement('option');
+    const properties = feature.properties;
+    option.value = properties.id;
+    option.textContent = `${properties.name || 'Unnamed station'} — ${
+      properties.system || MODE_LABELS[properties.mode] || 'Transit'
+    }`;
+    return option;
+  });
+
+  destinationSelect.append(...options);
+  destinationSelect.disabled = false;
+}
+
+function resetDestinationRouting() {
+  state.metadata = null;
+  state.stationById.clear();
+  state.transitGraph = null;
+  state.transitTimes = null;
+  state.destination = null;
+  state.destinationChoiceByStationId.clear();
+  state.schedules = null;
+  state.waitMinutesByStation.clear();
+  state.waitDetailsByStation.clear();
+
+  const nearestOption = document.createElement('option');
+  nearestOption.value = '';
+  nearestOption.textContent = 'Nearest station only';
+  destinationSelect.replaceChildren(nearestOption);
+  destinationSelect.disabled = true;
+  destinationSummaryEl.textContent =
+    'Choose a station here or click an open station on the map.';
+  scheduleSummaryEl.textContent = 'Loading official weekly schedules…';
+  setLegend('distance');
+
+  if (map.getLayer('station-destination')) {
+    map.setFilter('station-destination', ['==', ['get', 'id'], '']);
+  }
+}
 
 function metadataBounds(metadata) {
   const bounds = metadata.bbox;
@@ -433,6 +822,7 @@ function applyMapBounds(metadata) {
 
   const leftPadding = window.innerWidth >= 760 ? 360 : 48;
 
+  map.setMaxBounds(null);
   map.setMaxBounds(bounds);
   map.fitBounds(bounds, {
     padding: {
@@ -445,10 +835,45 @@ function applyMapBounds(metadata) {
   });
 }
 
+function resetSelection() {
+  selectedStreetProperties = null;
+  selectedLiveStreetFeature = null;
+  selectionTypeEl.textContent = 'Selected feature';
+  featureNameEl.textContent = 'None';
+  featureSummaryEl.textContent = 'Hover a highlighted street or station';
+  featureMetadataEl.replaceChildren();
+}
+
+function updateAreaChrome(areaKey) {
+  const area = AREAS[areaKey];
+  areaSelect.value = areaKey;
+  document.title = `Transit Colors — ${area.label}`;
+  mapEl.setAttribute(
+    'aria-label',
+    area.supportsDestination
+      ? `${area.label} transit access and travel time map`
+      : `${area.label} transit proximity map`,
+  );
+  destinationControlEl.hidden = !area.supportsDestination;
+  departureControlEl.hidden = !area.supportsDestination;
+  timeScaleControlEl.hidden = !area.supportsDestination;
+
+  const url = new URL(window.location.href);
+  if (areaKey === 'cdmx') {
+    url.searchParams.delete('area');
+  } else {
+    url.searchParams.set('area', areaKey);
+  }
+  window.history.replaceState({}, '', url);
+}
+
 function renderDetails(details) {
   featureMetadataEl.replaceChildren(
     ...details
-      .filter((detail) => detail.value)
+      .filter(
+        (detail) =>
+          detail.value !== undefined && detail.value !== null && detail.value !== '',
+      )
       .map((detail) => {
         const term = document.createElement('dt');
         term.textContent = detail.label;
@@ -466,8 +891,41 @@ function renderDetails(details) {
 function showStreetFeature(props) {
   const streetName = props.n || props.h || 'Unnamed street';
   selectedStreetProperties = props;
+  selectedLiveStreetFeature = null;
   selectionTypeEl.textContent = 'Selected street';
   featureNameEl.textContent = streetName;
+
+  if (state.destination && state.transitTimes) {
+    const travel = streetTravelTime(props, state.transitTimes);
+    const accessStation = state.stationById.get(props.s)?.properties;
+    const waitDetails = state.waitDetailsByStation.get(props.s);
+    const boardingWait = travel.transitMinutes > 0 ? waitDetails?.minutes ?? 0 : 0;
+    featureSummaryEl.textContent = `${formatMinutes(travel.totalMinutes)} estimated to ${
+      state.destination.properties.name
+    }`;
+    renderDetails([
+      { label: 'Access station', value: accessStation?.name },
+      {
+        label: 'Access walk',
+        value: `${formatMinutes(travel.walkingMinutes)} (${formatDistance(props.d)})`,
+      },
+      {
+        label: 'Boarding wait',
+        value:
+          travel.transitMinutes === 0
+            ? 'None — destination is the access station'
+            : waitDetails?.scheduled
+              ? `${formatMinutes(boardingWait)} (official weekly headway)`
+              : `${formatMinutes(boardingWait)} (estimated)`,
+      },
+      {
+        label: 'Ride + transfers',
+        value: formatMinutes(Math.max(0, travel.transitMinutes - boardingWait)),
+      },
+      { label: 'OSM highway', value: props.h },
+    ]);
+    return;
+  }
 
   if (activeStationModes.size === 0) {
     featureSummaryEl.textContent = 'No station types selected';
@@ -483,6 +941,13 @@ function showStreetFeature(props) {
       }
     }
 
+    if (futureStationToggle.checked) {
+      for (const mode of activeStationModes) {
+        const value = Number(props[FUTURE_MODE_DISTANCE_PROPERTIES[mode]]);
+        if (Number.isFinite(value)) distance = Math.min(distance, value);
+      }
+    }
+
     const distanceLabel =
       !Number.isFinite(distance) || distance > maxDistanceMeters
         ? `More than ${formatDistance(maxDistanceMeters)}`
@@ -490,13 +955,77 @@ function showStreetFeature(props) {
     featureSummaryEl.textContent = `${distanceLabel} from nearest selected station`;
   }
 
-  renderDetails([
-    { label: 'OSM highway', value: props.h },
-  ]);
+  renderDetails([{ label: 'OSM highway', value: props.h }]);
+}
+
+function projectCoordinate([lon, lat]) {
+  return {
+    x: lon * 111_320 * Math.cos((40.75 * Math.PI) / 180),
+    y: lat * 111_320,
+  };
+}
+
+function pointToSegmentDistance(point, start, end) {
+  const dx = end.x - start.x;
+  const dy = end.y - start.y;
+  if (dx === 0 && dy === 0) return Math.hypot(point.x - start.x, point.y - start.y);
+
+  const t = Math.max(
+    0,
+    Math.min(1, ((point.x - start.x) * dx + (point.y - start.y) * dy) / (dx * dx + dy * dy)),
+  );
+  return Math.hypot(point.x - (start.x + t * dx), point.y - (start.y + t * dy));
+}
+
+function geometryLines(geometry) {
+  if (geometry?.type === 'LineString') return [geometry.coordinates];
+  if (geometry?.type === 'MultiLineString') return geometry.coordinates;
+  return [];
+}
+
+function liveStreetDistance(geometry) {
+  let best = Number.POSITIVE_INFINITY;
+
+  for (const line of geometryLines(geometry)) {
+    const projectedLine = line.map(projectCoordinate);
+    for (let index = 0; index < projectedLine.length - 1; index += 1) {
+      for (const station of activeProjectedStations) {
+        best = Math.min(
+          best,
+          pointToSegmentDistance(station, projectedLine[index], projectedLine[index + 1]),
+        );
+      }
+    }
+  }
+
+  return best;
+}
+
+function showLiveStreetFeature(feature) {
+  const props = feature.properties ?? {};
+  const streetName = props.name || props['name:latin'] || props.class || 'Unnamed street';
+  selectedStreetProperties = null;
+  selectedLiveStreetFeature = feature;
+  selectionTypeEl.textContent = 'Selected street';
+  featureNameEl.textContent = streetName;
+
+  if (activeStationModes.size === 0) {
+    featureSummaryEl.textContent = 'No station types selected';
+  } else {
+    const distance = liveStreetDistance(feature.geometry);
+    const distanceLabel =
+      !Number.isFinite(distance) || distance > maxDistanceMeters
+        ? `More than ${formatDistance(maxDistanceMeters)}`
+        : formatDistance(distance);
+    featureSummaryEl.textContent = `${distanceLabel} from nearest selected station`;
+  }
+
+  renderDetails([{ label: 'Road class', value: props.class }]);
 }
 
 function showStationFeature(props) {
   selectedStreetProperties = null;
+  selectedLiveStreetFeature = null;
   selectionTypeEl.textContent = 'Selected station';
   featureNameEl.textContent = props.name || 'Unnamed station';
   featureSummaryEl.textContent = props.system || MODE_LABELS[props.mode] || 'Transit station';
@@ -509,8 +1038,133 @@ function showStationFeature(props) {
     { label: 'Route', value: props.route_name || props.route_relation },
     { label: 'Stop tag', value: props.highway || props.public_transport },
     { label: 'Opening', value: props.opening_date },
-    { label: 'OSM', value: props.id },
+    { label: props.id?.startsWith('gtfs/') ? 'GTFS' : 'OSM', value: props.id },
   ]);
+}
+
+function updateDestinationSummary() {
+  if (!state.destination) return;
+  destinationSummaryEl.textContent = `Color shows access walk + schedule-adjusted transit to ${
+    state.destination.properties.name
+  }, departing ${departureLabel()}.`;
+}
+
+function applyScheduleContext() {
+  if (!state.transitGraph) return;
+
+  const waitMinutesByStation = new Map();
+  const waitDetailsByStation = new Map();
+  let scheduledStationCount = 0;
+
+  for (const node of state.transitGraph.nodes) {
+    const details = scheduledWaitForStation(
+      state.schedules,
+      node.id,
+      state.scheduleWeekday,
+      state.scheduleMinute,
+    );
+    waitMinutesByStation.set(node.id, details.minutes);
+    waitDetailsByStation.set(node.id, details);
+    if (details.scheduled) scheduledStationCount += 1;
+  }
+
+  state.waitMinutesByStation = waitMinutesByStation;
+  state.waitDetailsByStation = waitDetailsByStation;
+  scheduleSummaryEl.textContent = state.schedules
+    ? `Official SEMOVI weekly headways cover ${formatInteger(
+        scheduledStationCount,
+      )} of ${formatInteger(
+        state.transitGraph.nodes.length,
+      )} open station records; the rest use a 4 min estimate.`
+    : 'Schedule data unavailable; boarding waits use a 4 min estimate.';
+
+  if (state.destination) {
+    state.transitTimes = calculateTransitTimes(
+      state.transitGraph,
+      state.destination.properties.id,
+      { waitMinutesByStation: state.waitMinutesByStation },
+    );
+    updateDestinationSummary();
+    applyTimeScale();
+  }
+}
+
+function updateScheduleContext() {
+  const parsedDay = Number(scheduleDaySelect.value);
+  const timeMatch = /^(\d{2}):(\d{2})$/.exec(scheduleTimeInput.value);
+  if (Number.isInteger(parsedDay) && parsedDay >= 0 && parsedDay <= 6) {
+    state.scheduleWeekday = parsedDay;
+  }
+  if (timeMatch) {
+    state.scheduleMinute = Number(timeMatch[1]) * 60 + Number(timeMatch[2]);
+  } else {
+    scheduleTimeInput.value = formatTimeInput(state.scheduleMinute);
+  }
+  applyScheduleContext();
+}
+
+function applyTimeScale() {
+  const stops = timeScaleStops(state.timeScaleMinutes);
+  state.timeScaleMinutes = stops.yellowMinutes;
+  timeScaleInput.value = String(stops.yellowMinutes);
+  timeScaleSummaryEl.textContent = `Yellow at ${stops.yellowMinutes} min, orange at ${
+    stops.orangeMinutes
+  } min, and red at ${stops.redMinutes} min.`;
+
+  if (!state.destination || !state.transitTimes) return;
+
+  setLegend('time');
+  syncStreetColor();
+  updateViewportStatistics();
+}
+
+function updateTimeScale(value) {
+  if (String(value).trim() === '') {
+    timeScaleInput.value = String(state.timeScaleMinutes);
+    return;
+  }
+  state.timeScaleMinutes = timeScaleStops(value).yellowMinutes;
+  applyTimeScale();
+}
+
+function clearDestination() {
+  state.destination = null;
+  state.transitTimes = null;
+  destinationSelect.value = '';
+  destinationSummaryEl.textContent =
+    'Choose a station here or click an open station on the map.';
+  setLegend('distance');
+  syncStreetColor();
+  updateViewportStatistics();
+  if (map.getLayer('station-destination')) {
+    map.setFilter('station-destination', ['==', ['get', 'id'], '']);
+  }
+  updateStatus('Ready');
+}
+
+function selectDestination(stationId) {
+  if (!stationId) {
+    clearDestination();
+    return;
+  }
+
+  if (!AREAS[activeAreaKey].supportsDestination || !state.transitGraph) return;
+
+  const destinationId = state.destinationChoiceByStationId.get(stationId) ?? stationId;
+  const destination = state.stationById.get(destinationId);
+  if (!destination || destination.properties.status !== 'open') return;
+
+  updateStatus('Calculating');
+  const transitTimes = calculateTransitTimes(state.transitGraph, destinationId, {
+    waitMinutesByStation: state.waitMinutesByStation,
+  });
+  state.destination = destination;
+  state.transitTimes = transitTimes;
+  destinationSelect.value = destinationId;
+  updateDestinationSummary();
+  applyTimeScale();
+  map.setFilter('station-destination', ['==', ['get', 'id'], destinationId]);
+  updateStatus('Destination set');
 }
 
 function installHover() {
@@ -569,211 +1223,468 @@ function installHover() {
 
     map.on('click', layerId, (event) => {
       const feature = event.features?.[0];
-      if (feature) showStationFeature(feature.properties);
+      if (!feature) return;
+      showStationFeature(feature.properties);
+      if (
+        AREAS[activeAreaKey].supportsDestination &&
+        feature.properties.status === 'open' &&
+        feature.properties.name
+      ) {
+        selectDestination(feature.properties.id);
+      }
     });
+  }
+}
+
+function liveStreetColor(stations) {
+  const stationCoordinates = stations.features.map((feature) => feature.geometry.coordinates);
+  const stationGeometry = {
+    type: 'MultiPoint',
+    coordinates: stationCoordinates.length > 0 ? stationCoordinates : [[0, 0]],
+  };
+  return [
+    'interpolate',
+    ['linear'],
+    ['distance', stationGeometry],
+    0,
+    COLORS.near,
+    1000,
+    COLORS.midNear,
+    2500,
+    COLORS.midFar,
+    maxDistanceMeters,
+    COLORS.far,
+  ];
+}
+
+function isStreetStyleLayer(layer) {
+  return (
+    layer.type === 'line' &&
+    layer['source-layer'] === 'transportation' &&
+    /^(road|bridge|tunnel)_/.test(layer.id) &&
+    !/(casing|rail|hatching|path|pedestrian)/.test(layer.id)
+  );
+}
+
+function installLiveStreetHover(layerId) {
+  map.on('mousemove', layerId, (event) => {
+    const feature = event.features?.[0];
+    if (!feature) return;
+    showLiveStreetFeature(feature);
+    map.getCanvas().style.cursor = 'pointer';
+  });
+  map.on('mouseleave', layerId, () => {
+    map.getCanvas().style.cursor = '';
+  });
+  map.on('click', layerId, (event) => {
+    const feature = event.features?.[0];
+    if (feature) showLiveStreetFeature(feature);
+  });
+}
+
+function installLiveStreetLayers(stations) {
+  const color = liveStreetColor(stations);
+
+  if (liveStreetLayerIds.length > 0) {
+    for (const layerId of liveStreetLayerIds) {
+      map.setPaintProperty(layerId, 'line-color', color);
+    }
+    return;
+  }
+
+  const labelLayerId = firstSymbolLayerId();
+  const streetLayers = map.getStyle().layers.filter(isStreetStyleLayer);
+
+  for (const layer of streetLayers) {
+    const layerId = `transit-${layer.id}`;
+    map.addLayer(
+      {
+        id: layerId,
+        type: 'line',
+        source: layer.source,
+        'source-layer': layer['source-layer'],
+        ...(layer.minzoom == null ? {} : { minzoom: layer.minzoom }),
+        ...(layer.maxzoom == null ? {} : { maxzoom: layer.maxzoom }),
+        ...(layer.filter == null ? {} : { filter: layer.filter }),
+        layout: {
+          ...(layer.layout ?? {}),
+          visibility: 'none',
+        },
+        paint: {
+          'line-color': color,
+          'line-opacity': 0.8,
+          'line-width': layer.paint?.['line-width'] ?? 1,
+        },
+      },
+      labelLayerId,
+    );
+    liveStreetLayerIds.push(layerId);
+    installLiveStreetHover(layerId);
+  }
+}
+
+function installMapData(stations) {
+  const existingStations = map.getSource('stations');
+
+  if (existingStations) {
+    existingStations.setData(stations);
+    return;
+  }
+
+  const labelLayerId = firstSymbolLayerId();
+  const streetTilesUrl = new URL(AREAS.cdmx.streetTiles, window.location.href).href;
+
+  map.addSource('streets', {
+    type: 'vector',
+    url: `pmtiles://${streetTilesUrl}`,
+    attribution: '© OpenStreetMap contributors',
+    promoteId: 'i',
+  });
+
+  map.addSource('stations', {
+    type: 'geojson',
+    data: stations,
+    generateId: true,
+  });
+
+  map.addLayer(
+    {
+      id: 'street-proximity',
+      type: 'line',
+      source: 'streets',
+      'source-layer': 'streets',
+      layout: {
+        visibility: 'none',
+      },
+      paint: {
+        'line-color': streetColorExpression(),
+        'line-width': [
+          'interpolate',
+          ['linear'],
+          ['zoom'],
+          9,
+          0.75,
+          12,
+          1.8,
+          15,
+          4.2,
+        ],
+        'line-opacity': [
+          'case',
+          ['boolean', ['feature-state', 'hover'], false],
+          1,
+          0.78,
+        ],
+      },
+    },
+    labelLayerId ?? undefined,
+  );
+
+  map.addLayer({
+    id: 'station-points-open',
+    type: 'circle',
+    source: 'stations',
+    filter: openStationFilter,
+    paint: {
+      'circle-color': stationColor,
+      'circle-stroke-color': '#18222c',
+      'circle-stroke-width': 1.5,
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3, 13, 6],
+    },
+  });
+
+  map.addLayer({
+    id: 'station-points-future',
+    type: 'circle',
+    source: 'stations',
+    filter: futureStationFilter,
+    layout: {
+      visibility: 'none',
+    },
+    paint: {
+      'circle-color': stationColor,
+      'circle-opacity': 0.42,
+      'circle-stroke-color': COLORS.future,
+      'circle-stroke-width': 2,
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3.5, 13, 7],
+    },
+  });
+
+  map.addLayer({
+    id: 'station-destination',
+    type: 'circle',
+    source: 'stations',
+    filter: ['==', ['get', 'id'], ''],
+    paint: {
+      'circle-color': 'rgba(255,255,255,0.35)',
+      'circle-stroke-color': '#18222c',
+      'circle-stroke-width': 3,
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 7, 13, 12],
+    },
+  });
+
+  map.addLayer({
+    id: 'station-labels-open',
+    type: 'symbol',
+    source: 'stations',
+    filter: openStationFilter,
+    minzoom: 11.4,
+    layout: {
+      'text-field': ['get', 'name'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 11.4, 10, 15, 13],
+      'text-offset': [0, 1.2],
+      'text-anchor': 'top',
+      'text-allow-overlap': false,
+      'text-optional': true,
+    },
+    paint: {
+      'text-color': '#18222c',
+      'text-halo-color': '#ffffff',
+      'text-halo-width': 1.2,
+    },
+  });
+
+  map.addLayer({
+    id: 'station-labels-future',
+    type: 'symbol',
+    source: 'stations',
+    filter: futureStationFilter,
+    minzoom: 10.8,
+    layout: {
+      visibility: 'none',
+      'text-field': ['concat', ['get', 'name'], ' (future)'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 10.8, 10, 15, 13],
+      'text-offset': [0, 1.25],
+      'text-anchor': 'top',
+      'text-allow-overlap': false,
+      'text-optional': true,
+    },
+    paint: {
+      'text-color': '#334155',
+      'text-halo-color': '#ffffff',
+      'text-halo-width': 1.2,
+      'text-opacity': 0.8,
+    },
+  });
+
+  installHover();
+}
+
+function scheduleDestinationSetup(area, stations, sequence) {
+  if (!area.supportsDestination) return;
+
+  const start = async () => {
+    const schedules = area.schedules
+      ? await fetchJson(area.schedules).catch(() => null)
+      : null;
+    if (sequence !== loadSequence) return;
+
+    const initializeDestination = () => {
+      if (sequence !== loadSequence) return;
+      state.schedules = schedules;
+      state.transitGraph = buildTransitGraph(stations.features);
+      applyScheduleContext();
+      renderDestinationOptions(stations.features);
+    };
+
+    if ('requestIdleCallback' in window) {
+      window.requestIdleCallback(initializeDestination, { timeout: 2_000 });
+    } else {
+      setTimeout(initializeDestination, 0);
+    }
+  };
+
+  if (loadingOperation) {
+    window.addEventListener('transit:ready', start, { once: true });
+  } else {
+    start();
+  }
+}
+
+async function loadArea(areaKey, { initial = false } = {}) {
+  const area = AREAS[areaKey];
+  const sequence = ++loadSequence;
+
+  if (!initial) beginLoading(`Loading ${area.label}`, 'area');
+  activeAreaKey = areaKey;
+  streetSourceLoaded = false;
+  resetDestinationRouting();
+  updateAreaChrome(areaKey);
+  resetSelection();
+
+  try {
+    const [stations, metadata] = await Promise.all([
+      fetchJson(area.stations),
+      fetchJson(area.metadata),
+    ]);
+
+    if (sequence !== loadSequence) return;
+
+    state.metadata = metadata;
+    state.stationById = new Map(
+      stations.features.map((feature) => [feature.properties.id, feature]),
+    );
+
+    loadedStations = stations;
+    renderMetadata(metadata);
+    installMapData(stations);
+    applyMapBounds(metadata);
+
+    if (area.liveRoads && pendingBasemapStyle) installBasemap();
+    if (area.liveRoads && basemapInstalled) {
+      installLiveStreetLayers(stations);
+    }
+
+    syncStationFilters();
+    syncStreetColor();
+    syncStreetVisibility();
+    syncStationVisibility();
+    updateViewportStatistics();
+    window.__transitPerformance.dataFetchedMs =
+      performance.now() - window.__transitPerformance.startedAt;
+    scheduleDestinationSetup(area, stations, sequence);
+
+    if (area.liveRoads) {
+      loadingCanFinish = true;
+      requestAnimationFrame(() => requestAnimationFrame(finishLoading));
+    }
+  } catch (error) {
+    if (sequence !== loadSequence) return;
+    console.error(error);
+    loadingOperation = null;
+    loadingCanFinish = false;
+    updateStatus('Data missing', { isError: true });
+    mapLoadingLabelEl.textContent = 'Map data could not be loaded';
+    mapEl.setAttribute('aria-busy', 'false');
+    featureSummaryEl.textContent = `Run ${area.buildCommand}, then refresh.`;
   }
 }
 
 async function initialize() {
   try {
-    const [stations, metadata, basemapStyle] = await Promise.all([
-      fetchJson(DATASETS.stations),
-      fetchJson(DATASETS.metadata),
-      fetchJson(DATASETS.basemapStyle),
-    ]);
-    pendingBasemapStyle = basemapStyle;
-    window.__transitPerformance.dataFetchedMs =
-      performance.now() - window.__transitPerformance.startedAt;
-
-    renderMetadata(metadata);
-    applyMapBounds(metadata);
-
-    const labelLayerId = firstSymbolLayerId();
-    const streetTilesUrl = new URL(
-      metadata.street_tiles_file ?? DATASETS.streetTiles,
-      window.location.href,
-    ).href;
-
-    map.addSource('streets', {
-      type: 'vector',
-      url: `pmtiles://${streetTilesUrl}`,
-      attribution: '© OpenStreetMap contributors',
-      promoteId: 'i',
-    });
-
-    map.addSource('stations', {
-      type: 'geojson',
-      data: stations,
-      generateId: true,
-    });
-
-    map.addLayer(
-      {
-        id: 'street-proximity',
-        type: 'line',
-        source: 'streets',
-        'source-layer': 'streets',
-        paint: {
-          'line-color': streetColorExpression(),
-          'line-width': [
-            'interpolate',
-            ['linear'],
-            ['zoom'],
-            9,
-            0.75,
-            12,
-            1.8,
-            15,
-            4.2,
-          ],
-          'line-opacity': [
-            'case',
-            ['boolean', ['feature-state', 'hover'], false],
-            1,
-            0.78,
-          ],
-        },
-      },
-      labelLayerId,
-    );
-
-    map.addLayer({
-      id: 'station-points-open',
-      type: 'circle',
-      source: 'stations',
-      filter: openStationFilter,
-      paint: {
-        'circle-color': stationColor,
-        'circle-stroke-color': '#18222c',
-        'circle-stroke-width': 1.5,
-        'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3, 13, 6],
-      },
-    });
-
-    map.addLayer({
-      id: 'station-points-future',
-      type: 'circle',
-      source: 'stations',
-      filter: futureStationFilter,
-      layout: {
-        visibility: 'none',
-      },
-      paint: {
-        'circle-color': stationColor,
-        'circle-opacity': 0.42,
-        'circle-stroke-color': COLORS.future,
-        'circle-stroke-width': 2,
-        'circle-radius': ['interpolate', ['linear'], ['zoom'], 9, 3.5, 13, 7],
-      },
-    });
-
-    map.addLayer({
-      id: 'station-labels-open',
-      type: 'symbol',
-      source: 'stations',
-      filter: openStationFilter,
-      minzoom: 11.4,
-      layout: {
-        'text-field': ['get', 'name'],
-        'text-size': ['interpolate', ['linear'], ['zoom'], 11.4, 10, 15, 13],
-        'text-offset': [0, 1.2],
-        'text-anchor': 'top',
-        'text-allow-overlap': false,
-        'text-optional': true,
-      },
-      paint: {
-        'text-color': '#18222c',
-        'text-halo-color': '#ffffff',
-        'text-halo-width': 1.2,
-      },
-    });
-
-    map.addLayer({
-      id: 'station-labels-future',
-      type: 'symbol',
-      source: 'stations',
-      filter: futureStationFilter,
-      minzoom: 10.8,
-      layout: {
-        visibility: 'none',
-        'text-field': ['concat', ['get', 'name'], ' (future)'],
-        'text-size': ['interpolate', ['linear'], ['zoom'], 10.8, 10, 15, 13],
-        'text-offset': [0, 1.25],
-        'text-anchor': 'top',
-        'text-allow-overlap': false,
-        'text-optional': true,
-      },
-      paint: {
-        'text-color': '#334155',
-        'text-halo-color': '#ffffff',
-        'text-halo-width': 1.2,
-        'text-opacity': 0.8,
-      },
-    });
-
-    installHover();
-    syncStationFilters();
-    syncStationVisibility();
-    loadingCanFinish = true;
+    pendingBasemapStyle = await fetchJson('vendor/openfreemap-liberty.json');
+    await loadArea(initialAreaKey, { initial: true });
   } catch (error) {
     console.error(error);
     loadingOperation = null;
-    updateStatus('Data missing', { isError: true });
-    mapLoadingLabelEl.textContent = 'Map data could not be loaded';
+    updateStatus('Map unavailable', { isError: true });
+    mapLoadingLabelEl.textContent = 'Map could not be initialized';
     mapEl.setAttribute('aria-busy', 'false');
-    featureSummaryEl.textContent = 'Run npm run build:data:cdmx, then refresh.';
   }
 }
 
 streetToggle.addEventListener('change', () => {
   runMapUpdate('Updating layers', () => {
-    setLayerVisibility('street-proximity', streetToggle.checked);
+    syncStreetVisibility();
+    updateViewportStatistics();
   });
 });
 
 stationToggle.addEventListener('change', () => {
-  runMapUpdate('Updating layers', syncStationVisibility);
+  runMapUpdate('Updating layers', () => {
+    syncStationVisibility();
+    updateViewportStatistics();
+  });
 });
 
 futureStationToggle.addEventListener('change', () => {
-  runMapUpdate('Updating layers', syncStationVisibility);
+  runMapUpdate('Updating layers', () => {
+    syncStationVisibility();
+    syncStreetColor();
+    updateViewportStatistics();
+
+    if (selectedStreetProperties) {
+      showStreetFeature(selectedStreetProperties);
+    } else if (selectedLiveStreetFeature) {
+      showLiveStreetFeature(selectedLiveStreetFeature);
+    }
+  });
 });
 
 map.on('sourcedataloading', (event) => {
-  if (event.sourceId !== 'streets' || !initialLoadComplete) return;
+  if (
+    event.sourceId !== 'streets' ||
+    AREAS[activeAreaKey].liveRoads ||
+    !initialLoadComplete
+  ) {
+    return;
+  }
 
   if (!loadingOperation) {
     streetSourceLoaded = false;
     beginLoading('Loading area', 'area');
-    loadingCanFinish = true;
   }
 });
 
 map.on('sourcedata', (event) => {
-  if (
-    event.sourceId === 'streets' &&
-    event.isSourceLoaded
-  ) {
+  if (event.sourceId === 'streets' && event.isSourceLoaded) {
     streetSourceLoaded = true;
   }
 });
 
-map.on('idle', finishLoading);
+map.on('moveend', updateViewportStatistics);
+map.on('idle', () => {
+  updateViewportStatistics();
+  if (AREAS[activeAreaKey].liveRoads && loadingOperation?.type !== 'filter') {
+    loadingCanFinish = true;
+    finishLoading();
+  }
+});
 map.on('render', () => {
+  if (!map.getLayer('street-proximity')) return;
+
+  const renderedStreets = AREAS[activeAreaKey].liveRoads
+    ? []
+    : map.queryRenderedFeatures({ layers: ['street-proximity'] });
   if (
     window.__transitPerformance.firstStreetRenderMs === null &&
-    map.getLayer('street-proximity') &&
-    map.queryRenderedFeatures({ layers: ['street-proximity'] }).length > 0
+    renderedStreets.length > 0
   ) {
     window.__transitPerformance.firstStreetRenderMs =
       performance.now() - window.__transitPerformance.startedAt;
   }
 
-  if (streetSourceLoaded && loadingOperation?.type !== 'filter') {
+  if (
+    !AREAS[activeAreaKey].liveRoads &&
+    loadingOperation?.type !== 'filter' &&
+    renderedStreets.length > 0 &&
+    (streetSourceLoaded || map.isSourceLoaded('streets'))
+  ) {
+    streetSourceLoaded = true;
+    updateViewportStatistics();
     loadingCanFinish = true;
     finishLoading();
   }
 });
+
+areaSelect.addEventListener('change', () => {
+  const areaKey = areaSelect.value;
+  if (areaKey !== activeAreaKey) loadArea(areaKey);
+});
+
+destinationSelect.addEventListener('change', () => {
+  selectDestination(destinationSelect.value);
+});
+
+scheduleDaySelect.addEventListener('change', updateScheduleContext);
+scheduleTimeInput.addEventListener('change', updateScheduleContext);
+
+timeScaleInput.addEventListener('input', () => {
+  if (timeScaleInput.value === '') return;
+  updateTimeScale(timeScaleInput.value);
+});
+
+timeScaleInput.addEventListener('change', () => {
+  updateTimeScale(timeScaleInput.value);
+});
+
+const initialDeparture = currentMexicoCityDeparture();
+state.scheduleWeekday = initialDeparture.weekday;
+state.scheduleMinute = initialDeparture.minute;
+scheduleDaySelect.value = String(initialDeparture.weekday);
+scheduleTimeInput.value = formatTimeInput(initialDeparture.minute);
+applyTimeScale();
+
 map.once('style.load', () => {
   window.__transitPerformance.styleLoadedMs =
     performance.now() - window.__transitPerformance.startedAt;

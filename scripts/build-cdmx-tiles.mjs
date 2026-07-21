@@ -10,6 +10,7 @@ const rootDir = resolve(__dirname, '..');
 const dataDir = resolve(rootDir, 'data');
 const streetsPath = resolve(dataDir, 'cdmx-streets.geojson');
 const distancesPath = resolve(dataDir, 'cdmx-street-mode-distances.json');
+const accessPath = resolve(dataDir, 'cdmx-street-access.json');
 const metadataPath = resolve(dataDir, 'cdmx-metadata.json');
 const temporaryPath = resolve(dataDir, '.cdmx-streets.ndjson');
 const tilesPath = resolve(dataDir, 'cdmx-streets.pmtiles');
@@ -28,6 +29,15 @@ const MODE_DISTANCE_PROPERTIES = {
   monorail: 'dm',
 };
 const MODE_KEYS = Object.keys(MODE_DISTANCE_PROPERTIES);
+const FUTURE_MODE_DISTANCE_PROPERTIES = {
+  subway: 'fs',
+  brt: 'fb',
+  light_rail: 'fl',
+  cable_car: 'fc',
+  commuter_rail: 'ft',
+  regional_rail: 'fr',
+  monorail: 'fm',
+};
 const STREET_MIN_ZOOM = {
   motorway: 8,
   trunk: 8,
@@ -54,7 +64,7 @@ async function writeLine(stream, value) {
   }
 }
 
-function validateDistanceData(features, distanceData) {
+function validateData(features, distanceData, streetAccess) {
   if (distanceData.feature_count !== features.length) {
     throw new Error(
       `Street mode distances have ${distanceData.feature_count} features; expected ${features.length}.`,
@@ -66,6 +76,14 @@ function validateDistanceData(features, distanceData) {
     if (!distances || distances.length !== features.length) {
       throw new Error(`Invalid street distance data for station mode: ${mode}.`);
     }
+  }
+
+  if (
+    !Array.isArray(streetAccess.station_ids) ||
+    !Array.isArray(streetAccess.street_station_indexes) ||
+    streetAccess.street_station_indexes.length !== features.length
+  ) {
+    throw new Error('Street access data does not match the street feature collection.');
   }
 }
 
@@ -108,7 +126,13 @@ function nearCountsByModeSelection(featureCount, distancesByMode) {
   return result;
 }
 
-async function buildTippecanoeInput(features, distancesByMode, maxDistance) {
+async function buildTippecanoeInput(
+  features,
+  distancesByMode,
+  futureDistancesByMode,
+  streetAccess,
+  maxDistance,
+) {
   const output = createWriteStream(temporaryPath, { encoding: 'utf8' });
 
   try {
@@ -117,6 +141,9 @@ async function buildTippecanoeInput(features, distancesByMode, maxDistance) {
         ...feature.properties,
         d: tileDistance(feature.properties.d, maxDistance),
         i: featureIndex,
+        s: streetAccess.station_ids[
+          streetAccess.street_station_indexes[featureIndex]
+        ],
       };
 
       for (const [mode, property] of Object.entries(MODE_DISTANCE_PROPERTIES)) {
@@ -124,6 +151,14 @@ async function buildTippecanoeInput(features, distancesByMode, maxDistance) {
           distancesByMode[mode][featureIndex],
           maxDistance,
         );
+      }
+
+      for (const [mode, distances] of Object.entries(futureDistancesByMode)) {
+        const property = FUTURE_MODE_DISTANCE_PROPERTIES[mode];
+        if (!property || distances.length !== features.length) {
+          throw new Error(`Invalid future street distance data for station mode: ${mode}.`);
+        }
+        properties[property] = tileDistance(distances[featureIndex], maxDistance);
       }
 
       await writeLine(output, {
@@ -172,20 +207,23 @@ async function runTippecanoe() {
 }
 
 async function main() {
-  const [streets, distanceData, metadata] = await Promise.all(
-    [streetsPath, distancesPath, metadataPath].map(async (path) =>
+  const [streets, distanceData, streetAccess, metadata] = await Promise.all(
+    [streetsPath, distancesPath, accessPath, metadataPath].map(async (path) =>
       JSON.parse(await readFile(path, 'utf8')),
     ),
   );
   const features = streets.features ?? [];
   const distancesByMode = distanceData.distances_by_mode ?? {};
+  const futureDistancesByMode = distanceData.future_distances_by_mode ?? {};
 
-  validateDistanceData(features, distanceData);
+  validateData(features, distanceData, streetAccess);
   console.log(`Preparing ${features.length.toLocaleString()} streets for vector tiling...`);
 
   await buildTippecanoeInput(
     features,
     distancesByMode,
+    futureDistancesByMode,
+    streetAccess,
     distanceData.max_distance_m ?? 5000,
   );
 
