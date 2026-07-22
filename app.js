@@ -10,7 +10,7 @@ import {
   scheduledWaitForService,
   scheduledWaitForStation,
   timeScaleStops,
-} from './routing.js?v=20260721d';
+} from './routing.js?v=20260722a';
 
 const AREAS = {
   cdmx: {
@@ -168,6 +168,7 @@ const selectionTypeEl = document.querySelector('#selection-type');
 const featureNameEl = document.querySelector('#feature-name');
 const featureSummaryEl = document.querySelector('#feature-summary');
 const featureMetadataEl = document.querySelector('#feature-metadata');
+const routeBreakdownEl = document.querySelector('#route-breakdown');
 const streetToggle = document.querySelector('#toggle-streets');
 const stationToggle = document.querySelector('#toggle-stations');
 const futureStationToggle = document.querySelector('#toggle-future-stations');
@@ -1158,6 +1159,8 @@ function resetSelection() {
   featureNameEl.textContent = 'None';
   featureSummaryEl.textContent = 'Hover a highlighted street or station';
   featureMetadataEl.replaceChildren();
+  routeBreakdownEl.replaceChildren();
+  routeBreakdownEl.hidden = true;
 }
 
 function updateAreaChrome(areaKey) {
@@ -1184,6 +1187,8 @@ function updateAreaChrome(areaKey) {
 }
 
 function renderDetails(details) {
+  routeBreakdownEl.replaceChildren();
+  routeBreakdownEl.hidden = true;
   featureMetadataEl.replaceChildren(
     ...details
       .filter(
@@ -1204,6 +1209,167 @@ function renderDetails(details) {
   );
 }
 
+function routeStationName(stationId) {
+  return state.stationById.get(stationId)?.properties?.name || 'Station';
+}
+
+function routeMetadata(serviceKey) {
+  if (!serviceKey) return null;
+  const routeId = String(serviceKey).replace(/\/[^/]+$/, '');
+  return state.schedules?.routes?.[routeId] ?? null;
+}
+
+function routeLegLabel(leg) {
+  const route = routeMetadata(leg.serviceKey);
+  const modeLabel = MODE_LABELS[route?.mode ?? leg.mode] ?? 'Transit';
+  return route?.name ? `${modeLabel} ${route.name}` : modeLabel;
+}
+
+function transferDetail(leg) {
+  const fromName = routeStationName(leg.fromStationId);
+  const toName = routeStationName(leg.toStationId);
+  return fromName === toName ? `At ${toName}` : `${fromName} → ${toName}`;
+}
+
+function routeTableRows(travel) {
+  const transitLegs = state.transitTimes?.routeFromStation?.(travel.stationId);
+  if (!Array.isArray(transitLegs)) return null;
+
+  const rows = [
+    {
+      label: 'Walk',
+      detail: `To ${routeStationName(travel.stationId)} · ${formatDistance(
+        travel.distanceMeters,
+      )}`,
+      minutes: travel.walkingMinutes,
+    },
+  ];
+  let pendingWait = null;
+  let previousRideKey = null;
+  let latestTransfer = null;
+
+  for (const leg of transitLegs) {
+    if (leg.type === 'wait') {
+      pendingWait = leg;
+      continue;
+    }
+
+    if (leg.type === 'transfer') {
+      if (latestTransfer) {
+        latestTransfer.toStationId = leg.toStationId;
+        latestTransfer.minutes += leg.minutes;
+        latestTransfer.detail = transferDetail(latestTransfer);
+        continue;
+      }
+
+      const row = {
+        label: 'Transfer',
+        detail: transferDetail(leg),
+        minutes: leg.minutes,
+        fromStationId: leg.fromStationId,
+        toStationId: leg.toStationId,
+      };
+      rows.push(row);
+      latestTransfer = row;
+      continue;
+    }
+
+    if (leg.type !== 'ride') continue;
+
+    const label = routeLegLabel(leg);
+    const rideKey = leg.serviceKey ?? `mode:${leg.mode ?? 'transit'}`;
+    const changedService = previousRideKey !== null && rideKey !== previousRideKey;
+    let boardingWait = 0;
+
+    if (latestTransfer) {
+      if (changedService) latestTransfer.detail += ` · to ${label}`;
+      if (pendingWait) {
+        latestTransfer.minutes += pendingWait.minutes;
+        latestTransfer.detail += ` · ${formatMinutes(pendingWait.minutes)} wait`;
+      }
+    } else if (changedService) {
+      rows.push({
+        label: 'Transfer',
+        detail: `At ${routeStationName(leg.fromStationId)} · to ${label}`,
+        minutes: pendingWait?.minutes ?? 0,
+      });
+    } else {
+      boardingWait = pendingWait?.minutes ?? 0;
+    }
+
+    const detail = `${routeStationName(leg.fromStationId)} → ${routeStationName(
+      leg.toStationId,
+    )}`;
+    rows.push({
+      label,
+      detail:
+        boardingWait > 0
+          ? `${detail} · ${formatMinutes(boardingWait)} wait`
+          : detail,
+      minutes: leg.minutes + boardingWait,
+    });
+    pendingWait = null;
+    previousRideKey = rideKey;
+    latestTransfer = null;
+  }
+
+  if (pendingWait) {
+    rows.push({
+      label: 'Wait',
+      detail: `At ${routeStationName(pendingWait.stationId)}`,
+      minutes: pendingWait.minutes,
+    });
+  }
+
+  return rows;
+}
+
+function renderRouteBreakdown(travel) {
+  const rows = routeTableRows(travel);
+  if (!rows) return;
+
+  const heading = document.createElement('div');
+  heading.className = 'route-breakdown-heading';
+  heading.textContent = 'Route breakdown';
+
+  const table = document.createElement('table');
+  table.setAttribute('aria-label', 'Concise route breakdown');
+  const head = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  for (const label of ['Leg', 'Route', 'Time']) {
+    const cell = document.createElement('th');
+    cell.scope = 'col';
+    cell.textContent = label;
+    headRow.append(cell);
+  }
+  head.append(headRow);
+
+  const body = document.createElement('tbody');
+  rows.forEach((row, index) => {
+    const tableRow = document.createElement('tr');
+    const labelCell = document.createElement('th');
+    labelCell.scope = 'row';
+
+    const stepNumber = document.createElement('span');
+    stepNumber.className = 'route-step-number';
+    stepNumber.textContent = String(index + 1);
+    const stepLabel = document.createElement('span');
+    stepLabel.textContent = row.label;
+    labelCell.append(stepNumber, stepLabel);
+
+    const detailCell = document.createElement('td');
+    detailCell.textContent = row.detail;
+    const timeCell = document.createElement('td');
+    timeCell.textContent = formatMinutes(row.minutes);
+    tableRow.append(labelCell, detailCell, timeCell);
+    body.append(tableRow);
+  });
+
+  table.append(head, body);
+  routeBreakdownEl.replaceChildren(heading, table);
+  routeBreakdownEl.hidden = false;
+}
+
 function showStreetFeature(props) {
   const streetName = props.n || props.h || 'Unnamed street';
   selectedStreetProperties = props;
@@ -1219,40 +1385,15 @@ function showStreetFeature(props) {
     }
 
     const accessStation = state.stationById.get(travel.stationId)?.properties;
-    const serviceKey = state.transitTimes.serviceByStation?.get(travel.stationId);
-    const serviceStateKey = serviceKey
-      ? `${travel.stationId}\u0000${serviceKey}`
-      : null;
-    const waitDetails =
-      state.waitDetailsByService.get(serviceStateKey) ??
-      state.waitDetailsByStation.get(travel.stationId);
-    const boardingWait = travel.transitMinutes > 0 ? waitDetails?.minutes ?? 0 : 0;
     featureSummaryEl.textContent = `${formatMinutes(travel.totalMinutes)} estimated to ${
       state.destination.properties.name
     }`;
     renderDetails([
       { label: 'Access station', value: accessStation?.name },
-      {
-        label: 'Access walk',
-        value: `${formatMinutes(travel.walkingMinutes)} (${formatDistance(
-          travel.distanceMeters,
-        )})`,
-      },
-      {
-        label: 'Boarding wait',
-        value:
-          travel.transitMinutes === 0
-            ? 'None — destination is the access station'
-            : waitDetails?.scheduled
-              ? `${formatMinutes(boardingWait)} (official weekly headway)`
-              : `${formatMinutes(boardingWait)} (estimated)`,
-      },
-      {
-        label: 'Ride + transfers',
-        value: formatMinutes(Math.max(0, travel.transitMinutes - boardingWait)),
-      },
+      { label: 'Departure', value: departureLabel() },
       { label: 'OSM highway', value: props.h },
     ]);
+    renderRouteBreakdown(travel);
     return;
   }
 

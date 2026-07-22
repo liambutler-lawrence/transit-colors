@@ -570,6 +570,84 @@ h1 {
   font-weight: 650;
 }
 
+.route-breakdown {
+  margin-top: 12px;
+  padding-top: 11px;
+  border-top: 1px solid var(--line);
+}
+
+.route-breakdown[hidden] {
+  display: none;
+}
+
+.route-breakdown-heading {
+  margin-bottom: 7px;
+  color: var(--ink);
+  font-size: 0.76rem;
+  font-weight: 850;
+}
+
+.route-breakdown table {
+  width: 100%;
+  border-spacing: 0;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 0.71rem;
+  line-height: 1.3;
+}
+
+.route-breakdown th,
+.route-breakdown td {
+  padding: 7px 5px;
+  border-bottom: 1px solid #e8ebef;
+  text-align: left;
+  vertical-align: top;
+}
+
+.route-breakdown thead th {
+  padding-top: 0;
+  color: var(--muted);
+  font-size: 0.65rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.035em;
+}
+
+.route-breakdown th:first-child {
+  width: 34%;
+}
+
+.route-breakdown th:last-child,
+.route-breakdown td:last-child {
+  width: 54px;
+  padding-right: 0;
+  text-align: right;
+  white-space: nowrap;
+}
+
+.route-breakdown tbody th {
+  color: var(--ink);
+  font-weight: 750;
+}
+
+.route-breakdown tbody td:nth-child(2) {
+  color: var(--muted);
+  overflow-wrap: anywhere;
+}
+
+.route-step-number {
+  display: inline-grid;
+  width: 18px;
+  height: 18px;
+  margin-right: 5px;
+  place-items: center;
+  border-radius: 999px;
+  color: #1d4f49;
+  background: #dff4ef;
+  font-size: 0.62rem;
+  font-weight: 850;
+}
+
 .maplibregl-ctrl-top-right {
   top: 18px;
   right: 18px;
