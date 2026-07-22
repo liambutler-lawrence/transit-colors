@@ -686,6 +686,7 @@ export function calculateTransitTimes(
   const minutesByStation = new Map(
     graph.nodes.map((node) => [node.id, Number.POSITIVE_INFINITY]),
   );
+  const nextStationByStation = new Map();
   const queue = new MinHeap();
   for (const id of validDestinationIds) {
     minutesByStation.set(id, 0);
@@ -700,6 +701,7 @@ export function calculateTransitTimes(
       const nextMinutes = current.minutes + edgeMinutes;
       if (nextMinutes >= minutesByStation.get(neighborId)) continue;
       minutesByStation.set(neighborId, nextMinutes);
+      nextStationByStation.set(neighborId, current.id);
       queue.push({ id: neighborId, minutes: nextMinutes });
     }
   }
@@ -718,7 +720,84 @@ export function calculateTransitTimes(
     minutesByStation.set(node.id, 90);
   }
 
+  minutesByStation.routeFromStation = (stationId) => {
+    const transitMinutes = minutesByStation.get(stationId);
+    if (!Number.isFinite(transitMinutes) || transitMinutes >= 90) return null;
+
+    const legs = [];
+    const visited = new Set();
+    let currentStationId = stationId;
+
+    while (nextStationByStation.has(currentStationId)) {
+      if (visited.has(currentStationId)) return null;
+      visited.add(currentStationId);
+
+      const nextStationId = nextStationByStation.get(currentStationId);
+      const currentNode = graph.nodeById.get(currentStationId);
+      const nextNode = graph.nodeById.get(nextStationId);
+      const minutes = graph.adjacency.get(currentStationId)?.get(nextStationId);
+      if (!currentNode || !nextNode || !Number.isFinite(minutes)) return null;
+
+      const meters = distanceMeters(currentNode.coordinates, nextNode.coordinates);
+      const isTransfer =
+        meters <= 300 ||
+        (currentNode.normalizedName &&
+          currentNode.normalizedName === nextNode.normalizedName &&
+          meters <= 900);
+      legs.push({
+        type: isTransfer ? 'transfer' : 'ride',
+        fromStationId: currentStationId,
+        toStationId: nextStationId,
+        mode: currentNode.mode,
+        serviceKey: null,
+        minutes,
+      });
+      currentStationId = nextStationId;
+    }
+
+    if (!validDestinationIds.includes(currentStationId)) return null;
+
+    const waitMinutes = Math.max(
+      0,
+      transitMinutes - legs.reduce((sum, leg) => sum + leg.minutes, 0),
+    );
+    const firstRide = legs.find((leg) => leg.type === 'ride');
+    if (waitMinutes > 0) {
+      legs.splice(Math.max(0, legs.indexOf(firstRide)), 0, {
+        type: 'wait',
+        stationId: firstRide?.fromStationId ?? stationId,
+        serviceKey: null,
+        minutes: waitMinutes,
+      });
+    }
+
+    return coalesceRideLegs(legs);
+  };
+
   return minutesByStation;
+}
+
+function coalesceRideLegs(legs) {
+  const coalesced = [];
+
+  for (const leg of legs) {
+    const previous = coalesced.at(-1);
+    const sameService =
+      previous?.type === 'ride' &&
+      leg.type === 'ride' &&
+      previous.serviceKey === leg.serviceKey &&
+      previous.mode === leg.mode &&
+      previous.toStationId === leg.fromStationId;
+
+    if (sameService) {
+      previous.toStationId = leg.toStationId;
+      previous.minutes += leg.minutes;
+    } else {
+      coalesced.push({ ...leg });
+    }
+  }
+
+  return coalesced;
 }
 
 function calculateScheduledTransitTimes(
@@ -733,18 +812,30 @@ function calculateScheduledTransitTimes(
   );
   const routeMinutes = new Map();
   const serviceByStation = new Map();
+  const baseDecisions = new Map();
+  const routeDecisions = new Map();
   const queue = new MinHeap();
 
-  const relaxBase = (stationId, minutes, serviceKey = null) => {
+  const relaxBase = (stationId, minutes, decision = null) => {
     if (minutes >= (baseMinutes.get(stationId) ?? Number.POSITIVE_INFINITY)) return;
     baseMinutes.set(stationId, minutes);
-    if (serviceKey) serviceByStation.set(stationId, serviceKey);
+    if (decision) {
+      baseDecisions.set(stationId, decision);
+    } else {
+      baseDecisions.delete(stationId);
+    }
+    if (decision?.type === 'board') {
+      serviceByStation.set(stationId, decision.serviceKey);
+    } else {
+      serviceByStation.delete(stationId);
+    }
     queue.push({ id: stationId, kind: 'base', minutes });
   };
-  const relaxRoute = (stationId, serviceKey, minutes) => {
+  const relaxRoute = (stationId, serviceKey, minutes, decision) => {
     const key = routeStateKey(stationId, serviceKey);
     if (minutes >= (routeMinutes.get(key) ?? Number.POSITIVE_INFINITY)) return;
     routeMinutes.set(key, minutes);
+    routeDecisions.set(key, decision);
     queue.push({ id: stationId, serviceKey, kind: 'route', minutes });
   };
 
@@ -758,11 +849,19 @@ function calculateScheduledTransitTimes(
       // Reverse of alighting: reaching a platform from the destination-side
       // station concourse is free.
       for (const serviceKey of servicesByStation.get(current.id) ?? []) {
-        relaxRoute(current.id, serviceKey, current.minutes);
+        relaxRoute(current.id, serviceKey, current.minutes, {
+          type: 'alight',
+          stationId: current.id,
+        });
       }
       for (const [fromStationId, transferMinutes] of
         reverseTransfers.get(current.id) ?? []) {
-        relaxBase(fromStationId, current.minutes + transferMinutes);
+        relaxBase(fromStationId, current.minutes + transferMinutes, {
+          type: 'transfer',
+          fromStationId,
+          toStationId: current.id,
+          minutes: transferMinutes,
+        });
       }
       continue;
     }
@@ -776,11 +875,22 @@ function calculateScheduledTransitTimes(
       waitMinutesByService.get(currentKey) ??
       waitMinutesByStation.get(current.id) ??
       DEFAULT_ESTIMATED_WAIT_MINUTES;
-    relaxBase(current.id, current.minutes + serviceWait, current.serviceKey);
+    relaxBase(current.id, current.minutes + serviceWait, {
+      type: 'board',
+      stationId: current.id,
+      serviceKey: current.serviceKey,
+      minutes: serviceWait,
+    });
 
     for (const [fromStationId, rideMinutes] of
       ridePredecessors.get(currentKey) ?? []) {
-      relaxRoute(fromStationId, current.serviceKey, current.minutes + rideMinutes);
+      relaxRoute(fromStationId, current.serviceKey, current.minutes + rideMinutes, {
+        type: 'ride',
+        fromStationId,
+        toStationId: current.id,
+        serviceKey: current.serviceKey,
+        minutes: rideMinutes,
+      });
     }
   }
 
@@ -788,6 +898,60 @@ function calculateScheduledTransitTimes(
     if (!Number.isFinite(minutes)) baseMinutes.set(stationId, 90);
   }
   baseMinutes.serviceByStation = serviceByStation;
+  baseMinutes.routeFromStation = (stationId) => {
+    const stationMinutes = baseMinutes.get(stationId);
+    if (!Number.isFinite(stationMinutes) || stationMinutes >= 90) return null;
+
+    const legs = [];
+    const visited = new Set();
+    let current = { kind: 'base', stationId };
+
+    while (true) {
+      const stateKey =
+        current.kind === 'base'
+          ? `base\u0000${current.stationId}`
+          : `route\u0000${current.stationId}\u0000${current.serviceKey}`;
+      if (visited.has(stateKey)) return null;
+      visited.add(stateKey);
+
+      if (current.kind === 'base') {
+        const decision = baseDecisions.get(current.stationId);
+        if (!decision) break;
+
+        if (decision.type === 'board') {
+          legs.push({ ...decision, type: 'wait' });
+          current = {
+            kind: 'route',
+            stationId: current.stationId,
+            serviceKey: decision.serviceKey,
+          };
+        } else {
+          legs.push({ ...decision });
+          current = { kind: 'base', stationId: decision.toStationId };
+        }
+        continue;
+      }
+
+      const decision = routeDecisions.get(
+        routeStateKey(current.stationId, current.serviceKey),
+      );
+      if (!decision) return null;
+
+      if (decision.type === 'ride') {
+        legs.push({ ...decision });
+        current = {
+          kind: 'route',
+          stationId: decision.toStationId,
+          serviceKey: current.serviceKey,
+        };
+      } else {
+        current = { kind: 'base', stationId: current.stationId };
+      }
+    }
+
+    if (!destinationIds.includes(current.stationId)) return null;
+    return coalesceRideLegs(legs);
+  };
   return baseMinutes;
 }
 

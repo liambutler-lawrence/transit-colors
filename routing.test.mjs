@@ -167,6 +167,19 @@ assert.equal(scheduledTimes.get('d'), 0);
 assert.equal(scheduledTimes.get('b'), 11);
 assert.equal(scheduledTimes.get('a'), 18);
 assert.equal(scheduledTimes.serviceByStation.get('a'), 'line-a/0');
+const scheduledRoute = scheduledTimes.routeFromStation('a');
+assert.deepEqual(
+  scheduledRoute.map((leg) => leg.type),
+  ['wait', 'ride', 'wait', 'ride'],
+);
+assert.equal(scheduledRoute[1].serviceKey, 'line-a/0');
+assert.equal(scheduledRoute[1].fromStationId, 'a');
+assert.equal(scheduledRoute[1].toStationId, 'b');
+assert.equal(scheduledRoute[3].serviceKey, 'line-b/0');
+assert.equal(
+  scheduledRoute.reduce((sum, leg) => sum + leg.minutes, 0),
+  scheduledTimes.get('a'),
+);
 
 const multiDestinationTimes = calculateTransitTimes(scheduledGraph, ['c', 'd'], {
   waitMinutesByService,
@@ -174,6 +187,12 @@ const multiDestinationTimes = calculateTransitTimes(scheduledGraph, ['c', 'd'], 
 assert.equal(multiDestinationTimes.get('c'), 0);
 assert.equal(multiDestinationTimes.get('d'), 0);
 assert.equal(multiDestinationTimes.get('a'), 12);
+const multiDestinationRoute = multiDestinationTimes.routeFromStation('a');
+assert.deepEqual(
+  multiDestinationRoute.map((leg) => leg.type),
+  ['wait', 'ride'],
+);
+assert.equal(multiDestinationRoute[1].toStationId, 'c');
 
 const multiAccessStreet = {
   s: 'a',
