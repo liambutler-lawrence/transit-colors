@@ -5,10 +5,13 @@
   --paper: #ffffff;
   --line: #d8dde5;
   --shadow: 0 18px 42px rgba(24, 34, 44, 0.18);
-  --green: #0aa66a;
-  --yellow: #ffd43b;
-  --orange: #f97316;
-  --red: #c7362f;
+  --green: #006837;
+  --bright-green: #39b54a;
+  --lime: #c7e62c;
+  --yellow: #ffe34d;
+  --orange: #ff9f1c;
+  --coral: #ef476f;
+  --red: #7a001f;
 }
 
 * {
@@ -289,8 +292,11 @@ h1 {
   background: linear-gradient(
     90deg,
     var(--green) 0%,
-    var(--yellow) 28%,
-    var(--orange) 58%,
+    var(--bright-green) 10%,
+    var(--lime) 15%,
+    var(--yellow) 20%,
+    var(--orange) 50%,
+    var(--coral) 75%,
     var(--red) 100%
   );
 }
@@ -299,8 +305,11 @@ h1 {
   background: linear-gradient(
     90deg,
     var(--green) 0%,
+    var(--bright-green) 12.5%,
+    var(--lime) 18.75%,
     var(--yellow) 25%,
     var(--orange) 50%,
+    var(--coral) 75%,
     var(--red) 100%
   );
 }
