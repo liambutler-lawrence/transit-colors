@@ -7,9 +7,11 @@ import {
   bestStreetTravelTime,
   buildTransitGraph,
   calculateTransitTimes,
+  createStreetAccessScorer,
   distanceMeters,
   scheduledWaitForService,
   scheduledWaitForStation,
+  splitStreetFeatures,
   streetTravelTime,
   timeScaleStops,
 } from './routing.js';
@@ -131,6 +133,109 @@ await assignNearestStations(streets, stations, {
   yieldControl: async () => {},
 });
 assert.equal(streets[0].properties.brtAccess, 'c-brt');
+
+const scoredStreet = {
+  type: 'Feature',
+  geometry: structuredClone(streets[0].geometry),
+  properties: { d: 20 },
+};
+const accessScorer = createStreetAccessScorer(stations);
+accessScorer.score([scoredStreet], {
+  candidateCount: 5,
+  modeProperties: {
+    subway: { station: 'subwayAccess', distance: 'subwayDistance' },
+    brt: { station: 'brtAccess', distance: 'brtDistance' },
+  },
+});
+assert.equal(scoredStreet.properties.s, streets[0].properties.s);
+assert.equal(scoredStreet.properties.s2, streets[0].properties.s2);
+assert.equal(scoredStreet.properties.d, streets[0].properties.d);
+assert.equal(scoredStreet.properties.subwayAccess, 'a');
+assert.equal(scoredStreet.properties.brtAccess, 'c-brt');
+
+const asyncScoredStreet = {
+  type: 'Feature',
+  geometry: structuredClone(streets[0].geometry),
+  properties: { d: 20 },
+};
+let asyncScoreYieldCount = 0;
+await accessScorer.scoreAsync([asyncScoredStreet], {
+  batchSize: 1,
+  candidateCount: 5,
+  yieldControl: async () => {
+    asyncScoreYieldCount += 1;
+  },
+});
+assert.equal(asyncScoredStreet.properties.s, streets[0].properties.s);
+assert.equal(asyncScoredStreet.properties.d, streets[0].properties.d);
+assert.equal(asyncScoreYieldCount, 1);
+
+const segmentedStreets = splitStreetFeatures(
+  [
+    {
+      type: 'Feature',
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [-99.14, 19.43],
+          [-99.139, 19.43],
+          [-99.138, 19.43],
+        ],
+      },
+      properties: { n: 'Long road' },
+    },
+    {
+      type: 'Feature',
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [-99.139, 19.429],
+          [-99.139, 19.43],
+          [-99.139, 19.431],
+        ],
+      },
+      properties: { n: 'Cross road' },
+    },
+  ],
+  { maxLengthMeters: 10_000 },
+);
+assert.equal(segmentedStreets.length, 4);
+assert.deepEqual(segmentedStreets[0].geometry.coordinates, [
+  [-99.14, 19.43],
+  [-99.139, 19.43],
+]);
+assert.deepEqual(segmentedStreets[1].geometry.coordinates, [
+  [-99.139, 19.43],
+  [-99.138, 19.43],
+]);
+assert.notEqual(segmentedStreets[0].properties, segmentedStreets[1].properties);
+
+const cappedStreetSegments = splitStreetFeatures(
+  [
+    {
+      type: 'Feature',
+      geometry: {
+        type: 'LineString',
+        coordinates: [
+          [-99.14, 19.43],
+          [-99.13, 19.43],
+        ],
+      },
+      properties: { n: 'Very long road' },
+    },
+  ],
+  { maxLengthMeters: 200 },
+);
+assert.ok(cappedStreetSegments.length >= 5);
+assert.ok(
+  cappedStreetSegments.every(
+    (feature) =>
+      distanceMeters(
+        feature.geometry.coordinates[0],
+        feature.geometry.coordinates.at(-1),
+      ) <= 200.1,
+  ),
+);
 
 const graph = buildTransitGraph(stations);
 const transitTimes = calculateTransitTimes(graph, 'd', {

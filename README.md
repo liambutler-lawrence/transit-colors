@@ -5,6 +5,10 @@ Static POC for the Mexico City and New York City metropolitan areas. It overlays
 - A color gradient based on distance to the nearest selected transit modes in either metro area.
 - Schedule-adjusted travel time to a selected station in either metro area, including the access walk, expected boarding wait, and estimated ride through the transit network.
 
+Both views use a seven-stop dark-green–green–lime–yellow–orange–coral–red scale
+so nearby changes remain visible without losing the familiar good-to-poor color
+direction.
+
 Choose a destination from the panel or click an open station on the map. Set a weekday and departure time to apply published service windows and headways. Select “Nearest station only” to return to the distance view.
 
 The destination view's time scale is configurable. Set the green-to-yellow transition in minutes; the orange and red transitions follow at 2× and 4× that value.
@@ -92,12 +96,13 @@ Future/planned status is based on:
 - Narrow network-level overrides for known not-yet-open systems whose OSM tags are incomplete, currently Mexicable Línea 3 and Tren Ligero Texcoco-La Paz
 
 Street color is computed from the nearest selected open-station mode and clamped to
-`0-5000m`. The source per-mode distances live in
-`data/cdmx-street-mode-distances.json`; the browser reads those values from
-`data/cdmx-streets.pmtiles` in 50m display increments. The archive uses a road-class
-zoom hierarchy so overview maps load major roads first and add local streets as the
-user zooms in. Enabling the top-level Future control also includes future/planned
-stations from the currently selected modes in the gradient.
+`0-5000m`. For the browser-facing archive, OSM roads are split at shared junctions
+and capped at 200m so every block-like segment receives independent nearest-station,
+per-mode, future-station, and destination-access calculations. Those values are
+stored in `data/cdmx-streets.pmtiles` in 25m display increments. The archive uses a
+road-class zoom hierarchy so overview maps load major roads first and add local
+streets as the user zooms in. Enabling the top-level Future control also includes
+future/planned stations from the currently selected modes in the gradient.
 
 ## Performance
 
@@ -142,7 +147,7 @@ The NYC builder combines current static GTFS station data for:
 
 The committed dataset is clipped to the regional transit footprint from `40.0-41.9° N` and `74.8-71.8° W`, which includes the outer commuter-rail branches while excluding NJ Transit service outside the NYC region.
 
-Unlike the precomputed CDMX street file, the browser collects the currently loaded OpenFreeMap roads for NYC and builds a viewport-based GeoJSON overlay. Each road receives its nearest selected station and distance, so the same visible `0-5000m` gradient, street details, destination routing, and in-view counts work in both metro areas. Panning or zooming refreshes the road overlay from the loaded vector tiles.
+Unlike the precomputed CDMX street file, the browser collects the currently loaded OpenFreeMap roads for NYC and builds a viewport-based GeoJSON overlay. Roads are split at shared junctions before each segment receives its nearest selected station and distance. Local zooms use the same 200m cap as the precomputed tiles, while the generalized regional overview uses a 400m cap. The same visible `0-5000m` gradient, street details, destination routing, and in-view counts therefore work in both metro areas. Panning or zooming refreshes the road overlay from the loaded vector tiles.
 
 `data/nyc-schedules.json` is generated with the station snapshot from the MTA, NJ Transit, and PATH static GTFS feeds. It compresses published departures into recurring weekday service windows and headway estimates for 945 of the 947 current station records. The remaining records use the labeled four-minute boarding-wait estimate.
 

@@ -1,23 +1,24 @@
 import {
   DEFAULT_TIME_SCALE_MINUTES,
   WALKING_METERS_PER_MINUTE,
-  assignNearestStations,
   attachScheduleGraph,
   bestStreetTravelTime,
   buildTransitGraph,
   calculateTransitTimes,
+  createStreetAccessScorer,
   distanceMeters,
   scheduledWaitForService,
   scheduledWaitForStation,
+  splitStreetFeatures,
   timeScaleStops,
-} from './routing.js?v=20260721d';
+} from './routing.js?v=20260722a';
 
 const AREAS = {
   cdmx: {
     label: 'Mexico City',
     center: [-99.1332, 19.4326],
     zoom: 10.5,
-    streetTiles: 'data/cdmx-streets.pmtiles?v=20260721c',
+    streetTiles: 'data/cdmx-streets.pmtiles?v=20260722a',
     stations: 'data/cdmx-stations.geojson',
     metadata: 'data/cdmx-metadata.json',
     schedules: 'data/cdmx-schedules.json',
@@ -43,10 +44,13 @@ const requestedAreaKey = new URLSearchParams(window.location.search).get('area')
 const initialAreaKey = Object.hasOwn(AREAS, requestedAreaKey) ? requestedAreaKey : 'cdmx';
 
 const COLORS = {
-  near: '#0aa66a',
-  midNear: '#ffd43b',
-  midFar: '#f97316',
-  far: '#c7362f',
+  near: '#006837',
+  nearMid: '#39b54a',
+  midNear: '#c7e62c',
+  mid: '#ffe34d',
+  midFar: '#ff9f1c',
+  farMid: '#ef476f',
+  far: '#7a001f',
   future: '#64748b',
 };
 
@@ -464,10 +468,16 @@ function timeStreetColor(transitTimes, scaleMinutes) {
     totalTime,
     0,
     COLORS.near,
-    stops.yellowMinutes,
+    stops.yellowMinutes / 2,
+    COLORS.nearMid,
+    stops.yellowMinutes * 0.75,
     COLORS.midNear,
+    stops.yellowMinutes,
+    COLORS.mid,
     stops.orangeMinutes,
     COLORS.midFar,
+    (stops.orangeMinutes + stops.redMinutes) / 2,
+    COLORS.farMid,
     stops.redMinutes,
     COLORS.far,
   ];
@@ -580,10 +590,16 @@ function streetColorExpression() {
     streetDistanceExpression(),
     0,
     COLORS.near,
-    1000,
+    500,
+    COLORS.nearMid,
+    750,
     COLORS.midNear,
+    1000,
+    COLORS.mid,
     2500,
     COLORS.midFar,
+    3750,
+    COLORS.farMid,
     maxDistanceMeters,
     COLORS.far,
   ];
@@ -1552,9 +1568,17 @@ function installHover() {
 }
 
 function loadedLiveRoads() {
-  const features = map.querySourceFeatures('openmaptiles', {
-    sourceLayer: 'transportation',
-  });
+  const roadLayerIds = map
+    .getStyle()
+    .layers.filter(
+      (layer) =>
+        layer.source === 'openmaptiles' &&
+        layer['source-layer'] === 'transportation' &&
+        layer.type === 'line' &&
+        !/(?:_casing$|rail|hatching|path|pedestrian)/.test(layer.id),
+    )
+    .map((layer) => layer.id);
+  const features = map.queryRenderedFeatures({ layers: roadLayerIds });
   const seen = new Set();
   const roads = [];
 
@@ -1583,12 +1607,18 @@ function loadedLiveRoads() {
           h: roadClass,
           class: roadClass,
           brunnel: properties.brunnel || '',
+          d: 0,
         },
       });
     }
   }
 
-  return roads;
+  // Always split shared junctions so one source feature cannot give several
+  // blocks one score. A looser cap keeps the generalized overview lightweight;
+  // local zooms use the same 200m block-scale cap as the precomputed tiles.
+  return splitStreetFeatures(roads, {
+    maxLengthMeters: map.getZoom() < 12 ? 400 : 200,
+  });
 }
 
 async function refreshLiveStreetData(refreshSequence, areaSequence) {
@@ -1615,7 +1645,10 @@ async function refreshLiveStreetData(refreshSequence, areaSequence) {
     updateStatus('Indexing streets');
 
     if (activeStations.length > 0) {
-      await assignNearestStations(roadFeatures, activeStations, { candidateCount: 5 });
+      await createStreetAccessScorer(activeStations, {
+        exhaustive: true,
+        stationFilter: () => true,
+      }).scoreAsync(roadFeatures, { batchSize: 500, candidateCount: 5 });
     } else {
       for (const feature of roadFeatures) {
         feature.properties.d = maxDistanceMeters;
