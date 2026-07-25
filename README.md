@@ -4,6 +4,8 @@ Static POC for the Mexico City and New York City metropolitan areas. It overlays
 
 - A color gradient based on distance to the nearest selected transit modes in either metro area.
 - Schedule-adjusted travel time to a selected station in either metro area, including the access walk, expected boarding wait, and estimated ride through the transit network.
+- A separate Circumference Lab that finds and displays maximum-area closed metro
+  loops using free-transfer interchanges.
 
 Choose a destination from the panel or click an open station on the map. Set a weekday and departure time to apply published service windows and headways. Select “Nearest station only” to return to the distance view.
 
@@ -13,12 +15,40 @@ The control panel occupies its own responsive pane instead of covering the map. 
 can be collapsed into a narrow desktop rail or a compact mobile bar; mobile starts
 collapsed so the map retains nearly the full screen until controls are needed.
 
+## Circumference Lab
+
+Use the product switch above the metro-area selector to open Circumference Lab.
+The initial criterion uses open metro service and free transfers. Passenger rail,
+controlled-access roads, and four-lane roads are represented in the criterion
+control as the next data adapters for the same route model.
+
+The automatic route builder:
+
+- collapses published free-transfer station complexes;
+- infers tightly co-located, same-name CDMX interchanges because that feed omits
+  transfer records;
+- removes branches that cannot participate in a closed loop;
+- traces valid simple faces in the remaining network; and
+- chooses the loop with the largest geodesic inner area.
+
+The route selector exposes the other ranked loops as manual overrides and stores
+the pinned choice per metro area in the browser. Selecting a route segment on the
+map also lets the user require or avoid that segment; the maximizer then chooses
+the largest ranked loop satisfying those edits.
+
+Contained and outer land areas use a consistent spherical polygon calculation.
+The outer figure is the selected Natural Earth 1:10m land polygon minus the route
+interior: the American mainland for CDMX and Long Island for NYC. The outward
+distance texture is alpha-masked by the same Long Island coastline, so it stops
+at the shore and does not tint adjacent landmasses. CDMX is inland, so its initial
+regional view shows only the local portion of the American-mainland gradient.
+
 ## Stack
 
 - Map renderer: MapLibre GL JS
 - Basemap: OpenFreeMap
 - Source data: OpenStreetMap via Overpass API, official AIFA/STE station maps,
-  and the official SEMOVI GTFS feed
+  official transit GTFS feeds, and Natural Earth 1:10m land polygons
 - Hosting target: GitHub Pages
 
 ## Local Development
@@ -30,6 +60,14 @@ brew install tippecanoe
 npm install
 npm run build:data:cdmx
 npm run build:data:nyc
+```
+
+The checked-in `data/circumference-landmasses.json` is built from the Natural Earth
+5.1.1 `ne_10m_land.shp` shapefile. After extracting that public-domain dataset,
+refresh the landmass measurements and Long Island mask with:
+
+```sh
+npm run build:data:landmasses -- /path/to/ne_10m_land.shp
 ```
 
 `build:data:cdmx` refreshes the source GeoJSON and then creates the browser-facing

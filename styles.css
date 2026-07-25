@@ -113,6 +113,45 @@ body {
   min-width: 0;
 }
 
+.product-tabs {
+  display: inline-flex;
+  max-width: 100%;
+  margin: 0 0 10px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #f1f3f5;
+}
+
+.product-tabs button {
+  appearance: none;
+  min-height: 30px;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 6px;
+  color: var(--muted);
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.product-tabs button[aria-selected="true"] {
+  color: #1d4f49;
+  background: #ffffff;
+  box-shadow: 0 1px 4px rgba(24, 34, 44, 0.12);
+}
+
+.product-tabs button:focus-visible {
+  outline: 3px solid rgba(20, 123, 111, 0.28);
+  outline-offset: 2px;
+}
+
+.circumference-active .product-tabs button[aria-selected="true"] {
+  color: #713b24;
+}
+
 .panel-actions {
   display: flex;
   flex: 0 0 auto;
@@ -166,6 +205,10 @@ body {
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-gutter: stable;
+}
+
+.product-panel[hidden] {
+  display: none;
 }
 
 .app-shell.panel-collapsed .panel {
@@ -305,6 +348,19 @@ h1 {
   );
 }
 
+.circumference-legend .legend-bar {
+  background: linear-gradient(
+    90deg,
+    #ee5b38 0%,
+    #f1b843 46%,
+    #179187 100%
+  );
+}
+
+.circumference-legend .legend-labels span:nth-child(2) {
+  text-align: center;
+}
+
 .legend-labels {
   display: flex;
   justify-content: space-between;
@@ -320,6 +376,74 @@ h1 {
   border: 1px solid var(--line);
   border-radius: 8px;
   background: #f8fafb;
+}
+
+.route-control {
+  display: grid;
+  gap: 6px;
+  margin: 0 0 16px;
+  padding: 12px;
+  border: 1px solid #e4d5ca;
+  border-radius: 8px;
+  background: #fffaf5;
+}
+
+.route-control > label {
+  color: var(--ink);
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.route-control > label:not(:first-child) {
+  margin-top: 5px;
+}
+
+.route-control select,
+.route-control button {
+  min-width: 0;
+  min-height: 38px;
+  border: 1px solid #c9b8aa;
+  border-radius: 6px;
+  color: var(--ink);
+  background: #ffffff;
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+.route-control select {
+  width: 100%;
+  padding: 7px 30px 7px 9px;
+}
+
+.route-control button {
+  padding: 7px 10px;
+  cursor: pointer;
+  font-weight: 800;
+}
+
+.route-control button:disabled {
+  cursor: default;
+  opacity: 0.52;
+}
+
+.route-control select:focus-visible,
+.route-control button:focus-visible {
+  outline: 3px solid rgba(219, 111, 63, 0.24);
+  outline-offset: 1px;
+}
+
+.route-choice-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 7px;
+}
+
+.route-control p,
+.method-note {
+  margin: 1px 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.42;
 }
 
 .destination-control label {
@@ -476,6 +600,62 @@ h1 {
 
 .toggles label:has(input:disabled) {
   opacity: 0.52;
+}
+
+.circumference-toggles input {
+  accent-color: #db6f3f;
+}
+
+.circumference-metrics .metric {
+  border-color: #e4d5ca;
+  background: #fffaf5;
+}
+
+.circumference-selection {
+  border-top-color: #e4d5ca;
+}
+
+.segment-actions {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+  margin-top: 11px;
+}
+
+.segment-actions button {
+  appearance: none;
+  min-height: 34px;
+  padding: 6px;
+  border: 1px solid #c9b8aa;
+  border-radius: 6px;
+  color: #713b24;
+  background: #fffaf5;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 800;
+}
+
+.segment-actions button:disabled {
+  cursor: default;
+  opacity: 0.46;
+}
+
+.segment-actions button:focus-visible {
+  outline: 3px solid rgba(219, 111, 63, 0.24);
+  outline-offset: 1px;
+}
+
+.method-note {
+  margin-top: 14px;
+  padding: 10px 11px;
+  border-radius: 7px;
+  background: #f5f2ef;
+}
+
+.circumference-active .status {
+  color: #713b24;
+  background: #fce9dc;
 }
 
 .station-breakdown {

@@ -11,6 +11,11 @@ import {
   scheduledWaitForStation,
   timeScaleStops,
 } from './routing.js?v=20260721d';
+import {
+  buildCircumferenceCandidates,
+  selectCircumferenceCandidate,
+} from './circumference.js?v=20260725a';
+import { renderCircumferenceGradient } from './circumference-map.js?v=20260725a';
 
 const AREAS = {
   cdmx: {
@@ -39,8 +44,13 @@ const AREAS = {
   },
 };
 
-const requestedAreaKey = new URLSearchParams(window.location.search).get('area');
+const initialSearchParams = new URLSearchParams(window.location.search);
+const requestedAreaKey = initialSearchParams.get('area');
 const initialAreaKey = Object.hasOwn(AREAS, requestedAreaKey) ? requestedAreaKey : 'cdmx';
+const initialProduct =
+  initialSearchParams.get('product') === 'circumference'
+    ? 'circumference'
+    : 'access';
 
 const COLORS = {
   near: '#0aa66a',
@@ -172,6 +182,47 @@ const streetToggle = document.querySelector('#toggle-streets');
 const stationToggle = document.querySelector('#toggle-stations');
 const futureStationToggle = document.querySelector('#toggle-future-stations');
 const areaSelect = document.querySelector('#metro-area');
+const productTitleEl = document.querySelector('#product-title');
+const accessProductButton = document.querySelector('#product-access');
+const circumferenceProductButton = document.querySelector(
+  '#product-circumference',
+);
+const accessProductEl = document.querySelector('#access-product');
+const circumferenceProductEl = document.querySelector(
+  '#circumference-product',
+);
+const circumferenceInnerAreaEl = document.querySelector(
+  '#circumference-inner-area',
+);
+const circumferenceOuterAreaEl = document.querySelector(
+  '#circumference-outer-area',
+);
+const circumferenceOuterLabelEl = document.querySelector(
+  '#circumference-outer-label',
+);
+const circumferenceLengthEl = document.querySelector('#circumference-length');
+const routeChoiceSelect = document.querySelector('#route-choice');
+const routeAutoButton = document.querySelector('#route-auto');
+const routeChoiceSummaryEl = document.querySelector('#route-choice-summary');
+const routeGradientToggle = document.querySelector('#toggle-route-gradient');
+const routeStationsToggle = document.querySelector('#toggle-route-stations');
+const routeAreaToggle = document.querySelector('#toggle-route-area');
+const circumferenceNameEl = document.querySelector('#circumference-name');
+const circumferenceSummaryEl = document.querySelector(
+  '#circumference-summary',
+);
+const circumferenceMetadataEl = document.querySelector(
+  '#circumference-metadata',
+);
+const routeRequireSegmentButton = document.querySelector(
+  '#route-require-segment',
+);
+const routeAvoidSegmentButton = document.querySelector(
+  '#route-avoid-segment',
+);
+const routeClearSegmentsButton = document.querySelector(
+  '#route-clear-segments',
+);
 
 function setPanelCollapsed(nextCollapsed, { remember = true } = {}) {
   panelCollapsed = nextCollapsed;
@@ -195,12 +246,32 @@ new ResizeObserver(() => {
 }).observe(mapEl);
 
 let activeAreaKey = initialAreaKey;
+let activeProduct = initialProduct;
 let loadSequence = 0;
 let loadedStations = { type: 'FeatureCollection', features: [] };
 let liveStreetRefreshTimer = null;
 let liveStreetRefreshSequence = 0;
 let liveStreetRefreshInFlight = false;
 let liveStreetRefreshPending = false;
+let circumferenceLandmasses = null;
+
+const circumferenceCanvas = document.createElement('canvas');
+circumferenceCanvas.id = 'circumference-gradient-canvas';
+circumferenceCanvas.width = 512;
+circumferenceCanvas.height = 512;
+circumferenceCanvas.hidden = true;
+document.body.append(circumferenceCanvas);
+
+const circumferenceState = {
+  areaKey: null,
+  candidates: [],
+  selected: null,
+  overrideId: '',
+  methodology: null,
+  inspectedSegmentId: '',
+  requiredSegmentIds: new Set(),
+  avoidedSegmentIds: new Set(),
+};
 
 const LIVE_ROAD_CLASSES = new Set([
   'motorway',
@@ -323,6 +394,26 @@ function formatMinutes(minutes) {
     return remainder > 0 ? `${hours} hr ${remainder} min` : `${hours} hr`;
   }
   return `${Math.round(minutes / 5) * 5} min`;
+}
+
+function formatArea(squareMeters) {
+  if (!Number.isFinite(squareMeters)) return '--';
+  const squareKilometers = squareMeters / 1_000_000;
+  if (squareKilometers >= 1_000_000) {
+    return `${(squareKilometers / 1_000_000).toFixed(2)}M km²`;
+  }
+  if (squareKilometers >= 10_000) {
+    return `${formatInteger(Math.round(squareKilometers))} km²`;
+  }
+  if (squareKilometers >= 100) {
+    return `${formatInteger(Math.round(squareKilometers))} km²`;
+  }
+  return `${squareKilometers.toFixed(2)} km²`;
+}
+
+function formatRouteLength(meters) {
+  if (!Number.isFinite(meters)) return '--';
+  return `${(meters / 1000).toFixed(1)} km`;
 }
 
 function formatTimeInput(minutes) {
@@ -501,8 +592,406 @@ function setLayerVisibility(id, visible) {
   }
 }
 
+function replaceMetadata(element, details) {
+  element.replaceChildren(
+    ...details
+      .filter(
+        (detail) =>
+          detail.value !== undefined && detail.value !== null && detail.value !== '',
+      )
+      .map((detail) => {
+        const term = document.createElement('dt');
+        term.textContent = detail.label;
+
+        const description = document.createElement('dd');
+        description.textContent = detail.value;
+
+        const fragment = document.createDocumentFragment();
+        fragment.append(term, description);
+        return fragment;
+      }),
+  );
+}
+
+function positionCircumferenceGradient() {
+  if (
+    map.getLayer('circumference-gradient') &&
+    map.getLayer('street-proximity')
+  ) {
+    map.moveLayer('circumference-gradient', 'street-proximity');
+  }
+}
+
+function syncCircumferenceVisibility() {
+  const visible =
+    activeProduct === 'circumference' && Boolean(circumferenceState.selected);
+  setLayerVisibility(
+    'circumference-gradient',
+    visible && routeGradientToggle.checked,
+  );
+  setLayerVisibility('circumference-area', visible && routeAreaToggle.checked);
+  setLayerVisibility('circumference-route-line', visible);
+  setLayerVisibility(
+    'circumference-route-stations',
+    visible && routeStationsToggle.checked,
+  );
+  setLayerVisibility(
+    'circumference-route-labels',
+    visible && routeStationsToggle.checked,
+  );
+}
+
+function circumferenceStorageKey(areaKey) {
+  return `transit-colors:circumference-route:${areaKey}`;
+}
+
+function storedCircumferenceOverride(areaKey) {
+  try {
+    return window.localStorage.getItem(circumferenceStorageKey(areaKey)) ?? '';
+  } catch {
+    return '';
+  }
+}
+
+function storeCircumferenceOverride(areaKey, overrideId) {
+  try {
+    if (overrideId) {
+      window.localStorage.setItem(circumferenceStorageKey(areaKey), overrideId);
+    } else {
+      window.localStorage.removeItem(circumferenceStorageKey(areaKey));
+    }
+  } catch {
+    // Storage can be unavailable in privacy modes; the in-memory override remains.
+  }
+}
+
+function hasSegmentOverrides() {
+  return (
+    circumferenceState.requiredSegmentIds.size > 0 ||
+    circumferenceState.avoidedSegmentIds.size > 0
+  );
+}
+
+function selectedCircumferenceCandidate() {
+  return selectCircumferenceCandidate(
+    circumferenceState.candidates,
+    circumferenceState.overrideId,
+    {
+      requiredSegmentIds: circumferenceState.requiredSegmentIds,
+      avoidedSegmentIds: circumferenceState.avoidedSegmentIds,
+    },
+  );
+}
+
+function resetCircumferenceRoute() {
+  circumferenceState.areaKey = null;
+  circumferenceState.candidates = [];
+  circumferenceState.selected = null;
+  circumferenceState.overrideId = '';
+  circumferenceState.methodology = null;
+  circumferenceState.inspectedSegmentId = '';
+  circumferenceState.requiredSegmentIds.clear();
+  circumferenceState.avoidedSegmentIds.clear();
+  circumferenceInnerAreaEl.textContent = '--';
+  circumferenceOuterAreaEl.textContent = '--';
+  circumferenceLengthEl.textContent = '--';
+  circumferenceNameEl.textContent = 'Waiting for route data';
+  circumferenceSummaryEl.textContent =
+    'The automatic choice maximizes contained area.';
+  circumferenceMetadataEl.replaceChildren();
+  routeChoiceSelect.replaceChildren(
+    Object.assign(document.createElement('option'), {
+      value: '',
+      textContent: 'Automatic · largest inner area',
+    }),
+  );
+  routeChoiceSelect.disabled = true;
+  routeAutoButton.disabled = true;
+  routeRequireSegmentButton.disabled = true;
+  routeAvoidSegmentButton.disabled = true;
+  routeClearSegmentsButton.disabled = true;
+  routeChoiceSummaryEl.textContent =
+    'Building closed loops from the metro network…';
+
+  if (map.getSource('circumference-route')) {
+    map.getSource('circumference-route').setData({
+      type: 'FeatureCollection',
+      features: [],
+    });
+  }
+  syncCircumferenceVisibility();
+}
+
+function fitCircumferenceCandidate(candidate, { animate = true } = {}) {
+  if (!candidate || candidate.coordinates.length === 0) return;
+  const bounds = candidate.coordinates.reduce(
+    (result, coordinate) => result.extend(coordinate),
+    new maplibregl.LngLatBounds(),
+  );
+  map.fitBounds(bounds, {
+    padding: compactPanelQuery.matches ? 30 : 56,
+    maxZoom: 12,
+    duration: animate ? 520 : 0,
+  });
+}
+
+function routeFeatureCollection(candidate) {
+  return {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [candidate.coordinates],
+        },
+        properties: { kind: 'inside' },
+      },
+      ...candidate.segments.map((segment, index) => ({
+        type: 'Feature',
+        id: index,
+        geometry: {
+          type: 'LineString',
+          coordinates: [segment.from.coordinate, segment.to.coordinate],
+        },
+        properties: {
+          kind: 'segment',
+          from: segment.from.name,
+          to: segment.to.name,
+          lines: segment.lines.join(', '),
+          segment_id: segment.id,
+        },
+      })),
+      ...candidate.stations.map((station, index) => ({
+        type: 'Feature',
+        id: candidate.segments.length + index,
+        geometry: {
+          type: 'Point',
+          coordinates: station.coordinate,
+        },
+        properties: {
+          kind: 'station',
+          name: station.name,
+        },
+      })),
+    ],
+  };
+}
+
+function renderCircumferenceCandidate(candidate, { fit = false } = {}) {
+  if (!candidate) return;
+  const landmass = circumferenceLandmasses?.areas?.[activeAreaKey];
+  circumferenceState.selected = candidate;
+  circumferenceState.inspectedSegmentId = '';
+  routeRequireSegmentButton.disabled = true;
+  routeAvoidSegmentButton.disabled = true;
+  routeClearSegmentsButton.disabled = !hasSegmentOverrides();
+
+  map.getSource('circumference-route')?.setData(routeFeatureCollection(candidate));
+
+  if (landmass) {
+    renderCircumferenceGradient(
+      circumferenceCanvas,
+      candidate.coordinates,
+      landmass.gradient_bounds,
+      landmass.mask,
+    );
+    const [west, south, east, north] = landmass.gradient_bounds;
+    const gradientSource = map.getSource('circumference-gradient');
+    gradientSource?.updateImage({
+      url: circumferenceCanvas.toDataURL('image/png'),
+      coordinates: [
+        [west, north],
+        [east, north],
+        [east, south],
+        [west, south],
+      ],
+    });
+  }
+
+  const isManual = Boolean(circumferenceState.overrideId);
+  const isSegmentEdited = !isManual && hasSegmentOverrides();
+  const outerArea = landmass
+    ? Math.max(0, landmass.area_m2 - candidate.areaSquareMeters)
+    : Number.NaN;
+  circumferenceInnerAreaEl.textContent = formatArea(candidate.areaSquareMeters);
+  circumferenceOuterAreaEl.textContent = formatArea(outerArea);
+  circumferenceLengthEl.textContent = formatRouteLength(candidate.lengthMeters);
+  circumferenceOuterLabelEl.textContent = landmass
+    ? `Outside on ${landmass.label}`
+    : 'Outside to coast';
+  circumferenceNameEl.textContent = `${AREAS[activeAreaKey].label} ${
+    isManual
+      ? 'pinned loop'
+      : isSegmentEdited
+        ? 'segment-edited loop'
+        : 'maximum-area loop'
+  }`;
+  circumferenceSummaryEl.textContent = `${
+    candidate.stations.length
+  } interchange nodes across lines ${candidate.lines.join(', ')}.`;
+  replaceMetadata(circumferenceMetadataEl, [
+    {
+      label: 'Choice',
+      value: isManual
+        ? 'Manual ranked override'
+        : isSegmentEdited
+          ? 'Maximum matching segment edits'
+          : 'Automatic area maximum',
+    },
+    { label: 'Landmass', value: landmass?.label },
+    {
+      label: 'Free transfers',
+      value: `${circumferenceState.methodology.publishedTransferCount} published, ${circumferenceState.methodology.inferredTransferCount} co-located`,
+    },
+    {
+      label: 'Candidates',
+      value: `${circumferenceState.candidates.length} valid simple loops`,
+    },
+    {
+      label: 'Segment edits',
+      value: isSegmentEdited
+        ? `${circumferenceState.requiredSegmentIds.size} required, ${circumferenceState.avoidedSegmentIds.size} avoided`
+        : undefined,
+    },
+  ]);
+  routeChoiceSummaryEl.textContent = isManual
+    ? 'This ranked loop is pinned as a manual override for this metro area.'
+    : isSegmentEdited
+      ? 'Largest-area ranked loop that satisfies the required and avoided segments.'
+      : `Automatic winner from ${circumferenceState.candidates.length} valid loops, ranked by contained area.`;
+
+  positionCircumferenceGradient();
+  syncCircumferenceVisibility();
+  if (fit && activeProduct === 'circumference') {
+    fitCircumferenceCandidate(candidate);
+  }
+}
+
+function renderCircumferenceOptions() {
+  const automaticOption = document.createElement('option');
+  automaticOption.value = '';
+  automaticOption.textContent = 'Automatic · largest inner area';
+  const candidateOptions = circumferenceState.candidates.map(
+    (candidate, index) => {
+      const option = document.createElement('option');
+      option.value = candidate.id;
+      option.textContent = `#${index + 1} · ${formatArea(
+        candidate.areaSquareMeters,
+      )} · Lines ${candidate.lines.join(', ')}`;
+      return option;
+    },
+  );
+  routeChoiceSelect.replaceChildren(automaticOption, ...candidateOptions);
+  routeChoiceSelect.disabled = candidateOptions.length === 0;
+  routeChoiceSelect.value = circumferenceState.overrideId;
+  routeAutoButton.disabled =
+    !circumferenceState.overrideId && !hasSegmentOverrides();
+}
+
+function prepareCircumferenceRoute(sequence = loadSequence) {
+  if (
+    sequence !== loadSequence ||
+    !state.schedules ||
+    !circumferenceLandmasses?.areas?.[activeAreaKey]
+  ) {
+    return;
+  }
+
+  if (
+    circumferenceState.areaKey === activeAreaKey &&
+    circumferenceState.candidates.length > 0
+  ) {
+    return;
+  }
+
+  if (activeProduct === 'circumference') {
+    updateStatus('Finding loops', { isLoading: true });
+  }
+  const result = buildCircumferenceCandidates(
+    loadedStations.features,
+    state.schedules,
+  );
+  circumferenceState.areaKey = activeAreaKey;
+  circumferenceState.candidates = result.candidates;
+  circumferenceState.methodology = result.methodology;
+
+  const storedOverride = storedCircumferenceOverride(activeAreaKey);
+  circumferenceState.overrideId = result.candidates.some(
+    (candidate) => candidate.id === storedOverride,
+  )
+    ? storedOverride
+    : '';
+  if (!circumferenceState.overrideId && storedOverride) {
+    storeCircumferenceOverride(activeAreaKey, '');
+  }
+
+  renderCircumferenceOptions();
+  const candidate = selectedCircumferenceCandidate();
+  if (!candidate) {
+    circumferenceNameEl.textContent = 'No closed metro loop found';
+    circumferenceSummaryEl.textContent =
+      'The current criterion does not produce a valid simple route.';
+    routeChoiceSummaryEl.textContent = 'No ranked routes are available.';
+    if (activeProduct === 'circumference') {
+      updateStatus('No loop', { isError: true });
+    }
+    return;
+  }
+
+  renderCircumferenceCandidate(candidate, {
+    fit: activeProduct === 'circumference',
+  });
+  if (activeProduct === 'circumference') updateStatus('Route ready');
+}
+
+function setActiveProduct(
+  product,
+  { fit = true, updateUrl = true } = {},
+) {
+  activeProduct = product === 'circumference' ? 'circumference' : 'access';
+  const circumferenceActive = activeProduct === 'circumference';
+  appShellEl.classList.toggle('circumference-active', circumferenceActive);
+  accessProductButton.setAttribute(
+    'aria-selected',
+    String(!circumferenceActive),
+  );
+  circumferenceProductButton.setAttribute(
+    'aria-selected',
+    String(circumferenceActive),
+  );
+  accessProductButton.tabIndex = circumferenceActive ? -1 : 0;
+  circumferenceProductButton.tabIndex = circumferenceActive ? 0 : -1;
+  accessProductEl.hidden = circumferenceActive;
+  circumferenceProductEl.hidden = !circumferenceActive;
+  productTitleEl.textContent = circumferenceActive
+    ? 'Circumference Lab'
+    : 'Transit Street Gradient';
+
+  syncStreetVisibility();
+  syncStationVisibility();
+  syncCircumferenceVisibility();
+  if (updateUrl) updateAreaChrome(activeAreaKey);
+
+  if (circumferenceActive) {
+    prepareCircumferenceRoute();
+    if (fit && circumferenceState.selected) {
+      fitCircumferenceCandidate(circumferenceState.selected);
+    }
+    updateStatus(
+      circumferenceState.selected ? 'Route ready' : 'Loading routes',
+      { isLoading: !circumferenceState.selected },
+    );
+  } else {
+    if (fit && state.metadata) applyMapBounds(state.metadata);
+    if (AREAS[activeAreaKey].liveRoads) scheduleLiveStreetRefresh();
+    updateStatus(state.destination ? 'Destination set' : 'Ready');
+    updateViewportStatistics();
+  }
+}
+
 function syncStationVisibility() {
-  const showStations = stationToggle.checked;
+  const showStations = activeProduct === 'access' && stationToggle.checked;
   const showFuture = showStations && futureStationToggle.checked;
 
   for (const layerId of openStationLayers) {
@@ -778,7 +1267,7 @@ function updateViewportStatistics(tiledStreets = null) {
 }
 
 function syncStreetVisibility() {
-  const visible = streetToggle.checked;
+  const visible = activeProduct === 'access' && streetToggle.checked;
   setLayerVisibility(
     'street-proximity',
     visible && !AREAS[activeAreaKey].liveRoads,
@@ -851,6 +1340,7 @@ function installBasemap() {
       }
     }
     basemapInstalled = true;
+    positionCircumferenceGradient();
     if (AREAS[activeAreaKey].liveRoads) {
       scheduleLiveStreetRefresh();
       syncStreetVisibility();
@@ -1163,12 +1653,17 @@ function resetSelection() {
 function updateAreaChrome(areaKey) {
   const area = AREAS[areaKey];
   areaSelect.value = areaKey;
-  document.title = `Transit Colors — ${area.label}`;
+  document.title =
+    activeProduct === 'circumference'
+      ? `Circumference Lab — ${area.label}`
+      : `Transit Colors — ${area.label}`;
   mapEl.setAttribute(
     'aria-label',
-    area.supportsDestination
-      ? `${area.label} transit access and travel time map`
-      : `${area.label} transit proximity map`,
+    activeProduct === 'circumference'
+      ? `${area.label} maximum-area circumferential route map`
+      : area.supportsDestination
+        ? `${area.label} transit access and travel time map`
+        : `${area.label} transit proximity map`,
   );
   destinationControlEl.hidden = !area.supportsDestination;
   departureControlEl.hidden = !area.supportsDestination;
@@ -1180,28 +1675,16 @@ function updateAreaChrome(areaKey) {
   } else {
     url.searchParams.set('area', areaKey);
   }
+  if (activeProduct === 'circumference') {
+    url.searchParams.set('product', 'circumference');
+  } else {
+    url.searchParams.delete('product');
+  }
   window.history.replaceState({}, '', url);
 }
 
 function renderDetails(details) {
-  featureMetadataEl.replaceChildren(
-    ...details
-      .filter(
-        (detail) =>
-          detail.value !== undefined && detail.value !== null && detail.value !== '',
-      )
-      .map((detail) => {
-        const term = document.createElement('dt');
-        term.textContent = detail.label;
-
-        const description = document.createElement('dd');
-        description.textContent = detail.value;
-
-        const fragment = document.createDocumentFragment();
-        fragment.append(term, description);
-        return fragment;
-      }),
-  );
+  replaceMetadata(featureMetadataEl, details);
 }
 
 function showStreetFeature(props) {
@@ -1481,6 +1964,74 @@ function selectDestination(stationId) {
   updateStatus('Destination set');
 }
 
+function showCircumferenceSegment(properties) {
+  if (!circumferenceState.selected) return;
+  circumferenceState.inspectedSegmentId = properties.segment_id || '';
+  routeRequireSegmentButton.disabled =
+    !circumferenceState.inspectedSegmentId ||
+    circumferenceState.requiredSegmentIds.has(
+      circumferenceState.inspectedSegmentId,
+    );
+  routeAvoidSegmentButton.disabled =
+    !circumferenceState.inspectedSegmentId ||
+    circumferenceState.avoidedSegmentIds.has(
+      circumferenceState.inspectedSegmentId,
+    );
+  circumferenceNameEl.textContent = `${properties.from} → ${properties.to}`;
+  circumferenceSummaryEl.textContent = properties.lines
+    ? `Metro line${properties.lines.includes(',') ? 's' : ''} ${properties.lines}`
+    : 'Free-transfer route segment';
+  replaceMetadata(circumferenceMetadataEl, [
+    { label: 'Segment', value: `${properties.from} to ${properties.to}` },
+    { label: 'Lines', value: properties.lines || 'Transfer connection' },
+    {
+      label: 'Loop area',
+      value: formatArea(circumferenceState.selected.areaSquareMeters),
+    },
+    {
+      label: 'Override',
+      value: circumferenceState.requiredSegmentIds.has(properties.segment_id)
+        ? 'Required'
+        : circumferenceState.avoidedSegmentIds.has(properties.segment_id)
+          ? 'Avoided'
+          : 'None',
+    },
+  ]);
+}
+
+function applyInspectedSegmentOverride(mode) {
+  const segmentId = circumferenceState.inspectedSegmentId;
+  if (!segmentId) return;
+
+  const previousRequired = new Set(circumferenceState.requiredSegmentIds);
+  const previousAvoided = new Set(circumferenceState.avoidedSegmentIds);
+  if (mode === 'require') {
+    circumferenceState.requiredSegmentIds.add(segmentId);
+    circumferenceState.avoidedSegmentIds.delete(segmentId);
+  } else {
+    circumferenceState.avoidedSegmentIds.add(segmentId);
+    circumferenceState.requiredSegmentIds.delete(segmentId);
+  }
+  circumferenceState.overrideId = '';
+  const candidate = selectedCircumferenceCandidate();
+
+  if (!candidate) {
+    circumferenceState.requiredSegmentIds = previousRequired;
+    circumferenceState.avoidedSegmentIds = previousAvoided;
+    routeChoiceSummaryEl.textContent =
+      'No ranked simple loop satisfies that segment edit.';
+    updateStatus('No matching loop', { isError: true });
+    return;
+  }
+
+  storeCircumferenceOverride(activeAreaKey, '');
+  routeChoiceSelect.value = '';
+  routeAutoButton.disabled = false;
+  routeClearSegmentsButton.disabled = false;
+  renderCircumferenceCandidate(candidate, { fit: true });
+  updateStatus('Route edited');
+}
+
 function installHover() {
   const stationLayerIds = ['station-points-open', 'station-points-future'];
   const streetLayers = [
@@ -1549,6 +2100,45 @@ function installHover() {
       }
     });
   }
+
+  let hoveredCircumferenceSegmentId = null;
+  map.on('mousemove', 'circumference-route-line', (event) => {
+    const feature = event.features?.[0];
+    if (!feature) return;
+    if (hoveredCircumferenceSegmentId !== null) {
+      map.setFeatureState(
+        {
+          source: 'circumference-route',
+          id: hoveredCircumferenceSegmentId,
+        },
+        { hover: false },
+      );
+    }
+    hoveredCircumferenceSegmentId = feature.id;
+    map.setFeatureState(
+      { source: 'circumference-route', id: feature.id },
+      { hover: true },
+    );
+    showCircumferenceSegment(feature.properties);
+    map.getCanvas().style.cursor = 'pointer';
+  });
+  map.on('mouseleave', 'circumference-route-line', () => {
+    if (hoveredCircumferenceSegmentId !== null) {
+      map.setFeatureState(
+        {
+          source: 'circumference-route',
+          id: hoveredCircumferenceSegmentId,
+        },
+        { hover: false },
+      );
+    }
+    hoveredCircumferenceSegmentId = null;
+    map.getCanvas().style.cursor = '';
+  });
+  map.on('click', 'circumference-route-line', (event) => {
+    const feature = event.features?.[0];
+    if (feature) showCircumferenceSegment(feature.properties);
+  });
 }
 
 function loadedLiveRoads() {
@@ -1649,7 +2239,7 @@ async function refreshLiveStreetData(refreshSequence, areaSequence) {
 }
 
 function scheduleLiveStreetRefresh() {
-  if (!AREAS[activeAreaKey].liveRoads) return;
+  if (activeProduct !== 'access' || !AREAS[activeAreaKey].liveRoads) return;
 
   window.clearTimeout(liveStreetRefreshTimer);
   const refreshSequence = ++liveStreetRefreshSequence;
@@ -1692,6 +2282,33 @@ function installMapData(stations) {
     type: 'geojson',
     data: stations,
     generateId: true,
+  });
+
+  map.addSource('circumference-gradient', {
+    type: 'image',
+    url: circumferenceCanvas.toDataURL('image/png'),
+    coordinates: [
+      [-99.42, 19.66],
+      [-98.84, 19.66],
+      [-98.84, 19.18],
+      [-99.42, 19.18],
+    ],
+  });
+
+  map.addSource('circumference-route', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+  });
+
+  map.addLayer({
+    id: 'circumference-gradient',
+    type: 'raster',
+    source: 'circumference-gradient',
+    layout: { visibility: 'none' },
+    paint: {
+      'raster-opacity': 0.9,
+      'raster-fade-duration': 0,
+    },
   });
 
   map.addLayer(
@@ -1846,7 +2463,89 @@ function installMapData(stations) {
     },
   });
 
+  map.addLayer({
+    id: 'circumference-area',
+    type: 'fill',
+    source: 'circumference-route',
+    filter: ['==', ['get', 'kind'], 'inside'],
+    layout: { visibility: 'none' },
+    paint: {
+      'fill-color': '#fff4df',
+      'fill-opacity': 0.46,
+    },
+  });
+
+  map.addLayer({
+    id: 'circumference-route-line',
+    type: 'line',
+    source: 'circumference-route',
+    filter: ['==', ['get', 'kind'], 'segment'],
+    layout: {
+      visibility: 'none',
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#b73f2e',
+      'line-width': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8,
+        3,
+        12,
+        6,
+        15,
+        10,
+      ],
+      'line-opacity': [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false],
+        1,
+        0.92,
+      ],
+      'line-blur': 0.15,
+    },
+  });
+
+  map.addLayer({
+    id: 'circumference-route-stations',
+    type: 'circle',
+    source: 'circumference-route',
+    filter: ['==', ['get', 'kind'], 'station'],
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-color': '#fff9ed',
+      'circle-stroke-color': '#8f3026',
+      'circle-stroke-width': 1.8,
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 2.6, 12, 5.2],
+    },
+  });
+
+  map.addLayer({
+    id: 'circumference-route-labels',
+    type: 'symbol',
+    source: 'circumference-route',
+    filter: ['==', ['get', 'kind'], 'station'],
+    minzoom: 10.6,
+    layout: {
+      visibility: 'none',
+      'text-field': ['get', 'name'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 10.6, 10, 14, 12],
+      'text-offset': [0, 1.15],
+      'text-anchor': 'top',
+      'text-allow-overlap': false,
+      'text-optional': true,
+    },
+    paint: {
+      'text-color': '#5e271f',
+      'text-halo-color': '#fffaf2',
+      'text-halo-width': 1.4,
+    },
+  });
+
   installHover();
+  syncCircumferenceVisibility();
 }
 
 function scheduleDestinationSetup(area, stations, sequence) {
@@ -1863,6 +2562,7 @@ function scheduleDestinationSetup(area, stations, sequence) {
       state.schedules = schedules;
       rebuildDestinationTransitGraph();
       renderDestinationOptions(stations.features);
+      prepareCircumferenceRoute(sequence);
     };
 
     if ('requestIdleCallback' in window) {
@@ -1890,6 +2590,7 @@ async function loadArea(areaKey, { initial = false } = {}) {
   streetSourceLoaded = false;
   setCurrentDeparture(area);
   resetDestinationRouting();
+  resetCircumferenceRoute();
   updateAreaChrome(areaKey);
   resetSelection();
 
@@ -1922,12 +2623,13 @@ async function loadArea(areaKey, { initial = false } = {}) {
     syncStreetColor();
     syncStreetVisibility();
     syncStationVisibility();
+    syncCircumferenceVisibility();
     updateViewportStatistics();
     window.__transitPerformance.dataFetchedMs =
       performance.now() - window.__transitPerformance.startedAt;
     scheduleDestinationSetup(area, stations, sequence);
 
-    if (area.liveRoads) {
+    if (area.liveRoads || activeProduct === 'circumference') {
       scheduleLiveStreetRefresh();
       loadingCanFinish = true;
       requestAnimationFrame(() => requestAnimationFrame(finishLoading));
@@ -1946,7 +2648,12 @@ async function loadArea(areaKey, { initial = false } = {}) {
 
 async function initialize() {
   try {
-    pendingBasemapStyle = await fetchJson('vendor/openfreemap-liberty.json');
+    const [basemapStyle, landmasses] = await Promise.all([
+      fetchJson('vendor/openfreemap-liberty.json'),
+      fetchJson('data/circumference-landmasses.json'),
+    ]);
+    pendingBasemapStyle = basemapStyle;
+    circumferenceLandmasses = landmasses;
     await loadArea(initialAreaKey, { initial: true });
   } catch (error) {
     console.error(error);
@@ -2036,7 +2743,9 @@ map.on('idle', () => {
 
   if (
     loadingOperation?.type !== 'filter' &&
-    (renderedStreets.length > 0 || !streetToggle.checked)
+    (renderedStreets.length > 0 ||
+      !streetToggle.checked ||
+      activeProduct === 'circumference')
   ) {
     streetSourceLoaded = true;
     loadingCanFinish = true;
@@ -2047,6 +2756,61 @@ areaSelect.addEventListener('change', () => {
   const areaKey = areaSelect.value;
   if (areaKey !== activeAreaKey) loadArea(areaKey);
 });
+
+accessProductButton.addEventListener('click', () => {
+  setActiveProduct('access');
+});
+
+circumferenceProductButton.addEventListener('click', () => {
+  setActiveProduct('circumference');
+});
+
+routeChoiceSelect.addEventListener('change', () => {
+  circumferenceState.requiredSegmentIds.clear();
+  circumferenceState.avoidedSegmentIds.clear();
+  circumferenceState.overrideId = routeChoiceSelect.value;
+  storeCircumferenceOverride(
+    activeAreaKey,
+    circumferenceState.overrideId,
+  );
+  routeAutoButton.disabled = !circumferenceState.overrideId;
+  const candidate = selectCircumferenceCandidate(
+    circumferenceState.candidates,
+    circumferenceState.overrideId,
+  );
+  renderCircumferenceCandidate(candidate, { fit: true });
+  updateStatus(
+    circumferenceState.overrideId ? 'Route pinned' : 'Route ready',
+  );
+});
+
+routeAutoButton.addEventListener('click', () => {
+  routeChoiceSelect.value = '';
+  routeChoiceSelect.dispatchEvent(new Event('change'));
+});
+
+routeRequireSegmentButton.addEventListener('click', () => {
+  applyInspectedSegmentOverride('require');
+});
+
+routeAvoidSegmentButton.addEventListener('click', () => {
+  applyInspectedSegmentOverride('avoid');
+});
+
+routeClearSegmentsButton.addEventListener('click', () => {
+  routeChoiceSelect.value = '';
+  routeChoiceSelect.dispatchEvent(new Event('change'));
+});
+
+for (const toggle of [
+  routeGradientToggle,
+  routeStationsToggle,
+  routeAreaToggle,
+]) {
+  toggle.addEventListener('change', () => {
+    syncCircumferenceVisibility();
+  });
+}
 
 destinationSelect.addEventListener('change', () => {
   selectDestination(destinationSelect.value);
@@ -2066,6 +2830,7 @@ timeScaleInput.addEventListener('change', () => {
 
 setCurrentDeparture(AREAS[initialAreaKey]);
 applyTimeScale();
+setActiveProduct(initialProduct, { fit: false, updateUrl: false });
 
 map.once('style.load', () => {
   window.__transitPerformance.styleLoadedMs =
