@@ -25,6 +25,18 @@ const networkLineOffset = expressionSpecificationSchema.parse([
   ['*', ['get', 'line_position'], 5.2],
 ]);
 
+const boundaryAlternativeOffset = expressionSpecificationSchema.parse([
+  'interpolate',
+  ['linear'],
+  ['zoom'],
+  8,
+  ['*', ['get', 'line_position'], 4.4],
+  12,
+  ['*', ['get', 'line_position'], 7.3],
+  15,
+  ['*', ['get', 'line_position'], 10.5],
+]);
+
 export function installCircumferenceLayers(): void {
   map.addLayer({
     id: 'circumference-area',
@@ -127,6 +139,42 @@ export function installCircumferenceLayers(): void {
       'text-halo-color': '#fffaf2',
       'text-halo-width': 1.3,
       'text-opacity': 0.78,
+    },
+  });
+
+  map.addLayer({
+    id: 'circumference-route-alternative-casing',
+    type: 'line',
+    source: 'circumference-route',
+    filter: ['==', ['get', 'kind'], 'segment-alternative'],
+    layout: {
+      visibility: 'none',
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#fffaf2',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2.8, 12, 5, 15, 7],
+      'line-offset': boundaryAlternativeOffset,
+      'line-opacity': 0.82,
+    },
+  });
+
+  map.addLayer({
+    id: 'circumference-route-alternative-line',
+    type: 'line',
+    source: 'circumference-route',
+    filter: ['==', ['get', 'kind'], 'segment-alternative'],
+    layout: {
+      visibility: 'none',
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': ['get', 'color'],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1.4, 12, 2.8, 15, 4.6],
+      'line-offset': boundaryAlternativeOffset,
+      'line-opacity': 0.78,
     },
   });
 

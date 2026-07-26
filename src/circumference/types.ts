@@ -30,6 +30,7 @@ export interface CircumferenceSegment {
   readonly from: CircumferenceNode;
   readonly id: string;
   readonly lines: readonly string[];
+  readonly primaryLine: string | null;
   readonly to: CircumferenceNode;
   readonly transferMinutes: number | null;
   readonly transferSource: TransferEdge['source'] | null;

@@ -83,6 +83,71 @@ assert.equal(
   null,
 );
 
+const parallelServiceResult = buildCircumferenceCandidates(
+  squareStations,
+  {
+    routes: {
+      localL: {
+        mode: 'subway',
+        name: 'L',
+        description: 'Synthetic Local',
+      },
+      localM: {
+        mode: 'subway',
+        name: 'M',
+        description: 'Synthetic Local',
+      },
+      express: {
+        mode: 'subway',
+        name: 'X',
+        description: 'Synthetic Express',
+      },
+    },
+    graph: {
+      e: {
+        a: [
+          ['b', 1, 'localL/0'],
+          ['b', 1, 'express/0'],
+          ['d', 1, 'localM/0'],
+          ['d', 1, 'express/0'],
+        ],
+        b: [
+          ['c', 1, 'localL/0'],
+          ['c', 1, 'express/0'],
+        ],
+        c: [
+          ['d', 1, 'localM/0'],
+          ['d', 1, 'express/0'],
+        ],
+      },
+      t: {},
+    },
+  },
+  { minimumAreaSquareMeters: 1 },
+);
+const parallelServiceWinner = parallelServiceResult.candidates[0];
+assert.ok(parallelServiceWinner);
+assert.deepEqual(parallelServiceWinner.lines, ['L', 'M']);
+assert.ok(
+  parallelServiceWinner.segments.every(
+    (segment) =>
+      segment.type === 'transfer' ||
+      (segment.primaryLine !== 'X' &&
+        segment.primaryLine !== null &&
+        segment.lines.includes(segment.primaryLine)),
+  ),
+);
+const primaryLineByEdge = new Map(
+  parallelServiceWinner.segments.map((segment) => [
+    [segment.from.id, segment.to.id].sort().join('::'),
+    segment.primaryLine,
+  ]),
+);
+assert.equal(primaryLineByEdge.get('a::b'), 'L');
+assert.equal(primaryLineByEdge.get('b::c'), 'L');
+assert.equal(primaryLineByEdge.get('c::d'), 'M');
+assert.equal(primaryLineByEdge.get('a::d'), 'M');
+
 const splitPlatformCoordinates = new Map([
   ['a', [0, 0]],
   ['transfer-a', [0.01, 0]],
@@ -417,6 +482,13 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
     winner.transferCount,
     winner.segments.filter(({ type }) => type === 'transfer').length,
   );
+  assert.ok(
+    winner.segments.every(
+      (segment) =>
+        segment.type === 'transfer' ||
+        (segment.primaryLine !== null && segment.lines.includes(segment.primaryLine)),
+    ),
+  );
   const stationFeaturesById = new Map(
     stations.features.map((feature) => [feature.properties.id, feature]),
   );
@@ -473,6 +545,21 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
     assert.ok(hasWinnerRide('gtfs/mta-subway/B23', 'gtfs/mta-subway/D43', 'D'));
     assert.ok(hasWinnerRide('gtfs/mta-subway/D12', 'gtfs/mta-subway/D13', 'B'));
     assert.ok(hasWinnerTransfer('gtfs/mta-subway/A12', 'gtfs/mta-subway/D13'));
+    const primaryLineBetween = (fromName, toName, concurrentLine) =>
+      winner.segments.find(
+        (segment) =>
+          segment.type === 'ride' &&
+          segment.lines.includes(concurrentLine) &&
+          new Set([segment.from.name, segment.to.name]).has(fromName) &&
+          new Set([segment.from.name, segment.to.name]).has(toName),
+      )?.primaryLine;
+    assert.equal(primaryLineBetween('125 St', '116 St', '4'), '6');
+    assert.equal(primaryLineBetween('168 St', '163 St-Amsterdam Av', 'A'), 'C');
+    assert.equal(primaryLineBetween('Sheepshead Bay', 'Brighton Beach', 'B'), 'Q');
+    assert.equal(
+      primaryLineBetween('Sutphin Blvd-Archer Av-JFK Airport', '121 St', 'Z'),
+      'J',
+    );
     assert.equal(result.methodology.inferredTransferCount, 0);
     assert.ok(
       result.network.segments

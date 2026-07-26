@@ -248,6 +248,155 @@ function sortLineNames(first: string, second: string): number {
   });
 }
 
+function serviceStopPriority(lineName: string, description?: string): number {
+  const serviceDescription = String(description ?? '');
+  const isLocal = /\blocal\b/i.test(serviceDescription);
+  const isExpress =
+    /\bexpress\b/i.test(serviceDescription) || /X$/i.test(String(lineName).trim());
+  if (isLocal && !isExpress) return 0;
+  if (isExpress && !isLocal) return 2;
+  return 1;
+}
+
+interface PrimaryLineChoice {
+  readonly coveragePenalty: number;
+  readonly lines: readonly string[];
+  readonly servicePenalty: number;
+  readonly signature: string;
+  readonly switches: number;
+}
+
+function comparePrimaryLineChoices(
+  first: PrimaryLineChoice,
+  second: PrimaryLineChoice,
+): number {
+  return (
+    first.servicePenalty - second.servicePenalty ||
+    first.switches - second.switches ||
+    first.coveragePenalty - second.coveragePenalty ||
+    first.signature.localeCompare(second.signature, 'en', {
+      numeric: true,
+      sensitivity: 'base',
+    })
+  );
+}
+
+function selectRideRunPrimaryLines(
+  runIndices: readonly number[],
+  segments: readonly CircumferenceSegment[],
+  servicePriorityByLine: ReadonlyMap<string, number>,
+  closed: boolean,
+): readonly string[] {
+  const firstSegment = segments[runIndices[0] ?? -1];
+  if (!firstSegment || firstSegment.lines.length === 0) return [];
+  const coverageByLine = new Map<string, number>();
+  for (const segmentIndex of runIndices) {
+    for (const lineName of segments[segmentIndex]?.lines ?? []) {
+      coverageByLine.set(lineName, (coverageByLine.get(lineName) ?? 0) + 1);
+    }
+  }
+
+  const servicePenalty = (lineName: string): number =>
+    servicePriorityByLine.get(lineName) ?? serviceStopPriority(lineName);
+  const coveragePenalty = (lineName: string): number =>
+    runIndices.length - (coverageByLine.get(lineName) ?? 0);
+  const solve = (requiredFirstLine: string | null): PrimaryLineChoice | null => {
+    let states = new Map<string, PrimaryLineChoice>();
+    for (const lineName of firstSegment.lines) {
+      if (requiredFirstLine !== null && lineName !== requiredFirstLine) continue;
+      states.set(lineName, {
+        servicePenalty: servicePenalty(lineName),
+        switches: 0,
+        coveragePenalty: coveragePenalty(lineName),
+        lines: [lineName],
+        signature: lineName,
+      });
+    }
+
+    for (const segmentIndex of runIndices.slice(1)) {
+      const segment = segments[segmentIndex];
+      if (!segment) continue;
+      const nextStates = new Map<string, PrimaryLineChoice>();
+      for (const lineName of segment.lines) {
+        for (const [previousLine, state] of states) {
+          const choice: PrimaryLineChoice = {
+            servicePenalty: state.servicePenalty + servicePenalty(lineName),
+            switches: state.switches + (previousLine === lineName ? 0 : 1),
+            coveragePenalty: state.coveragePenalty + coveragePenalty(lineName),
+            lines: [...state.lines, lineName],
+            signature: `${state.signature}\u0000${lineName}`,
+          };
+          const existing = nextStates.get(lineName);
+          if (!existing || comparePrimaryLineChoices(choice, existing) < 0) {
+            nextStates.set(lineName, choice);
+          }
+        }
+      }
+      states = nextStates;
+    }
+
+    const completed = [...states].map(([lastLine, state]) =>
+      closed && requiredFirstLine !== null && lastLine !== requiredFirstLine
+        ? { ...state, switches: state.switches + 1 }
+        : state,
+    );
+    return completed.sort(comparePrimaryLineChoices)[0] ?? null;
+  };
+
+  if (!closed) return solve(null)?.lines ?? [];
+  return (
+    firstSegment.lines
+      .map((lineName) => solve(lineName))
+      .filter((choice): choice is PrimaryLineChoice => choice !== null)
+      .sort(comparePrimaryLineChoices)[0]?.lines ?? []
+  );
+}
+
+function assignPrimaryLines(
+  segments: readonly CircumferenceSegment[],
+  servicePriorityByLine: ReadonlyMap<string, number>,
+): CircumferenceSegment[] {
+  const primaryLines: (string | null)[] = segments.map(() => null);
+  const separatorIndex = segments.findIndex(
+    (segment) => segment.type !== 'ride' || segment.lines.length === 0,
+  );
+  const assignRun = (runIndices: readonly number[], closed: boolean): void => {
+    const selectedLines = selectRideRunPrimaryLines(
+      runIndices,
+      segments,
+      servicePriorityByLine,
+      closed,
+    );
+    for (const [runIndex, segmentIndex] of runIndices.entries()) {
+      primaryLines[segmentIndex] = selectedLines[runIndex] ?? null;
+    }
+  };
+
+  if (separatorIndex === -1) {
+    assignRun(
+      segments.map((_, index) => index),
+      true,
+    );
+  } else {
+    let runIndices: number[] = [];
+    for (let offset = 1; offset <= segments.length; offset += 1) {
+      const segmentIndex = (separatorIndex + offset) % segments.length;
+      const segment = segments[segmentIndex];
+      if (segment?.type === 'ride' && segment.lines.length > 0) {
+        runIndices.push(segmentIndex);
+      } else if (runIndices.length > 0) {
+        assignRun(runIndices, false);
+        runIndices = [];
+      }
+    }
+  }
+
+  return segments.map((segment, index) => ({
+    ...segment,
+    primaryLine: primaryLines[index] ?? null,
+  }));
+}
+
 function simplifyTransferPath(
   path: readonly NodeId[],
   transfersByEdge: ReadonlyMap<EdgeKey, TransferEdge>,
@@ -297,6 +446,7 @@ function buildGeometryVariant({
   minimumAreaSquareMeters,
   nodes,
   normalizedLinesByEdge,
+  servicePriorityByLine,
   hiddenNetworkShortcuts,
   trackGeometryEnabled,
   transfersByEdge,
@@ -308,6 +458,7 @@ function buildGeometryVariant({
   readonly minimumAreaSquareMeters: number;
   readonly nodes: NodeMap;
   readonly normalizedLinesByEdge: EdgeStringSets;
+  readonly servicePriorityByLine: ReadonlyMap<string, number>;
   readonly hiddenNetworkShortcuts: ReadonlySet<EdgeKey>;
   readonly trackGeometryEnabled: boolean;
   readonly transfersByEdge: ReadonlyMap<EdgeKey, TransferEdge>;
@@ -321,43 +472,51 @@ function buildGeometryVariant({
     ...simplifiedCandidatePaths.values(),
   ]
     .map((path) => {
-      const segments: CircumferenceSegment[] = path.flatMap((nodeId, index) => {
-        const nextId = path[(index + 1) % path.length];
-        if (!nextId) return [];
-        const key = edgeKey(nodeId, nextId);
-        const transfer = transfersByEdge.get(key);
-        const from = getRequired(nodes, nodeId);
-        const to = getRequired(nodes, nextId);
-        const coordinates: Coordinate[] = transfer
-          ? [
-              [from.coordinate[0], from.coordinate[1]],
-              [to.coordinate[0], to.coordinate[1]],
-            ]
-          : orientedEdgeCoordinates(
-              nodeId,
-              nextId,
-              nodes,
-              geometriesByEdge,
-              trackGeometryEnabled,
-            );
-        return [
-          {
-            id: stableCandidateId([nodeId, nextId]).replace('route-', 'segment-'),
-            from,
-            to,
-            type: transfer ? 'transfer' : 'ride',
-            lines: [...(linesByEdge.get(key) ?? [])].sort(sortLineNames),
-            coordinates,
-            distanceMeters: lineLengthMeters(coordinates),
-            transferSource: transfer?.source ?? null,
-            transferMinutes: transfer?.minutes ?? null,
-          } satisfies CircumferenceSegment,
-        ];
-      });
-      const coordinates = joinSegmentCoordinates(segments);
-      const lines = [...new Set(segments.flatMap((segment) => segment.lines))].sort(
-        sortLineNames,
+      const segments = assignPrimaryLines(
+        path.flatMap((nodeId, index) => {
+          const nextId = path[(index + 1) % path.length];
+          if (!nextId) return [];
+          const key = edgeKey(nodeId, nextId);
+          const transfer = transfersByEdge.get(key);
+          const from = getRequired(nodes, nodeId);
+          const to = getRequired(nodes, nextId);
+          const coordinates: Coordinate[] = transfer
+            ? [
+                [from.coordinate[0], from.coordinate[1]],
+                [to.coordinate[0], to.coordinate[1]],
+              ]
+            : orientedEdgeCoordinates(
+                nodeId,
+                nextId,
+                nodes,
+                geometriesByEdge,
+                trackGeometryEnabled,
+              );
+          return [
+            {
+              id: stableCandidateId([nodeId, nextId]).replace('route-', 'segment-'),
+              from,
+              to,
+              type: transfer ? 'transfer' : 'ride',
+              lines: [...(linesByEdge.get(key) ?? [])].sort(sortLineNames),
+              primaryLine: null,
+              coordinates,
+              distanceMeters: lineLengthMeters(coordinates),
+              transferSource: transfer?.source ?? null,
+              transferMinutes: transfer?.minutes ?? null,
+            } satisfies CircumferenceSegment,
+          ];
+        }),
+        servicePriorityByLine,
       );
+      const coordinates = joinSegmentCoordinates(segments);
+      const lines = [
+        ...new Set(
+          segments.flatMap((segment) =>
+            segment.primaryLine === null ? [] : [segment.primaryLine],
+          ),
+        ),
+      ].sort(sortLineNames);
       const walkingLengthMeters = segments
         .filter((segment) => segment.type === 'transfer')
         .reduce((total, segment) => total + segment.distanceMeters, 0);
@@ -486,12 +645,18 @@ export function buildCircumferenceCandidates(
   const transfersByEdge = new Map<EdgeKey, TransferEdge>();
   const geometriesByEdge = trackGeometryByEdge(schedules);
   const routeIdsByLineName = new Map<string, Set<string>>();
+  const servicePriorityByLine = new Map<string, number>();
   for (const [routeId, route] of Object.entries(schedules.routes)) {
     if (route.mode !== 'subway') continue;
     const lineName = route.name || routeId;
     const routeIds = routeIdsByLineName.get(lineName) ?? new Set();
     routeIds.add(routeId);
     routeIdsByLineName.set(lineName, routeIds);
+    const priority = serviceStopPriority(lineName, route.description);
+    servicePriorityByLine.set(
+      lineName,
+      Math.min(servicePriorityByLine.get(lineName) ?? priority, priority),
+    );
   }
   const ambiguousLineNames = new Set(
     [...routeIdsByLineName]
@@ -800,6 +965,7 @@ export function buildCircumferenceCandidates(
       minimumAreaSquareMeters,
       nodes,
       normalizedLinesByEdge,
+      servicePriorityByLine,
       hiddenNetworkShortcuts,
       trackGeometryEnabled,
       transfersByEdge,
