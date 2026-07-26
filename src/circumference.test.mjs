@@ -440,6 +440,13 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
   );
 
   if (areaKey === 'nyc') {
+    const networkRideSegment = (firstId, secondId) =>
+      result.network.segments.find(
+        (segment) =>
+          segment.type === 'ride' &&
+          new Set([segment.from.id, segment.to.id]).has(firstId) &&
+          new Set([segment.from.id, segment.to.id]).has(secondId),
+      );
     const hasNetworkTransfer = (firstId, secondId) =>
       result.network.segments.some(
         (segment) =>
@@ -494,6 +501,18 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
       hasNetworkTransfer('gtfs/mta-subway/A11', 'gtfs/mta-subway/D12'),
       false,
     );
+    const groveToJournal = networkRideSegment('gtfs/path/26728', 'gtfs/path/26731');
+    assert.ok(groveToJournal);
+    assert.ok(groveToJournal.coordinates.length > 2);
+    assert.ok(groveToJournal.lines.includes('PATH · Newark - World Trade Center'));
+    assert.equal(networkRideSegment('gtfs/path/26727', 'gtfs/path/26731'), undefined);
+    assert.equal(networkRideSegment('gtfs/path/26731', 'gtfs/path/26732'), undefined);
+    assert.equal(
+      networkRideSegment('gtfs/path/26728', 'gtfs/path/26732')?.lines.includes(
+        'PATH · Newark - World Trade Center',
+      ),
+      false,
+    );
     assert.equal(
       stationFeaturesById.get('gtfs/mta-subway/D13').properties.route_ref,
       'B;D',
@@ -546,12 +565,11 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
       ['62 St', 'Bay Pkwy'],
       ['New Dorp', 'St George'],
       ['Great Kills', 'St George'],
+      ['Exchange Place', 'Journal Square'],
+      ['Journal Square', 'Newport'],
     ]) {
       assert.ok(removedPairs.has(pair.sort().join(' :: ')));
     }
-    assert.ok(
-      result.methodology.removedShortcuts.every(({ lines }) => !lines.includes('PATH')),
-    );
   } else {
     assert.ok(
       winner.segments.some(
