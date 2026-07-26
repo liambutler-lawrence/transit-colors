@@ -206,8 +206,17 @@ function removeServiceShortcuts(
   linesByEdge,
   familiesByEdge,
   ambiguousLineNames,
+  normalizedLinesByEdge,
 ) {
   const shortcuts = new Set();
+  const normalizeLinesOntoPath = (nodeIds, lineNames) => {
+    for (let index = 1; index < nodeIds.length; index += 1) {
+      const key = edgeKey(nodeIds[index - 1], nodeIds[index]);
+      const normalizedLines = normalizedLinesByEdge.get(key) ?? new Set();
+      for (const lineName of lineNames) normalizedLines.add(lineName);
+      normalizedLinesByEdge.set(key, normalizedLines);
+    }
+  };
 
   for (const [fromId, neighbors] of adjacency) {
     for (const toId of neighbors) {
@@ -239,6 +248,7 @@ function removeServiceShortcuts(
         directFamilies,
       );
       if (sameLinePath?.nodeIds.length > 2) {
+        normalizeLinesOntoPath(sameLinePath.nodeIds, directLineNames);
         shortcuts.add(key);
         continue;
       }
@@ -255,7 +265,10 @@ function removeServiceShortcuts(
 
       const ring = corridorPath.nodeIds.map((nodeId) => nodes.get(nodeId).coordinate);
       const averageWidth = (2 * polygonAreaSquareMeters(ring)) / directDistance;
-      if (averageWidth <= CORRIDOR_AVERAGE_WIDTH_M) shortcuts.add(key);
+      if (averageWidth <= CORRIDOR_AVERAGE_WIDTH_M) {
+        normalizeLinesOntoPath(corridorPath.nodeIds, directLineNames);
+        shortcuts.add(key);
+      }
     }
   }
 
@@ -1716,6 +1729,12 @@ export function buildCircumferenceCandidates(
       : node.name;
   }
 
+  const normalizedLinesByEdge = new Map(
+    [...linesByEdge].map(([key, lineNames]) => [
+      key,
+      new Set(lineNames),
+    ]),
+  );
   const candidatePaths = new Map();
   const removedShortcuts = new Set();
   const biconnectedComponentSizes = [];
@@ -1733,6 +1752,7 @@ export function buildCircumferenceCandidates(
       linesByEdge,
       familiesByEdge,
       ambiguousLineNames,
+      normalizedLinesByEdge,
     )) {
       removedShortcuts.add(key);
     }
@@ -1870,9 +1890,29 @@ export function buildCircumferenceCandidates(
     .filter((candidate) => candidate.areaSquareMeters >= minimumAreaSquareMeters)
     .sort((first, second) => second.areaSquareMeters - first.areaSquareMeters);
   const candidates = selectDiverseCandidates(rankedCandidates, maxCandidates);
+  const networkSegments = [...normalizedLinesByEdge]
+    .filter(([key]) => !removedShortcuts.has(key))
+    .map(([key, lineNames]) => {
+      const [fromId, toId] = key.split(EDGE_KEY_SEPARATOR);
+      return {
+        id: `network-${stableCandidateId([fromId, toId]).replace(
+          'route-',
+          '',
+        )}`,
+        from: nodes.get(fromId),
+        to: nodes.get(toId),
+        lines: [...lineNames].sort(sortLineNames),
+      };
+    });
 
   return {
     candidates,
+    network: {
+      stations: [...nodes.values()].filter(
+        (node) => node.lineNames.length > 0,
+      ),
+      segments: networkSegments,
+    },
     methodology: {
       eligibleStationCount: eligibleStations.length,
       platformNodeCount: nodes.size,

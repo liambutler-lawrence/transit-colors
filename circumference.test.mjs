@@ -8,6 +8,7 @@ import {
   selectCircumferenceCandidate,
 } from './circumference.js';
 import { calculateLandmassCoverage } from './circumference-landmass.js';
+import { hasOfficialLineColor, lineColor } from './line-colors.js';
 
 const oneDegreeSquare = [
   [0, 0],
@@ -20,6 +21,11 @@ assert.ok(
   Math.abs(polygonAreaSquareMeters(oneDegreeSquare) / 1_000_000 - 12_364) < 20,
 );
 assert.ok(lineLengthMeters(oneDegreeSquare) / 1000 > 440);
+assert.equal(lineColor('cdmx', '1'), '#F05097');
+assert.equal(lineColor('cdmx', 'L12'), '#BFA042');
+assert.equal(lineColor('nyc', 'A'), '#0062CF');
+assert.equal(lineColor('nyc', '6X'), '#009952');
+assert.equal(lineColor('nyc', 'SIR'), '#008EB7');
 
 const squareStations = [
   ['a', [0, 0]],
@@ -68,6 +74,8 @@ const squareResult = buildCircumferenceCandidates(
 assert.equal(squareResult.candidates.length, 1);
 assert.equal(squareResult.candidates[0].stations.length, 4);
 assert.deepEqual(squareResult.candidates[0].lines, ['A']);
+assert.equal(squareResult.network.stations.length, 5);
+assert.equal(squareResult.network.segments.length, 5);
 assert.equal(
   selectCircumferenceCandidate(
     squareResult.candidates,
@@ -147,6 +155,8 @@ const splitTransfer = splitPlatformWinner.segments.find(
 assert.equal(splitTransfer.transferSource, 'published');
 assert.equal(splitTransfer.transferMinutes, 2);
 assert.notDeepEqual(splitTransfer.from.coordinate, splitTransfer.to.coordinate);
+assert.equal(splitPlatformResult.network.stations.length, 5);
+assert.equal(splitPlatformResult.network.segments.length, 4);
 
 const adjacentCellStations = [
   ['a', [0, 0]],
@@ -224,6 +234,23 @@ assert.deepEqual(
 );
 assert.deepEqual(shortcutResult.methodology.removedShortcuts[0].lines, ['A']);
 assert.equal(shortcutResult.candidates.length, 0);
+assert.equal(shortcutResult.network.segments.length, 3);
+assert.ok(
+  shortcutResult.network.segments.every(
+    (segment) =>
+      segment.lines.includes('A') &&
+      new Set([segment.from.id, segment.to.id]).size === 2,
+  ),
+);
+assert.ok(
+  shortcutResult.network.segments.every(
+    (segment) =>
+      !(
+        new Set([segment.from.id, segment.to.id]).has('start') &&
+        new Set([segment.from.id, segment.to.id]).has('end')
+      ),
+  ),
+);
 
 for (const [areaKey, expectedMinimumAreaKm2] of [
   ['cdmx', 120],
@@ -250,6 +277,21 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
   assert.equal(winner.coordinates.length, winner.nodeIds.length + 1);
   assert.ok(winner.lines.length > 1);
   assert.ok(result.candidates.length > 2);
+  const activeLineNames = new Set(winner.lines);
+  const fullLineStations = result.network.stations.filter((station) =>
+    station.lineNames.some((lineName) => activeLineNames.has(lineName)),
+  );
+  assert.ok(fullLineStations.length > winner.stations.length);
+  assert.ok(
+    result.network.segments.some((segment) =>
+      segment.lines.some((lineName) => activeLineNames.has(lineName)),
+    ),
+  );
+  assert.ok(
+    winner.lines.every((lineName) =>
+      hasOfficialLineColor(areaKey, lineName),
+    ),
+  );
   assert.ok(winner.transferCount > 0);
   assert.ok(winner.walkingLengthMeters > 0);
   assert.equal(
