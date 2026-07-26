@@ -5,6 +5,11 @@ All notable changes to this project will be documented here. The format follows
 
 ## Unreleased
 
+### Fixed
+
+- Accept unavailable NYC street histogram and street-count metadata without blocking
+  Street Gradient or Circumference initialization.
+
 ### Changed
 
 - Migrated browser and algorithm code to strict TypeScript.
