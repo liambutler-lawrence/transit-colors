@@ -43,6 +43,13 @@ The automatic route builder:
   area, landmass intersections, and the outward gradient all use this same
   platform-and-walk geometry.
 
+For every line used on the selected boundary, the map also renders the complete
+normalized line and all of its platform nodes. Ride segments use official agency
+colors, including parallel color strokes where multiple services share an edge;
+walking links remain dashed and visually separate. The color values come from
+the [CDMX Integrated Mobility line renderer](https://serviciosatlas.sgirpc.cdmx.gob.mx/arcgis/rest/services/AtlasCapasPublicas/Movilidad_Integrada_CDMX/FeatureServer/1)
+and the [MTA subway brand palette](https://www.mta.info/document/168976).
+
 The route selector exposes the other ranked loops as manual overrides and stores
 the pinned choice per metro area in the browser. Selecting a route segment on the
 map also lets the user require or avoid that segment; the maximizer then chooses

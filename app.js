@@ -15,12 +15,13 @@ import {
 import {
   buildCircumferenceCandidates,
   selectCircumferenceCandidate,
-} from './circumference.js?v=20260725e';
+} from './circumference.js?v=20260725f';
 import {
   calculateLandmassCoverage,
   combinedLandmassArea,
 } from './circumference-landmass.js?v=20260725e';
 import { renderCircumferenceGradient } from './circumference-map.js?v=20260725e';
+import { lineColor } from './line-colors.js?v=20260725f';
 
 const AREAS = {
   cdmx: {
@@ -277,6 +278,7 @@ document.body.append(circumferenceCanvas);
 const circumferenceState = {
   areaKey: null,
   candidates: [],
+  network: { stations: [], segments: [] },
   selected: null,
   overrideId: '',
   methodology: null,
@@ -648,8 +650,19 @@ function syncCircumferenceVisibility() {
     visible && routeGradientToggle.checked,
   );
   setLayerVisibility('circumference-area', visible && routeAreaToggle.checked);
+  setLayerVisibility('circumference-network-casing', visible);
+  setLayerVisibility('circumference-network-line', visible);
+  setLayerVisibility('circumference-route-casing', visible);
   setLayerVisibility('circumference-route-line', visible);
   setLayerVisibility('circumference-transfer-line', visible);
+  setLayerVisibility(
+    'circumference-network-stations',
+    visible && routeStationsToggle.checked,
+  );
+  setLayerVisibility(
+    'circumference-network-labels',
+    visible && routeStationsToggle.checked,
+  );
   setLayerVisibility(
     'circumference-route-stations',
     visible && routeStationsToggle.checked,
@@ -705,6 +718,7 @@ function selectedCircumferenceCandidate() {
 function resetCircumferenceRoute() {
   circumferenceState.areaKey = null;
   circumferenceState.candidates = [];
+  circumferenceState.network = { stations: [], segments: [] };
   circumferenceState.selected = null;
   circumferenceState.overrideId = '';
   circumferenceState.methodology = null;
@@ -744,7 +758,16 @@ function resetCircumferenceRoute() {
 
 function fitCircumferenceCandidate(candidate, { animate = true } = {}) {
   if (!candidate || candidate.coordinates.length === 0) return;
-  const bounds = candidate.coordinates.reduce(
+  const activeLines = new Set(candidate.lines);
+  const fullLineCoordinates = circumferenceState.network.stations
+    .filter((station) =>
+      station.lineNames.some((lineName) => activeLines.has(lineName)),
+    )
+    .map((station) => station.coordinate);
+  const bounds = [
+    ...candidate.coordinates,
+    ...fullLineCoordinates,
+  ].reduce(
     (result, coordinate) => result.extend(coordinate),
     new maplibregl.LngLatBounds(),
   );
@@ -755,21 +778,77 @@ function fitCircumferenceCandidate(candidate, { animate = true } = {}) {
   });
 }
 
+function centeredLinePosition(index, count) {
+  return index - (count - 1) / 2;
+}
+
 function routeFeatureCollection(candidate) {
-  return {
-    type: 'FeatureCollection',
-    features: [
-      {
-        type: 'Feature',
-        geometry: {
-          type: 'Polygon',
-          coordinates: [candidate.coordinates],
-        },
-        properties: { kind: 'inside' },
+  const activeLines = new Set(candidate.lines);
+  const features = [
+    {
+      type: 'Feature',
+      geometry: {
+        type: 'Polygon',
+        coordinates: [candidate.coordinates],
       },
-      ...candidate.segments.map((segment, index) => ({
+      properties: { kind: 'inside' },
+    },
+  ];
+  let featureId = 0;
+
+  for (const segment of circumferenceState.network.segments) {
+    const displayedLines = segment.lines.filter((lineName) =>
+      activeLines.has(lineName),
+    );
+    for (const [index, lineName] of displayedLines.entries()) {
+      features.push({
         type: 'Feature',
-        id: index,
+        id: featureId,
+        geometry: {
+          type: 'LineString',
+          coordinates: [segment.from.coordinate, segment.to.coordinate],
+        },
+        properties: {
+          kind: 'network-segment',
+          line: lineName,
+          color: lineColor(activeAreaKey, lineName),
+          line_position: centeredLinePosition(index, displayedLines.length),
+        },
+      });
+      featureId += 1;
+    }
+  }
+
+  for (const station of circumferenceState.network.stations) {
+    const displayedLines = station.lineNames.filter((lineName) =>
+      activeLines.has(lineName),
+    );
+    if (displayedLines.length === 0) continue;
+    features.push({
+      type: 'Feature',
+      id: featureId,
+      geometry: {
+        type: 'Point',
+        coordinates: station.coordinate,
+      },
+      properties: {
+        kind: 'network-station',
+        name: station.name,
+        label: `${station.name} · ${displayedLines.join('/')}`,
+        lines: displayedLines.join(', '),
+        color: lineColor(activeAreaKey, displayedLines[0]),
+      },
+    });
+    featureId += 1;
+  }
+
+  for (const segment of candidate.segments) {
+    const displayedLines =
+      segment.type === 'transfer' ? [''] : segment.lines;
+    for (const [index, lineName] of displayedLines.entries()) {
+      features.push({
+        type: 'Feature',
+        id: featureId,
         geometry: {
           type: 'LineString',
           coordinates: [segment.from.coordinate, segment.to.coordinate],
@@ -780,29 +859,46 @@ function routeFeatureCollection(candidate) {
           to: segment.to.name,
           from_label: segment.from.label,
           to_label: segment.to.label,
+          line: lineName,
           lines: segment.lines.join(', '),
+          color: lineColor(activeAreaKey, lineName),
+          line_position:
+            segment.type === 'transfer'
+              ? 0
+              : centeredLinePosition(index, displayedLines.length),
           segment_id: segment.id,
           segment_type: segment.type,
           distance_m: segment.distanceMeters,
           transfer_source: segment.transferSource ?? '',
           transfer_minutes: segment.transferMinutes ?? '',
         },
-      })),
-      ...candidate.stations.map((station, index) => ({
-        type: 'Feature',
-        id: candidate.segments.length + index,
-        geometry: {
-          type: 'Point',
-          coordinates: station.coordinate,
-        },
-        properties: {
-          kind: 'station',
-          name: station.name,
-          label: station.label,
-          lines: station.lineNames.join(', '),
-        },
-      })),
-    ],
+      });
+      featureId += 1;
+    }
+  }
+
+  for (const station of candidate.stations) {
+    features.push({
+      type: 'Feature',
+      id: featureId,
+      geometry: {
+        type: 'Point',
+        coordinates: station.coordinate,
+      },
+      properties: {
+        kind: 'station',
+        name: station.name,
+        label: station.label,
+        lines: station.lineNames.join(', '),
+        color: lineColor(activeAreaKey, station.lineNames[0]),
+      },
+    });
+    featureId += 1;
+  }
+
+  return {
+    type: 'FeatureCollection',
+    features,
   };
 }
 
@@ -830,6 +926,11 @@ function renderLandmassBreakdown(coverage) {
 function renderCircumferenceCandidate(candidate, { fit = false } = {}) {
   if (!candidate) return;
   const landmassArea = circumferenceLandmasses?.areas?.[activeAreaKey];
+  const activeLineNames = new Set(candidate.lines);
+  const fullLineStationCount = circumferenceState.network.stations.filter(
+    (station) =>
+      station.lineNames.some((lineName) => activeLineNames.has(lineName)),
+  ).length;
   const landmassCoverage = calculateLandmassCoverage(
     candidate.coordinates,
     landmassArea,
@@ -915,6 +1016,10 @@ function renderCircumferenceCandidate(candidate, { fit = false } = {}) {
       )}`,
     },
     {
+      label: 'Complete lines shown',
+      value: `${candidate.lines.length} lines · ${fullLineStationCount} platform nodes`,
+    },
+    {
       label: 'GTFS geometry',
       value:
         circumferenceState.methodology.removedShortcutCount > 0
@@ -991,6 +1096,7 @@ function prepareCircumferenceRoute(sequence = loadSequence) {
   );
   circumferenceState.areaKey = activeAreaKey;
   circumferenceState.candidates = result.candidates;
+  circumferenceState.network = result.network;
   circumferenceState.methodology = result.methodology;
 
   const storedOverride = storedCircumferenceOverride(activeAreaKey);
@@ -2747,6 +2853,158 @@ function installMapData(stations) {
   });
 
   map.addLayer({
+    id: 'circumference-network-casing',
+    type: 'line',
+    source: 'circumference-route',
+    filter: ['==', ['get', 'kind'], 'network-segment'],
+    layout: {
+      visibility: 'none',
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#fffaf2',
+      'line-width': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8,
+        2.8,
+        12,
+        5,
+        15,
+        7,
+      ],
+      'line-offset': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8,
+        ['*', ['get', 'line_position'], 1.8],
+        12,
+        ['*', ['get', 'line_position'], 3.2],
+        15,
+        ['*', ['get', 'line_position'], 5.2],
+      ],
+      'line-opacity': 0.68,
+    },
+  });
+
+  map.addLayer({
+    id: 'circumference-network-line',
+    type: 'line',
+    source: 'circumference-route',
+    filter: ['==', ['get', 'kind'], 'network-segment'],
+    layout: {
+      visibility: 'none',
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': ['get', 'color'],
+      'line-width': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8,
+        1.4,
+        12,
+        2.8,
+        15,
+        4.6,
+      ],
+      'line-offset': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8,
+        ['*', ['get', 'line_position'], 1.8],
+        12,
+        ['*', ['get', 'line_position'], 3.2],
+        15,
+        ['*', ['get', 'line_position'], 5.2],
+      ],
+      'line-opacity': 0.68,
+    },
+  });
+
+  map.addLayer({
+    id: 'circumference-network-stations',
+    type: 'circle',
+    source: 'circumference-route',
+    filter: ['==', ['get', 'kind'], 'network-station'],
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-color': '#fffdf8',
+      'circle-stroke-color': ['get', 'color'],
+      'circle-stroke-width': 1.5,
+      'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 1.8, 12, 3.5, 15, 5],
+      'circle-opacity': 0.95,
+    },
+  });
+
+  map.addLayer({
+    id: 'circumference-network-labels',
+    type: 'symbol',
+    source: 'circumference-route',
+    filter: ['==', ['get', 'kind'], 'network-station'],
+    minzoom: 11.8,
+    layout: {
+      visibility: 'none',
+      'text-field': ['get', 'label'],
+      'text-size': ['interpolate', ['linear'], ['zoom'], 11.8, 9, 15, 11],
+      'text-offset': [0, 1],
+      'text-anchor': 'top',
+      'text-allow-overlap': false,
+      'text-optional': true,
+    },
+    paint: {
+      'text-color': '#3f2a24',
+      'text-halo-color': '#fffaf2',
+      'text-halo-width': 1.3,
+      'text-opacity': 0.78,
+    },
+  });
+
+  map.addLayer({
+    id: 'circumference-route-casing',
+    type: 'line',
+    source: 'circumference-route',
+    filter: ['==', ['get', 'kind'], 'segment'],
+    layout: {
+      visibility: 'none',
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#fffaf2',
+      'line-width': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8,
+        5.5,
+        12,
+        9,
+        15,
+        13,
+      ],
+      'line-offset': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8,
+        ['*', ['get', 'line_position'], 3.2],
+        12,
+        ['*', ['get', 'line_position'], 5.2],
+        15,
+        ['*', ['get', 'line_position'], 7.5],
+      ],
+      'line-opacity': 0.94,
+    },
+  });
+
+  map.addLayer({
     id: 'circumference-route-line',
     type: 'line',
     source: 'circumference-route',
@@ -2757,7 +3015,7 @@ function installMapData(stations) {
       'line-join': 'round',
     },
     paint: {
-      'line-color': '#b73f2e',
+      'line-color': ['get', 'color'],
       'line-width': [
         'interpolate',
         ['linear'],
@@ -2769,13 +3027,24 @@ function installMapData(stations) {
         15,
         10,
       ],
+      'line-offset': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8,
+        ['*', ['get', 'line_position'], 3.2],
+        12,
+        ['*', ['get', 'line_position'], 5.2],
+        15,
+        ['*', ['get', 'line_position'], 7.5],
+      ],
       'line-opacity': [
         'case',
         ['boolean', ['feature-state', 'hover'], false],
         1,
         0.92,
       ],
-      'line-blur': 0.15,
+      'line-blur': 0.05,
     },
   });
 
@@ -2819,9 +3088,9 @@ function installMapData(stations) {
     filter: ['==', ['get', 'kind'], 'station'],
     layout: { visibility: 'none' },
     paint: {
-      'circle-color': '#fff9ed',
-      'circle-stroke-color': '#8f3026',
-      'circle-stroke-width': 1.8,
+      'circle-color': ['get', 'color'],
+      'circle-stroke-color': '#fffaf2',
+      'circle-stroke-width': 2,
       'circle-radius': ['interpolate', ['linear'], ['zoom'], 8, 2.6, 12, 5.2],
     },
   });
