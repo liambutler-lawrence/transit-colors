@@ -1,9 +1,29 @@
 const OFFICIAL_SOURCES = {
+  metroGtfs:
+    'https://datos.cdmx.gob.mx/dataset/75538d96-3ade-4bc5-ae7d-d85595e4522d/resource/32ed1b6b-41cd-49b3-b7f0-b57acb0eb819/download/gtfs.zip',
   trenAifa: 'https://www.aifa.aero/conectividad/tren',
   trolebus10: 'https://www.ste.cdmx.gob.mx/linea-10',
   trolebus11: 'https://www.ste.cdmx.gob.mx/linea-11',
   trolebus12: 'https://www.ste.cdmx.gob.mx/linea-12',
 };
+
+const METRO_PLATFORM_OVERRIDES = [
+  ['chabacano-line-8', 'Chabacano L8', 8, -99.13375, 19.41021],
+  ['chabacano-line-9', 'Chabacano L9', 9, -99.13397, 19.40851],
+  ['tacuba-line-7', 'Tacuba L7', 7, -99.18717, 19.45823],
+].map(([id, name, line, lon, lat]) => ({
+  id: `official/metro/${id}`,
+  name,
+  coordinates: [lon, lat],
+  mode: 'subway',
+  system: 'Metro',
+  network: `STC Metro Línea ${line}`,
+  operator: 'Sistema de Transporte Colectivo Metro',
+  route_ref: String(line),
+  route_name: `Línea ${line}`,
+  source: 'Official SEMOVI GTFS platform stop',
+  source_url: OFFICIAL_SOURCES.metroGtfs,
+}));
 
 function slug(value) {
   return value
@@ -141,6 +161,7 @@ const TROLEBUS_LINE_12_STATIONS = buildCorridorStations({
 });
 
 export const CURATED_CDMX_STATIONS = [
+  ...METRO_PLATFORM_OVERRIDES,
   ...TREN_AIFA_STATIONS,
   ...TROLEBUS_LINE_10_STATIONS,
   ...TROLEBUS_LINE_11_STATIONS,

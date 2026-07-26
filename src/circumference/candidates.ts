@@ -43,6 +43,7 @@ import type {
   CircumferenceGeometryVariants,
   CircumferenceModeResult,
   CircumferenceNetwork,
+  CircumferenceNetworkSegment,
   CircumferenceNode,
   CircumferenceResult,
   CircumferenceSegment,
@@ -246,6 +247,41 @@ function sortLineNames(first: string, second: string): number {
   });
 }
 
+function simplifyTransferPath(
+  path: readonly NodeId[],
+  transfersByEdge: ReadonlyMap<EdgeKey, TransferEdge>,
+  nodes: NodeMap,
+): CyclePath {
+  const simplified = [...path];
+  let changed = true;
+
+  while (changed && simplified.length > 3) {
+    changed = false;
+    for (let index = 0; index < simplified.length; index += 1) {
+      const previousId =
+        simplified[(index - 1 + simplified.length) % simplified.length];
+      const currentId = simplified[index];
+      const nextId = simplified[(index + 1) % simplified.length];
+      if (!previousId || !currentId || !nextId) continue;
+      const stationName = normalizeStationName(getRequired(nodes, currentId).name);
+      if (
+        stationName &&
+        normalizeStationName(getRequired(nodes, previousId).name) === stationName &&
+        normalizeStationName(getRequired(nodes, nextId).name) === stationName &&
+        transfersByEdge.has(edgeKey(previousId, currentId)) &&
+        transfersByEdge.has(edgeKey(currentId, nextId)) &&
+        transfersByEdge.has(edgeKey(previousId, nextId))
+      ) {
+        simplified.splice(index, 1);
+        changed = true;
+        break;
+      }
+    }
+  }
+
+  return simplified;
+}
+
 interface GeometryVariant {
   readonly candidates: CircumferenceCandidate[];
   readonly generatedCandidateCount: number;
@@ -275,7 +311,14 @@ function buildGeometryVariant({
   readonly trackGeometryEnabled: boolean;
   readonly transfersByEdge: ReadonlyMap<EdgeKey, TransferEdge>;
 }): GeometryVariant {
-  const rankedCandidates: CircumferenceCandidate[] = candidatePaths
+  const simplifiedCandidatePaths = new Map<string, CyclePath>();
+  for (const candidatePath of candidatePaths) {
+    const path = simplifyTransferPath(candidatePath, transfersByEdge, nodes);
+    simplifiedCandidatePaths.set(stableCandidateId(path), path);
+  }
+  const rankedCandidates: CircumferenceCandidate[] = [
+    ...simplifiedCandidatePaths.values(),
+  ]
     .map((path) => {
       const segments: CircumferenceSegment[] = path.flatMap((nodeId, index) => {
         const nextId = path[(index + 1) % path.length];
@@ -343,7 +386,7 @@ function buildGeometryVariant({
     .filter((candidate) => candidate.coordinates.length >= 4)
     .filter((candidate) => candidate.areaSquareMeters >= minimumAreaSquareMeters)
     .sort((first, second) => second.areaSquareMeters - first.areaSquareMeters);
-  const networkSegments = [...normalizedLinesByEdge]
+  const networkRideSegments: CircumferenceNetworkSegment[] = [...normalizedLinesByEdge]
     .filter(([key]) => !removedShortcuts.has(key))
     .map(([key, lineNames]) => {
       const [fromId, toId] = key.split(EDGE_KEY_SEPARATOR);
@@ -352,6 +395,7 @@ function buildGeometryVariant({
         id: stableCandidateId([fromId, toId]).replace('route-', 'network-'),
         from: getRequired(nodes, fromId),
         to: getRequired(nodes, toId),
+        type: 'ride',
         lines: [...lineNames].sort(sortLineNames),
         coordinates: orientedEdgeCoordinates(
           fromId,
@@ -362,12 +406,34 @@ function buildGeometryVariant({
         ),
       };
     });
+  const networkTransferSegments: CircumferenceNetworkSegment[] = [
+    ...transfersByEdge,
+  ].map(([key, transfer]) => {
+    const [fromId, toId] = key.split(EDGE_KEY_SEPARATOR);
+    if (!fromId || !toId) throw new Error(`Invalid transfer edge key: ${key}`);
+    const from = getRequired(nodes, fromId);
+    const to = getRequired(nodes, toId);
+    return {
+      id: stableCandidateId([fromId, toId]).replace('route-', 'network-transfer-'),
+      from,
+      to,
+      type: 'transfer',
+      lines: [],
+      coordinates: [
+        [from.coordinate[0], from.coordinate[1]],
+        [to.coordinate[0], to.coordinate[1]],
+      ],
+      distanceMeters: transfer.distanceMeters,
+      transferSource: transfer.source,
+      transferMinutes: transfer.minutes,
+    };
+  });
 
   return {
     candidates: selectDiverseCandidates(rankedCandidates, maxCandidates),
     network: {
       stations: [...nodes.values()].filter((node) => node.lineNames.length > 0),
-      segments: networkSegments,
+      segments: [...networkRideSegments, ...networkTransferSegments],
     },
     generatedCandidateCount: rankedCandidates.length,
   };

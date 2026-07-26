@@ -8,6 +8,7 @@ import {
   parseCsv,
   stationEdgeKey,
 } from './gtfs-shape-centerlines.mjs';
+import { metroLineRefsForStation } from './cdmx-platforms.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, '..');
@@ -180,8 +181,12 @@ async function buildArea({ areaKey, feeds, geometrySource }) {
         )
         .sort(
           (first, second) =>
+            (areaKey === 'cdmx'
+              ? Number(metroLineRefsForStation(first.properties).size === 0) -
+                Number(metroLineRefsForStation(second.properties).size === 0)
+              : 0) ||
             distanceSquared(first.geometry.coordinates, stopCoordinate) -
-            distanceSquared(second.geometry.coordinates, stopCoordinate),
+              distanceSquared(second.geometry.coordinates, stopCoordinate),
         )[0];
       const stationId = match?.properties.id ?? null;
       stationIdCache.set(cacheKey, stationId);

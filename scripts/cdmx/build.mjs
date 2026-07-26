@@ -3,6 +3,10 @@ import { resolve } from 'node:path';
 
 import { CURATED_CDMX_STATIONS, OFFICIAL_SOURCES } from '../cdmx-curated-stations.mjs';
 import {
+  metroLineRefsForStation,
+  normalizedPlatformStationName,
+} from '../cdmx-platforms.mjs';
+import {
   CURATED_REPLACEMENT_DISTANCE_M,
   FUTURE_NETWORK_RULES,
   MAX_DISTANCE_M,
@@ -212,17 +216,31 @@ function reconcileStationFeatures(features) {
         .split(';')
         .map((value) => normalizeTag(value)),
     );
-    return !curatedFeatures.some(
-      (curated) =>
-        curated.properties.mode === properties.mode &&
-        (normalizeTag(curated.properties.name) === normalizedName ||
-          (properties.mode === 'brt' &&
-            routeRefs.has(normalizeTag(curated.properties.route_ref)))) &&
+    return !curatedFeatures.some((curated) => {
+      if (
+        curated.properties.mode !== properties.mode ||
         coordinateDistanceMeters(
           curated.geometry.coordinates,
           feature.geometry.coordinates,
-        ) <= CURATED_REPLACEMENT_DISTANCE_M,
-    );
+        ) > CURATED_REPLACEMENT_DISTANCE_M
+      ) {
+        return false;
+      }
+      if (properties.mode === 'subway') {
+        const curatedLines = metroLineRefsForStation(curated.properties);
+        const featureLines = metroLineRefsForStation(properties);
+        return (
+          normalizedPlatformStationName(curated.properties.name) ===
+            normalizedPlatformStationName(properties.name) &&
+          [...curatedLines].some((line) => featureLines.has(line))
+        );
+      }
+      return (
+        normalizeTag(curated.properties.name) === normalizedName ||
+        (properties.mode === 'brt' &&
+          routeRefs.has(normalizeTag(curated.properties.route_ref)))
+      );
+    });
   });
 
   return [...retainedFeatures, ...curatedFeatures];
