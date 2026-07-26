@@ -17,6 +17,7 @@ import {
   combinedLandmassArea,
   type LandmassCoverage,
 } from '../circumference-landmass.js';
+import { circumferenceGradientCoordinates } from '../circumference-gradient-source.js';
 import { renderCircumferenceGradient } from '../circumference-map.js';
 import type {
   CircumferenceCandidate,
@@ -28,7 +29,6 @@ import type { AreaKey, MetadataDetail } from './types.js';
 import {
   AREAS,
   activeStationModes,
-  canvasSource,
   circumferenceCanvas,
   circumferenceInnerAreaEl,
   circumferenceLandmassBreakdownEl,
@@ -44,6 +44,7 @@ import {
   formatDistance,
   formatRouteLength,
   geoJsonSource,
+  imageSource,
   map,
   routeAreaToggle,
   routeAutoButton,
@@ -430,16 +431,9 @@ export function renderCircumferenceCandidate(
         .map((landmass) => landmass.mask)
         .filter((mask) => Array.isArray(mask)),
     );
-    const [west, south, east, north] = landmassArea.gradient_bounds;
-    const gradientSource = canvasSource('circumference-gradient');
-    gradientSource?.updateImage({
+    imageSource('circumference-gradient')?.updateImage({
+      coordinates: circumferenceGradientCoordinates(landmassArea.gradient_bounds),
       url: circumferenceCanvas.toDataURL('image/png'),
-      coordinates: [
-        [west, north],
-        [east, north],
-        [east, south],
-        [west, south],
-      ],
     });
   }
 
