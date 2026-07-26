@@ -615,6 +615,10 @@ h1 {
   accent-color: #db6f3f;
 }
 
+.circumference-toggles {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
 .circumference-metrics .metric {
   border-color: #e4d5ca;
   background: #fffaf5;

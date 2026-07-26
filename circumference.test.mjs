@@ -252,6 +252,54 @@ assert.ok(
   ),
 );
 
+const curvedSquareSchedules = structuredClone(squareSchedules);
+curvedSquareSchedules.graph.g = {
+  a: [
+    [
+      'b',
+      [
+        [0, 0],
+        [0.005, -0.003],
+        [0.01, 0],
+      ],
+    ],
+  ],
+};
+curvedSquareSchedules.track_geometry = {
+  method: 'Synthetic averaged track centerline',
+};
+const curvedSquareResult = buildCircumferenceCandidates(
+  squareStations,
+  curvedSquareSchedules,
+  { minimumAreaSquareMeters: 1 },
+);
+const straightSquareResult = buildCircumferenceCandidates(
+  squareStations,
+  curvedSquareSchedules,
+  { minimumAreaSquareMeters: 1, useTrackGeometry: false },
+);
+assert.equal(curvedSquareResult.methodology.trackGeometryEnabled, true);
+assert.equal(straightSquareResult.methodology.trackGeometryEnabled, false);
+assert.equal(
+  curvedSquareResult.geometryVariants.straight.methodology.trackGeometryEnabled,
+  false,
+);
+assert.ok(
+  curvedSquareResult.candidates[0].coordinates.length >
+    straightSquareResult.candidates[0].coordinates.length,
+);
+assert.ok(
+  curvedSquareResult.candidates[0].areaSquareMeters >
+    straightSquareResult.candidates[0].areaSquareMeters,
+);
+assert.equal(
+  curvedSquareResult.network.segments.find(
+    (segment) => new Set([segment.from.id, segment.to.id]).has('a') &&
+      new Set([segment.from.id, segment.to.id]).has('b'),
+  ).coordinates.length,
+  3,
+);
+
 for (const [areaKey, expectedMinimumAreaKm2] of [
   ['cdmx', 120],
   ['nyc', 147],
@@ -274,9 +322,18 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
   assert.ok(winner);
   assert.ok(winner.areaSquareMeters / 1_000_000 > expectedMinimumAreaKm2);
   assert.equal(new Set(winner.nodeIds).size, winner.nodeIds.length);
-  assert.equal(winner.coordinates.length, winner.nodeIds.length + 1);
+  assert.ok(winner.coordinates.length > winner.nodeIds.length + 1);
   assert.ok(winner.lines.length > 1);
   assert.ok(result.candidates.length > 2);
+  assert.equal(result.methodology.trackGeometryEnabled, true);
+  assert.ok(result.methodology.trackGeometryEdgeCount > 100);
+  const straightWinner = result.geometryVariants.straight.candidates[0];
+  assert.equal(straightWinner.id, winner.id);
+  assert.equal(
+    straightWinner.coordinates.length,
+    straightWinner.nodeIds.length + 1,
+  );
+  assert.notEqual(straightWinner.lengthMeters, winner.lengthMeters);
   const activeLineNames = new Set(winner.lines);
   const fullLineStations = result.network.stations.filter((station) =>
     station.lineNames.some((lineName) => activeLineNames.has(lineName)),
@@ -285,6 +342,20 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
   assert.ok(
     result.network.segments.some((segment) =>
       segment.lines.some((lineName) => activeLineNames.has(lineName)),
+    ),
+  );
+  const eligibleLineNames = new Set(
+    result.network.segments.flatMap((segment) => segment.lines),
+  );
+  assert.ok(eligibleLineNames.size >= (areaKey === 'nyc' ? 34 : 12));
+  assert.ok(
+    [...eligibleLineNames].every((lineName) =>
+      hasOfficialLineColor(areaKey, lineName),
+    ),
+  );
+  assert.ok(
+    result.network.segments.every(
+      (segment) => segment.coordinates.length > 2,
     ),
   );
   assert.ok(
@@ -313,7 +384,13 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
     assert.notEqual(transfer.from.id, transfer.to.id);
     assert.notDeepEqual(transfer.from.coordinate, transfer.to.coordinate);
     assert.ok(transfer.distanceMeters > 0);
+    assert.equal(transfer.coordinates.length, 2);
   }
+  assert.ok(
+    winner.segments
+      .filter(({ type }) => type === 'ride')
+      .some(({ coordinates }) => coordinates.length > 2),
+  );
 
   if (areaKey === 'nyc') {
     const winnerStationNames = new Set(

@@ -12,9 +12,10 @@
     "build:data:access": "node scripts/build-street-access.mjs",
     "build:data:landmasses": "node scripts/build-circumference-landmasses.mjs",
     "build:data:schedules": "node scripts/build-gtfs-schedules.mjs",
-    "build:data": "npm run build:data:cdmx && npm run build:data:schedules && npm run build:data:nyc",
+    "build:data:tracks": "node scripts/build-track-geometries.mjs",
+    "build:data": "npm run build:data:cdmx && npm run build:data:schedules && npm run build:data:nyc && npm run build:data:tracks",
     "dev": "node scripts/serve.mjs",
-    "check": "node --check scripts/build-cdmx-data.mjs && node --check scripts/cdmx-curated-stations.mjs && node --check scripts/rebuild-cdmx-derived-data.mjs && node --check scripts/build-cdmx-tiles.mjs && node --check scripts/build-nyc-data.mjs && node --check scripts/build-street-access.mjs && node --check scripts/build-gtfs-schedules.mjs && node --check scripts/build-circumference-landmasses.mjs && node --check scripts/copy-vendor-assets.mjs && node --check scripts/serve.mjs && node --check routing.js && node --check circumference.js && node --check circumference-landmass.js && node --check app.js && node --test scripts/build-cdmx-data.test.mjs && node routing.test.mjs && node circumference.test.mjs",
+    "check": "node --check scripts/build-cdmx-data.mjs && node --check scripts/cdmx-curated-stations.mjs && node --check scripts/rebuild-cdmx-derived-data.mjs && node --check scripts/build-cdmx-tiles.mjs && node --check scripts/build-nyc-data.mjs && node --check scripts/build-street-access.mjs && node --check scripts/build-gtfs-schedules.mjs && node --check scripts/build-track-geometries.mjs && node --check scripts/gtfs-shape-centerlines.mjs && node --check scripts/build-circumference-landmasses.mjs && node --check scripts/copy-vendor-assets.mjs && node --check scripts/serve.mjs && node --check routing.js && node --check circumference.js && node --check circumference-landmass.js && node --check app.js && node --test scripts/build-cdmx-data.test.mjs scripts/gtfs-shape-centerlines.test.mjs && node routing.test.mjs && node circumference.test.mjs",
     "test": "node routing.test.mjs && node circumference.test.mjs"
   },
   "devDependencies": {

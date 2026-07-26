@@ -15,13 +15,13 @@ import {
 import {
   buildCircumferenceCandidates,
   selectCircumferenceCandidate,
-} from './circumference.js?v=20260725f';
+} from './circumference.js?v=20260725g';
 import {
   calculateLandmassCoverage,
   combinedLandmassArea,
 } from './circumference-landmass.js?v=20260725e';
-import { renderCircumferenceGradient } from './circumference-map.js?v=20260725e';
-import { lineColor } from './line-colors.js?v=20260725f';
+import { renderCircumferenceGradient } from './circumference-map.js?v=20260725g';
+import { lineColor } from './line-colors.js?v=20260725g';
 
 const AREAS = {
   cdmx: {
@@ -31,7 +31,7 @@ const AREAS = {
     streetTiles: 'data/cdmx-streets.pmtiles?v=20260722a',
     stations: 'data/cdmx-stations.geojson',
     metadata: 'data/cdmx-metadata.json',
-    schedules: 'data/cdmx-schedules.json',
+    schedules: 'data/cdmx-schedules.json?v=20260725g',
     timezone: 'America/Mexico_City',
     supportsDestination: true,
     buildCommand: 'npm run build:data:cdmx',
@@ -43,7 +43,7 @@ const AREAS = {
     liveRoads: true,
     stations: 'data/nyc-stations.geojson',
     metadata: 'data/nyc-metadata.json',
-    schedules: 'data/nyc-schedules.json',
+    schedules: 'data/nyc-schedules.json?v=20260725g',
     timezone: 'America/New_York',
     supportsDestination: true,
     buildCommand: 'npm run build:data:nyc',
@@ -217,6 +217,9 @@ const circumferenceLandmassBreakdownEl = document.querySelector(
 const routeChoiceSelect = document.querySelector('#route-choice');
 const routeAutoButton = document.querySelector('#route-auto');
 const routeChoiceSummaryEl = document.querySelector('#route-choice-summary');
+const routeTrackGeometryToggle = document.querySelector(
+  '#toggle-track-geometry',
+);
 const routeGradientToggle = document.querySelector('#toggle-route-gradient');
 const routeStationsToggle = document.querySelector('#toggle-route-stations');
 const routeAreaToggle = document.querySelector('#toggle-route-area');
@@ -270,8 +273,8 @@ let circumferenceLandmasses = null;
 
 const circumferenceCanvas = document.createElement('canvas');
 circumferenceCanvas.id = 'circumference-gradient-canvas';
-circumferenceCanvas.width = 512;
-circumferenceCanvas.height = 512;
+circumferenceCanvas.width = 384;
+circumferenceCanvas.height = 384;
 circumferenceCanvas.hidden = true;
 document.body.append(circumferenceCanvas);
 
@@ -285,6 +288,8 @@ const circumferenceState = {
   inspectedSegmentId: '',
   requiredSegmentIds: new Set(),
   avoidedSegmentIds: new Set(),
+  geometryMode: null,
+  geometryVariants: null,
 };
 
 const LIVE_ROAD_CLASSES = new Set([
@@ -725,6 +730,8 @@ function resetCircumferenceRoute() {
   circumferenceState.inspectedSegmentId = '';
   circumferenceState.requiredSegmentIds.clear();
   circumferenceState.avoidedSegmentIds.clear();
+  circumferenceState.geometryMode = null;
+  circumferenceState.geometryVariants = null;
   circumferenceInnerAreaEl.textContent = '--';
   circumferenceOuterAreaEl.textContent = '--';
   circumferenceLengthEl.textContent = '--';
@@ -758,12 +765,8 @@ function resetCircumferenceRoute() {
 
 function fitCircumferenceCandidate(candidate, { animate = true } = {}) {
   if (!candidate || candidate.coordinates.length === 0) return;
-  const activeLines = new Set(candidate.lines);
-  const fullLineCoordinates = circumferenceState.network.stations
-    .filter((station) =>
-      station.lineNames.some((lineName) => activeLines.has(lineName)),
-    )
-    .map((station) => station.coordinate);
+  const fullLineCoordinates = circumferenceState.network.segments
+    .flatMap((segment) => segment.coordinates);
   const bounds = [
     ...candidate.coordinates,
     ...fullLineCoordinates,
@@ -783,7 +786,6 @@ function centeredLinePosition(index, count) {
 }
 
 function routeFeatureCollection(candidate) {
-  const activeLines = new Set(candidate.lines);
   const features = [
     {
       type: 'Feature',
@@ -797,16 +799,14 @@ function routeFeatureCollection(candidate) {
   let featureId = 0;
 
   for (const segment of circumferenceState.network.segments) {
-    const displayedLines = segment.lines.filter((lineName) =>
-      activeLines.has(lineName),
-    );
+    const displayedLines = segment.lines;
     for (const [index, lineName] of displayedLines.entries()) {
       features.push({
         type: 'Feature',
         id: featureId,
         geometry: {
           type: 'LineString',
-          coordinates: [segment.from.coordinate, segment.to.coordinate],
+          coordinates: segment.coordinates,
         },
         properties: {
           kind: 'network-segment',
@@ -820,9 +820,7 @@ function routeFeatureCollection(candidate) {
   }
 
   for (const station of circumferenceState.network.stations) {
-    const displayedLines = station.lineNames.filter((lineName) =>
-      activeLines.has(lineName),
-    );
+    const displayedLines = station.lineNames;
     if (displayedLines.length === 0) continue;
     features.push({
       type: 'Feature',
@@ -851,7 +849,7 @@ function routeFeatureCollection(candidate) {
         id: featureId,
         geometry: {
           type: 'LineString',
-          coordinates: [segment.from.coordinate, segment.to.coordinate],
+          coordinates: segment.coordinates,
         },
         properties: {
           kind: segment.type === 'transfer' ? 'transfer' : 'segment',
@@ -926,11 +924,10 @@ function renderLandmassBreakdown(coverage) {
 function renderCircumferenceCandidate(candidate, { fit = false } = {}) {
   if (!candidate) return;
   const landmassArea = circumferenceLandmasses?.areas?.[activeAreaKey];
-  const activeLineNames = new Set(candidate.lines);
-  const fullLineStationCount = circumferenceState.network.stations.filter(
-    (station) =>
-      station.lineNames.some((lineName) => activeLineNames.has(lineName)),
-  ).length;
+  const eligibleLineNames = new Set(
+    circumferenceState.network.segments.flatMap((segment) => segment.lines),
+  );
+  const fullLineStationCount = circumferenceState.network.stations.length;
   const landmassCoverage = calculateLandmassCoverage(
     candidate.coordinates,
     landmassArea,
@@ -1016,11 +1013,17 @@ function renderCircumferenceCandidate(candidate, { fit = false } = {}) {
       )}`,
     },
     {
-      label: 'Complete lines shown',
-      value: `${candidate.lines.length} lines · ${fullLineStationCount} platform nodes`,
+      label: 'Eligible lines shown',
+      value: `${eligibleLineNames.size} lines · ${fullLineStationCount} platform nodes`,
     },
     {
-      label: 'GTFS geometry',
+      label: 'Route geometry',
+      value: circumferenceState.methodology.trackGeometryEnabled
+        ? `${circumferenceState.methodology.trackGeometryEdgeCount} averaged GTFS track centerlines`
+        : 'Straight platform-to-platform edges',
+    },
+    {
+      label: 'Network cleanup',
       value:
         circumferenceState.methodology.removedShortcutCount > 0
           ? `${circumferenceState.methodology.removedShortcutCount} limited-stop chords normalized`
@@ -1082,6 +1085,7 @@ function prepareCircumferenceRoute(sequence = loadSequence) {
 
   if (
     circumferenceState.areaKey === activeAreaKey &&
+    circumferenceState.geometryMode === routeTrackGeometryToggle.checked &&
     circumferenceState.candidates.length > 0
   ) {
     return;
@@ -1090,14 +1094,30 @@ function prepareCircumferenceRoute(sequence = loadSequence) {
   if (activeProduct === 'circumference') {
     updateStatus('Finding loops', { isLoading: true });
   }
-  const result = buildCircumferenceCandidates(
-    loadedStations.features,
-    state.schedules,
-  );
+  const geometryMode = routeTrackGeometryToggle.checked
+    ? 'track'
+    : 'straight';
+  let result;
+  if (
+    circumferenceState.areaKey === activeAreaKey &&
+    circumferenceState.geometryVariants
+  ) {
+    result = circumferenceState.geometryVariants[geometryMode];
+  } else {
+    const built = buildCircumferenceCandidates(
+      loadedStations.features,
+      state.schedules,
+      { useTrackGeometry: routeTrackGeometryToggle.checked },
+    );
+    circumferenceState.geometryVariants = built.geometryVariants;
+    result = built.geometryVariants[geometryMode];
+  }
   circumferenceState.areaKey = activeAreaKey;
+  circumferenceState.geometryMode = routeTrackGeometryToggle.checked;
   circumferenceState.candidates = result.candidates;
   circumferenceState.network = result.network;
   circumferenceState.methodology = result.methodology;
+  routeTrackGeometryToggle.disabled = !result.methodology.trackGeometryAvailable;
 
   const storedOverride = storedCircumferenceOverride(activeAreaKey);
   circumferenceState.overrideId = result.candidates.some(
@@ -3384,6 +3404,20 @@ for (const toggle of [
     syncCircumferenceVisibility();
   });
 }
+
+routeTrackGeometryToggle.addEventListener('change', () => {
+  if (!state.schedules) return;
+  updateStatus(
+    routeTrackGeometryToggle.checked
+      ? 'Following track paths'
+      : 'Using straight edges',
+    { isLoading: true },
+  );
+  circumferenceState.candidates = [];
+  requestAnimationFrame(() => {
+    prepareCircumferenceRoute();
+  });
+});
 
 destinationSelect.addEventListener('change', () => {
   selectDestination(destinationSelect.value);

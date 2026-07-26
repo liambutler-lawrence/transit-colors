@@ -32,6 +32,10 @@ The automatic route builder:
   collapsing transfer complexes to a shared centroid;
 - represents a change between platforms as an explicit walking edge, including
   published free transfers and same-name inferred links where a feed omits them;
+- replaces station-to-station chords with centerlines sampled from the official
+  GTFS trip shapes. Distinct directional/track-side observations are resampled
+  and averaged, while every centerline still terminates at the exact
+  line-platform coordinate;
 - normalizes express and limited-stop GTFS chords onto the available local
   station chain so stop-skipping services do not invent triangular track links;
 - removes branches that cannot participate in a closed loop;
@@ -41,14 +45,21 @@ The automatic route builder:
 - rejects repeated-station and self-intersecting routes; and
 - chooses the loop with the largest geodesic inner area. Route length, inner
   area, landmass intersections, and the outward gradient all use this same
-  platform-and-walk geometry.
+  track-and-walk geometry.
 
-For every line used on the selected boundary, the map also renders the complete
-normalized line and all of its platform nodes. Ride segments use official agency
-colors, including parallel color strokes where multiple services share an edge;
-walking links remain dashed and visually separate. The color values come from
+The **Track paths** toggle switches the complete model back to straight
+platform-to-platform edges. Rendering, automatic area ranking, route length,
+landmass intersections, and the gradient change together, so the curved and
+straight versions remain directly comparable.
+
+The map renders every complete metro/subway line eligible under the active
+criterion and all of its platform nodes, whether or not that line participates
+in the selected boundary. Ride segments use official agency colors, including
+parallel color strokes where multiple services share an edge; walking links
+remain dashed and visually separate. The color values come from
 the [CDMX Integrated Mobility line renderer](https://serviciosatlas.sgirpc.cdmx.gob.mx/arcgis/rest/services/AtlasCapasPublicas/Movilidad_Integrada_CDMX/FeatureServer/1)
-and the [MTA subway brand palette](https://www.mta.info/document/168976).
+and the [MTA subway brand palette](https://www.mta.info/document/168976); PATH
+service colors come directly from its published GTFS `route_color` values.
 
 The route selector exposes the other ranked loops as manual overrides and stores
 the pinned choice per metro area in the browser. Selecting a route segment on the
@@ -82,6 +93,8 @@ brew install tippecanoe
 npm install
 npm run build:data:cdmx
 npm run build:data:nyc
+npm run build:data:schedules
+npm run build:data:tracks
 ```
 
 The checked-in `data/circumference-landmasses.json` is built from the Natural Earth
@@ -208,6 +221,12 @@ Unlike the precomputed CDMX street file, the browser collects the currently load
 `data/nyc-schedules.json` is generated with the station snapshot from the MTA, NJ Transit, and PATH static GTFS feeds. It compresses published departures into recurring weekday service windows and headway estimates for 945 of the 947 current station records. The remaining records use the labeled four-minute boarding-wait estimate.
 
 Downloaded GTFS archives are cached in `data/.gtfs-cache/`. Set `REFRESH_GTFS_CACHE=1` to force a refresh.
+
+`npm run build:data:tracks` reads the cached CDMX, MTA subway, and PATH feeds and
+adds compact station-to-station shape centerlines to both schedule snapshots.
+The builder averages distinct GTFS shape observations at a common 80-meter
+sampling interval (capped at 64 points per segment) and records exact platform
+coordinates as the endpoints.
 
 `data/cdmx-street-access.json` stores the nearest-station index for every street. It is generated alongside the other data by `npm run build:data:cdmx`; `npm run build:data:access` can regenerate only this sidecar from the checked-in station and street files.
 

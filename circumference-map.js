@@ -47,6 +47,62 @@ function pointToSegmentDistance(point, start, end) {
   );
 }
 
+function simplifyOpenLine(points, tolerance) {
+  if (points.length <= 2) return points;
+  let maximumDistance = 0;
+  let splitIndex = -1;
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const distance = pointToSegmentDistance(
+      points[index],
+      points[0],
+      points.at(-1),
+    );
+    if (distance > maximumDistance) {
+      maximumDistance = distance;
+      splitIndex = index;
+    }
+  }
+  if (maximumDistance <= tolerance || splitIndex === -1) {
+    return [points[0], points.at(-1)];
+  }
+  return [
+    ...simplifyOpenLine(points.slice(0, splitIndex + 1), tolerance).slice(0, -1),
+    ...simplifyOpenLine(points.slice(splitIndex), tolerance),
+  ];
+}
+
+function simplifyClosedLine(points, tolerance) {
+  const ring =
+    points.length > 2 &&
+    points[0].x === points.at(-1).x &&
+    points[0].y === points.at(-1).y
+      ? points.slice(0, -1)
+      : points;
+  if (ring.length <= 3) return [...ring, ring[0]];
+
+  let oppositeIndex = 1;
+  let maximumDistance = 0;
+  for (let index = 1; index < ring.length; index += 1) {
+    const distance = Math.hypot(
+      ring[index].x - ring[0].x,
+      ring[index].y - ring[0].y,
+    );
+    if (distance > maximumDistance) {
+      maximumDistance = distance;
+      oppositeIndex = index;
+    }
+  }
+  const firstHalf = simplifyOpenLine(
+    ring.slice(0, oppositeIndex + 1),
+    tolerance,
+  );
+  const secondHalf = simplifyOpenLine(
+    [...ring.slice(oppositeIndex), ring[0]],
+    tolerance,
+  );
+  return [...firstHalf.slice(0, -1), ...secondHalf];
+}
+
 function blend(first, second, amount) {
   return first.map((value, index) =>
     Math.round(value + (second[index] - value) * amount),
@@ -93,7 +149,13 @@ export function renderCircumferenceGradient(
     x: (longitude - west) * metersPerLongitudeDegree,
     y: (latitude - south) * metersPerLatitudeDegree,
   });
-  const route = routeCoordinates.map(project);
+  const route = simplifyClosedLine(
+    routeCoordinates.map(project),
+    Math.max(
+      ((east - west) * metersPerLongitudeDegree) / width,
+      ((north - south) * metersPerLatitudeDegree) / height,
+    ) * 0.65,
+  );
   const segments = route.slice(1).map((end, index) => ({
     start: route[index],
     end,
