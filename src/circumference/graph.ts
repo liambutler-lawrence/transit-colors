@@ -20,6 +20,7 @@ export const SHORTCUT_MINIMUM_LENGTH_M = 1_400;
 export const SAME_LINE_SHORTCUT_RATIO = 1.8;
 export const CORRIDOR_SHORTCUT_RATIO = 1.6;
 export const CORRIDOR_AVERAGE_WIDTH_M = 900;
+export const SHORTCUT_STATION_ALIGNMENT_M = 160;
 export const CYCLE_SEARCH_BEAM_WIDTH = 4;
 export const CYCLE_SEARCH_MAX_ROUNDS = 18;
 export const OUTER_CYCLE_MERGE_SEED_LIMIT = 80;
@@ -351,6 +352,57 @@ export function shortestAlternatePath(
   return null;
 }
 
+function distanceToSegmentMeters(
+  point: Coordinate,
+  start: Coordinate,
+  end: Coordinate,
+): number {
+  const latitudeRadians = toRadians(point[1]);
+  const project = ([longitude, latitude]: Coordinate): readonly [number, number] => [
+    toRadians(longitude - point[0]) * EARTH_RADIUS_M * Math.cos(latitudeRadians),
+    toRadians(latitude - point[1]) * EARTH_RADIUS_M,
+  ];
+  const [startX, startY] = project(start);
+  const [endX, endY] = project(end);
+  const deltaX = endX - startX;
+  const deltaY = endY - startY;
+  const squaredLength = deltaX * deltaX + deltaY * deltaY;
+  if (squaredLength === 0) return Math.hypot(startX, startY);
+  const progress = Math.max(
+    0,
+    Math.min(1, -(startX * deltaX + startY * deltaY) / squaredLength),
+  );
+  return Math.hypot(startX + progress * deltaX, startY + progress * deltaY);
+}
+
+function trackGeometryFollowsIntermediateStations(
+  key: EdgeKey,
+  pathNodeIds: readonly NodeId[],
+  nodes: NodeMap,
+  geometriesByEdge: TrackGeometryMap,
+): boolean | null {
+  const geometry = geometriesByEdge.get(key);
+  const intermediateIds = pathNodeIds.slice(1, -1);
+  if (!geometry || geometry.coordinates.length < 2 || intermediateIds.length === 0) {
+    return null;
+  }
+
+  return intermediateIds.every((nodeId) => {
+    const coordinate = getRequired(nodes, nodeId).coordinate;
+    let closestDistance = Infinity;
+    for (let index = 1; index < geometry.coordinates.length; index += 1) {
+      const start = geometry.coordinates[index - 1];
+      const end = geometry.coordinates[index];
+      if (!start || !end) continue;
+      closestDistance = Math.min(
+        closestDistance,
+        distanceToSegmentMeters(coordinate, start, end),
+      );
+    }
+    return closestDistance <= SHORTCUT_STATION_ALIGNMENT_M;
+  });
+}
+
 /**
  * GTFS stop sequences describe where a train stops, not the physical track
  * between those stops. Express and limited-stop trips therefore create long
@@ -368,6 +420,8 @@ export function removeServiceShortcuts(
   familiesByEdge: EdgeStringSets,
   ambiguousLineNames: ReadonlySet<string>,
   normalizedLinesByEdge: MutableEdgeStringSets,
+  hiddenNetworkShortcuts: Set<EdgeKey>,
+  geometriesByEdge: TrackGeometryMap,
 ): Set<EdgeKey> {
   const shortcuts = new Set<EdgeKey>();
   const normalizeLinesOntoPath = (
@@ -415,8 +469,17 @@ export function removeServiceShortcuts(
         directFamilies,
       );
       if (sameLinePath && sameLinePath.nodeIds.length > 2) {
-        normalizeLinesOntoPath(sameLinePath.nodeIds, directLineNames);
+        const followsStations = trackGeometryFollowsIntermediateStations(
+          key,
+          sameLinePath.nodeIds,
+          nodes,
+          geometriesByEdge,
+        );
         shortcuts.add(key);
+        if (followsStations !== false) {
+          normalizeLinesOntoPath(sameLinePath.nodeIds, directLineNames);
+          hiddenNetworkShortcuts.add(key);
+        }
         continue;
       }
 
@@ -429,14 +492,23 @@ export function removeServiceShortcuts(
         directDistance * CORRIDOR_SHORTCUT_RATIO,
       );
       if (!corridorPath || corridorPath.nodeIds.length <= 2) continue;
+      const followsStations = trackGeometryFollowsIntermediateStations(
+        key,
+        corridorPath.nodeIds,
+        nodes,
+        geometriesByEdge,
+      );
 
       const ring = corridorPath.nodeIds.map(
         (nodeId) => getRequired(nodes, nodeId).coordinate,
       );
       const averageWidth = (2 * polygonAreaSquareMeters(ring)) / directDistance;
       if (averageWidth <= CORRIDOR_AVERAGE_WIDTH_M) {
-        normalizeLinesOntoPath(corridorPath.nodeIds, directLineNames);
         shortcuts.add(key);
+        if (followsStations !== false) {
+          normalizeLinesOntoPath(corridorPath.nodeIds, directLineNames);
+          hiddenNetworkShortcuts.add(key);
+        }
       }
     }
   }

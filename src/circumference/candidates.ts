@@ -297,7 +297,7 @@ function buildGeometryVariant({
   minimumAreaSquareMeters,
   nodes,
   normalizedLinesByEdge,
-  removedShortcuts,
+  hiddenNetworkShortcuts,
   trackGeometryEnabled,
   transfersByEdge,
 }: {
@@ -308,7 +308,7 @@ function buildGeometryVariant({
   readonly minimumAreaSquareMeters: number;
   readonly nodes: NodeMap;
   readonly normalizedLinesByEdge: EdgeStringSets;
-  readonly removedShortcuts: ReadonlySet<EdgeKey>;
+  readonly hiddenNetworkShortcuts: ReadonlySet<EdgeKey>;
   readonly trackGeometryEnabled: boolean;
   readonly transfersByEdge: ReadonlyMap<EdgeKey, TransferEdge>;
 }): GeometryVariant {
@@ -388,7 +388,7 @@ function buildGeometryVariant({
     .filter((candidate) => candidate.areaSquareMeters >= minimumAreaSquareMeters)
     .sort((first, second) => second.areaSquareMeters - first.areaSquareMeters);
   const networkRideSegments: CircumferenceNetworkSegment[] = [...normalizedLinesByEdge]
-    .filter(([key]) => !removedShortcuts.has(key))
+    .filter(([key]) => !hiddenNetworkShortcuts.has(key))
     .map(([key, lineNames]) => {
       const [fromId, toId] = key.split(EDGE_KEY_SEPARATOR);
       if (!fromId || !toId) throw new Error(`Invalid edge key: ${key}`);
@@ -651,6 +651,7 @@ export function buildCircumferenceCandidates(
   );
   const candidatePaths = new Map<string, CyclePath>();
   const removedShortcuts = new Set<EdgeKey>();
+  const hiddenNetworkShortcuts = new Set<EdgeKey>();
   const biconnectedComponentSizes: number[] = [];
   let biconnectedComponentCount = 0;
   let corePlatformNodeCount = 0;
@@ -662,6 +663,8 @@ export function buildCircumferenceCandidates(
       familiesByEdge,
       ambiguousLineNames,
       normalizedLinesByEdge,
+      hiddenNetworkShortcuts,
+      geometriesByEdge,
     )) {
       removedShortcuts.add(key);
     }
@@ -797,7 +800,7 @@ export function buildCircumferenceCandidates(
       minimumAreaSquareMeters,
       nodes,
       normalizedLinesByEdge,
-      removedShortcuts,
+      hiddenNetworkShortcuts,
       trackGeometryEnabled,
       transfersByEdge,
     });
