@@ -63,7 +63,8 @@ npm test
 ```
 
 Tests cover street segmentation and access scoring, schedule-aware routing, CDMX data
-classification, and circumference route invariants against the committed datasets.
+classification, GTFS centerline extraction, and circumference route invariants against
+the committed datasets.
 
 When fixing a defect, add a regression test near the affected module. Tests may use
 plain JavaScript fixtures, but production boundaries must still validate unknown data.

@@ -6,7 +6,11 @@ New York City region. It includes:
 - street-level distance to selected transit modes;
 - schedule-adjusted travel time to a selected station; and
 - a Circumference Lab that finds large, closed metro loops and measures the land they
-  enclose, then renders each selected line in its official agency color.
+  enclose.
+
+Circumference routes follow averaged centerlines from official GTFS track shapes by
+default, with an option to compare straight platform-to-platform geometry. The map also
+shows every eligible metro line and platform in its official agency color.
 
 The public site is deployed at
 [liambutler-lawrence.github.io/transit-colors](https://liambutler-lawrence.github.io/transit-colors/).

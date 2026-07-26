@@ -1,4 +1,4 @@
-import type { Coordinate } from '../domain.js';
+import type { Coordinate, Schedule } from '../domain.js';
 import type {
   Adjacency,
   CyclePath,
@@ -10,6 +10,7 @@ import type {
   NodeId,
   NodeMap,
   ReadonlyAdjacency,
+  TrackGeometryMap,
 } from './types.js';
 
 export const EARTH_RADIUS_M = 6_371_008.8;
@@ -212,6 +213,65 @@ export class UnionFind {
 
 export function edgeKey(firstId: NodeId, secondId: NodeId): EdgeKey {
   return [firstId, secondId].sort().join(EDGE_KEY_SEPARATOR);
+}
+
+function copyCoordinate(coordinate: Coordinate): Coordinate {
+  return [coordinate[0], coordinate[1]];
+}
+
+export function trackGeometryByEdge(schedules: Schedule): TrackGeometryMap {
+  const geometries = new Map<EdgeKey, { coordinates: Coordinate[]; fromId: NodeId }>();
+  for (const [fromId, entries] of Object.entries(schedules.graph.g ?? {})) {
+    for (const [toId, coordinates] of entries) {
+      geometries.set(edgeKey(fromId, toId), {
+        fromId,
+        coordinates: coordinates.map(copyCoordinate),
+      });
+    }
+  }
+  return geometries;
+}
+
+export function orientedEdgeCoordinates(
+  fromId: NodeId,
+  toId: NodeId,
+  nodes: NodeMap,
+  geometriesByEdge: TrackGeometryMap,
+  useTrackGeometry: boolean,
+): Coordinate[] {
+  const fallback = [
+    copyCoordinate(getRequired(nodes, fromId).coordinate),
+    copyCoordinate(getRequired(nodes, toId).coordinate),
+  ];
+  if (!useTrackGeometry) return fallback;
+  const geometry = geometriesByEdge.get(edgeKey(fromId, toId));
+  if (!geometry) return fallback;
+  const coordinates =
+    geometry.fromId === fromId
+      ? geometry.coordinates
+      : [...geometry.coordinates].reverse();
+  return coordinates.map(copyCoordinate);
+}
+
+export function joinSegmentCoordinates(
+  segments: readonly { readonly coordinates: readonly Coordinate[] }[],
+): Coordinate[] {
+  const coordinates: Coordinate[] = [];
+  for (const segment of segments) {
+    const additions =
+      coordinates.length > 0 ? segment.coordinates.slice(1) : segment.coordinates;
+    coordinates.push(...additions.map(copyCoordinate));
+  }
+  const first = coordinates[0];
+  const last = coordinates.at(-1);
+  if (
+    first !== undefined &&
+    last !== undefined &&
+    (first[0] !== last[0] || first[1] !== last[1])
+  ) {
+    coordinates.push(copyCoordinate(first));
+  }
+  return coordinates;
 }
 
 export function serviceFamily(routeId: string, lineName: string): string {

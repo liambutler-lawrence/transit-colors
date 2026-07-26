@@ -1,4 +1,4 @@
-import type { Schedule, StationFeature } from '../domain.js';
+import type { Coordinate, Schedule, StationFeature } from '../domain.js';
 import {
   CYCLE_SEARCH_BEAM_WIDTH,
   CYCLE_SEARCH_MAX_ROUNDS,
@@ -15,9 +15,11 @@ import {
   fundamentalCycles,
   getRequired,
   hasSelfIntersection,
+  joinSegmentCoordinates,
   lineLengthMeters,
   mergeCyclePaths,
   normalizeStationName,
+  orientedEdgeCoordinates,
   polygonAreaSquareMeters,
   removeBranches,
   removeServiceShortcuts,
@@ -25,6 +27,7 @@ import {
   serviceFamily,
   spanningTreeCycles,
   stableCandidateId,
+  trackGeometryByEdge,
 } from './graph.js';
 import {
   expandCyclesWithEars,
@@ -37,16 +40,21 @@ import type {
   Adjacency,
   BuildCircumferenceOptions,
   CircumferenceCandidate,
+  CircumferenceGeometryVariants,
+  CircumferenceModeResult,
+  CircumferenceNetwork,
   CircumferenceNode,
   CircumferenceResult,
   CircumferenceSegment,
   CyclePath,
   EdgeKey,
+  EdgeStringSets,
   MutableEdgeStringSets,
   NodeId,
   NodeMap,
   ReadonlyAdjacency,
   SelectCircumferenceOptions,
+  TrackGeometryMap,
   TransferEdge,
 } from './types.js';
 
@@ -238,6 +246,133 @@ function sortLineNames(first: string, second: string): number {
   });
 }
 
+interface GeometryVariant {
+  readonly candidates: CircumferenceCandidate[];
+  readonly generatedCandidateCount: number;
+  readonly network: CircumferenceNetwork;
+}
+
+function buildGeometryVariant({
+  candidatePaths,
+  geometriesByEdge,
+  linesByEdge,
+  maxCandidates,
+  minimumAreaSquareMeters,
+  nodes,
+  normalizedLinesByEdge,
+  removedShortcuts,
+  trackGeometryEnabled,
+  transfersByEdge,
+}: {
+  readonly candidatePaths: readonly CyclePath[];
+  readonly geometriesByEdge: TrackGeometryMap;
+  readonly linesByEdge: EdgeStringSets;
+  readonly maxCandidates: number;
+  readonly minimumAreaSquareMeters: number;
+  readonly nodes: NodeMap;
+  readonly normalizedLinesByEdge: EdgeStringSets;
+  readonly removedShortcuts: ReadonlySet<EdgeKey>;
+  readonly trackGeometryEnabled: boolean;
+  readonly transfersByEdge: ReadonlyMap<EdgeKey, TransferEdge>;
+}): GeometryVariant {
+  const rankedCandidates: CircumferenceCandidate[] = candidatePaths
+    .map((path) => {
+      const segments: CircumferenceSegment[] = path.flatMap((nodeId, index) => {
+        const nextId = path[(index + 1) % path.length];
+        if (!nextId) return [];
+        const key = edgeKey(nodeId, nextId);
+        const transfer = transfersByEdge.get(key);
+        const from = getRequired(nodes, nodeId);
+        const to = getRequired(nodes, nextId);
+        const coordinates: Coordinate[] = transfer
+          ? [
+              [from.coordinate[0], from.coordinate[1]],
+              [to.coordinate[0], to.coordinate[1]],
+            ]
+          : orientedEdgeCoordinates(
+              nodeId,
+              nextId,
+              nodes,
+              geometriesByEdge,
+              trackGeometryEnabled,
+            );
+        return [
+          {
+            id: stableCandidateId([nodeId, nextId]).replace('route-', 'segment-'),
+            from,
+            to,
+            type: transfer ? 'transfer' : 'ride',
+            lines: [...(linesByEdge.get(key) ?? [])].sort(sortLineNames),
+            coordinates,
+            distanceMeters: lineLengthMeters(coordinates),
+            transferSource: transfer?.source ?? null,
+            transferMinutes: transfer?.minutes ?? null,
+          } satisfies CircumferenceSegment,
+        ];
+      });
+      const coordinates = joinSegmentCoordinates(segments);
+      const lines = [...new Set(segments.flatMap((segment) => segment.lines))].sort(
+        sortLineNames,
+      );
+      const walkingLengthMeters = segments
+        .filter((segment) => segment.type === 'transfer')
+        .reduce((total, segment) => total + segment.distanceMeters, 0);
+
+      return {
+        id: stableCandidateId(path),
+        nodeIds: path,
+        stations: path.map((nodeId) => getRequired(nodes, nodeId)),
+        coordinates,
+        segments,
+        lines,
+        transferCount: segments.filter((segment) => segment.type === 'transfer').length,
+        walkingLengthMeters,
+        rideLengthMeters: segments
+          .filter((segment) => segment.type === 'ride')
+          .reduce((total, segment) => total + segment.distanceMeters, 0),
+        areaSquareMeters: polygonAreaSquareMeters(coordinates),
+        lengthMeters: segments.reduce(
+          (total, segment) => total + segment.distanceMeters,
+          0,
+        ),
+      } satisfies CircumferenceCandidate;
+    })
+    // Candidate topology is already constrained to a simple station-node cycle.
+    // Do not reject a physical alignment merely because grade-separated tracks
+    // cross in plan view or a short interchange walk crosses another segment.
+    .filter((candidate) => candidate.coordinates.length >= 4)
+    .filter((candidate) => candidate.areaSquareMeters >= minimumAreaSquareMeters)
+    .sort((first, second) => second.areaSquareMeters - first.areaSquareMeters);
+  const networkSegments = [...normalizedLinesByEdge]
+    .filter(([key]) => !removedShortcuts.has(key))
+    .map(([key, lineNames]) => {
+      const [fromId, toId] = key.split(EDGE_KEY_SEPARATOR);
+      if (!fromId || !toId) throw new Error(`Invalid edge key: ${key}`);
+      return {
+        id: stableCandidateId([fromId, toId]).replace('route-', 'network-'),
+        from: getRequired(nodes, fromId),
+        to: getRequired(nodes, toId),
+        lines: [...lineNames].sort(sortLineNames),
+        coordinates: orientedEdgeCoordinates(
+          fromId,
+          toId,
+          nodes,
+          geometriesByEdge,
+          trackGeometryEnabled,
+        ),
+      };
+    });
+
+  return {
+    candidates: selectDiverseCandidates(rankedCandidates, maxCandidates),
+    network: {
+      stations: [...nodes.values()].filter((node) => node.lineNames.length > 0),
+      segments: networkSegments,
+    },
+    generatedCandidateCount: rankedCandidates.length,
+  };
+}
+
 /**
  * Builds closed metro loops from route edges and zero-fare interchanges.
  * Express stop-to-stop shortcuts are normalized onto local station chains,
@@ -251,6 +386,7 @@ export function buildCircumferenceCandidates(
   {
     maxCandidates = 12,
     minimumAreaSquareMeters = 250_000,
+    useTrackGeometry = true,
   }: BuildCircumferenceOptions = {},
 ): CircumferenceResult {
   const eligibleStations = stationFeatures.filter(
@@ -281,6 +417,7 @@ export function buildCircumferenceCandidates(
     [...nodes.keys()].map((nodeId) => [nodeId, new Set<string>()]),
   );
   const transfersByEdge = new Map<EdgeKey, TransferEdge>();
+  const geometriesByEdge = trackGeometryByEdge(schedules);
   const routeIdsByLineName = new Map<string, Set<string>>();
   for (const [routeId, route] of Object.entries(schedules.routes)) {
     if (route.mode !== 'subway') continue;
@@ -560,105 +697,63 @@ export function buildCircumferenceCandidates(
     candidatePaths.set(stableCandidateId(path), path);
   }
 
-  const rankedCandidates: CircumferenceCandidate[] = [...candidatePaths.values()]
-    .flatMap((path) => {
-      const openCoordinates = path.map(
-        (nodeId) => getRequired(nodes, nodeId).coordinate,
-      );
-      const firstCoordinate = openCoordinates[0];
-      if (!firstCoordinate) return [];
-      const coordinates = [...openCoordinates, firstCoordinate];
-      const segments: CircumferenceSegment[] = path.flatMap((nodeId, index) => {
-        const nextId = path[(index + 1) % path.length];
-        if (!nextId) return [];
-        const key = edgeKey(nodeId, nextId);
-        const transfer = transfersByEdge.get(key);
-        return [
-          {
-            id: stableCandidateId([nodeId, nextId]).replace('route-', 'segment-'),
-            from: getRequired(nodes, nodeId),
-            to: getRequired(nodes, nextId),
-            type: transfer ? 'transfer' : 'ride',
-            lines: [...(linesByEdge.get(key) ?? [])].sort(sortLineNames),
-            distanceMeters: distanceMeters(
-              getRequired(nodes, nodeId).coordinate,
-              getRequired(nodes, nextId).coordinate,
-            ),
-            transferSource: transfer?.source ?? null,
-            transferMinutes: transfer?.minutes ?? null,
-          },
-        ];
-      });
-      const lines = [...new Set(segments.flatMap((segment) => segment.lines))].sort(
-        sortLineNames,
-      );
-      const walkingLengthMeters = segments
-        .filter((segment) => segment.type === 'transfer')
-        .reduce((total, segment) => total + segment.distanceMeters, 0);
-
-      return [
-        {
-          id: stableCandidateId(path),
-          nodeIds: path,
-          stations: path.map((nodeId) => getRequired(nodes, nodeId)),
-          coordinates,
-          segments,
-          lines,
-          transferCount: segments.filter((segment) => segment.type === 'transfer')
-            .length,
-          walkingLengthMeters,
-          rideLengthMeters: lineLengthMeters(coordinates) - walkingLengthMeters,
-          areaSquareMeters: polygonAreaSquareMeters(coordinates),
-          lengthMeters: lineLengthMeters(coordinates),
-        },
-      ];
-    })
-    .filter((candidate) => candidate.areaSquareMeters >= minimumAreaSquareMeters)
-    .sort((first, second) => second.areaSquareMeters - first.areaSquareMeters);
-  const candidates = selectDiverseCandidates(rankedCandidates, maxCandidates);
-  const networkSegments = [...normalizedLinesByEdge]
-    .filter(([key]) => !removedShortcuts.has(key))
-    .map(([key, lineNames]) => {
-      const [fromId, toId] = key.split(EDGE_KEY_SEPARATOR);
-      if (!fromId || !toId) throw new Error(`Invalid edge key: ${key}`);
-      return {
-        id: stableCandidateId([fromId, toId]).replace('route-', 'network-'),
-        from: getRequired(nodes, fromId),
-        to: getRequired(nodes, toId),
-        lines: [...lineNames].sort(sortLineNames),
-      };
+  const removedShortcutsDetails = [...removedShortcuts].map((key) => {
+    const [fromId, toId] = key.split(EDGE_KEY_SEPARATOR);
+    if (!fromId || !toId) {
+      throw new Error(`Invalid edge key: ${key}`);
+    }
+    return {
+      from: getRequired(nodes, fromId).name,
+      to: getRequired(nodes, toId).name,
+      lines: [...(linesByEdge.get(key) ?? [])].sort(sortLineNames),
+    };
+  });
+  const makeModeResult = (trackGeometryEnabled: boolean): CircumferenceModeResult => {
+    const variant = buildGeometryVariant({
+      candidatePaths: [...candidatePaths.values()],
+      geometriesByEdge,
+      linesByEdge,
+      maxCandidates,
+      minimumAreaSquareMeters,
+      nodes,
+      normalizedLinesByEdge,
+      removedShortcuts,
+      trackGeometryEnabled,
+      transfersByEdge,
     });
-
+    return {
+      candidates: variant.candidates,
+      network: variant.network,
+      methodology: {
+        eligibleStationCount: eligibleStations.length,
+        platformNodeCount: nodes.size,
+        corePlatformNodeCount,
+        publishedTransferCount,
+        inferredTransferCount,
+        removedShortcutCount: removedShortcuts.size,
+        removedShortcuts: removedShortcutsDetails,
+        biconnectedComponentCount,
+        biconnectedComponentSizes: [...biconnectedComponentSizes].sort(
+          (first, second) => second - first,
+        ),
+        generatedCandidateCount: variant.generatedCandidateCount,
+        trackGeometryAvailable: geometriesByEdge.size > 0,
+        trackGeometryEdgeCount: geometriesByEdge.size,
+        trackGeometryEnabled: trackGeometryEnabled && geometriesByEdge.size > 0,
+        trackGeometryMethod: schedules.track_geometry?.method ?? null,
+      },
+    };
+  };
+  const geometryVariants: CircumferenceGeometryVariants = {
+    track: makeModeResult(true),
+    straight: makeModeResult(false),
+  };
+  const selectedVariant = useTrackGeometry
+    ? geometryVariants.track
+    : geometryVariants.straight;
   return {
-    candidates,
-    network: {
-      stations: [...nodes.values()].filter((node) => node.lineNames.length > 0),
-      segments: networkSegments,
-    },
-    methodology: {
-      eligibleStationCount: eligibleStations.length,
-      platformNodeCount: nodes.size,
-      corePlatformNodeCount,
-      publishedTransferCount,
-      inferredTransferCount,
-      removedShortcutCount: removedShortcuts.size,
-      removedShortcuts: [...removedShortcuts].map((key) => {
-        const [fromId, toId] = key.split(EDGE_KEY_SEPARATOR);
-        if (!fromId || !toId) {
-          throw new Error(`Invalid edge key: ${key}`);
-        }
-        return {
-          from: getRequired(nodes, fromId).name,
-          to: getRequired(nodes, toId).name,
-          lines: [...(linesByEdge.get(key) ?? [])].sort(sortLineNames),
-        };
-      }),
-      biconnectedComponentCount,
-      biconnectedComponentSizes: biconnectedComponentSizes.sort(
-        (first, second) => second - first,
-      ),
-      generatedCandidateCount: rankedCandidates.length,
-    },
+    ...selectedVariant,
+    geometryVariants,
   };
 }
 

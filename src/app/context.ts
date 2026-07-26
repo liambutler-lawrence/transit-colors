@@ -296,6 +296,10 @@ export const routeChoiceSummaryEl = requiredElement(
   '#route-choice-summary',
   HTMLElement,
 );
+export const routeTrackGeometryToggle = requiredElement(
+  '#toggle-track-geometry',
+  HTMLInputElement,
+);
 export const routeGradientToggle = requiredElement(
   '#toggle-route-gradient',
   HTMLInputElement,
@@ -390,6 +394,8 @@ document.body.append(circumferenceCanvas);
 export const circumferenceState: CircumferenceState = {
   areaKey: null,
   candidates: [],
+  geometryMode: null,
+  geometryVariants: null,
   network: {
     segments: [],
     stations: [],

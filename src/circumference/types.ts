@@ -25,6 +25,7 @@ export interface TransferEdge {
 }
 
 export interface CircumferenceSegment {
+  readonly coordinates: Coordinate[];
   readonly distanceMeters: number;
   readonly from: CircumferenceNode;
   readonly id: string;
@@ -50,6 +51,7 @@ export interface CircumferenceCandidate {
 }
 
 export interface CircumferenceNetworkSegment {
+  readonly coordinates: Coordinate[];
   readonly from: CircumferenceNode;
   readonly id: string;
   readonly lines: readonly string[];
@@ -78,17 +80,31 @@ export interface CircumferenceMethodology {
   readonly publishedTransferCount: number;
   readonly removedShortcutCount: number;
   readonly removedShortcuts: RemovedShortcut[];
+  readonly trackGeometryAvailable: boolean;
+  readonly trackGeometryEdgeCount: number;
+  readonly trackGeometryEnabled: boolean;
+  readonly trackGeometryMethod: string | null;
 }
 
-export interface CircumferenceResult {
+export interface CircumferenceModeResult {
   readonly candidates: CircumferenceCandidate[];
   readonly methodology: CircumferenceMethodology;
   readonly network: CircumferenceNetwork;
 }
 
+export type CircumferenceGeometryMode = 'straight' | 'track';
+export type CircumferenceGeometryVariants = Readonly<
+  Record<CircumferenceGeometryMode, CircumferenceModeResult>
+>;
+
+export interface CircumferenceResult extends CircumferenceModeResult {
+  readonly geometryVariants: CircumferenceGeometryVariants;
+}
+
 export interface BuildCircumferenceOptions {
   readonly maxCandidates?: number;
   readonly minimumAreaSquareMeters?: number;
+  readonly useTrackGeometry?: boolean;
 }
 
 export interface SelectCircumferenceOptions {
@@ -99,6 +115,13 @@ export interface SelectCircumferenceOptions {
 export type EdgeStringSets = ReadonlyMap<EdgeKey, ReadonlySet<string>>;
 export type MutableEdgeStringSets = Map<EdgeKey, Set<string>>;
 export type EdgeCost = (fromId: NodeId, toId: NodeId) => number;
+
+export interface TrackGeometry {
+  readonly coordinates: Coordinate[];
+  readonly fromId: NodeId;
+}
+
+export type TrackGeometryMap = ReadonlyMap<EdgeKey, TrackGeometry>;
 
 export interface RankedPath {
   readonly areaSquareMeters: number;

@@ -50,6 +50,22 @@ npm run build:data:schedules
 Schedule files compress published departures into recurring weekday service windows and
 headway estimates. Set `REFRESH_GTFS_CACHE=1` to replace downloaded GTFS caches.
 
+## Track geometry
+
+After the schedule and station snapshots are current, run:
+
+```sh
+npm run build:data:tracks
+```
+
+The builder reads official GTFS trip shapes from the local feed cache, extracts
+station-to-station observations, resamples them to a common interval, and averages
+distinct directions or track sides. Centerlines retain exact platform coordinates as
+their endpoints and fall back to a straight edge when no reliable shape section exists.
+
+`npm run build:data` refreshes both metro areas, schedules, and track geometry in the
+required order.
+
 ## Landmasses
 
 After downloading and extracting Natural Earth 5.1.1 `ne_10m_land.shp`:

@@ -53,6 +53,63 @@ function pointToSegmentDistance(point: Point, start: Point, end: Point): number 
   );
 }
 
+function simplifyOpenLine(points: readonly Point[], tolerance: number): Point[] {
+  if (points.length <= 2) return [...points];
+  const first = points[0];
+  const last = points.at(-1);
+  if (!first || !last) return [];
+
+  let maximumDistance = 0;
+  let splitIndex = -1;
+  for (let index = 1; index < points.length - 1; index += 1) {
+    const point = points[index];
+    if (!point) continue;
+    const distance = pointToSegmentDistance(point, first, last);
+    if (distance > maximumDistance) {
+      maximumDistance = distance;
+      splitIndex = index;
+    }
+  }
+  if (maximumDistance <= tolerance || splitIndex === -1) {
+    return [first, last];
+  }
+  return [
+    ...simplifyOpenLine(points.slice(0, splitIndex + 1), tolerance).slice(0, -1),
+    ...simplifyOpenLine(points.slice(splitIndex), tolerance),
+  ];
+}
+
+function simplifyClosedLine(points: readonly Point[], tolerance: number): Point[] {
+  const first = points[0];
+  const last = points.at(-1);
+  if (!first || !last) return [];
+  const ring =
+    points.length > 2 && first.x === last.x && first.y === last.y
+      ? points.slice(0, -1)
+      : [...points];
+  const ringFirst = ring[0];
+  if (!ringFirst) return [];
+  if (ring.length <= 3) return [...ring, ringFirst];
+
+  let oppositeIndex = 1;
+  let maximumDistance = 0;
+  for (let index = 1; index < ring.length; index += 1) {
+    const point = ring[index];
+    if (!point) continue;
+    const distance = Math.hypot(point.x - ringFirst.x, point.y - ringFirst.y);
+    if (distance > maximumDistance) {
+      maximumDistance = distance;
+      oppositeIndex = index;
+    }
+  }
+  const firstHalf = simplifyOpenLine(ring.slice(0, oppositeIndex + 1), tolerance);
+  const secondHalf = simplifyOpenLine(
+    [...ring.slice(oppositeIndex), ringFirst],
+    tolerance,
+  );
+  return [...firstHalf.slice(0, -1), ...secondHalf];
+}
+
 function blend(first: Color, second: Color, amount: number): Color {
   return [
     Math.round(first[0] + (second[0] - first[0]) * amount),
@@ -107,7 +164,13 @@ export function renderCircumferenceGradient(
     x: (longitude - west) * metersPerLongitudeDegree,
     y: (latitude - south) * metersPerLatitudeDegree,
   });
-  const route = routeCoordinates.map(project);
+  const route = simplifyClosedLine(
+    routeCoordinates.map(project),
+    Math.max(
+      ((east - west) * metersPerLongitudeDegree) / width,
+      ((north - south) * metersPerLatitudeDegree) / height,
+    ) * 0.65,
+  );
   const segments = route.slice(1).flatMap((end, index) => {
     const start = route[index];
     return start ? [{ end, start }] : [];

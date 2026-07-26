@@ -7,6 +7,8 @@ import { z } from 'zod';
 
 import type {
   CircumferenceCandidate,
+  CircumferenceGeometryMode,
+  CircumferenceGeometryVariants,
   CircumferenceMethodology,
   CircumferenceNetwork,
 } from '../circumference/types.js';
@@ -42,6 +44,8 @@ export interface CircumferenceState {
   areaKey: AreaKey | null;
   avoidedSegmentIds: Set<string>;
   candidates: CircumferenceCandidate[];
+  geometryMode: CircumferenceGeometryMode | null;
+  geometryVariants: CircumferenceGeometryVariants | null;
   inspectedSegmentId: string;
   methodology: CircumferenceMethodology | null;
   network: CircumferenceNetwork;

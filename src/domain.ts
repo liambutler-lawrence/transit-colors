@@ -82,6 +82,12 @@ export const scheduleSchema = z
         z.string(),
         z.array(z.tuple([z.string().min(1), z.number(), z.string().min(1)])),
       ),
+      g: z
+        .record(
+          z.string(),
+          z.array(z.tuple([z.string().min(1), z.array(coordinateSchema).min(2)])),
+        )
+        .optional(),
       t: z.record(z.string(), z.array(z.tuple([z.string().min(1), z.number()]))),
     }),
     routes: z.record(
@@ -105,6 +111,16 @@ export const scheduleSchema = z
     ),
     source: z.string().optional(),
     timezone: z.string().optional(),
+    track_geometry: z
+      .object({
+        method: z.string().min(1),
+        edge_count: z.number().int().nonnegative().optional(),
+        endpoint_model: z.string().optional(),
+        shape_observation_count: z.number().int().nonnegative().optional(),
+        source: z.string().optional(),
+      })
+      .loose()
+      .optional(),
   })
   .loose();
 

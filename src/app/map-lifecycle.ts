@@ -95,6 +95,7 @@ import {
   routeGradientToggle,
   routeRequireSegmentButton,
   routeStationsToggle,
+  routeTrackGeometryToggle,
   runtime,
   scheduleDaySelect,
   scheduleTimeInput,
@@ -879,6 +880,18 @@ for (const toggle of [routeGradientToggle, routeStationsToggle, routeAreaToggle]
     syncCircumferenceVisibility();
   });
 }
+
+routeTrackGeometryToggle.addEventListener('change', () => {
+  if (!state.schedules) return;
+  updateStatus(
+    routeTrackGeometryToggle.checked ? 'Following track paths' : 'Using straight edges',
+    { isLoading: true },
+  );
+  circumferenceState.candidates = [];
+  requestAnimationFrame(() => {
+    prepareCircumferenceRoute();
+  });
+});
 
 destinationSelect.addEventListener('change', () => {
   selectDestination(destinationSelect.value);

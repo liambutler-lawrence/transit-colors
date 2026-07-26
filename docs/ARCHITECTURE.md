@@ -14,6 +14,8 @@ application, deterministic derived datasets, and scripts that refresh those data
    loading state, and destination options.
 5. `src/app/feature-details.ts` manages selections and schedule-aware route details.
 6. `src/app/circumference-ui.ts` renders loop candidates and landmass coverage.
+7. `src/app/circumference-layers.ts` owns the complete-line, selected-route, transfer,
+   station, and label layer definitions.
 
 The application modules form a one-way dependency graph from shared context to features
 to lifecycle orchestration. Cross-feature refresh requests use browser events instead of
@@ -48,7 +50,13 @@ construction live in `src/circumference/candidates.ts`.
 
 The calculation removes non-cyclic branches and route shortcuts, generates several
 families of valid simple cycles, rejects self-intersections and repeated stations, and
-ranks the remaining loops by geodesic enclosed area.
+ranks the remaining loops by geodesic enclosed area. Ride edges use averaged official
+GTFS shape centerlines when available and exact platform-to-platform fallback geometry
+otherwise. Both track and straight variants share the same topology and can be switched
+without rebuilding the graph.
+
+The circumference map renders the full eligible subway network in official line colors,
+then emphasizes the selected boundary and its walking transfers.
 
 ## Static data
 
