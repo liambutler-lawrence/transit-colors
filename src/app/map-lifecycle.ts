@@ -1,6 +1,7 @@
 import type { FeatureIdentifier } from 'maplibre-gl';
 
 import { selectCircumferenceCandidate } from '../circumference.js';
+import { createCircumferenceGradientSource } from '../circumference-gradient-source.js';
 import { createStreetAccessScorer, splitStreetFeatures } from '../routing.js';
 import {
   landmassDataSchema,
@@ -416,16 +417,13 @@ export function installMapData(stations: StationCollection): void {
     generateId: true,
   });
 
-  map.addSource('circumference-gradient', {
-    type: 'image',
-    url: circumferenceCanvas.toDataURL('image/png'),
-    coordinates: [
-      [-99.42, 19.66],
-      [-98.84, 19.66],
-      [-98.84, 19.18],
-      [-99.42, 19.18],
-    ],
-  });
+  map.addSource(
+    'circumference-gradient',
+    createCircumferenceGradientSource(
+      circumferenceCanvas.toDataURL('image/png'),
+      [-99.42, 19.18, -98.84, 19.66],
+    ),
+  );
 
   map.addSource('circumference-route', {
     type: 'geojson',

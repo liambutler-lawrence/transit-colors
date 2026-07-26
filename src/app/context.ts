@@ -1,7 +1,7 @@
 import maplibregl, {
-  type CanvasSource,
   type ExpressionSpecification,
   type GeoJSONSource,
+  type ImageSource,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
@@ -165,9 +165,9 @@ export function geoJsonSource(id: string): GeoJSONSource | null {
   return source instanceof maplibregl.GeoJSONSource ? source : null;
 }
 
-export function canvasSource(id: string): CanvasSource | null {
+export function imageSource(id: string): ImageSource | null {
   const source = map.getSource(id);
-  return source instanceof maplibregl.CanvasSource ? source : null;
+  return source instanceof maplibregl.ImageSource ? source : null;
 }
 
 export const FUTURE_MODE_DISTANCE_PROPERTIES = {

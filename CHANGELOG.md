@@ -7,6 +7,8 @@ All notable changes to this project will be documented here. The format follows
 
 ### Fixed
 
+- Refresh the Circumference distance-gradient image from its rendered canvas so the
+  Gradient layer toggle controls visible map pixels.
 - Accept unavailable NYC street histogram and street-count metadata without blocking
   Street Gradient or Circumference initialization.
 
