@@ -2,8 +2,9 @@ import type { Coordinate, Schedule, StationFeature } from '../domain.js';
 import {
   CYCLE_SEARCH_BEAM_WIDTH,
   CYCLE_SEARCH_MAX_ROUNDS,
+  EAR_EXPANSION_MAX_ROUNDS,
+  EAR_EXPANSION_ROUND_SEED_LIMIT,
   EDGE_KEY_SEPARATOR,
-  INFERRED_TRANSFER_DISTANCE_M,
   INFERRED_TRANSFER_DISTANCE_WITHOUT_PUBLISHED_M,
   OUTER_CYCLE_MERGE_SEED_LIMIT,
   biconnectedComponents,
@@ -587,58 +588,52 @@ export function buildCircumferenceCandidates(
       }
     }
   }
-  const publishedTransferAdjacency: Adjacency = new Map(
-    [...adjacency].map(([nodeId, neighbors]) => [nodeId, new Set(neighbors)]),
-  );
+  // Name matching is only a fallback for feeds that publish no transfer table
+  // at all (currently CDMX). When a feed publishes transfers, that table is
+  // authoritative: same-name stations can be separate, fare-controlled
+  // complexes such as NYC's two 155 St stations.
+  if (publishedTransferCount === 0) {
+    const stationsByName = new Map<string, StationFeature[]>();
+    for (const feature of eligibleStations) {
+      const normalizedName = normalizeStationName(feature.properties.name);
+      if (!normalizedName) continue;
+      const bucket = stationsByName.get(normalizedName) ?? [];
+      bucket.push(feature);
+      stationsByName.set(normalizedName, bucket);
+    }
 
-  // Same-name, route-bearing records can supply missing platform links. Feeds
-  // with published transfers use a conservative co-location threshold; feeds
-  // without them (currently CDMX) allow documented long in-station walks such
-  // as Atlalilco. Platforms remain separate points in both cases.
-  const inferredTransferDistance =
-    publishedTransferCount === 0
-      ? INFERRED_TRANSFER_DISTANCE_WITHOUT_PUBLISHED_M
-      : INFERRED_TRANSFER_DISTANCE_M;
-  const stationsByName = new Map<string, StationFeature[]>();
-  for (const feature of eligibleStations) {
-    const normalizedName = normalizeStationName(feature.properties.name);
-    if (!normalizedName) continue;
-    const bucket = stationsByName.get(normalizedName) ?? [];
-    bucket.push(feature);
-    stationsByName.set(normalizedName, bucket);
-  }
-
-  for (const bucket of stationsByName.values()) {
-    for (let firstIndex = 0; firstIndex < bucket.length; firstIndex += 1) {
-      for (
-        let secondIndex = firstIndex + 1;
-        secondIndex < bucket.length;
-        secondIndex += 1
-      ) {
-        const first = bucket[firstIndex];
-        const second = bucket[secondIndex];
-        if (!first || !second) continue;
-        const firstId = first.properties.id;
-        const secondId = second.properties.id;
-        const firstLines = getRequired(linesByNode, firstId);
-        const secondLines = getRequired(linesByNode, secondId);
-        if (firstLines.size === 0 || secondLines.size === 0) continue;
-        const sameLineSet =
-          firstLines.size === secondLines.size &&
-          [...firstLines].every((lineName) => secondLines.has(lineName));
-        if (
-          sameLineSet ||
-          distanceMeters(first.geometry.coordinates, second.geometry.coordinates) >
-            inferredTransferDistance
+    for (const bucket of stationsByName.values()) {
+      for (let firstIndex = 0; firstIndex < bucket.length; firstIndex += 1) {
+        for (
+          let secondIndex = firstIndex + 1;
+          secondIndex < bucket.length;
+          secondIndex += 1
         ) {
-          continue;
-        }
-        if (
-          addTransfer(firstId, secondId, {
-            source: 'inferred',
-          })
-        ) {
-          inferredTransferCount += 1;
+          const first = bucket[firstIndex];
+          const second = bucket[secondIndex];
+          if (!first || !second) continue;
+          const firstId = first.properties.id;
+          const secondId = second.properties.id;
+          const firstLines = getRequired(linesByNode, firstId);
+          const secondLines = getRequired(linesByNode, secondId);
+          if (firstLines.size === 0 || secondLines.size === 0) continue;
+          const sameLineSet =
+            firstLines.size === secondLines.size &&
+            [...firstLines].every((lineName) => secondLines.has(lineName));
+          if (
+            sameLineSet ||
+            distanceMeters(first.geometry.coordinates, second.geometry.coordinates) >
+              INFERRED_TRANSFER_DISTANCE_WITHOUT_PUBLISHED_M
+          ) {
+            continue;
+          }
+          if (
+            addTransfer(firstId, secondId, {
+              source: 'inferred',
+            })
+          ) {
+            inferredTransferCount += 1;
+          }
         }
       }
     }
@@ -659,12 +654,7 @@ export function buildCircumferenceCandidates(
   const biconnectedComponentSizes: number[] = [];
   let biconnectedComponentCount = 0;
   let corePlatformNodeCount = 0;
-  const searchAdjacencyVariants = [adjacency];
-  if (publishedTransferCount > 0 && inferredTransferCount > 0) {
-    searchAdjacencyVariants.push(publishedTransferAdjacency);
-  }
-
-  for (const searchAdjacency of searchAdjacencyVariants) {
+  for (const searchAdjacency of [adjacency]) {
     for (const key of removeServiceShortcuts(
       searchAdjacency,
       nodes,
@@ -758,7 +748,11 @@ export function buildCircumferenceCandidates(
   // example the Bronx extension first, then the West End/D branch in Brooklyn).
   // Feed only newly discovered ears into the next round so combinations are
   // found without repeatedly expanding the entire candidate population.
-  for (let round = 0; round < 3 && earExpansionSeeds.length > 0; round += 1) {
+  for (
+    let round = 0;
+    round < EAR_EXPANSION_MAX_ROUNDS && earExpansionSeeds.length > 0;
+    round += 1
+  ) {
     const newEarPaths: CyclePath[] = [];
     for (const path of expandCyclesWithEars(
       earExpansionSeeds,
@@ -779,7 +773,7 @@ export function buildCircumferenceCandidates(
         ),
       }))
       .sort((first, second) => second.areaSquareMeters - first.areaSquareMeters)
-      .slice(0, 1)
+      .slice(0, EAR_EXPANSION_ROUND_SEED_LIMIT)
       .map((candidate) => candidate.path);
   }
 
