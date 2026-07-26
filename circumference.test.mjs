@@ -80,9 +80,86 @@ assert.equal(
   null,
 );
 
+const adjacentCellStations = [
+  ['a', [0, 0]],
+  ['b', [0.01, 0]],
+  ['c', [0.02, 0]],
+  ['d', [0.02, 0.01]],
+  ['e', [0.01, 0.01]],
+  ['f', [0, 0.01]],
+].map(([id, coordinates]) => ({
+  type: 'Feature',
+  geometry: { type: 'Point', coordinates },
+  properties: { id, name: id, mode: 'subway', status: 'open' },
+}));
+const adjacentCellResult = buildCircumferenceCandidates(
+  adjacentCellStations,
+  {
+    routes: { line: { mode: 'subway', name: 'A' } },
+    graph: {
+      e: {
+        a: [
+          ['b', 1, 'line/0'],
+          ['f', 1, 'line/0'],
+        ],
+        b: [
+          ['c', 1, 'line/0'],
+          ['e', 1, 'line/0'],
+        ],
+        c: [['d', 1, 'line/0']],
+        d: [['e', 1, 'line/0']],
+        e: [['f', 1, 'line/0']],
+      },
+      t: {},
+    },
+  },
+  { minimumAreaSquareMeters: 1 },
+);
+assert.equal(adjacentCellResult.candidates[0].stations.length, 6);
+assert.ok(adjacentCellResult.candidates[0].areaSquareMeters > 2_400_000);
+
+const shortcutStations = [
+  ['start', [0, 0]],
+  ['local-1', [0.01, 0.002]],
+  ['local-2', [0.02, 0.002]],
+  ['end', [0.03, 0]],
+].map(([id, coordinates]) => ({
+  type: 'Feature',
+  geometry: { type: 'Point', coordinates },
+  properties: { id, name: id, mode: 'subway', status: 'open' },
+}));
+const shortcutResult = buildCircumferenceCandidates(
+  shortcutStations,
+  {
+    routes: { line: { mode: 'subway', name: 'A' } },
+    graph: {
+      e: {
+        start: [
+          ['local-1', 1, 'line/0'],
+          ['end', 1, 'line/0'],
+        ],
+        'local-1': [['local-2', 1, 'line/0']],
+        'local-2': [['end', 1, 'line/0']],
+      },
+      t: {},
+    },
+  },
+  { minimumAreaSquareMeters: 1 },
+);
+assert.equal(shortcutResult.methodology.removedShortcutCount, 1);
+assert.deepEqual(
+  [
+    shortcutResult.methodology.removedShortcuts[0].from,
+    shortcutResult.methodology.removedShortcuts[0].to,
+  ].sort(),
+  ['end', 'start'],
+);
+assert.deepEqual(shortcutResult.methodology.removedShortcuts[0].lines, ['A']);
+assert.equal(shortcutResult.candidates.length, 0);
+
 for (const [areaKey, expectedMinimumAreaKm2] of [
-  ['cdmx', 26],
-  ['nyc', 10],
+  ['cdmx', 120],
+  ['nyc', 75],
 ]) {
   const stations = JSON.parse(
     await readFile(
@@ -105,6 +182,27 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
   assert.equal(winner.coordinates.length, winner.nodeIds.length + 1);
   assert.ok(winner.lines.length > 1);
   assert.ok(result.candidates.length > 2);
+
+  if (areaKey === 'nyc') {
+    const removedPairs = new Set(
+      result.methodology.removedShortcuts.map(({ from, to }) =>
+        [from, to].sort().join(' :: '),
+      ),
+    );
+    for (const pair of [
+      ['3 Av-138 St', 'Hunts Point Av'],
+      ['62 St', 'Bay Pkwy'],
+      ['New Dorp', 'St George'],
+      ['Great Kills', 'St George'],
+    ]) {
+      assert.ok(removedPairs.has(pair.sort().join(' :: ')));
+    }
+    assert.ok(
+      result.methodology.removedShortcuts.every(
+        ({ lines }) => !lines.includes('PATH'),
+      ),
+    );
+  }
 }
 
 console.log('Circumference route checks passed.');

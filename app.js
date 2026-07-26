@@ -15,7 +15,7 @@ import {
 import {
   buildCircumferenceCandidates,
   selectCircumferenceCandidate,
-} from './circumference.js?v=20260725b';
+} from './circumference.js?v=20260725c';
 import { renderCircumferenceGradient } from './circumference-map.js?v=20260725b';
 
 const AREAS = {
@@ -856,8 +856,15 @@ function renderCircumferenceCandidate(candidate, { fit = false } = {}) {
       value: `${circumferenceState.methodology.publishedTransferCount} published, ${circumferenceState.methodology.inferredTransferCount} co-located`,
     },
     {
+      label: 'GTFS geometry',
+      value:
+        circumferenceState.methodology.removedShortcutCount > 0
+          ? `${circumferenceState.methodology.removedShortcutCount} limited-stop chords normalized`
+          : 'No limited-stop chords detected',
+    },
+    {
       label: 'Candidates',
-      value: `${circumferenceState.candidates.length} valid simple loops`,
+      value: `${circumferenceState.candidates.length} diverse of ${circumferenceState.methodology.generatedCandidateCount} valid loops`,
     },
     {
       label: 'Segment edits',
@@ -870,7 +877,7 @@ function renderCircumferenceCandidate(candidate, { fit = false } = {}) {
     ? 'This ranked loop is pinned as a manual override for this metro area.'
     : isSegmentEdited
       ? 'Largest-area ranked loop that satisfies the required and avoided segments.'
-      : `Automatic winner from ${circumferenceState.candidates.length} valid loops, ranked by contained area.`;
+      : `Automatic winner from ${circumferenceState.methodology.generatedCandidateCount} valid loops, ranked by contained area.`;
 
   positionCircumferenceGradient();
   syncCircumferenceVisibility();

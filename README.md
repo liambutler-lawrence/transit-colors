@@ -31,8 +31,11 @@ The automatic route builder:
 - collapses published free-transfer station complexes;
 - infers tightly co-located, same-name CDMX interchanges because that feed omits
   transfer records;
+- normalizes express and limited-stop GTFS chords onto the available local
+  station chain so stop-skipping services do not invent triangular track links;
 - removes branches that cannot participate in a closed loop;
-- traces valid simple faces in the remaining network; and
+- traces atomic cycles, combines adjacent boundaries into larger valid simple
+  loops, and rejects self-intersecting routes; and
 - chooses the loop with the largest geodesic inner area.
 
 The route selector exposes the other ranked loops as manual overrides and stores
