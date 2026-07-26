@@ -9,7 +9,9 @@ import type {
 } from 'geojson';
 
 import {
+  boundaryAlternativePosition,
   buildCircumferenceCandidates,
+  junctionContinuationLinePositions,
   selectCircumferenceCandidate,
 } from '../circumference.js';
 import {
@@ -269,9 +271,11 @@ function segmentEndpointKey(fromId: string, toId: string): string {
   return [fromId, toId].sort().join('\u0000');
 }
 
-function boundaryAlternativePosition(index: number): number {
-  const distance = Math.floor(index / 2) + 1;
-  return index % 2 === 0 ? -distance : distance;
+function sortLineNames(first: string, second: string): number {
+  return first.localeCompare(second, 'en', {
+    numeric: true,
+    sensitivity: 'base',
+  });
 }
 
 export function routeFeatureCollection(
@@ -301,6 +305,31 @@ export function routeFeatureCollection(
       segment.lines,
     );
   }
+  const boundaryLineLayouts = candidate.segments
+    .filter((segment) => segment.type === 'ride')
+    .map((segment) => {
+      const displayedLines = [
+        ...new Set([
+          ...segment.lines,
+          ...(networkLinesByEdge.get(
+            segmentEndpointKey(segment.from.id, segment.to.id),
+          ) ?? []),
+        ]),
+      ].sort(sortLineNames);
+      return {
+        coordinates: segment.coordinates,
+        displayedLines,
+        fromId: segment.from.id,
+        primaryLine: segment.primaryLine ?? displayedLines[0] ?? '',
+        toId: segment.to.id,
+      };
+    });
+  const coordinatesByNodeId = new Map(
+    circumferenceState.network.stations.map((station) => [
+      station.id,
+      station.coordinate,
+    ]),
+  );
 
   for (const segment of circumferenceState.network.segments) {
     if (
@@ -310,7 +339,21 @@ export function routeFeatureCollection(
       continue;
     }
     const displayedLines = segment.type === 'transfer' ? [''] : segment.lines;
+    const continuationPositions =
+      segment.type === 'ride'
+        ? junctionContinuationLinePositions(
+            {
+              coordinates: segment.coordinates,
+              fromId: segment.from.id,
+              lines: segment.lines,
+              toId: segment.to.id,
+            },
+            boundaryLineLayouts,
+            coordinatesByNodeId,
+          )
+        : new Map<string, number>();
     for (const [index, lineName] of displayedLines.entries()) {
+      const continuationPosition = continuationPositions.get(lineName);
       const feature: Feature<LineString, GeoJsonProperties> = {
         type: 'Feature',
         id: featureId,
@@ -319,7 +362,12 @@ export function routeFeatureCollection(
           coordinates: segment.coordinates,
         },
         properties: {
-          kind: segment.type === 'transfer' ? 'network-transfer' : 'network-segment',
+          kind:
+            segment.type === 'transfer'
+              ? 'network-transfer'
+              : continuationPosition === undefined
+                ? 'network-segment'
+                : 'segment-alternative',
           line: lineName,
           color:
             segment.type === 'transfer'
@@ -328,7 +376,9 @@ export function routeFeatureCollection(
           line_position:
             segment.type === 'transfer'
               ? 0
-              : centeredLinePosition(index, displayedLines.length),
+              : (continuationPosition ??
+                centeredLinePosition(index, displayedLines.length)),
+          junction_continuation: continuationPosition !== undefined,
         },
       };
       features.push(feature);
@@ -370,12 +420,7 @@ export function routeFeatureCollection(
                 segmentEndpointKey(segment.from.id, segment.to.id),
               ) ?? []),
             ]),
-          ].sort((first, second) =>
-            first.localeCompare(second, 'en', {
-              numeric: true,
-              sensitivity: 'base',
-            }),
-          );
+          ].sort(sortLineNames);
     const primaryLine = segment.primaryLine ?? displayedLines[0] ?? '';
     const alternativeLines = displayedLines.filter(
       (lineName) => lineName !== primaryLine,
