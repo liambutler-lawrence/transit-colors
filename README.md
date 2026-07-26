@@ -28,9 +28,10 @@ control as the next data adapters for the same route model.
 
 The automatic route builder:
 
-- collapses published free-transfer station complexes;
-- infers tightly co-located, same-name CDMX interchanges because that feed omits
-  transfer records;
+- keeps each GTFS line-platform station at its published coordinate instead of
+  collapsing transfer complexes to a shared centroid;
+- represents a change between platforms as an explicit walking edge, including
+  published free transfers and same-name inferred links where a feed omits them;
 - normalizes express and limited-stop GTFS chords onto the available local
   station chain so stop-skipping services do not invent triangular track links;
 - removes branches that cannot participate in a closed loop;
@@ -38,7 +39,9 @@ The automatic route builder:
   spanning-tree cycles, and explicitly connects geographically extreme network
   anchors into larger valid simple loops;
 - rejects repeated-station and self-intersecting routes; and
-- chooses the loop with the largest geodesic inner area.
+- chooses the loop with the largest geodesic inner area. Route length, inner
+  area, landmass intersections, and the outward gradient all use this same
+  platform-and-walk geometry.
 
 The route selector exposes the other ranked loops as manual overrides and stores
 the pinned choice per metro area in the browser. Selecting a route segment on the

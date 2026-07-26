@@ -1,12 +1,16 @@
 const EARTH_RADIUS_M = 6_371_008.8;
-const NAME_TRANSFER_DISTANCE_M = 350;
+const INFERRED_TRANSFER_DISTANCE_M = 350;
+const INFERRED_TRANSFER_DISTANCE_WITHOUT_PUBLISHED_M = 900;
 const EDGE_KEY_SEPARATOR = '\u0000';
-const SHORTCUT_MINIMUM_LENGTH_M = 2_000;
+const SHORTCUT_MINIMUM_LENGTH_M = 1_400;
 const SAME_LINE_SHORTCUT_RATIO = 1.8;
 const CORRIDOR_SHORTCUT_RATIO = 1.6;
 const CORRIDOR_AVERAGE_WIDTH_M = 900;
 const CYCLE_SEARCH_BEAM_WIDTH = 4;
 const CYCLE_SEARCH_MAX_ROUNDS = 18;
+const OUTER_CYCLE_MERGE_SEED_LIMIT = 80;
+const EAR_EXPANSION_SEED_LIMIT = 10;
+const EAR_EXPANSION_PAIR_LIMIT = 42;
 const SPANNING_TREE_RANDOM_SEEDS = 48;
 const EXTREME_ANCHOR_PAIR_LIMIT = 28;
 
@@ -39,9 +43,7 @@ function distanceMeters([lonA, latA], [lonB, latB]) {
   const longitudeDelta = toRadians(lonB - lonA);
   const haversine =
     Math.sin(latitudeDelta / 2) ** 2 +
-    Math.cos(latARadians) *
-      Math.cos(latBRadians) *
-      Math.sin(longitudeDelta / 2) ** 2;
+    Math.cos(latARadians) * Math.cos(latBRadians) * Math.sin(longitudeDelta / 2) ** 2;
 
   return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(haversine));
 }
@@ -226,9 +228,7 @@ function removeServiceShortcuts(
         continue;
       }
 
-      const directFamilies = new Set(
-        familiesByEdge.get(key) ?? [],
-      );
+      const directFamilies = new Set(familiesByEdge.get(key) ?? []);
       const sameLinePath = shortestAlternatePath(
         adjacency,
         nodes,
@@ -253,11 +253,8 @@ function removeServiceShortcuts(
       );
       if (!corridorPath || corridorPath.nodeIds.length <= 2) continue;
 
-      const ring = corridorPath.nodeIds.map(
-        (nodeId) => nodes.get(nodeId).coordinate,
-      );
-      const averageWidth =
-        (2 * polygonAreaSquareMeters(ring)) / directDistance;
+      const ring = corridorPath.nodeIds.map((nodeId) => nodes.get(nodeId).coordinate);
+      const averageWidth = (2 * polygonAreaSquareMeters(ring)) / directDistance;
       if (averageWidth <= CORRIDOR_AVERAGE_WIDTH_M) shortcuts.add(key);
     }
   }
@@ -325,10 +322,7 @@ function biconnectedComponents(adjacency) {
           do {
             edge = edgeStack.pop();
             if (edge) edges.push(edge);
-          } while (
-            edge &&
-            !(edge[0] === nodeId && edge[1] === neighborId)
-          );
+          } while (edge && !(edge[0] === nodeId && edge[1] === neighborId));
           if (edges.length >= 3) components.push(edges);
         }
       } else if (
@@ -374,9 +368,7 @@ function stableCandidateId(nodeIds) {
 
 function cycleEdgeKeys(path) {
   return new Set(
-    path.map((nodeId, index) =>
-      edgeKey(nodeId, path[(index + 1) % path.length]),
-    ),
+    path.map((nodeId, index) => edgeKey(nodeId, path[(index + 1) % path.length])),
   );
 }
 
@@ -406,8 +398,7 @@ function pathsFromCycleEdges(edgeKeys) {
       path.push(currentId);
       unvisited.delete(currentId);
       const neighbors = [...adjacency.get(currentId)];
-      const nextId =
-        neighbors[0] === previousId ? neighbors[1] : neighbors[0];
+      const nextId = neighbors[0] === previousId ? neighbors[1] : neighbors[0];
       previousId = currentId;
       currentId = nextId;
     } while (currentId !== startId && path.length <= adjacency.size);
@@ -536,10 +527,7 @@ function spanningTreeCycles(adjacency, nodes) {
   };
   const radialScore = (edge) => {
     const [longitude, latitude] = midpoint(edge);
-    return (
-      (longitude - center.longitude) ** 2 +
-      (latitude - center.latitude) ** 2
-    );
+    return (longitude - center.longitude) ** 2 + (latitude - center.latitude) ** 2;
   };
   const strategies = [
     (edge) => radialScore(edge),
@@ -598,27 +586,19 @@ function convexHullNodeIds(adjacency, nodes) {
       (second.coordinate[0] - origin.coordinate[0]);
   const lower = [];
   for (const point of points) {
-    while (
-      lower.length >= 2 &&
-      cross(lower.at(-2), lower.at(-1), point) <= 0
-    ) {
+    while (lower.length >= 2 && cross(lower.at(-2), lower.at(-1), point) <= 0) {
       lower.pop();
     }
     lower.push(point);
   }
   const upper = [];
   for (const point of [...points].reverse()) {
-    while (
-      upper.length >= 2 &&
-      cross(upper.at(-2), upper.at(-1), point) <= 0
-    ) {
+    while (upper.length >= 2 && cross(upper.at(-2), upper.at(-1), point) <= 0) {
       upper.pop();
     }
     upper.push(point);
   }
-  return [...lower.slice(0, -1), ...upper.slice(0, -1)].map(
-    (point) => point.nodeId,
-  );
+  return [...lower.slice(0, -1), ...upper.slice(0, -1)].map((point) => point.nodeId);
 }
 
 function addFlowArc(graph, from, to, capacity, cost, routeKey = null) {
@@ -640,13 +620,7 @@ function addFlowArc(graph, from, to, capacity, cost, routeKey = null) {
   graph[to].push(reverse);
 }
 
-function vertexDisjointCycle(
-  adjacency,
-  nodes,
-  fromId,
-  toId,
-  edgeCost,
-) {
+function vertexDisjointCycle(adjacency, nodes, fromId, toId, edgeCost) {
   const nodeIds = [...adjacency.keys()];
   const indexById = new Map(nodeIds.map((nodeId, index) => [nodeId, index]));
   const graph = Array.from({ length: nodeIds.length * 2 }, () => []);
@@ -665,22 +639,8 @@ function vertexDisjointCycle(
   for (const [firstId, secondId] of graphEdges(adjacency)) {
     const key = edgeKey(firstId, secondId);
     const cost = edgeCost(firstId, secondId);
-    addFlowArc(
-      graph,
-      outputIndex(firstId),
-      inputIndex(secondId),
-      1,
-      cost,
-      key,
-    );
-    addFlowArc(
-      graph,
-      outputIndex(secondId),
-      inputIndex(firstId),
-      1,
-      cost,
-      key,
-    );
+    addFlowArc(graph, outputIndex(firstId), inputIndex(secondId), 1, cost, key);
+    addFlowArc(graph, outputIndex(secondId), inputIndex(firstId), 1, cost, key);
   }
 
   const source = outputIndex(fromId);
@@ -695,11 +655,7 @@ function vertexDisjointCycle(
       let changed = false;
       for (let nodeIndex = 0; nodeIndex < graph.length; nodeIndex += 1) {
         if (!Number.isFinite(distances[nodeIndex])) continue;
-        for (
-          let edgeIndex = 0;
-          edgeIndex < graph[nodeIndex].length;
-          edgeIndex += 1
-        ) {
+        for (let edgeIndex = 0; edgeIndex < graph[nodeIndex].length; edgeIndex += 1) {
           const edge = graph[nodeIndex][edgeIndex];
           if (edge.capacity <= 0) continue;
           const nextDistance = distances[nodeIndex] + edge.cost;
@@ -788,10 +744,7 @@ function extremeAnchorCycles(adjacency, nodes) {
   const maximumRadius = Math.max(...componentNodeIds.map(radialDistance));
   const cycles = new Map();
 
-  for (const { firstId, secondId } of pairs.slice(
-    0,
-    EXTREME_ANCHOR_PAIR_LIMIT,
-  )) {
+  for (const { firstId, secondId } of pairs.slice(0, EXTREME_ANCHOR_PAIR_LIMIT)) {
     for (const minimumFactor of [1, 0.35, 0.12, 0.04]) {
       const path = vertexDisjointCycle(
         adjacency,
@@ -816,13 +769,7 @@ function extremeAnchorCycles(adjacency, nodes) {
   return [...cycles.values()];
 }
 
-function shortestNodePath(
-  adjacency,
-  fromId,
-  toId,
-  excludedNodeIds,
-  edgeCost,
-) {
+function shortestNodePath(adjacency, fromId, toId, excludedNodeIds, edgeCost) {
   const distances = new Map([[fromId, 0]]);
   const previous = new Map();
   const pending = [[0, fromId]];
@@ -924,18 +871,15 @@ function waypointExtremeCycles(adjacency, nodes) {
     );
   };
   const maximumRadius = Math.max(...nodeIds.map(radialDistance));
-  const costs = [1, 0.4, 0.12].map(
-    (minimumFactor) => (fromId, toId) => {
-      const length = distanceMeters(
-        nodes.get(fromId).coordinate,
-        nodes.get(toId).coordinate,
-      );
-      const radial =
-        (radialDistance(fromId) + radialDistance(toId)) /
-        (2 * maximumRadius);
-      return length * (minimumFactor + 1 - radial);
-    },
-  );
+  const costs = [1, 0.4, 0.12].map((minimumFactor) => (fromId, toId) => {
+    const length = distanceMeters(
+      nodes.get(fromId).coordinate,
+      nodes.get(toId).coordinate,
+    );
+    const radial =
+      (radialDistance(fromId) + radialDistance(toId)) / (2 * maximumRadius);
+    return length * (minimumFactor + 1 - radial);
+  });
   const cycles = new Map();
 
   for (const directCost of costs) {
@@ -980,10 +924,7 @@ function waypointExtremeCycles(adjacency, nodes) {
             );
           }
           if (!directPath || !waypointPath) continue;
-          const path = [
-            ...directPath,
-            ...[...waypointPath].reverse().slice(1, -1),
-          ];
+          const path = [...directPath, ...[...waypointPath].reverse().slice(1, -1)];
           if (new Set(path).size === path.length) {
             cycles.set(stableCandidateId(path), path);
           }
@@ -992,6 +933,377 @@ function waypointExtremeCycles(adjacency, nodes) {
     }
   }
   return [...cycles.values()];
+}
+
+function closedPathThroughWaypoints(adjacency, waypointIds, edgeCost) {
+  if (new Set(waypointIds).size < 3) return null;
+  const stops = [...waypointIds, waypointIds[0]];
+  const path = [stops[0]];
+  const exclusions = new Set();
+
+  for (let index = 1; index < stops.length; index += 1) {
+    const segment = shortestNodePath(
+      adjacency,
+      stops[index - 1],
+      stops[index],
+      exclusions,
+      edgeCost,
+    );
+    if (!segment) return null;
+    path.push(...segment.slice(1));
+    for (const nodeId of segment.slice(0, -1)) exclusions.add(nodeId);
+  }
+
+  path.pop();
+  return new Set(path).size === path.length ? path : null;
+}
+
+/**
+ * Cardinal anchors alone can miss a real perimeter bulge that is not the
+ * northernmost or easternmost station. Sample several angular directions and
+ * join their extreme platform nodes in geographic order, retaining the exact
+ * walking links used between line-specific platforms.
+ */
+function radialWaypointCycles(adjacency, nodes) {
+  const nodeIds = [...adjacency.keys()];
+  if (nodeIds.length < 3) return [];
+  const center = nodeIds.reduce(
+    (total, nodeId) => {
+      const coordinate = nodes.get(nodeId).coordinate;
+      total[0] += coordinate[0] / nodeIds.length;
+      total[1] += coordinate[1] / nodeIds.length;
+      return total;
+    },
+    [0, 0],
+  );
+  const projected = new Map(
+    nodeIds.map((nodeId) => {
+      const coordinate = nodes.get(nodeId).coordinate;
+      return [
+        nodeId,
+        [
+          (coordinate[0] - center[0]) * Math.cos(toRadians(center[1])),
+          coordinate[1] - center[1],
+        ],
+      ];
+    }),
+  );
+  const radialDistance = (nodeId) => Math.hypot(...projected.get(nodeId));
+  const maximumRadius = Math.max(...nodeIds.map(radialDistance));
+  const costs = [1, 0.4, 0.12].map((minimumFactor) => (fromId, toId) => {
+    const length = distanceMeters(
+      nodes.get(fromId).coordinate,
+      nodes.get(toId).coordinate,
+    );
+    const radial =
+      (radialDistance(fromId) + radialDistance(toId)) / (2 * maximumRadius);
+    return length * (minimumFactor + 1 - radial);
+  });
+  const cycles = new Map();
+
+  for (const directionCount of [6, 8, 10, 12]) {
+    for (const rotation of [0, 0.5]) {
+      const anchors = [];
+      for (let index = 0; index < directionCount; index += 1) {
+        const angle = ((index + rotation) * Math.PI * 2) / directionCount;
+        const direction = [Math.cos(angle), Math.sin(angle)];
+        const anchorId = nodeIds.toSorted((firstId, secondId) => {
+          const first = projected.get(firstId);
+          const second = projected.get(secondId);
+          return (
+            second[0] * direction[0] +
+            second[1] * direction[1] -
+            (first[0] * direction[0] + first[1] * direction[1])
+          );
+        })[0];
+        if (!anchors.includes(anchorId)) anchors.push(anchorId);
+      }
+      if (anchors.length < 3) continue;
+
+      for (const edgeCost of costs) {
+        for (const orderedAnchors of [anchors, [...anchors].reverse()]) {
+          const path = closedPathThroughWaypoints(adjacency, orderedAnchors, edgeCost);
+          if (path) cycles.set(stableCandidateId(path), path);
+        }
+      }
+    }
+  }
+  return [...cycles.values()];
+}
+
+function transferWaypointCycles(adjacency, nodes, transferEdgeKeys) {
+  const nodeIds = [...adjacency.keys()];
+  if (nodeIds.length < 4) return [];
+  const center = nodeIds.reduce(
+    (total, nodeId) => {
+      const coordinate = nodes.get(nodeId).coordinate;
+      total[0] += coordinate[0] / nodeIds.length;
+      total[1] += coordinate[1] / nodeIds.length;
+      return total;
+    },
+    [0, 0],
+  );
+  const projected = (nodeId) => {
+    const coordinate = nodes.get(nodeId).coordinate;
+    return [
+      (coordinate[0] - center[0]) * Math.cos(toRadians(center[1])),
+      coordinate[1] - center[1],
+    ];
+  };
+  const cardinalAnchors = [
+    [1, 0],
+    [0, 1],
+    [-1, 0],
+    [0, -1],
+  ].map(
+    (direction) =>
+      nodeIds.toSorted((firstId, secondId) => {
+        const first = projected(firstId);
+        const second = projected(secondId);
+        return (
+          second[0] * direction[0] +
+          second[1] * direction[1] -
+          (first[0] * direction[0] + first[1] * direction[1])
+        );
+      })[0],
+  );
+  const transferPairs = [...transferEdgeKeys]
+    .map((key) => key.split(EDGE_KEY_SEPARATOR))
+    .filter(([fromId, toId]) => adjacency.get(fromId)?.has(toId))
+    .sort((first, second) => {
+      const firstRadius = Math.max(
+        Math.hypot(...projected(first[0])),
+        Math.hypot(...projected(first[1])),
+      );
+      const secondRadius = Math.max(
+        Math.hypot(...projected(second[0])),
+        Math.hypot(...projected(second[1])),
+      );
+      return secondRadius - firstRadius;
+    })
+    .slice(0, 48);
+  const maximumRadius = Math.max(
+    ...nodeIds.map((nodeId) => Math.hypot(...projected(nodeId))),
+  );
+  const costs = [1, 0.35, 0.1].map((minimumFactor) => (fromId, toId) => {
+    const length = distanceMeters(
+      nodes.get(fromId).coordinate,
+      nodes.get(toId).coordinate,
+    );
+    const radial =
+      (Math.hypot(...projected(fromId)) + Math.hypot(...projected(toId))) /
+      (2 * maximumRadius);
+    return length * (minimumFactor + 1 - radial);
+  });
+  const cycles = new Map();
+
+  for (const transferPair of transferPairs) {
+    const anchors = [...new Set([...cardinalAnchors, ...transferPair])].sort(
+      (firstId, secondId) => {
+        const first = projected(firstId);
+        const second = projected(secondId);
+        return Math.atan2(first[1], first[0]) - Math.atan2(second[1], second[0]);
+      },
+    );
+    for (const edgeCost of costs) {
+      for (const orderedAnchors of [anchors, [...anchors].reverse()]) {
+        const path = closedPathThroughWaypoints(adjacency, orderedAnchors, edgeCost);
+        if (path) cycles.set(stableCandidateId(path), path);
+      }
+    }
+  }
+  return [...cycles.values()];
+}
+
+function cycleArc(path, fromIndex, toIndex) {
+  const arc = [path[fromIndex]];
+  let index = fromIndex;
+  while (index !== toIndex) {
+    index = (index + 1) % path.length;
+    arc.push(path[index]);
+  }
+  return arc;
+}
+
+/**
+ * Expand a large cycle with "ears": an off-cycle path that reconnects at two
+ * existing platform nodes. This captures legitimate perimeter detours (for
+ * example through a transfer branch) without collapsing either endpoint into
+ * a station-complex centroid.
+ */
+function expandCyclesWithEars(seedPaths, adjacency, nodes, transferEdgeKeys) {
+  const transferKeys = new Set(transferEdgeKeys);
+  const transferNodeIds = new Set(
+    [...transferKeys].flatMap((key) => key.split(EDGE_KEY_SEPARATOR)),
+  );
+  const proposals = new Map();
+
+  for (const seedPath of seedPaths.slice(0, EAR_EXPANSION_SEED_LIMIT)) {
+    const cycleNodes = new Set(seedPath);
+    const unvisited = new Set(
+      [...adjacency.keys()].filter((nodeId) => !cycleNodes.has(nodeId)),
+    );
+    const components = [];
+
+    while (unvisited.size > 0) {
+      const startId = unvisited.values().next().value;
+      const pending = [startId];
+      const component = new Set();
+      const boundary = new Set();
+      unvisited.delete(startId);
+      while (pending.length > 0) {
+        const nodeId = pending.pop();
+        component.add(nodeId);
+        for (const neighborId of adjacency.get(nodeId) ?? []) {
+          if (cycleNodes.has(neighborId)) {
+            boundary.add(neighborId);
+          } else if (unvisited.delete(neighborId)) {
+            pending.push(neighborId);
+          }
+        }
+      }
+      if (boundary.size >= 2) components.push({ component, boundary });
+    }
+
+    const center = seedPath.reduce(
+      (total, nodeId) => {
+        const coordinate = nodes.get(nodeId).coordinate;
+        total[0] += coordinate[0] / seedPath.length;
+        total[1] += coordinate[1] / seedPath.length;
+        return total;
+      },
+      [0, 0],
+    );
+    const radialDistance = (nodeId) => {
+      const coordinate = nodes.get(nodeId).coordinate;
+      return Math.hypot(
+        (coordinate[0] - center[0]) * Math.cos(toRadians(center[1])),
+        coordinate[1] - center[1],
+      );
+    };
+    const maximumRadius = Math.max(...[...adjacency.keys()].map(radialDistance));
+
+    for (const { component, boundary } of components) {
+      const boundaryIds = [...boundary];
+      const pairs = [];
+      for (let firstIndex = 0; firstIndex < boundaryIds.length; firstIndex += 1) {
+        for (
+          let secondIndex = firstIndex + 1;
+          secondIndex < boundaryIds.length;
+          secondIndex += 1
+        ) {
+          const fromId = boundaryIds[firstIndex];
+          const toId = boundaryIds[secondIndex];
+          const transferPriority =
+            Number(transferNodeIds.has(fromId)) + Number(transferNodeIds.has(toId));
+          pairs.push({
+            fromId,
+            toId,
+            score:
+              transferPriority * 1_000_000 +
+              distanceMeters(nodes.get(fromId).coordinate, nodes.get(toId).coordinate),
+          });
+        }
+      }
+      pairs.sort((first, second) => second.score - first.score);
+
+      const allowedNodeIds = new Set(component);
+      for (const boundaryId of boundary) allowedNodeIds.add(boundaryId);
+      const earAdjacency = new Map(
+        [...allowedNodeIds].map((nodeId) => [
+          nodeId,
+          new Set(
+            [...(adjacency.get(nodeId) ?? [])].filter((neighborId) =>
+              allowedNodeIds.has(neighborId),
+            ),
+          ),
+        ]),
+      );
+      const costs = [1, 0.35, 0.1].map((minimumFactor) => (fromId, toId) => {
+        const length = distanceMeters(
+          nodes.get(fromId).coordinate,
+          nodes.get(toId).coordinate,
+        );
+        const radial =
+          (radialDistance(fromId) + radialDistance(toId)) / (2 * maximumRadius);
+        return length * (minimumFactor + 1 - radial);
+      });
+      const addEarProposals = (ear) => {
+        if (!ear || ear.length < 3) return;
+        const fromId = ear[0];
+        const toId = ear.at(-1);
+        const fromIndex = seedPath.indexOf(fromId);
+        const toIndex = seedPath.indexOf(toId);
+        const forwardArc = cycleArc(seedPath, fromIndex, toIndex);
+        const reverseArc = cycleArc(seedPath, toIndex, fromIndex);
+        for (const path of [
+          [...forwardArc, ...ear.slice(1, -1).reverse()],
+          [...reverseArc, ...ear.slice(1, -1)],
+        ]) {
+          if (new Set(path).size !== path.length) continue;
+          const coordinates = path.map((nodeId) => nodes.get(nodeId).coordinate);
+          if (hasSelfIntersection(coordinates)) continue;
+          proposals.set(stableCandidateId(path), path);
+        }
+      };
+
+      const portals = boundaryIds
+        .flatMap((boundaryId) =>
+          [...(adjacency.get(boundaryId) ?? [])]
+            .filter((neighborId) => component.has(neighborId))
+            .map((neighborId) => ({
+              boundaryId,
+              neighborId,
+              isTransfer: transferKeys.has(edgeKey(boundaryId, neighborId)),
+              radius: radialDistance(neighborId),
+            })),
+        )
+        .sort(
+          (first, second) =>
+            Number(second.isTransfer) - Number(first.isTransfer) ||
+            second.radius - first.radius,
+        )
+        .slice(0, 32);
+      for (const { boundaryId, neighborId } of portals) {
+        const targets = boundaryIds
+          .filter((targetId) => targetId !== boundaryId)
+          .sort(
+            (firstId, secondId) =>
+              distanceMeters(
+                nodes.get(boundaryId).coordinate,
+                nodes.get(secondId).coordinate,
+              ) -
+              distanceMeters(
+                nodes.get(boundaryId).coordinate,
+                nodes.get(firstId).coordinate,
+              ),
+          )
+          .slice(0, 18);
+        for (const targetId of targets) {
+          for (const edgeCost of costs) {
+            const continuation = shortestNodePath(
+              earAdjacency,
+              neighborId,
+              targetId,
+              new Set([boundaryId]),
+              edgeCost,
+            );
+            if (continuation) {
+              addEarProposals([boundaryId, ...continuation]);
+            }
+          }
+        }
+      }
+
+      for (const { fromId, toId } of pairs.slice(0, EAR_EXPANSION_PAIR_LIMIT)) {
+        for (const edgeCost of costs) {
+          const ear = shortestNodePath(earAdjacency, fromId, toId, new Set(), edgeCost);
+          addEarProposals(ear);
+        }
+      }
+    }
+  }
+  return [...proposals.values()];
 }
 
 function orientation(first, second, third) {
@@ -1085,8 +1397,7 @@ function traceFaces(adjacency, nodes) {
         if (incomingIndex === -1) break;
         const followingId =
           currentNeighbors[
-            (incomingIndex - 1 + currentNeighbors.length) %
-              currentNeighbors.length
+            (incomingIndex - 1 + currentNeighbors.length) % currentNeighbors.length
           ];
         previousId = currentId;
         currentId = followingId;
@@ -1166,10 +1477,7 @@ function combineCycles(seedPaths, nodes) {
       }
     }
     frontier = [...next.values()]
-      .sort(
-        (first, second) =>
-          second.areaSquareMeters - first.areaSquareMeters,
-      )
+      .sort((first, second) => second.areaSquareMeters - first.areaSquareMeters)
       .slice(0, CYCLE_SEARCH_BEAM_WIDTH);
   }
 
@@ -1183,10 +1491,7 @@ function candidateSimilarity(first, second) {
   for (const key of firstEdges) {
     if (secondEdges.has(key)) intersectionSize += 1;
   }
-  return (
-    intersectionSize /
-    (firstEdges.size + secondEdges.size - intersectionSize)
-  );
+  return intersectionSize / (firstEdges.size + secondEdges.size - intersectionSize);
 }
 
 function selectDiverseCandidates(rankedCandidates, maximumCount) {
@@ -1202,8 +1507,7 @@ function selectDiverseCandidates(rankedCandidates, maximumCount) {
       if (
         selected.every(
           (selectedCandidate) =>
-            candidateSimilarity(candidate, selectedCandidate) <=
-            maximumSimilarity,
+            candidateSimilarity(candidate, selectedCandidate) <= maximumSimilarity,
         )
       ) {
         selected.push(candidate);
@@ -1214,16 +1518,6 @@ function selectDiverseCandidates(rankedCandidates, maximumCount) {
   }
 
   return selected;
-}
-
-function representativeName(features) {
-  return (
-    features
-      .map((feature) => feature.properties.name)
-      .filter(Boolean)
-      .sort((first, second) => first.length - second.length)[0] ||
-    'Unnamed interchange'
-  );
 }
 
 function sortLineNames(first, second) {
@@ -1247,24 +1541,130 @@ export function buildCircumferenceCandidates(
 ) {
   const eligibleStations = stationFeatures.filter(
     (feature) =>
-      feature.properties?.mode === 'subway' &&
-      feature.properties?.status === 'open',
+      feature.properties?.mode === 'subway' && feature.properties?.status === 'open',
   );
   const stationById = new Map(
     eligibleStations.map((feature) => [feature.properties.id, feature]),
   );
-  const unions = new UnionFind([...stationById.keys()]);
-  let publishedTransferCount = 0;
-  let inferredTransferCount = 0;
+  const nodes = new Map(
+    eligibleStations.map((feature) => [
+      feature.properties.id,
+      {
+        id: feature.properties.id,
+        coordinate: [...feature.geometry.coordinates],
+        name: feature.properties.name || 'Unnamed platform',
+        stationIds: [feature.properties.id],
+        lineNames: [],
+      },
+    ]),
+  );
+  const adjacency = new Map([...nodes.keys()].map((nodeId) => [nodeId, new Set()]));
+  const linesByEdge = new Map();
+  const familiesByEdge = new Map();
+  const linesByNode = new Map([...nodes.keys()].map((nodeId) => [nodeId, new Set()]));
+  const transfersByEdge = new Map();
+  const routeIdsByLineName = new Map();
+  for (const [routeId, route] of Object.entries(schedules?.routes ?? {})) {
+    if (route?.mode !== 'subway') continue;
+    const lineName = route.name || routeId;
+    const routeIds = routeIdsByLineName.get(lineName) ?? new Set();
+    routeIds.add(routeId);
+    routeIdsByLineName.set(lineName, routeIds);
+  }
+  const ambiguousLineNames = new Set(
+    [...routeIdsByLineName]
+      .filter(([, routeIds]) => routeIds.size > 1)
+      .map(([lineName]) => lineName),
+  );
 
-  for (const [fromStationId, transfers] of Object.entries(
-    schedules?.graph?.t ?? {},
-  )) {
-    for (const [toStationId] of transfers) {
-      if (unions.union(fromStationId, toStationId)) publishedTransferCount += 1;
+  for (const [fromStationId, edges] of Object.entries(schedules?.graph?.e ?? {})) {
+    if (!stationById.has(fromStationId)) continue;
+
+    for (const [toStationId, , serviceKey] of edges) {
+      if (!stationById.has(toStationId)) continue;
+      const routeId = routeIdForService(serviceKey);
+      const route = schedules?.routes?.[routeId];
+      if (route?.mode !== 'subway') continue;
+
+      if (fromStationId === toStationId) continue;
+
+      adjacency.get(fromStationId).add(toStationId);
+      adjacency.get(toStationId).add(fromStationId);
+      const key = edgeKey(fromStationId, toStationId);
+      const lineName = route.name || routeId;
+      const lines = linesByEdge.get(key) ?? new Set();
+      lines.add(lineName);
+      linesByEdge.set(key, lines);
+      const families = familiesByEdge.get(key) ?? new Set();
+      families.add(serviceFamily(routeId, lineName));
+      familiesByEdge.set(key, families);
+      linesByNode.get(fromStationId).add(lineName);
+      linesByNode.get(toStationId).add(lineName);
     }
   }
 
+  let publishedTransferCount = 0;
+  let inferredTransferCount = 0;
+  const addTransfer = (fromStationId, toStationId, { source, minutes = null }) => {
+    if (
+      fromStationId === toStationId ||
+      !nodes.has(fromStationId) ||
+      !nodes.has(toStationId)
+    ) {
+      return false;
+    }
+    const key = edgeKey(fromStationId, toStationId);
+    if (linesByEdge.has(key)) return false;
+    const existing = transfersByEdge.get(key);
+    if (existing) {
+      if (
+        Number.isFinite(minutes) &&
+        (!Number.isFinite(existing.minutes) || minutes < existing.minutes)
+      ) {
+        existing.minutes = minutes;
+      }
+      if (source === 'published') existing.source = source;
+      return false;
+    }
+
+    const walkingDistanceMeters = distanceMeters(
+      nodes.get(fromStationId).coordinate,
+      nodes.get(toStationId).coordinate,
+    );
+    transfersByEdge.set(key, {
+      source,
+      minutes: Number.isFinite(minutes) ? minutes : null,
+      distanceMeters: walkingDistanceMeters,
+    });
+    adjacency.get(fromStationId).add(toStationId);
+    adjacency.get(toStationId).add(fromStationId);
+    return true;
+  };
+
+  for (const [fromStationId, transfers] of Object.entries(schedules?.graph?.t ?? {})) {
+    for (const [toStationId, minutes] of transfers) {
+      if (
+        addTransfer(fromStationId, toStationId, {
+          source: 'published',
+          minutes,
+        })
+      ) {
+        publishedTransferCount += 1;
+      }
+    }
+  }
+  const publishedTransferAdjacency = new Map(
+    [...adjacency].map(([nodeId, neighbors]) => [nodeId, new Set(neighbors)]),
+  );
+
+  // Same-name, route-bearing records can supply missing platform links. Feeds
+  // with published transfers use a conservative co-location threshold; feeds
+  // without them (currently CDMX) allow documented long in-station walks such
+  // as Atlalilco. Platforms remain separate points in both cases.
+  const inferredTransferDistance =
+    publishedTransferCount === 0
+      ? INFERRED_TRANSFER_DISTANCE_WITHOUT_PUBLISHED_M
+      : INFERRED_TRANSFER_DISTANCE_M;
   const stationsByName = new Map();
   for (const feature of eligibleStations) {
     const normalizedName = normalizeStationName(feature.properties.name);
@@ -1283,12 +1683,25 @@ export function buildCircumferenceCandidates(
       ) {
         const first = bucket[firstIndex];
         const second = bucket[secondIndex];
+        const firstId = first.properties.id;
+        const secondId = second.properties.id;
+        const firstLines = linesByNode.get(firstId);
+        const secondLines = linesByNode.get(secondId);
+        if (firstLines.size === 0 || secondLines.size === 0) continue;
+        const sameLineSet =
+          firstLines.size === secondLines.size &&
+          [...firstLines].every((lineName) => secondLines.has(lineName));
         if (
-          distanceMeters(
-            first.geometry.coordinates,
-            second.geometry.coordinates,
-          ) <= NAME_TRANSFER_DISTANCE_M &&
-          unions.union(first.properties.id, second.properties.id)
+          sameLineSet ||
+          distanceMeters(first.geometry.coordinates, second.geometry.coordinates) >
+            inferredTransferDistance
+        ) {
+          continue;
+        }
+        if (
+          addTransfer(firstId, secondId, {
+            source: 'inferred',
+          })
         ) {
           inferredTransferCount += 1;
         }
@@ -1296,120 +1709,119 @@ export function buildCircumferenceCandidates(
     }
   }
 
-  const featuresByComplex = new Map();
-  for (const feature of eligibleStations) {
-    const complexId = unions.find(feature.properties.id);
-    const members = featuresByComplex.get(complexId) ?? [];
-    members.push(feature);
-    featuresByComplex.set(complexId, members);
+  for (const [nodeId, node] of nodes) {
+    node.lineNames = [...linesByNode.get(nodeId)].sort(sortLineNames);
+    node.label = node.lineNames.length
+      ? `${node.name} · ${node.lineNames.join('/')}`
+      : node.name;
   }
 
-  const nodes = new Map();
-  for (const [complexId, features] of featuresByComplex) {
-    nodes.set(complexId, {
-      id: complexId,
-      coordinate: [
-        features.reduce(
-          (total, feature) => total + feature.geometry.coordinates[0],
-          0,
-        ) / features.length,
-        features.reduce(
-          (total, feature) => total + feature.geometry.coordinates[1],
-          0,
-        ) / features.length,
-      ],
-      name: representativeName(features),
-      stationIds: features.map((feature) => feature.properties.id),
-    });
+  const candidatePaths = new Map();
+  const removedShortcuts = new Set();
+  const biconnectedComponentSizes = [];
+  let biconnectedComponentCount = 0;
+  let corePlatformNodeCount = 0;
+  const searchAdjacencyVariants = [adjacency];
+  if (publishedTransferCount > 0 && inferredTransferCount > 0) {
+    searchAdjacencyVariants.push(publishedTransferAdjacency);
   }
 
-  const adjacency = new Map([...nodes.keys()].map((nodeId) => [nodeId, new Set()]));
-  const linesByEdge = new Map();
-  const familiesByEdge = new Map();
-  const routeIdsByLineName = new Map();
-  for (const [routeId, route] of Object.entries(schedules?.routes ?? {})) {
-    if (route?.mode !== 'subway') continue;
-    const lineName = route.name || routeId;
-    const routeIds = routeIdsByLineName.get(lineName) ?? new Set();
-    routeIds.add(routeId);
-    routeIdsByLineName.set(lineName, routeIds);
-  }
-  const ambiguousLineNames = new Set(
-    [...routeIdsByLineName]
-      .filter(([, routeIds]) => routeIds.size > 1)
-      .map(([lineName]) => lineName),
-  );
+  for (const searchAdjacency of searchAdjacencyVariants) {
+    for (const key of removeServiceShortcuts(
+      searchAdjacency,
+      nodes,
+      linesByEdge,
+      familiesByEdge,
+      ambiguousLineNames,
+    )) {
+      removedShortcuts.add(key);
+    }
+    removeBranches(searchAdjacency);
+    corePlatformNodeCount = Math.max(corePlatformNodeCount, searchAdjacency.size);
+    const components = biconnectedComponents(searchAdjacency);
+    biconnectedComponentCount += components.length;
+    biconnectedComponentSizes.push(
+      ...components.map((component) => new Set(component.flat()).size),
+    );
 
-  for (const [fromStationId, edges] of Object.entries(
-    schedules?.graph?.e ?? {},
-  )) {
-    if (!stationById.has(fromStationId)) continue;
+    for (const component of components) {
+      const componentGraph = componentAdjacency(component);
+      const componentCandidates = new Map();
+      const addComponentCandidate = (path) => {
+        const id = stableCandidateId(path);
+        componentCandidates.set(id, path);
+        candidatePaths.set(id, path);
+      };
+      const seeds = [
+        ...traceFaces(componentGraph, nodes),
+        ...fundamentalCycles(componentGraph),
+      ];
+      for (const path of combineCycles(seeds, nodes)) {
+        addComponentCandidate(path);
+      }
+      const spanningProposals = spanningTreeCycles(componentGraph, nodes);
+      for (const path of spanningProposals) {
+        const coordinates = path.map((nodeId) => nodes.get(nodeId).coordinate);
+        if (new Set(path).size === path.length && !hasSelfIntersection(coordinates)) {
+          addComponentCandidate(path);
+        }
+      }
+      const extremeProposals = extremeAnchorCycles(componentGraph, nodes);
+      for (const path of extremeProposals) {
+        const coordinates = path.map((nodeId) => nodes.get(nodeId).coordinate);
+        if (!hasSelfIntersection(coordinates)) {
+          addComponentCandidate(path);
+        }
+      }
+      for (const path of waypointExtremeCycles(componentGraph, nodes)) {
+        const coordinates = path.map((nodeId) => nodes.get(nodeId).coordinate);
+        if (!hasSelfIntersection(coordinates)) addComponentCandidate(path);
+      }
+      for (const path of radialWaypointCycles(componentGraph, nodes)) {
+        const coordinates = path.map((nodeId) => nodes.get(nodeId).coordinate);
+        if (!hasSelfIntersection(coordinates)) addComponentCandidate(path);
+      }
+      for (const path of transferWaypointCycles(
+        componentGraph,
+        nodes,
+        transfersByEdge.keys(),
+      )) {
+        const coordinates = path.map((nodeId) => nodes.get(nodeId).coordinate);
+        if (!hasSelfIntersection(coordinates)) addComponentCandidate(path);
+      }
 
-    for (const [toStationId, , serviceKey] of edges) {
-      if (!stationById.has(toStationId)) continue;
-      const routeId = routeIdForService(serviceKey);
-      const route = schedules?.routes?.[routeId];
-      if (route?.mode !== 'subway') continue;
-
-      const fromComplexId = unions.find(fromStationId);
-      const toComplexId = unions.find(toStationId);
-      if (fromComplexId === toComplexId) continue;
-
-      adjacency.get(fromComplexId).add(toComplexId);
-      adjacency.get(toComplexId).add(fromComplexId);
-      const key = edgeKey(fromComplexId, toComplexId);
-      const lines = linesByEdge.get(key) ?? new Set();
-      lines.add(route.name || routeId);
-      linesByEdge.set(key, lines);
-      const families = familiesByEdge.get(key) ?? new Set();
-      families.add(serviceFamily(routeId, route.name || routeId));
-      familiesByEdge.set(key, families);
+      const outerMergeSeeds = [...componentCandidates.values()]
+        .map((path) => ({
+          path,
+          areaSquareMeters: polygonAreaSquareMeters(
+            path.map((nodeId) => nodes.get(nodeId).coordinate),
+          ),
+        }))
+        .sort((first, second) => second.areaSquareMeters - first.areaSquareMeters)
+        .slice(0, OUTER_CYCLE_MERGE_SEED_LIMIT)
+        .map((candidate) => candidate.path);
+      for (const path of combineCycles(outerMergeSeeds, nodes)) {
+        addComponentCandidate(path);
+      }
     }
   }
 
-  const removedShortcuts = removeServiceShortcuts(
+  const earExpansionSeeds = [...candidatePaths.values()]
+    .map((path) => ({
+      path,
+      areaSquareMeters: polygonAreaSquareMeters(
+        path.map((nodeId) => nodes.get(nodeId).coordinate),
+      ),
+    }))
+    .sort((first, second) => second.areaSquareMeters - first.areaSquareMeters)
+    .map((candidate) => candidate.path);
+  for (const path of expandCyclesWithEars(
+    earExpansionSeeds,
     adjacency,
     nodes,
-    linesByEdge,
-    familiesByEdge,
-    ambiguousLineNames,
-  );
-  removeBranches(adjacency);
-  const components = biconnectedComponents(adjacency);
-  const candidatePaths = new Map();
-  for (const component of components) {
-    const componentGraph = componentAdjacency(component);
-    const addComponentCandidate = (path) => {
-      candidatePaths.set(stableCandidateId(path), path);
-    };
-    const seeds = [
-      ...traceFaces(componentGraph, nodes),
-      ...fundamentalCycles(componentGraph),
-    ];
-    for (const path of combineCycles(seeds, nodes)) {
-      addComponentCandidate(path);
-    }
-    const spanningProposals = spanningTreeCycles(componentGraph, nodes);
-    for (const path of spanningProposals) {
-      const coordinates = path.map((nodeId) => nodes.get(nodeId).coordinate);
-      if (
-        new Set(path).size === path.length &&
-        !hasSelfIntersection(coordinates)
-      ) {
-        addComponentCandidate(path);
-      }
-    }
-    const extremeProposals = extremeAnchorCycles(componentGraph, nodes);
-    for (const path of extremeProposals) {
-      const coordinates = path.map((nodeId) => nodes.get(nodeId).coordinate);
-      if (!hasSelfIntersection(coordinates)) {
-        addComponentCandidate(path);
-      }
-    }
-    for (const path of waypointExtremeCycles(componentGraph, nodes)) {
-      const coordinates = path.map((nodeId) => nodes.get(nodeId).coordinate);
-      if (!hasSelfIntersection(coordinates)) addComponentCandidate(path);
-    }
+    transfersByEdge.keys(),
+  )) {
+    candidatePaths.set(stableCandidateId(path), path);
   }
 
   const rankedCandidates = [...candidatePaths.values()]
@@ -1418,18 +1830,28 @@ export function buildCircumferenceCandidates(
       const coordinates = [...openCoordinates, openCoordinates[0]];
       const segments = path.map((nodeId, index) => {
         const nextId = path[(index + 1) % path.length];
+        const key = edgeKey(nodeId, nextId);
+        const transfer = transfersByEdge.get(key);
         return {
           id: stableCandidateId([nodeId, nextId]).replace('route-', 'segment-'),
           from: nodes.get(nodeId),
           to: nodes.get(nextId),
-          lines: [...(linesByEdge.get(edgeKey(nodeId, nextId)) ?? [])].sort(
-            sortLineNames,
+          type: transfer ? 'transfer' : 'ride',
+          lines: [...(linesByEdge.get(key) ?? [])].sort(sortLineNames),
+          distanceMeters: distanceMeters(
+            nodes.get(nodeId).coordinate,
+            nodes.get(nextId).coordinate,
           ),
+          transferSource: transfer?.source ?? null,
+          transferMinutes: transfer?.minutes ?? null,
         };
       });
       const lines = [...new Set(segments.flatMap((segment) => segment.lines))].sort(
         sortLineNames,
       );
+      const walkingLengthMeters = segments
+        .filter((segment) => segment.type === 'transfer')
+        .reduce((total, segment) => total + segment.distanceMeters, 0);
 
       return {
         id: stableCandidateId(path),
@@ -1438,6 +1860,9 @@ export function buildCircumferenceCandidates(
         coordinates,
         segments,
         lines,
+        transferCount: segments.filter((segment) => segment.type === 'transfer').length,
+        walkingLengthMeters,
+        rideLengthMeters: lineLengthMeters(coordinates) - walkingLengthMeters,
         areaSquareMeters: polygonAreaSquareMeters(coordinates),
         lengthMeters: lineLengthMeters(coordinates),
       };
@@ -1450,8 +1875,8 @@ export function buildCircumferenceCandidates(
     candidates,
     methodology: {
       eligibleStationCount: eligibleStations.length,
-      complexCount: nodes.size,
-      coreComplexCount: adjacency.size,
+      platformNodeCount: nodes.size,
+      corePlatformNodeCount,
       publishedTransferCount,
       inferredTransferCount,
       removedShortcutCount: removedShortcuts.size,
@@ -1463,10 +1888,10 @@ export function buildCircumferenceCandidates(
           lines: [...(linesByEdge.get(key) ?? [])].sort(sortLineNames),
         };
       }),
-      biconnectedComponentCount: components.length,
-      biconnectedComponentSizes: components
-        .map((component) => new Set(component.flat()).size)
-        .sort((first, second) => second - first),
+      biconnectedComponentCount,
+      biconnectedComponentSizes: biconnectedComponentSizes.sort(
+        (first, second) => second - first,
+      ),
       generatedCandidateCount: rankedCandidates.length,
     },
   };
@@ -1480,16 +1905,10 @@ export function selectCircumferenceCandidate(
   const requiredSegments = new Set(requiredSegmentIds);
   const avoidedSegments = new Set(avoidedSegmentIds);
   const matchingCandidates = candidates.filter((candidate) => {
-    const candidateSegments = new Set(
-      candidate.segments.map((segment) => segment.id),
-    );
+    const candidateSegments = new Set(candidate.segments.map((segment) => segment.id));
     return (
-      [...requiredSegments].every((segmentId) =>
-        candidateSegments.has(segmentId),
-      ) &&
-      [...avoidedSegments].every(
-        (segmentId) => !candidateSegments.has(segmentId),
-      )
+      [...requiredSegments].every((segmentId) => candidateSegments.has(segmentId)) &&
+      [...avoidedSegments].every((segmentId) => !candidateSegments.has(segmentId))
     );
   });
 

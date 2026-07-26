@@ -6,7 +6,7 @@
     <title>Transit Colors</title>
     <link rel="preconnect" href="https://tiles.openfreemap.org" />
     <link href="vendor/maplibre-gl.css" rel="stylesheet" />
-    <link href="styles.css?v=20260725d" rel="stylesheet" />
+    <link href="styles.css?v=20260725e" rel="stylesheet" />
   </head>
   <body>
     <main class="app-shell">
@@ -265,9 +265,10 @@
             </div>
 
             <p class="method-note">
-              Route area follows GTFS station-to-station geometry. Each touched
-              landmass is measured and coast-clipped separately. Ranked loops can
-              be pinned as manual overrides.
+              Route area follows exact line-platform points and explicit walking
+              links between transfer platforms. Each touched landmass is measured
+              and coast-clipped separately. Ranked loops can be pinned as manual
+              overrides.
             </p>
           </div>
         </div>
@@ -277,6 +278,6 @@
     <script src="vendor/maplibre-gl.js"></script>
     <script src="vendor/pmtiles.js"></script>
     <script src="vendor/polygon-clipping.js"></script>
-    <script type="module" src="app.js?v=20260725d"></script>
+    <script type="module" src="app.js?v=20260725e"></script>
   </body>
 </html>

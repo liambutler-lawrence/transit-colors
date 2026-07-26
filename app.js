@@ -15,12 +15,12 @@ import {
 import {
   buildCircumferenceCandidates,
   selectCircumferenceCandidate,
-} from './circumference.js?v=20260725d';
+} from './circumference.js?v=20260725e';
 import {
   calculateLandmassCoverage,
   combinedLandmassArea,
-} from './circumference-landmass.js?v=20260725d';
-import { renderCircumferenceGradient } from './circumference-map.js?v=20260725d';
+} from './circumference-landmass.js?v=20260725e';
+import { renderCircumferenceGradient } from './circumference-map.js?v=20260725e';
 
 const AREAS = {
   cdmx: {
@@ -649,6 +649,7 @@ function syncCircumferenceVisibility() {
   );
   setLayerVisibility('circumference-area', visible && routeAreaToggle.checked);
   setLayerVisibility('circumference-route-line', visible);
+  setLayerVisibility('circumference-transfer-line', visible);
   setLayerVisibility(
     'circumference-route-stations',
     visible && routeStationsToggle.checked,
@@ -774,11 +775,17 @@ function routeFeatureCollection(candidate) {
           coordinates: [segment.from.coordinate, segment.to.coordinate],
         },
         properties: {
-          kind: 'segment',
+          kind: segment.type === 'transfer' ? 'transfer' : 'segment',
           from: segment.from.name,
           to: segment.to.name,
+          from_label: segment.from.label,
+          to_label: segment.to.label,
           lines: segment.lines.join(', '),
           segment_id: segment.id,
+          segment_type: segment.type,
+          distance_m: segment.distanceMeters,
+          transfer_source: segment.transferSource ?? '',
+          transfer_minutes: segment.transferMinutes ?? '',
         },
       })),
       ...candidate.stations.map((station, index) => ({
@@ -791,6 +798,8 @@ function routeFeatureCollection(candidate) {
         properties: {
           kind: 'station',
           name: station.name,
+          label: station.label,
+          lines: station.lineNames.join(', '),
         },
       })),
     ],
@@ -879,7 +888,9 @@ function renderCircumferenceCandidate(candidate, { fit = false } = {}) {
   }`;
   circumferenceSummaryEl.textContent = `${
     candidate.stations.length
-  } interchange nodes across lines ${candidate.lines.join(', ')}.`;
+  } line-platform nodes, including ${candidate.transferCount} walking ${
+    candidate.transferCount === 1 ? 'transfer' : 'transfers'
+  }, across lines ${candidate.lines.join(', ')}.`;
   replaceMetadata(circumferenceMetadataEl, [
     {
       label: 'Choice',
@@ -895,7 +906,13 @@ function renderCircumferenceCandidate(candidate, { fit = false } = {}) {
     },
     {
       label: 'Free transfers',
-      value: `${circumferenceState.methodology.publishedTransferCount} published, ${circumferenceState.methodology.inferredTransferCount} co-located`,
+      value: `${circumferenceState.methodology.publishedTransferCount} published walks, ${circumferenceState.methodology.inferredTransferCount} inferred walks`,
+    },
+    {
+      label: 'Selected walking links',
+      value: `${candidate.transferCount} · ${formatDistance(
+        candidate.walkingLengthMeters,
+      )}`,
     },
     {
       label: 'GTFS geometry',
@@ -2172,6 +2189,7 @@ function selectDestination(stationId) {
 
 function showCircumferenceSegment(properties) {
   if (!circumferenceState.selected) return;
+  const isTransfer = properties.segment_type === 'transfer';
   circumferenceState.inspectedSegmentId = properties.segment_id || '';
   routeRequireSegmentButton.disabled =
     !circumferenceState.inspectedSegmentId ||
@@ -2183,13 +2201,37 @@ function showCircumferenceSegment(properties) {
     circumferenceState.avoidedSegmentIds.has(
       circumferenceState.inspectedSegmentId,
     );
-  circumferenceNameEl.textContent = `${properties.from} → ${properties.to}`;
-  circumferenceSummaryEl.textContent = properties.lines
-    ? `Metro line${properties.lines.includes(',') ? 's' : ''} ${properties.lines}`
-    : 'Free-transfer route segment';
+  circumferenceNameEl.textContent = isTransfer
+    ? `${properties.from_label} ⇢ ${properties.to_label}`
+    : `${properties.from} → ${properties.to}`;
+  circumferenceSummaryEl.textContent = isTransfer
+    ? `${formatDistance(properties.distance_m)} platform-to-platform walk`
+    : `Metro line${properties.lines.includes(',') ? 's' : ''} ${properties.lines}`;
   replaceMetadata(circumferenceMetadataEl, [
-    { label: 'Segment', value: `${properties.from} to ${properties.to}` },
-    { label: 'Lines', value: properties.lines || 'Transfer connection' },
+    {
+      label: isTransfer ? 'Platforms' : 'Segment',
+      value: isTransfer
+        ? `${properties.from_label} to ${properties.to_label}`
+        : `${properties.from} to ${properties.to}`,
+    },
+    {
+      label: isTransfer ? 'Connection' : 'Lines',
+      value: isTransfer
+        ? `${
+            properties.transfer_source === 'published'
+              ? 'Published'
+              : 'Inferred'
+          } walking link${
+            properties.transfer_minutes
+              ? ` · ${properties.transfer_minutes} min`
+              : ''
+          }`
+        : properties.lines,
+    },
+    {
+      label: 'Distance',
+      value: formatDistance(properties.distance_m),
+    },
     {
       label: 'Loop area',
       value: formatArea(circumferenceState.selected.areaSquareMeters),
@@ -2308,43 +2350,49 @@ function installHover() {
   }
 
   let hoveredCircumferenceSegmentId = null;
-  map.on('mousemove', 'circumference-route-line', (event) => {
-    const feature = event.features?.[0];
-    if (!feature) return;
-    if (hoveredCircumferenceSegmentId !== null) {
+  const circumferenceSegmentLayerIds = [
+    'circumference-route-line',
+    'circumference-transfer-line',
+  ];
+  for (const layerId of circumferenceSegmentLayerIds) {
+    map.on('mousemove', layerId, (event) => {
+      const feature = event.features?.[0];
+      if (!feature) return;
+      if (hoveredCircumferenceSegmentId !== null) {
+        map.setFeatureState(
+          {
+            source: 'circumference-route',
+            id: hoveredCircumferenceSegmentId,
+          },
+          { hover: false },
+        );
+      }
+      hoveredCircumferenceSegmentId = feature.id;
       map.setFeatureState(
-        {
-          source: 'circumference-route',
-          id: hoveredCircumferenceSegmentId,
-        },
-        { hover: false },
+        { source: 'circumference-route', id: feature.id },
+        { hover: true },
       );
-    }
-    hoveredCircumferenceSegmentId = feature.id;
-    map.setFeatureState(
-      { source: 'circumference-route', id: feature.id },
-      { hover: true },
-    );
-    showCircumferenceSegment(feature.properties);
-    map.getCanvas().style.cursor = 'pointer';
-  });
-  map.on('mouseleave', 'circumference-route-line', () => {
-    if (hoveredCircumferenceSegmentId !== null) {
-      map.setFeatureState(
-        {
-          source: 'circumference-route',
-          id: hoveredCircumferenceSegmentId,
-        },
-        { hover: false },
-      );
-    }
-    hoveredCircumferenceSegmentId = null;
-    map.getCanvas().style.cursor = '';
-  });
-  map.on('click', 'circumference-route-line', (event) => {
-    const feature = event.features?.[0];
-    if (feature) showCircumferenceSegment(feature.properties);
-  });
+      showCircumferenceSegment(feature.properties);
+      map.getCanvas().style.cursor = 'pointer';
+    });
+    map.on('mouseleave', layerId, () => {
+      if (hoveredCircumferenceSegmentId !== null) {
+        map.setFeatureState(
+          {
+            source: 'circumference-route',
+            id: hoveredCircumferenceSegmentId,
+          },
+          { hover: false },
+        );
+      }
+      hoveredCircumferenceSegmentId = null;
+      map.getCanvas().style.cursor = '';
+    });
+    map.on('click', layerId, (event) => {
+      const feature = event.features?.[0];
+      if (feature) showCircumferenceSegment(feature.properties);
+    });
+  }
 }
 
 function loadedLiveRoads() {
@@ -2732,6 +2780,39 @@ function installMapData(stations) {
   });
 
   map.addLayer({
+    id: 'circumference-transfer-line',
+    type: 'line',
+    source: 'circumference-route',
+    filter: ['==', ['get', 'kind'], 'transfer'],
+    layout: {
+      visibility: 'none',
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#5e271f',
+      'line-width': [
+        'interpolate',
+        ['linear'],
+        ['zoom'],
+        8,
+        2,
+        12,
+        4,
+        15,
+        7,
+      ],
+      'line-dasharray': [1, 1.3],
+      'line-opacity': [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false],
+        1,
+        0.9,
+      ],
+    },
+  });
+
+  map.addLayer({
     id: 'circumference-route-stations',
     type: 'circle',
     source: 'circumference-route',
@@ -2753,7 +2834,7 @@ function installMapData(stations) {
     minzoom: 10.6,
     layout: {
       visibility: 'none',
-      'text-field': ['get', 'name'],
+      'text-field': ['get', 'label'],
       'text-size': ['interpolate', ['linear'], ['zoom'], 10.6, 10, 14, 12],
       'text-offset': [0, 1.15],
       'text-anchor': 'top',
@@ -2873,7 +2954,7 @@ async function initialize() {
   try {
     const [basemapStyle, landmasses] = await Promise.all([
       fetchJson('vendor/openfreemap-liberty.json'),
-      fetchJson('data/circumference-landmasses.json?v=20260725d'),
+      fetchJson('data/circumference-landmasses.json?v=20260725e'),
     ]);
     pendingBasemapStyle = basemapStyle;
     circumferenceLandmasses = landmasses;

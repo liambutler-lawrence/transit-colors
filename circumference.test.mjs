@@ -82,6 +82,72 @@ assert.equal(
   null,
 );
 
+const splitPlatformCoordinates = new Map([
+  ['a', [0, 0]],
+  ['transfer-a', [0.01, 0]],
+  ['transfer-b', [0.0102, 0.0001]],
+  ['c', [0.01, 0.01]],
+  ['d', [0, 0.01]],
+]);
+const splitPlatformStations = [...splitPlatformCoordinates].map(
+  ([id, coordinates]) => ({
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates },
+    properties: {
+      id,
+      name: id.startsWith('transfer') ? 'Transfer' : id,
+      mode: 'subway',
+      status: 'open',
+    },
+  }),
+);
+const splitPlatformResult = buildCircumferenceCandidates(
+  splitPlatformStations,
+  {
+    routes: {
+      lineA: { mode: 'subway', name: 'A' },
+      lineB: { mode: 'subway', name: 'B' },
+    },
+    graph: {
+      e: {
+        a: [
+          ['transfer-a', 1, 'lineA/0'],
+          ['d', 1, 'lineA/1'],
+        ],
+        'transfer-b': [['c', 1, 'lineB/0']],
+        c: [['d', 1, 'lineB/0']],
+      },
+      t: {
+        'transfer-a': [['transfer-b', 2]],
+      },
+    },
+  },
+  { minimumAreaSquareMeters: 1 },
+);
+const splitPlatformWinner = splitPlatformResult.candidates[0];
+assert.ok(splitPlatformWinner);
+assert.equal(splitPlatformWinner.stations.length, 5);
+assert.equal(splitPlatformWinner.transferCount, 1);
+assert.equal(
+  splitPlatformWinner.segments.filter(({ type }) => type === 'transfer')
+    .length,
+  1,
+);
+assert.ok(splitPlatformWinner.walkingLengthMeters > 20);
+assert.deepEqual(splitPlatformWinner.lines, ['A', 'B']);
+for (const station of splitPlatformWinner.stations) {
+  assert.deepEqual(
+    station.coordinate,
+    splitPlatformCoordinates.get(station.id),
+  );
+}
+const splitTransfer = splitPlatformWinner.segments.find(
+  ({ type }) => type === 'transfer',
+);
+assert.equal(splitTransfer.transferSource, 'published');
+assert.equal(splitTransfer.transferMinutes, 2);
+assert.notDeepEqual(splitTransfer.from.coordinate, splitTransfer.to.coordinate);
+
 const adjacentCellStations = [
   ['a', [0, 0]],
   ['b', [0.01, 0]],
@@ -184,14 +250,36 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
   assert.equal(winner.coordinates.length, winner.nodeIds.length + 1);
   assert.ok(winner.lines.length > 1);
   assert.ok(result.candidates.length > 2);
+  assert.ok(winner.transferCount > 0);
+  assert.ok(winner.walkingLengthMeters > 0);
+  assert.equal(
+    winner.transferCount,
+    winner.segments.filter(({ type }) => type === 'transfer').length,
+  );
+  const stationFeaturesById = new Map(
+    stations.features.map((feature) => [feature.properties.id, feature]),
+  );
+  for (const station of winner.stations) {
+    assert.deepEqual(
+      station.coordinate,
+      stationFeaturesById.get(station.id).geometry.coordinates,
+    );
+  }
+  for (const transfer of winner.segments.filter(
+    ({ type }) => type === 'transfer',
+  )) {
+    assert.notEqual(transfer.from.id, transfer.to.id);
+    assert.notDeepEqual(transfer.from.coordinate, transfer.to.coordinate);
+    assert.ok(transfer.distanceMeters > 0);
+  }
 
   if (areaKey === 'nyc') {
     const winnerStationNames = new Set(
       winner.stations.map((station) => station.name),
     );
     for (const stationName of [
-      '168 St',
-      '161 St-Yankee Stadium',
+      '138 St-Grand Concourse',
+      '149 St-Grand Concourse',
       'Jamaica-Van Wyck',
       'Sutphin Blvd-Archer Av-JFK Airport',
       'Coney Island-Stillwell Av',
