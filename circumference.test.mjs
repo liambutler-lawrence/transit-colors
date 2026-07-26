@@ -1,11 +1,13 @@
 import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
+import polygonClipping from 'polygon-clipping';
 import {
   buildCircumferenceCandidates,
   lineLengthMeters,
   polygonAreaSquareMeters,
   selectCircumferenceCandidate,
 } from './circumference.js';
+import { calculateLandmassCoverage } from './circumference-landmass.js';
 
 const oneDegreeSquare = [
   [0, 0],
@@ -159,7 +161,7 @@ assert.equal(shortcutResult.candidates.length, 0);
 
 for (const [areaKey, expectedMinimumAreaKm2] of [
   ['cdmx', 120],
-  ['nyc', 75],
+  ['nyc', 147],
 ]) {
   const stations = JSON.parse(
     await readFile(
@@ -184,6 +186,47 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
   assert.ok(result.candidates.length > 2);
 
   if (areaKey === 'nyc') {
+    const winnerStationNames = new Set(
+      winner.stations.map((station) => station.name),
+    );
+    for (const stationName of [
+      '168 St',
+      '161 St-Yankee Stadium',
+      'Jamaica-Van Wyck',
+      'Sutphin Blvd-Archer Av-JFK Airport',
+      'Coney Island-Stillwell Av',
+    ]) {
+      assert.ok(winnerStationNames.has(stationName));
+    }
+
+    const landmassData = JSON.parse(
+      await readFile(
+        new URL('./data/circumference-landmasses.json', import.meta.url),
+        'utf8',
+      ),
+    );
+    const coverage = calculateLandmassCoverage(
+      winner.coordinates,
+      landmassData.areas.nyc,
+      polygonClipping,
+    );
+    assert.deepEqual(
+      coverage.map((landmass) => landmass.label),
+      [
+        'American mainland',
+        'Manhattan',
+        'Long Island',
+        'Roosevelt Island',
+      ],
+    );
+    assert.ok(
+      coverage.every(
+        (landmass) =>
+          landmass.insideAreaSquareMeters > 0 &&
+          landmass.outsideAreaSquareMeters > 0,
+      ),
+    );
+
     const removedPairs = new Set(
       result.methodology.removedShortcuts.map(({ from, to }) =>
         [from, to].sort().join(' :: '),

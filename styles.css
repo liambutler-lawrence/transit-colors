@@ -620,6 +620,40 @@ h1 {
   background: #fffaf5;
 }
 
+.landmass-breakdown {
+  display: grid;
+  gap: 6px;
+  margin: -10px 0 18px;
+}
+
+.landmass-breakdown:empty {
+  display: none;
+}
+
+.landmass-stat {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 10px;
+  align-items: baseline;
+  padding: 7px 9px;
+  border: 1px solid #e4d5ca;
+  border-radius: 7px;
+  color: var(--muted);
+  background: #fffaf5;
+  font-size: 0.68rem;
+}
+
+.landmass-stat strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--ink);
+  font-size: 0.72rem;
+}
+
+.landmass-stat span {
+  text-align: right;
+}
+
 .circumference-selection {
   border-top-color: #e4d5ca;
 }
@@ -911,5 +945,15 @@ h1 {
   .app-shell,
   .panel-toggle svg {
     transition: none;
+  }
+}
+
+@media (max-width: 600px) {
+  .landmass-stat {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .landmass-stat strong {
+    grid-column: 1 / -1;
   }
 }

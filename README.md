@@ -34,8 +34,10 @@ The automatic route builder:
 - normalizes express and limited-stop GTFS chords onto the available local
   station chain so stop-skipping services do not invent triangular track links;
 - removes branches that cannot participate in a closed loop;
-- traces atomic cycles, combines adjacent boundaries into larger valid simple
-  loops, and rejects self-intersecting routes; and
+- traces atomic cycles, combines adjacent boundaries, samples deterministic
+  spanning-tree cycles, and explicitly connects geographically extreme network
+  anchors into larger valid simple loops;
+- rejects repeated-station and self-intersecting routes; and
 - chooses the loop with the largest geodesic inner area.
 
 The route selector exposes the other ranked loops as manual overrides and stores
@@ -43,12 +45,15 @@ the pinned choice per metro area in the browser. Selecting a route segment on th
 map also lets the user require or avoid that segment; the maximizer then chooses
 the largest ranked loop satisfying those edits.
 
-Contained and outer land areas use a consistent spherical polygon calculation.
-The outer figure is the selected Natural Earth 1:10m land polygon minus the route
-interior: the American mainland for CDMX and Long Island for NYC. The outward
-distance texture is alpha-masked by the same Long Island coastline, so it stops
-at the shore and does not tint adjacent landmasses. CDMX is inland, so its initial
-regional view shows only the local portion of the American-mainland gradient.
+Contained and outer land areas use exact route/landmass intersections followed
+by a consistent spherical polygon calculation. NYC reports every landmass touched
+by the selected loop separately: the American mainland, Manhattan, Long Island,
+and Roosevelt Island. The outward distance texture uses all of those masks at
+once, so the color stops at each coastline instead of tinting water or omitting
+smaller islands. Natural Earth supplies the first three masks; Roosevelt Island
+uses a manual local shoreline supplement and its published 2020 Census land area.
+CDMX is inland, so its initial regional view shows only the local portion of the
+American-mainland gradient.
 
 ## Stack
 
@@ -71,7 +76,7 @@ npm run build:data:nyc
 
 The checked-in `data/circumference-landmasses.json` is built from the Natural Earth
 5.1.1 `ne_10m_land.shp` shapefile. After extracting that public-domain dataset,
-refresh the landmass measurements and Long Island mask with:
+refresh the landmass measurements and NYC coastline masks with:
 
 ```sh
 npm run build:data:landmasses -- /path/to/ne_10m_land.shp

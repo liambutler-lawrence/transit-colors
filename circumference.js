@@ -7,6 +7,8 @@ const CORRIDOR_SHORTCUT_RATIO = 1.6;
 const CORRIDOR_AVERAGE_WIDTH_M = 900;
 const CYCLE_SEARCH_BEAM_WIDTH = 4;
 const CYCLE_SEARCH_MAX_ROUNDS = 18;
+const SPANNING_TREE_RANDOM_SEEDS = 48;
+const EXTREME_ANCHOR_PAIR_LIMIT = 28;
 
 function toRadians(value) {
   return (value * Math.PI) / 180;
@@ -378,7 +380,7 @@ function cycleEdgeKeys(path) {
   );
 }
 
-function pathFromCycleEdges(edgeKeys) {
+function pathsFromCycleEdges(edgeKeys) {
   if (edgeKeys.size < 3) return null;
   const adjacency = new Map();
   for (const key of edgeKeys) {
@@ -389,24 +391,50 @@ function pathFromCycleEdges(edgeKeys) {
     adjacency.get(toId).add(fromId);
   }
   if ([...adjacency.values()].some((neighbors) => neighbors.size !== 2)) {
-    return null;
+    return [];
   }
 
-  const startId = [...adjacency.keys()].sort()[0];
-  const path = [];
-  let previousId = null;
-  let currentId = startId;
+  const unvisited = new Set(adjacency.keys());
+  const paths = [];
+  while (unvisited.size > 0) {
+    const startId = [...unvisited].sort()[0];
+    const path = [];
+    let previousId = null;
+    let currentId = startId;
 
-  do {
-    path.push(currentId);
-    const neighbors = [...adjacency.get(currentId)];
-    const nextId =
-      neighbors[0] === previousId ? neighbors[1] : neighbors[0];
-    previousId = currentId;
-    currentId = nextId;
-  } while (currentId !== startId && path.length <= edgeKeys.size);
+    do {
+      path.push(currentId);
+      unvisited.delete(currentId);
+      const neighbors = [...adjacency.get(currentId)];
+      const nextId =
+        neighbors[0] === previousId ? neighbors[1] : neighbors[0];
+      previousId = currentId;
+      currentId = nextId;
+    } while (currentId !== startId && path.length <= adjacency.size);
 
-  return currentId === startId && path.length === edgeKeys.size ? path : null;
+    if (currentId !== startId || path.length < 3) return [];
+    paths.push(path);
+  }
+  return paths;
+}
+
+function pathFromCycleEdges(edgeKeys) {
+  const paths = pathsFromCycleEdges(edgeKeys);
+  return paths?.length === 1 ? paths[0] : null;
+}
+
+function mergeCyclePathOptions(firstPath, secondPath) {
+  const mergedEdges = cycleEdgeKeys(firstPath);
+  for (const key of cycleEdgeKeys(secondPath)) {
+    if (mergedEdges.has(key)) mergedEdges.delete(key);
+    else mergedEdges.add(key);
+  }
+  return pathsFromCycleEdges(mergedEdges) ?? [];
+}
+
+function mergeCyclePaths(firstPath, secondPath) {
+  const paths = mergeCyclePathOptions(firstPath, secondPath);
+  return paths.length === 1 ? paths[0] : null;
 }
 
 function fundamentalCycles(adjacency) {
@@ -443,6 +471,527 @@ function fundamentalCycles(adjacency) {
     if (!discovery.has(nodeId)) visit(nodeId);
   }
   return cycles;
+}
+
+function graphEdges(adjacency) {
+  const edges = [];
+  for (const [fromId, neighbors] of adjacency) {
+    for (const toId of neighbors) {
+      if (fromId < toId) edges.push([fromId, toId]);
+    }
+  }
+  return edges;
+}
+
+function pathInTree(adjacency, fromId, toId) {
+  const pending = [fromId];
+  const previous = new Map([[fromId, null]]);
+
+  while (pending.length > 0) {
+    const nodeId = pending.shift();
+    if (nodeId === toId) break;
+    for (const neighborId of adjacency.get(nodeId) ?? []) {
+      if (previous.has(neighborId)) continue;
+      previous.set(neighborId, nodeId);
+      pending.push(neighborId);
+    }
+  }
+  if (!previous.has(toId)) return null;
+
+  const path = [toId];
+  while (path[0] !== fromId) path.unshift(previous.get(path[0]));
+  return path;
+}
+
+function deterministicEdgeScore(key, seed) {
+  let hash = (2_166_136_261 ^ seed) >>> 0;
+  for (let index = 0; index < key.length; index += 1) {
+    hash ^= key.charCodeAt(index);
+    hash = Math.imul(hash, 16_777_619);
+  }
+  return hash >>> 0;
+}
+
+/**
+ * Produce complete cycle proposals from several deterministic spanning trees.
+ * Perimeter-biased trees retain geographically extreme edges; seeded trees
+ * explore other valid topologies without making the browser result random.
+ */
+function spanningTreeCycles(adjacency, nodes) {
+  const nodeIds = [...adjacency.keys()];
+  const edges = graphEdges(adjacency);
+  const center = nodeIds.reduce(
+    (total, nodeId) => {
+      const [longitude, latitude] = nodes.get(nodeId).coordinate;
+      total.longitude += longitude / nodeIds.length;
+      total.latitude += latitude / nodeIds.length;
+      return total;
+    },
+    { longitude: 0, latitude: 0 },
+  );
+  const midpoint = ([fromId, toId]) => {
+    const from = nodes.get(fromId).coordinate;
+    const to = nodes.get(toId).coordinate;
+    return [(from[0] + to[0]) / 2, (from[1] + to[1]) / 2];
+  };
+  const radialScore = (edge) => {
+    const [longitude, latitude] = midpoint(edge);
+    return (
+      (longitude - center.longitude) ** 2 +
+      (latitude - center.latitude) ** 2
+    );
+  };
+  const strategies = [
+    (edge) => radialScore(edge),
+    (edge) => -radialScore(edge),
+    (edge) => midpoint(edge)[0],
+    (edge) => -midpoint(edge)[0],
+    (edge) => midpoint(edge)[1],
+    (edge) => -midpoint(edge)[1],
+    ...Array.from(
+      { length: SPANNING_TREE_RANDOM_SEEDS },
+      (_, seed) => (edge) =>
+        deterministicEdgeScore(edgeKey(edge[0], edge[1]), seed + 1),
+    ),
+  ];
+  const cycles = new Map();
+
+  for (const score of strategies) {
+    const unions = new UnionFind(nodeIds);
+    const tree = new Map(nodeIds.map((nodeId) => [nodeId, new Set()]));
+    const nonTreeEdges = [];
+    for (const [fromId, toId] of [...edges].sort(
+      (first, second) => score(second) - score(first),
+    )) {
+      if (unions.union(fromId, toId)) {
+        tree.get(fromId).add(toId);
+        tree.get(toId).add(fromId);
+      } else {
+        nonTreeEdges.push([fromId, toId]);
+      }
+    }
+
+    for (const [fromId, toId] of nonTreeEdges) {
+      const path = pathInTree(tree, fromId, toId);
+      if (!path || path.length < 3) continue;
+      cycles.set(stableCandidateId(path), path);
+    }
+  }
+
+  return [...cycles.values()];
+}
+
+function convexHullNodeIds(adjacency, nodes) {
+  const points = [...adjacency.keys()]
+    .map((nodeId) => ({ nodeId, coordinate: nodes.get(nodeId).coordinate }))
+    .sort(
+      (first, second) =>
+        first.coordinate[0] - second.coordinate[0] ||
+        first.coordinate[1] - second.coordinate[1],
+    );
+  if (points.length <= 3) return points.map((point) => point.nodeId);
+
+  const cross = (origin, first, second) =>
+    (first.coordinate[0] - origin.coordinate[0]) *
+      (second.coordinate[1] - origin.coordinate[1]) -
+    (first.coordinate[1] - origin.coordinate[1]) *
+      (second.coordinate[0] - origin.coordinate[0]);
+  const lower = [];
+  for (const point of points) {
+    while (
+      lower.length >= 2 &&
+      cross(lower.at(-2), lower.at(-1), point) <= 0
+    ) {
+      lower.pop();
+    }
+    lower.push(point);
+  }
+  const upper = [];
+  for (const point of [...points].reverse()) {
+    while (
+      upper.length >= 2 &&
+      cross(upper.at(-2), upper.at(-1), point) <= 0
+    ) {
+      upper.pop();
+    }
+    upper.push(point);
+  }
+  return [...lower.slice(0, -1), ...upper.slice(0, -1)].map(
+    (point) => point.nodeId,
+  );
+}
+
+function addFlowArc(graph, from, to, capacity, cost, routeKey = null) {
+  const forward = {
+    to,
+    reverseIndex: graph[to].length,
+    capacity,
+    cost,
+    routeKey,
+  };
+  const reverse = {
+    to: from,
+    reverseIndex: graph[from].length,
+    capacity: 0,
+    cost: -cost,
+    routeKey: null,
+  };
+  graph[from].push(forward);
+  graph[to].push(reverse);
+}
+
+function vertexDisjointCycle(
+  adjacency,
+  nodes,
+  fromId,
+  toId,
+  edgeCost,
+) {
+  const nodeIds = [...adjacency.keys()];
+  const indexById = new Map(nodeIds.map((nodeId, index) => [nodeId, index]));
+  const graph = Array.from({ length: nodeIds.length * 2 }, () => []);
+  const inputIndex = (nodeId) => indexById.get(nodeId) * 2;
+  const outputIndex = (nodeId) => indexById.get(nodeId) * 2 + 1;
+
+  for (const nodeId of nodeIds) {
+    addFlowArc(
+      graph,
+      inputIndex(nodeId),
+      outputIndex(nodeId),
+      nodeId === fromId || nodeId === toId ? 2 : 1,
+      0,
+    );
+  }
+  for (const [firstId, secondId] of graphEdges(adjacency)) {
+    const key = edgeKey(firstId, secondId);
+    const cost = edgeCost(firstId, secondId);
+    addFlowArc(
+      graph,
+      outputIndex(firstId),
+      inputIndex(secondId),
+      1,
+      cost,
+      key,
+    );
+    addFlowArc(
+      graph,
+      outputIndex(secondId),
+      inputIndex(firstId),
+      1,
+      cost,
+      key,
+    );
+  }
+
+  const source = outputIndex(fromId);
+  const sink = inputIndex(toId);
+  for (let flow = 0; flow < 2; flow += 1) {
+    const distances = Array(graph.length).fill(Infinity);
+    const previousNode = Array(graph.length).fill(-1);
+    const previousEdge = Array(graph.length).fill(-1);
+    distances[source] = 0;
+
+    for (let iteration = 0; iteration < graph.length - 1; iteration += 1) {
+      let changed = false;
+      for (let nodeIndex = 0; nodeIndex < graph.length; nodeIndex += 1) {
+        if (!Number.isFinite(distances[nodeIndex])) continue;
+        for (
+          let edgeIndex = 0;
+          edgeIndex < graph[nodeIndex].length;
+          edgeIndex += 1
+        ) {
+          const edge = graph[nodeIndex][edgeIndex];
+          if (edge.capacity <= 0) continue;
+          const nextDistance = distances[nodeIndex] + edge.cost;
+          if (nextDistance >= distances[edge.to] - 1e-9) continue;
+          distances[edge.to] = nextDistance;
+          previousNode[edge.to] = nodeIndex;
+          previousEdge[edge.to] = edgeIndex;
+          changed = true;
+        }
+      }
+      if (!changed) break;
+    }
+    if (!Number.isFinite(distances[sink])) return null;
+
+    let current = sink;
+    while (current !== source) {
+      const prior = previousNode[current];
+      if (prior < 0) return null;
+      const edge = graph[prior][previousEdge[current]];
+      edge.capacity -= 1;
+      graph[current][edge.reverseIndex].capacity += 1;
+      current = prior;
+    }
+  }
+
+  const usedRouteEdges = new Set();
+  for (const edges of graph) {
+    for (const edge of edges) {
+      if (edge.routeKey && edge.capacity === 0) {
+        if (usedRouteEdges.has(edge.routeKey)) {
+          usedRouteEdges.delete(edge.routeKey);
+        } else {
+          usedRouteEdges.add(edge.routeKey);
+        }
+      }
+    }
+  }
+  return pathFromCycleEdges(usedRouteEdges);
+}
+
+/**
+ * Close two vertex-disjoint paths between geographically extreme anchors.
+ * This retains complete north/east/south/west perimeter options that a
+ * locally greedy face merger can discard before they become area-positive.
+ */
+function extremeAnchorCycles(adjacency, nodes) {
+  const hullNodeIds = convexHullNodeIds(adjacency, nodes);
+  const pairs = [];
+  for (let firstIndex = 0; firstIndex < hullNodeIds.length; firstIndex += 1) {
+    for (
+      let secondIndex = firstIndex + 1;
+      secondIndex < hullNodeIds.length;
+      secondIndex += 1
+    ) {
+      const firstId = hullNodeIds[firstIndex];
+      const secondId = hullNodeIds[secondIndex];
+      pairs.push({
+        firstId,
+        secondId,
+        distance: distanceMeters(
+          nodes.get(firstId).coordinate,
+          nodes.get(secondId).coordinate,
+        ),
+      });
+    }
+  }
+  pairs.sort((first, second) => second.distance - first.distance);
+
+  const componentNodeIds = [...adjacency.keys()];
+  const center = componentNodeIds.reduce(
+    (total, nodeId) => {
+      const coordinate = nodes.get(nodeId).coordinate;
+      total[0] += coordinate[0] / componentNodeIds.length;
+      total[1] += coordinate[1] / componentNodeIds.length;
+      return total;
+    },
+    [0, 0],
+  );
+  const radialDistance = (nodeId) => {
+    const coordinate = nodes.get(nodeId).coordinate;
+    return Math.hypot(
+      (coordinate[0] - center[0]) * Math.cos(toRadians(center[1])),
+      coordinate[1] - center[1],
+    );
+  };
+  const maximumRadius = Math.max(...componentNodeIds.map(radialDistance));
+  const cycles = new Map();
+
+  for (const { firstId, secondId } of pairs.slice(
+    0,
+    EXTREME_ANCHOR_PAIR_LIMIT,
+  )) {
+    for (const minimumFactor of [1, 0.35, 0.12, 0.04]) {
+      const path = vertexDisjointCycle(
+        adjacency,
+        nodes,
+        firstId,
+        secondId,
+        (edgeFromId, edgeToId) => {
+          const length = distanceMeters(
+            nodes.get(edgeFromId).coordinate,
+            nodes.get(edgeToId).coordinate,
+          );
+          const radial =
+            (radialDistance(edgeFromId) + radialDistance(edgeToId)) /
+            (2 * maximumRadius);
+          return length * (minimumFactor + 1 - radial);
+        },
+      );
+      if (path) cycles.set(stableCandidateId(path), path);
+    }
+  }
+
+  return [...cycles.values()];
+}
+
+function shortestNodePath(
+  adjacency,
+  fromId,
+  toId,
+  excludedNodeIds,
+  edgeCost,
+) {
+  const distances = new Map([[fromId, 0]]);
+  const previous = new Map();
+  const pending = [[0, fromId]];
+
+  while (pending.length > 0) {
+    pending.sort((first, second) => second[0] - first[0]);
+    const [distance, nodeId] = pending.pop();
+    if (distance !== distances.get(nodeId)) continue;
+    if (nodeId === toId) {
+      const path = [toId];
+      while (path[0] !== fromId) path.unshift(previous.get(path[0]));
+      return path;
+    }
+    for (const neighborId of adjacency.get(nodeId) ?? []) {
+      if (
+        neighborId !== toId &&
+        neighborId !== fromId &&
+        excludedNodeIds.has(neighborId)
+      ) {
+        continue;
+      }
+      const nextDistance = distance + edgeCost(nodeId, neighborId);
+      if (nextDistance >= (distances.get(neighborId) ?? Infinity)) continue;
+      distances.set(neighborId, nextDistance);
+      previous.set(neighborId, nodeId);
+      pending.push([nextDistance, neighborId]);
+    }
+  }
+  return null;
+}
+
+function pathThroughWaypoints(
+  adjacency,
+  fromId,
+  waypointIds,
+  toId,
+  excludedNodeIds,
+  edgeCost,
+) {
+  const stops = [fromId, ...waypointIds, toId];
+  const path = [fromId];
+  const exclusions = new Set(excludedNodeIds);
+  for (let index = 1; index < stops.length; index += 1) {
+    const segment = shortestNodePath(
+      adjacency,
+      stops[index - 1],
+      stops[index],
+      exclusions,
+      edgeCost,
+    );
+    if (!segment) return null;
+    path.push(...segment.slice(1));
+    for (const nodeId of segment.slice(1, -1)) exclusions.add(nodeId);
+  }
+  return path;
+}
+
+/**
+ * Preserve three-sided geographic extent explicitly: one anchor-to-anchor path
+ * must pass through the opposite extreme, while the return path remains
+ * vertex-disjoint. This preserves valid outer perimeters that span several
+ * locally nested loops.
+ */
+function waypointExtremeCycles(adjacency, nodes) {
+  const nodeIds = [...adjacency.keys()];
+  if (nodeIds.length < 3) return [];
+  const northId = nodeIds.toSorted(
+    (firstId, secondId) =>
+      nodes.get(secondId).coordinate[1] - nodes.get(firstId).coordinate[1],
+  )[0];
+  const eastId = nodeIds.toSorted(
+    (firstId, secondId) =>
+      nodes.get(secondId).coordinate[0] - nodes.get(firstId).coordinate[0],
+  )[0];
+  const southId = nodeIds.toSorted(
+    (firstId, secondId) =>
+      nodes.get(firstId).coordinate[1] - nodes.get(secondId).coordinate[1],
+  )[0];
+  const westId = nodeIds.toSorted(
+    (firstId, secondId) =>
+      nodes.get(firstId).coordinate[0] - nodes.get(secondId).coordinate[0],
+  )[0];
+  if (new Set([northId, eastId, southId, westId]).size < 4) return [];
+
+  const center = nodeIds.reduce(
+    (total, nodeId) => {
+      const coordinate = nodes.get(nodeId).coordinate;
+      total[0] += coordinate[0] / nodeIds.length;
+      total[1] += coordinate[1] / nodeIds.length;
+      return total;
+    },
+    [0, 0],
+  );
+  const radialDistance = (nodeId) => {
+    const coordinate = nodes.get(nodeId).coordinate;
+    return Math.hypot(
+      (coordinate[0] - center[0]) * Math.cos(toRadians(center[1])),
+      coordinate[1] - center[1],
+    );
+  };
+  const maximumRadius = Math.max(...nodeIds.map(radialDistance));
+  const costs = [1, 0.4, 0.12].map(
+    (minimumFactor) => (fromId, toId) => {
+      const length = distanceMeters(
+        nodes.get(fromId).coordinate,
+        nodes.get(toId).coordinate,
+      );
+      const radial =
+        (radialDistance(fromId) + radialDistance(toId)) /
+        (2 * maximumRadius);
+      return length * (minimumFactor + 1 - radial);
+    },
+  );
+  const cycles = new Map();
+
+  for (const directCost of costs) {
+    for (const waypointCost of costs) {
+      for (const waypointIds of [[southId], [westId, southId]]) {
+        for (const directFirst of [true, false]) {
+          let directPath;
+          let waypointPath;
+          if (directFirst) {
+            directPath = shortestNodePath(
+              adjacency,
+              northId,
+              eastId,
+              new Set(),
+              directCost,
+            );
+            if (!directPath) continue;
+            waypointPath = pathThroughWaypoints(
+              adjacency,
+              northId,
+              waypointIds,
+              eastId,
+              new Set(directPath.slice(1, -1)),
+              waypointCost,
+            );
+          } else {
+            waypointPath = pathThroughWaypoints(
+              adjacency,
+              northId,
+              waypointIds,
+              eastId,
+              new Set(),
+              waypointCost,
+            );
+            if (!waypointPath) continue;
+            directPath = shortestNodePath(
+              adjacency,
+              northId,
+              eastId,
+              new Set(waypointPath.slice(1, -1)),
+              directCost,
+            );
+          }
+          if (!directPath || !waypointPath) continue;
+          const path = [
+            ...directPath,
+            ...[...waypointPath].reverse().slice(1, -1),
+          ];
+          if (new Set(path).size === path.length) {
+            cycles.set(stableCandidateId(path), path);
+          }
+        }
+      }
+    }
+  }
+  return [...cycles.values()];
 }
 
 function orientation(first, second, third) {
@@ -607,12 +1156,7 @@ function combineCycles(seedPaths, nodes) {
         }
         if (!sharesEdge) continue;
 
-        const mergedEdges = new Set(state.edges);
-        for (const key of seed.edges) {
-          if (mergedEdges.has(key)) mergedEdges.delete(key);
-          else mergedEdges.add(key);
-        }
-        const mergedPath = pathFromCycleEdges(mergedEdges);
+        const mergedPath = mergeCyclePaths(state.path, seed.path);
         if (!mergedPath) continue;
 
         const mergedId = stableCandidateId(mergedPath);
@@ -835,12 +1379,36 @@ export function buildCircumferenceCandidates(
   const candidatePaths = new Map();
   for (const component of components) {
     const componentGraph = componentAdjacency(component);
+    const addComponentCandidate = (path) => {
+      candidatePaths.set(stableCandidateId(path), path);
+    };
     const seeds = [
       ...traceFaces(componentGraph, nodes),
       ...fundamentalCycles(componentGraph),
     ];
     for (const path of combineCycles(seeds, nodes)) {
-      candidatePaths.set(stableCandidateId(path), path);
+      addComponentCandidate(path);
+    }
+    const spanningProposals = spanningTreeCycles(componentGraph, nodes);
+    for (const path of spanningProposals) {
+      const coordinates = path.map((nodeId) => nodes.get(nodeId).coordinate);
+      if (
+        new Set(path).size === path.length &&
+        !hasSelfIntersection(coordinates)
+      ) {
+        addComponentCandidate(path);
+      }
+    }
+    const extremeProposals = extremeAnchorCycles(componentGraph, nodes);
+    for (const path of extremeProposals) {
+      const coordinates = path.map((nodeId) => nodes.get(nodeId).coordinate);
+      if (!hasSelfIntersection(coordinates)) {
+        addComponentCandidate(path);
+      }
+    }
+    for (const path of waypointExtremeCycles(componentGraph, nodes)) {
+      const coordinates = path.map((nodeId) => nodes.get(nodeId).coordinate);
+      if (!hasSelfIntersection(coordinates)) addComponentCandidate(path);
     }
   }
 

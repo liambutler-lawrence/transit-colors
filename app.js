@@ -15,8 +15,12 @@ import {
 import {
   buildCircumferenceCandidates,
   selectCircumferenceCandidate,
-} from './circumference.js?v=20260725c';
-import { renderCircumferenceGradient } from './circumference-map.js?v=20260725b';
+} from './circumference.js?v=20260725d';
+import {
+  calculateLandmassCoverage,
+  combinedLandmassArea,
+} from './circumference-landmass.js?v=20260725d';
+import { renderCircumferenceGradient } from './circumference-map.js?v=20260725d';
 
 const AREAS = {
   cdmx: {
@@ -206,6 +210,9 @@ const circumferenceOuterLabelEl = document.querySelector(
   '#circumference-outer-label',
 );
 const circumferenceLengthEl = document.querySelector('#circumference-length');
+const circumferenceLandmassBreakdownEl = document.querySelector(
+  '#circumference-landmass-breakdown',
+);
 const routeChoiceSelect = document.querySelector('#route-choice');
 const routeAutoButton = document.querySelector('#route-auto');
 const routeChoiceSummaryEl = document.querySelector('#route-choice-summary');
@@ -706,6 +713,7 @@ function resetCircumferenceRoute() {
   circumferenceInnerAreaEl.textContent = '--';
   circumferenceOuterAreaEl.textContent = '--';
   circumferenceLengthEl.textContent = '--';
+  circumferenceLandmassBreakdownEl.replaceChildren();
   circumferenceNameEl.textContent = 'Waiting for route data';
   circumferenceSummaryEl.textContent =
     'The automatic choice maximizes contained area.';
@@ -789,9 +797,34 @@ function routeFeatureCollection(candidate) {
   };
 }
 
+function renderLandmassBreakdown(coverage) {
+  circumferenceLandmassBreakdownEl.replaceChildren(
+    ...coverage.map((landmass) => {
+      const item = document.createElement('div');
+      item.className = 'landmass-stat';
+      const name = document.createElement('strong');
+      name.textContent = landmass.label;
+      const inside = document.createElement('span');
+      inside.textContent = `${formatArea(
+        landmass.insideAreaSquareMeters,
+      )} inside`;
+      const outside = document.createElement('span');
+      outside.textContent = `${formatArea(
+        landmass.outsideAreaSquareMeters,
+      )} outside to coast`;
+      item.append(name, inside, outside);
+      return item;
+    }),
+  );
+}
+
 function renderCircumferenceCandidate(candidate, { fit = false } = {}) {
   if (!candidate) return;
-  const landmass = circumferenceLandmasses?.areas?.[activeAreaKey];
+  const landmassArea = circumferenceLandmasses?.areas?.[activeAreaKey];
+  const landmassCoverage = calculateLandmassCoverage(
+    candidate.coordinates,
+    landmassArea,
+  );
   circumferenceState.selected = candidate;
   circumferenceState.inspectedSegmentId = '';
   routeRequireSegmentButton.disabled = true;
@@ -800,14 +833,16 @@ function renderCircumferenceCandidate(candidate, { fit = false } = {}) {
 
   map.getSource('circumference-route')?.setData(routeFeatureCollection(candidate));
 
-  if (landmass) {
+  if (landmassArea) {
     renderCircumferenceGradient(
       circumferenceCanvas,
       candidate.coordinates,
-      landmass.gradient_bounds,
-      landmass.mask,
+      landmassArea.gradient_bounds,
+      landmassCoverage
+        .map((landmass) => landmass.mask)
+        .filter((mask) => Array.isArray(mask)),
     );
-    const [west, south, east, north] = landmass.gradient_bounds;
+    const [west, south, east, north] = landmassArea.gradient_bounds;
     const gradientSource = map.getSource('circumference-gradient');
     gradientSource?.updateImage({
       url: circumferenceCanvas.toDataURL('image/png'),
@@ -822,15 +857,19 @@ function renderCircumferenceCandidate(candidate, { fit = false } = {}) {
 
   const isManual = Boolean(circumferenceState.overrideId);
   const isSegmentEdited = !isManual && hasSegmentOverrides();
-  const outerArea = landmass
-    ? Math.max(0, landmass.area_m2 - candidate.areaSquareMeters)
-    : Number.NaN;
+  const outerArea = combinedLandmassArea(
+    landmassCoverage,
+    'outsideAreaSquareMeters',
+  );
   circumferenceInnerAreaEl.textContent = formatArea(candidate.areaSquareMeters);
   circumferenceOuterAreaEl.textContent = formatArea(outerArea);
   circumferenceLengthEl.textContent = formatRouteLength(candidate.lengthMeters);
-  circumferenceOuterLabelEl.textContent = landmass
-    ? `Outside on ${landmass.label}`
+  circumferenceOuterLabelEl.textContent = landmassCoverage.length
+    ? `Outside across ${landmassCoverage.length} landmass${
+        landmassCoverage.length === 1 ? '' : 'es'
+      }`
     : 'Outside to coast';
+  renderLandmassBreakdown(landmassCoverage);
   circumferenceNameEl.textContent = `${AREAS[activeAreaKey].label} ${
     isManual
       ? 'pinned loop'
@@ -850,7 +889,10 @@ function renderCircumferenceCandidate(candidate, { fit = false } = {}) {
           ? 'Maximum matching segment edits'
           : 'Automatic area maximum',
     },
-    { label: 'Landmass', value: landmass?.label },
+    {
+      label: 'Landmasses',
+      value: landmassCoverage.map((landmass) => landmass.label).join(', '),
+    },
     {
       label: 'Free transfers',
       value: `${circumferenceState.methodology.publishedTransferCount} published, ${circumferenceState.methodology.inferredTransferCount} co-located`,
@@ -2831,7 +2873,7 @@ async function initialize() {
   try {
     const [basemapStyle, landmasses] = await Promise.all([
       fetchJson('vendor/openfreemap-liberty.json'),
-      fetchJson('data/circumference-landmasses.json'),
+      fetchJson('data/circumference-landmasses.json?v=20260725d'),
     ]);
     pendingBasemapStyle = basemapStyle;
     circumferenceLandmasses = landmasses;

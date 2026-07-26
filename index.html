@@ -6,7 +6,7 @@
     <title>Transit Colors</title>
     <link rel="preconnect" href="https://tiles.openfreemap.org" />
     <link href="vendor/maplibre-gl.css" rel="stylesheet" />
-    <link href="styles.css?v=20260725b" rel="stylesheet" />
+    <link href="styles.css?v=20260725d" rel="stylesheet" />
   </head>
   <body>
     <main class="app-shell">
@@ -193,6 +193,11 @@
                 <strong id="circumference-length">--</strong>
               </div>
             </div>
+            <div
+              id="circumference-landmass-breakdown"
+              class="landmass-breakdown"
+              aria-label="Touched landmass area breakdown"
+            ></div>
 
             <div class="legend circumference-legend" aria-label="Outward distance gradient">
               <div class="legend-bar"></div>
@@ -260,9 +265,9 @@
             </div>
 
             <p class="method-note">
-              Route area follows GTFS station-to-station geometry. Outer area and
-              coast clipping use Natural Earth 1:10m land polygons. Ranked loops
-              can be pinned as manual overrides.
+              Route area follows GTFS station-to-station geometry. Each touched
+              landmass is measured and coast-clipped separately. Ranked loops can
+              be pinned as manual overrides.
             </p>
           </div>
         </div>
@@ -271,6 +276,7 @@
 
     <script src="vendor/maplibre-gl.js"></script>
     <script src="vendor/pmtiles.js"></script>
-    <script type="module" src="app.js?v=20260725c"></script>
+    <script src="vendor/polygon-clipping.js"></script>
+    <script type="module" src="app.js?v=20260725d"></script>
   </body>
 </html>
