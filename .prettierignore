@@ -1,0 +1,6 @@
+dist/
+AGENTS.md
+node_modules/
+data/
+vendor/
+package-lock.json

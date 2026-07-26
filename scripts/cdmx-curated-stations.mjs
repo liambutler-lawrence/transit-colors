@@ -14,13 +14,7 @@ function slug(value) {
     .replace(/^-|-$/g, '');
 }
 
-function buildCorridorStations({
-  id,
-  line,
-  routeName,
-  sourceUrl,
-  stations,
-}) {
+function buildCorridorStations({ id, line, routeName, sourceUrl, stations }) {
   return stations.map(([name, lon, lat], index) => ({
     id: `official/trolebus-${id}/${String(index + 1).padStart(2, '0')}-${slug(name)}`,
     name,

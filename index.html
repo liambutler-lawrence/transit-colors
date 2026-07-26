@@ -5,8 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <title>Transit Colors</title>
     <link rel="preconnect" href="https://tiles.openfreemap.org" />
-    <link href="vendor/maplibre-gl.css" rel="stylesheet" />
-    <link href="styles.css?v=20260725d" rel="stylesheet" />
+    <link href="/styles.css" rel="stylesheet" />
   </head>
   <body>
     <main class="app-shell">
@@ -162,7 +161,11 @@
               </label>
             </div>
 
-            <div id="station-breakdown" class="station-breakdown" aria-label="Station mode counts"></div>
+            <div
+              id="station-breakdown"
+              class="station-breakdown"
+              aria-label="Station mode counts"
+            ></div>
 
             <div class="selection" aria-live="polite">
               <span id="selection-type" class="metric-label">Selected feature</span>
@@ -185,7 +188,9 @@
                 <strong id="circumference-inner-area">--</strong>
               </div>
               <div class="metric">
-                <span id="circumference-outer-label" class="metric-label">To coast</span>
+                <span id="circumference-outer-label" class="metric-label"
+                  >To coast</span
+                >
                 <strong id="circumference-outer-area">--</strong>
               </div>
               <div class="metric">
@@ -199,7 +204,10 @@
               aria-label="Touched landmass area breakdown"
             ></div>
 
-            <div class="legend circumference-legend" aria-label="Outward distance gradient">
+            <div
+              class="legend circumference-legend"
+              aria-label="Outward distance gradient"
+            >
               <div class="legend-bar"></div>
               <div class="legend-labels">
                 <span>Route</span>
@@ -213,7 +221,9 @@
               <select id="route-criterion">
                 <option value="metro">Metro · free transfers</option>
                 <option value="passenger-rail" disabled>Passenger rail · next</option>
-                <option value="motorway" disabled>Controlled-access roads · next</option>
+                <option value="motorway" disabled>
+                  Controlled-access roads · next
+                </option>
                 <option value="four-lane" disabled>4-lane roads · next</option>
               </select>
 
@@ -229,14 +239,17 @@
               </p>
             </div>
 
-            <div class="toggles circumference-toggles" aria-label="Circumference layers">
+            <div
+              class="toggles circumference-toggles"
+              aria-label="Circumference layers"
+            >
               <label>
                 <input id="toggle-route-gradient" type="checkbox" checked />
                 <span>Gradient</span>
               </label>
               <label>
                 <input id="toggle-route-stations" type="checkbox" checked />
-                <span>Stops</span>
+                <span>All stops</span>
               </label>
               <label>
                 <input id="toggle-route-area" type="checkbox" checked />
@@ -265,18 +278,15 @@
             </div>
 
             <p class="method-note">
-              Route area follows GTFS station-to-station geometry. Each touched
-              landmass is measured and coast-clipped separately. Ranked loops can
-              be pinned as manual overrides.
+              The map shows every platform and full extent of each line used by the
+              boundary, in its official color. Route area follows exact line-platform
+              points and walking links between transfer platforms.
             </p>
           </div>
         </div>
       </section>
     </main>
 
-    <script src="vendor/maplibre-gl.js"></script>
-    <script src="vendor/pmtiles.js"></script>
-    <script src="vendor/polygon-clipping.js"></script>
-    <script type="module" src="app.js?v=20260725d"></script>
+    <script type="module" src="/src/app.ts"></script>
   </body>
 </html>

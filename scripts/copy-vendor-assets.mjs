@@ -46,7 +46,9 @@ await writeFile(
   `${JSON.stringify(basemapStyle)}\n`,
   'utf8',
 );
-const backgroundLayer = basemapStyle.layers.find((layer) => layer.type === 'background');
+const backgroundLayer = basemapStyle.layers.find(
+  (layer) => layer.type === 'background',
+);
 await writeFile(
   resolve(vendorDir, 'openfreemap-shell.json'),
   `${JSON.stringify({

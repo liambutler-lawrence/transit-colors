@@ -1,10 +1,16 @@
+import type { Coordinate } from './domain.js';
+import type { Point } from './routing/types.js';
+
 const EARTH_RADIUS_M = 6_371_008.8;
 
-function toRadians(value) {
+type BoundsTuple = [number, number, number, number];
+type Color = [number, number, number];
+
+function toRadians(value: number): number {
   return (value * Math.PI) / 180;
 }
 
-function pointInPolygon(point, polygon) {
+function pointInPolygon(point: Point, polygon: readonly Point[]): boolean {
   let inside = false;
   for (
     let currentIndex = 0, previousIndex = polygon.length - 1;
@@ -13,11 +19,11 @@ function pointInPolygon(point, polygon) {
   ) {
     const current = polygon[currentIndex];
     const previous = polygon[previousIndex];
+    if (!current || !previous) continue;
     if (
-      (current.y > point.y) !== (previous.y > point.y) &&
+      current.y > point.y !== previous.y > point.y &&
       point.x <
-        ((previous.x - current.x) * (point.y - current.y)) /
-          (previous.y - current.y) +
+        ((previous.x - current.x) * (point.y - current.y)) / (previous.y - current.y) +
           current.x
     ) {
       inside = !inside;
@@ -26,7 +32,7 @@ function pointInPolygon(point, polygon) {
   return inside;
 }
 
-function pointToSegmentDistance(point, start, end) {
+function pointToSegmentDistance(point: Point, start: Point, end: Point): number {
   const deltaX = end.x - start.x;
   const deltaY = end.y - start.y;
   if (deltaX === 0 && deltaY === 0) {
@@ -47,22 +53,29 @@ function pointToSegmentDistance(point, start, end) {
   );
 }
 
-function blend(first, second, amount) {
-  return first.map((value, index) =>
-    Math.round(value + (second[index] - value) * amount),
-  );
+function blend(first: Color, second: Color, amount: number): Color {
+  return [
+    Math.round(first[0] + (second[0] - first[0]) * amount),
+    Math.round(first[1] + (second[1] - first[1]) * amount),
+    Math.round(first[2] + (second[2] - first[2]) * amount),
+  ];
 }
 
-function gradientColor(amount) {
-  const routeColor = [238, 91, 56];
-  const middleColor = [241, 184, 67];
-  const coastColor = [23, 145, 135];
+function gradientColor(amount: number): Color {
+  const routeColor: Color = [238, 91, 56];
+  const middleColor: Color = [241, 184, 67];
+  const coastColor: Color = [23, 145, 135];
   return amount < 0.45
     ? blend(routeColor, middleColor, amount / 0.45)
     : blend(middleColor, coastColor, (amount - 0.45) / 0.55);
 }
 
-function canvasCoordinate([longitude, latitude], bounds, width, height) {
+function canvasCoordinate(
+  [longitude, latitude]: Coordinate,
+  bounds: BoundsTuple,
+  width: number,
+  height: number,
+): Coordinate {
   const [west, south, east, north] = bounds;
   return [
     ((longitude - west) / (east - west)) * width,
@@ -76,12 +89,13 @@ function canvasCoordinate([longitude, latitude], bounds, width, height) {
  * every touched coastline instead of selecting only the largest landmass.
  */
 export function renderCircumferenceGradient(
-  canvas,
-  routeCoordinates,
-  bounds,
-  landmassRings,
-) {
+  canvas: HTMLCanvasElement,
+  routeCoordinates: readonly Coordinate[],
+  bounds: BoundsTuple,
+  landmassRings: readonly Coordinate[][],
+): void {
   const context = canvas.getContext('2d', { alpha: true });
+  if (!context) throw new Error('Canvas 2D rendering is unavailable.');
   const width = canvas.width;
   const height = canvas.height;
   const [west, south, east, north] = bounds;
@@ -89,15 +103,15 @@ export function renderCircumferenceGradient(
   const metersPerLongitudeDegree =
     toRadians(1) * EARTH_RADIUS_M * Math.cos(toRadians(referenceLatitude));
   const metersPerLatitudeDegree = toRadians(1) * EARTH_RADIUS_M;
-  const project = ([longitude, latitude]) => ({
+  const project = ([longitude, latitude]: Coordinate): Point => ({
     x: (longitude - west) * metersPerLongitudeDegree,
     y: (latitude - south) * metersPerLatitudeDegree,
   });
   const route = routeCoordinates.map(project);
-  const segments = route.slice(1).map((end, index) => ({
-    start: route[index],
-    end,
-  }));
+  const segments = route.slice(1).flatMap((end, index) => {
+    const start = route[index];
+    return start ? [{ end, start }] : [];
+  });
   const image = context.createImageData(width, height);
   const distanceScaleMeters = Math.max(
     20_000,
@@ -137,11 +151,7 @@ export function renderCircumferenceGradient(
   context.clearRect(0, 0, width, height);
   context.putImageData(image, 0, 0);
 
-  const rings = Array.isArray(landmassRings?.[0]?.[0])
-    ? landmassRings
-    : Array.isArray(landmassRings)
-      ? [landmassRings]
-      : [];
+  const rings = landmassRings;
   if (rings.length > 0) {
     context.save();
     context.globalCompositeOperation = 'destination-in';

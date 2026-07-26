@@ -8,6 +8,7 @@ import {
   selectCircumferenceCandidate,
 } from './circumference.js';
 import { calculateLandmassCoverage } from './circumference-landmass.js';
+import { hasOfficialLineColor, lineColor } from './line-colors.js';
 
 const oneDegreeSquare = [
   [0, 0],
@@ -16,10 +17,13 @@ const oneDegreeSquare = [
   [0, 1],
   [0, 0],
 ];
-assert.ok(
-  Math.abs(polygonAreaSquareMeters(oneDegreeSquare) / 1_000_000 - 12_364) < 20,
-);
+assert.ok(Math.abs(polygonAreaSquareMeters(oneDegreeSquare) / 1_000_000 - 12_364) < 20);
 assert.ok(lineLengthMeters(oneDegreeSquare) / 1000 > 440);
+assert.equal(lineColor('cdmx', '1'), '#F05097');
+assert.equal(lineColor('cdmx', 'L12'), '#BFA042');
+assert.equal(lineColor('nyc', 'A'), '#0062CF');
+assert.equal(lineColor('nyc', '6X'), '#009952');
+assert.equal(lineColor('nyc', 'SIR'), '#008EB7');
 
 const squareStations = [
   ['a', [0, 0]],
@@ -60,19 +64,16 @@ const squareSchedules = {
     t: {},
   },
 };
-const squareResult = buildCircumferenceCandidates(
-  squareStations,
-  squareSchedules,
-  { minimumAreaSquareMeters: 1 },
-);
+const squareResult = buildCircumferenceCandidates(squareStations, squareSchedules, {
+  minimumAreaSquareMeters: 1,
+});
 assert.equal(squareResult.candidates.length, 1);
 assert.equal(squareResult.candidates[0].stations.length, 4);
 assert.deepEqual(squareResult.candidates[0].lines, ['A']);
+assert.equal(squareResult.network.stations.length, 5);
+assert.equal(squareResult.network.segments.length, 5);
 assert.equal(
-  selectCircumferenceCandidate(
-    squareResult.candidates,
-    squareResult.candidates[0].id,
-  ),
+  selectCircumferenceCandidate(squareResult.candidates, squareResult.candidates[0].id),
   squareResult.candidates[0],
 );
 assert.equal(
@@ -81,6 +82,70 @@ assert.equal(
   }),
   null,
 );
+
+const splitPlatformCoordinates = new Map([
+  ['a', [0, 0]],
+  ['transfer-a', [0.01, 0]],
+  ['transfer-b', [0.0102, 0.0001]],
+  ['c', [0.01, 0.01]],
+  ['d', [0, 0.01]],
+]);
+const splitPlatformStations = [...splitPlatformCoordinates].map(
+  ([id, coordinates]) => ({
+    type: 'Feature',
+    geometry: { type: 'Point', coordinates },
+    properties: {
+      id,
+      name: id.startsWith('transfer') ? 'Transfer' : id,
+      mode: 'subway',
+      status: 'open',
+    },
+  }),
+);
+const splitPlatformResult = buildCircumferenceCandidates(
+  splitPlatformStations,
+  {
+    routes: {
+      lineA: { mode: 'subway', name: 'A' },
+      lineB: { mode: 'subway', name: 'B' },
+    },
+    graph: {
+      e: {
+        a: [
+          ['transfer-a', 1, 'lineA/0'],
+          ['d', 1, 'lineA/1'],
+        ],
+        'transfer-b': [['c', 1, 'lineB/0']],
+        c: [['d', 1, 'lineB/0']],
+      },
+      t: {
+        'transfer-a': [['transfer-b', 2]],
+      },
+    },
+  },
+  { minimumAreaSquareMeters: 1 },
+);
+const splitPlatformWinner = splitPlatformResult.candidates[0];
+assert.ok(splitPlatformWinner);
+assert.equal(splitPlatformWinner.stations.length, 5);
+assert.equal(splitPlatformWinner.transferCount, 1);
+assert.equal(
+  splitPlatformWinner.segments.filter(({ type }) => type === 'transfer').length,
+  1,
+);
+assert.ok(splitPlatformWinner.walkingLengthMeters > 20);
+assert.deepEqual(splitPlatformWinner.lines, ['A', 'B']);
+for (const station of splitPlatformWinner.stations) {
+  assert.deepEqual(station.coordinate, splitPlatformCoordinates.get(station.id));
+}
+const splitTransfer = splitPlatformWinner.segments.find(
+  ({ type }) => type === 'transfer',
+);
+assert.equal(splitTransfer.transferSource, 'published');
+assert.equal(splitTransfer.transferMinutes, 2);
+assert.notDeepEqual(splitTransfer.from.coordinate, splitTransfer.to.coordinate);
+assert.equal(splitPlatformResult.network.stations.length, 5);
+assert.equal(splitPlatformResult.network.segments.length, 4);
 
 const adjacentCellStations = [
   ['a', [0, 0]],
@@ -158,6 +223,23 @@ assert.deepEqual(
 );
 assert.deepEqual(shortcutResult.methodology.removedShortcuts[0].lines, ['A']);
 assert.equal(shortcutResult.candidates.length, 0);
+assert.equal(shortcutResult.network.segments.length, 3);
+assert.ok(
+  shortcutResult.network.segments.every(
+    (segment) =>
+      segment.lines.includes('A') &&
+      new Set([segment.from.id, segment.to.id]).size === 2,
+  ),
+);
+assert.ok(
+  shortcutResult.network.segments.every(
+    (segment) =>
+      !(
+        new Set([segment.from.id, segment.to.id]).has('start') &&
+        new Set([segment.from.id, segment.to.id]).has('end')
+      ),
+  ),
+);
 
 for (const [areaKey, expectedMinimumAreaKm2] of [
   ['cdmx', 120],
@@ -165,13 +247,13 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
 ]) {
   const stations = JSON.parse(
     await readFile(
-      new URL(`./data/${areaKey}-stations.geojson`, import.meta.url),
+      new URL(`../data/${areaKey}-stations.geojson`, import.meta.url),
       'utf8',
     ),
   );
   const schedules = JSON.parse(
     await readFile(
-      new URL(`./data/${areaKey}-schedules.json`, import.meta.url),
+      new URL(`../data/${areaKey}-schedules.json`, import.meta.url),
       'utf8',
     ),
   );
@@ -184,14 +266,43 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
   assert.equal(winner.coordinates.length, winner.nodeIds.length + 1);
   assert.ok(winner.lines.length > 1);
   assert.ok(result.candidates.length > 2);
+  const activeLineNames = new Set(winner.lines);
+  const fullLineStations = result.network.stations.filter((station) =>
+    station.lineNames.some((lineName) => activeLineNames.has(lineName)),
+  );
+  assert.ok(fullLineStations.length > winner.stations.length);
+  assert.ok(
+    result.network.segments.some((segment) =>
+      segment.lines.some((lineName) => activeLineNames.has(lineName)),
+    ),
+  );
+  assert.ok(winner.lines.every((lineName) => hasOfficialLineColor(areaKey, lineName)));
+  assert.ok(winner.transferCount > 0);
+  assert.ok(winner.walkingLengthMeters > 0);
+  assert.equal(
+    winner.transferCount,
+    winner.segments.filter(({ type }) => type === 'transfer').length,
+  );
+  const stationFeaturesById = new Map(
+    stations.features.map((feature) => [feature.properties.id, feature]),
+  );
+  for (const station of winner.stations) {
+    assert.deepEqual(
+      station.coordinate,
+      stationFeaturesById.get(station.id).geometry.coordinates,
+    );
+  }
+  for (const transfer of winner.segments.filter(({ type }) => type === 'transfer')) {
+    assert.notEqual(transfer.from.id, transfer.to.id);
+    assert.notDeepEqual(transfer.from.coordinate, transfer.to.coordinate);
+    assert.ok(transfer.distanceMeters > 0);
+  }
 
   if (areaKey === 'nyc') {
-    const winnerStationNames = new Set(
-      winner.stations.map((station) => station.name),
-    );
+    const winnerStationNames = new Set(winner.stations.map((station) => station.name));
     for (const stationName of [
-      '168 St',
-      '161 St-Yankee Stadium',
+      '138 St-Grand Concourse',
+      '149 St-Grand Concourse',
       'Jamaica-Van Wyck',
       'Sutphin Blvd-Archer Av-JFK Airport',
       'Coney Island-Stillwell Av',
@@ -201,7 +312,7 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
 
     const landmassData = JSON.parse(
       await readFile(
-        new URL('./data/circumference-landmasses.json', import.meta.url),
+        new URL('../data/circumference-landmasses.json', import.meta.url),
         'utf8',
       ),
     );
@@ -212,18 +323,12 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
     );
     assert.deepEqual(
       coverage.map((landmass) => landmass.label),
-      [
-        'American mainland',
-        'Manhattan',
-        'Long Island',
-        'Roosevelt Island',
-      ],
+      ['American mainland', 'Manhattan', 'Long Island', 'Roosevelt Island'],
     );
     assert.ok(
       coverage.every(
         (landmass) =>
-          landmass.insideAreaSquareMeters > 0 &&
-          landmass.outsideAreaSquareMeters > 0,
+          landmass.insideAreaSquareMeters > 0 && landmass.outsideAreaSquareMeters > 0,
       ),
     );
 
@@ -241,9 +346,7 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
       assert.ok(removedPairs.has(pair.sort().join(' :: ')));
     }
     assert.ok(
-      result.methodology.removedShortcuts.every(
-        ({ lines }) => !lines.includes('PATH'),
-      ),
+      result.methodology.removedShortcuts.every(({ lines }) => !lines.includes('PATH')),
     );
   }
 }
