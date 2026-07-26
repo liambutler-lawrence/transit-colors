@@ -565,9 +565,11 @@ function dedupeStations(features) {
   const stations = new Map();
 
   for (const feature of features) {
-    const [lon, lat] = feature.geometry.coordinates;
-    const normalizedName = feature.properties.name.trim().toLowerCase();
-    const key = `${lon.toFixed(4)},${lat.toFixed(4)},${normalizedName}`;
+    // Distinct GTFS parent stations at the same published coordinate can be
+    // separate line-platform groups connected by an in-station walk (for
+    // example the A/C and B/D platforms at 145 St). Keep their feed IDs
+    // separate so ride edges are not deleted when the output graph is filtered.
+    const key = feature.properties.id;
     if (!stations.has(key)) stations.set(key, feature);
   }
 

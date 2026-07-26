@@ -4,6 +4,7 @@ import {
   EAR_EXPANSION_SEED_LIMIT,
   EDGE_KEY_SEPARATOR,
   EXTREME_ANCHOR_PAIR_LIMIT,
+  UnionFind,
   addFlowArc,
   convexHullNodeIds,
   distanceMeters,
@@ -632,6 +633,43 @@ export function expandCyclesWithEars(
   const transferNodeIds = new Set<NodeId>(
     [...transferKeys].flatMap((key) => key.split(EDGE_KEY_SEPARATOR)),
   );
+  const transferGroups = new UnionFind([...adjacency.keys()]);
+  for (const key of transferKeys) {
+    const [fromId, toId] = key.split(EDGE_KEY_SEPARATOR);
+    if (fromId && toId) transferGroups.union(fromId, toId);
+  }
+  const coordinateTotalsByTransferGroup = new Map<
+    string,
+    { coordinate: Coordinate; count: number }
+  >();
+  for (const nodeId of adjacency.keys()) {
+    const groupId = transferGroups.find(nodeId);
+    const total = coordinateTotalsByTransferGroup.get(groupId) ?? {
+      coordinate: [0, 0],
+      count: 0,
+    };
+    const coordinate = getRequired(nodes, nodeId).coordinate;
+    total.coordinate[0] += coordinate[0];
+    total.coordinate[1] += coordinate[1];
+    total.count += 1;
+    coordinateTotalsByTransferGroup.set(groupId, total);
+  }
+  const transferGroupCoordinate = (groupId: string): Coordinate => {
+    const total = getRequired(coordinateTotalsByTransferGroup, groupId);
+    return [total.coordinate[0] / total.count, total.coordinate[1] / total.count];
+  };
+  const isSimpleAfterTransfers = (path: readonly NodeId[]): boolean => {
+    const groupIds: string[] = [];
+    for (const nodeId of path) {
+      const groupId = transferGroups.find(nodeId);
+      if (groupIds.at(-1) !== groupId) groupIds.push(groupId);
+    }
+    if (groupIds.length > 1 && groupIds[0] === groupIds.at(-1)) groupIds.pop();
+    return (
+      new Set(groupIds).size === groupIds.length &&
+      !hasSelfIntersection(groupIds.map(transferGroupCoordinate))
+    );
+  };
   const proposals = new Map<string, CyclePath>();
 
   for (const seedPath of seedPaths.slice(0, EAR_EXPANSION_SEED_LIMIT)) {
@@ -755,10 +793,7 @@ export function expandCyclesWithEars(
           [...reverseArc, ...ear.slice(1, -1)],
         ]) {
           if (new Set(path).size !== path.length) continue;
-          const coordinates = path.map(
-            (nodeId) => getRequired(nodes, nodeId).coordinate,
-          );
-          if (hasSelfIntersection(coordinates)) continue;
+          if (!isSimpleAfterTransfers(path)) continue;
           proposals.set(stableCandidateId(path), path);
         }
       };

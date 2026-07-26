@@ -350,8 +350,8 @@ assert.equal(
 );
 
 for (const [areaKey, expectedMinimumAreaKm2] of [
-  ['cdmx', 120],
-  ['nyc', 147],
+  ['cdmx', 125],
+  ['nyc', 157],
 ]) {
   const stations = JSON.parse(
     await readFile(
@@ -439,6 +439,27 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
   );
 
   if (areaKey === 'nyc') {
+    const hasWinnerRide = (firstId, secondId, lineName) =>
+      winner.segments.some(
+        (segment) =>
+          segment.type === 'ride' &&
+          segment.lines.includes(lineName) &&
+          new Set([segment.from.id, segment.to.id]).has(firstId) &&
+          new Set([segment.from.id, segment.to.id]).has(secondId),
+      );
+    assert.ok(hasWinnerRide('gtfs/mta-subway/B16', 'gtfs/mta-subway/B17', 'D'));
+    assert.ok(hasWinnerRide('gtfs/mta-subway/B23', 'gtfs/mta-subway/D43', 'D'));
+    assert.ok(hasWinnerRide('gtfs/mta-subway/D12', 'gtfs/mta-subway/D13', 'B'));
+    assert.ok(hasWinnerRide('gtfs/mta-subway/D13', 'gtfs/mta-subway/A14', 'B'));
+    assert.equal(
+      stationFeaturesById.get('gtfs/mta-subway/D13').properties.route_ref,
+      'B;D',
+    );
+    assert.ok(
+      schedules.graph.t['gtfs/mta-subway/D13'].some(
+        ([toStationId]) => toStationId === 'gtfs/mta-subway/A12',
+      ),
+    );
     const winnerStationNames = new Set(winner.stations.map((station) => station.name));
     for (const stationName of [
       '138 St-Grand Concourse',
@@ -487,6 +508,17 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
     }
     assert.ok(
       result.methodology.removedShortcuts.every(({ lines }) => !lines.includes('PATH')),
+    );
+  } else {
+    assert.ok(
+      winner.segments.some(
+        (segment) =>
+          segment.type === 'ride' &&
+          segment.lines.includes('4') &&
+          new Set([segment.from.name, segment.to.name]).size === 2 &&
+          new Set([segment.from.name, segment.to.name]).has('Jamaica') &&
+          new Set([segment.from.name, segment.to.name]).has('Santa Anita'),
+      ),
     );
   }
 }

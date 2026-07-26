@@ -745,7 +745,7 @@ export function buildCircumferenceCandidates(
     }
   }
 
-  const earExpansionSeeds = [...candidatePaths.values()]
+  let earExpansionSeeds = [...candidatePaths.values()]
     .map((path) => ({
       path,
       areaSquareMeters: polygonAreaSquareMeters(
@@ -754,13 +754,33 @@ export function buildCircumferenceCandidates(
     }))
     .sort((first, second) => second.areaSquareMeters - first.areaSquareMeters)
     .map((candidate) => candidate.path);
-  for (const path of expandCyclesWithEars(
-    earExpansionSeeds,
-    adjacency,
-    nodes,
-    transfersByEdge.keys(),
-  )) {
-    candidatePaths.set(stableCandidateId(path), path);
+  // A perimeter can need several independent outward substitutions (for
+  // example the Bronx extension first, then the West End/D branch in Brooklyn).
+  // Feed only newly discovered ears into the next round so combinations are
+  // found without repeatedly expanding the entire candidate population.
+  for (let round = 0; round < 3 && earExpansionSeeds.length > 0; round += 1) {
+    const newEarPaths: CyclePath[] = [];
+    for (const path of expandCyclesWithEars(
+      earExpansionSeeds,
+      adjacency,
+      nodes,
+      transfersByEdge.keys(),
+    )) {
+      const id = stableCandidateId(path);
+      if (candidatePaths.has(id)) continue;
+      candidatePaths.set(id, path);
+      newEarPaths.push(path);
+    }
+    earExpansionSeeds = newEarPaths
+      .map((path) => ({
+        path,
+        areaSquareMeters: polygonAreaSquareMeters(
+          path.map((nodeId) => getRequired(nodes, nodeId).coordinate),
+        ),
+      }))
+      .sort((first, second) => second.areaSquareMeters - first.areaSquareMeters)
+      .slice(0, 1)
+      .map((candidate) => candidate.path);
   }
 
   const removedShortcutsDetails = [...removedShortcuts].map((key) => {
