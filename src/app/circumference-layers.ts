@@ -75,6 +75,24 @@ export function installCircumferenceLayers(): void {
   });
 
   map.addLayer({
+    id: 'circumference-network-transfer-line',
+    type: 'line',
+    source: 'circumference-route',
+    filter: ['==', ['get', 'kind'], 'network-transfer'],
+    layout: {
+      visibility: 'none',
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#6f625b',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1, 12, 2, 15, 3.2],
+      'line-dasharray': [1, 1.6],
+      'line-opacity': 0.62,
+    },
+  });
+
+  map.addLayer({
     id: 'circumference-network-stations',
     type: 'circle',
     source: 'circumference-route',

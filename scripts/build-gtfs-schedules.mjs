@@ -4,6 +4,7 @@ import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 import { distanceMeters } from '../src/routing.js';
+import { metroLineRefsForStation, stationMatchesRoute } from './cdmx-platforms.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, '..');
@@ -323,8 +324,16 @@ async function main() {
 
   for (const station of openStations) {
     const properties = station.properties;
+    const stationLineRefs =
+      properties.mode === 'subway' ? metroLineRefsForStation(properties) : new Set();
+    const platformPriority = stationLineRefs.size > 0 ? 0 : 1;
     const nearbyStops = transitStops
-      .filter((stop) => stop.modes.has(properties.mode))
+      .filter(
+        (stop) =>
+          stop.modes.has(properties.mode) &&
+          (properties.mode !== 'subway' ||
+            stationMatchesRoute(properties, stop.routeIds, routeById)),
+      )
       .map((stop) => ({
         stop,
         meters: distanceMeters(station.geometry.coordinates, stop.coordinates),
@@ -344,10 +353,16 @@ async function main() {
 
     for (const { stop, meters } of matches) {
       const existingMatch = stationIdByGtfsStopId.get(stop.id);
-      if (!existingMatch || meters < existingMatch.meters) {
+      if (
+        !existingMatch ||
+        platformPriority < existingMatch.platformPriority ||
+        (platformPriority === existingMatch.platformPriority &&
+          meters < existingMatch.meters)
+      ) {
         stationIdByGtfsStopId.set(stop.id, {
           stationId: properties.id,
           meters,
+          platformPriority,
         });
       }
       if (!stop.schedule) continue;

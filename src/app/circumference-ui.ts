@@ -119,6 +119,7 @@ export function syncCircumferenceVisibility(): void {
   setLayerVisibility('circumference-area', visible && routeAreaToggle.checked);
   setLayerVisibility('circumference-network-casing', visible);
   setLayerVisibility('circumference-network-line', visible);
+  setLayerVisibility('circumference-network-transfer-line', visible);
   setLayerVisibility('circumference-route-casing', visible);
   setLayerVisibility('circumference-route-line', visible);
   setLayerVisibility('circumference-transfer-line', visible);
@@ -266,7 +267,7 @@ export function routeFeatureCollection(
   let featureId = 0;
 
   for (const segment of circumferenceState.network.segments) {
-    const displayedLines = segment.lines;
+    const displayedLines = segment.type === 'transfer' ? [''] : segment.lines;
     for (const [index, lineName] of displayedLines.entries()) {
       const feature: Feature<LineString, GeoJsonProperties> = {
         type: 'Feature',
@@ -276,10 +277,16 @@ export function routeFeatureCollection(
           coordinates: segment.coordinates,
         },
         properties: {
-          kind: 'network-segment',
+          kind: segment.type === 'transfer' ? 'network-transfer' : 'network-segment',
           line: lineName,
-          color: lineColor(runtime.activeAreaKey, lineName),
-          line_position: centeredLinePosition(index, displayedLines.length),
+          color:
+            segment.type === 'transfer'
+              ? ''
+              : lineColor(runtime.activeAreaKey, lineName),
+          line_position:
+            segment.type === 'transfer'
+              ? 0
+              : centeredLinePosition(index, displayedLines.length),
         },
       };
       features.push(feature);

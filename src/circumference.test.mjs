@@ -145,7 +145,67 @@ assert.equal(splitTransfer.transferSource, 'published');
 assert.equal(splitTransfer.transferMinutes, 2);
 assert.notDeepEqual(splitTransfer.from.coordinate, splitTransfer.to.coordinate);
 assert.equal(splitPlatformResult.network.stations.length, 5);
-assert.equal(splitPlatformResult.network.segments.length, 4);
+assert.equal(splitPlatformResult.network.segments.length, 5);
+assert.equal(
+  splitPlatformResult.network.segments.filter(({ type }) => type === 'transfer').length,
+  1,
+);
+
+const transferChainStations = [
+  ['a', [0, 0], 'A'],
+  ['pantitlan-5', [0.01, 0], 'Pantitlán L5'],
+  ['pantitlan-1', [0.0102, 0.0002], 'Pantitlán L1'],
+  ['pantitlan-a', [0.0104, 0.0001], 'Pantitlán LA'],
+  ['pantitlan-9', [0.0106, 0], 'Pantitlán L9'],
+  ['c', [0.01, 0.01], 'C'],
+  ['d', [0, 0.01], 'D'],
+  ['spur-1', [0.012, 0.002], 'Spur 1'],
+  ['spur-a', [0.012, 0.001], 'Spur A'],
+].map(([id, coordinates, name]) => ({
+  type: 'Feature',
+  geometry: { type: 'Point', coordinates },
+  properties: { id, name, mode: 'subway', status: 'open' },
+}));
+const transferChainResult = buildCircumferenceCandidates(
+  transferChainStations,
+  {
+    routes: {
+      line5: { mode: 'subway', name: '5' },
+      line1: { mode: 'subway', name: '1' },
+      lineA: { mode: 'subway', name: 'A' },
+      line9: { mode: 'subway', name: '9' },
+    },
+    graph: {
+      e: {
+        a: [
+          ['pantitlan-5', 1, 'line5/0'],
+          ['d', 1, 'line5/1'],
+        ],
+        'pantitlan-1': [['spur-1', 1, 'line1/0']],
+        'pantitlan-a': [['spur-a', 1, 'lineA/0']],
+        'pantitlan-9': [['c', 1, 'line9/0']],
+        c: [['d', 1, 'line9/0']],
+      },
+      t: {},
+    },
+  },
+  { minimumAreaSquareMeters: 1 },
+);
+assert.ok(transferChainResult.candidates.length > 0);
+const directPantitlanTransfer = transferChainResult.candidates[0].segments.filter(
+  (segment) =>
+    segment.type === 'transfer' &&
+    segment.from.name.startsWith('Pantitlán') &&
+    segment.to.name.startsWith('Pantitlán'),
+);
+assert.equal(directPantitlanTransfer.length, 1);
+assert.deepEqual(
+  new Set([
+    ...directPantitlanTransfer[0].from.lineNames,
+    ...directPantitlanTransfer[0].to.lineNames,
+  ]),
+  new Set(['5', '9']),
+);
 
 const adjacentCellStations = [
   ['a', [0, 0]],
@@ -337,10 +397,19 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
   assert.ok(
     [...eligibleLineNames].every((lineName) => hasOfficialLineColor(areaKey, lineName)),
   );
-  const shapedSegmentCount = result.network.segments.filter(
+  assert.ok(
+    result.network.segments.some(
+      (segment) => segment.type === 'transfer' && segment.coordinates.length === 2,
+    ),
+  );
+  assert.ok(winner.lines.every((lineName) => hasOfficialLineColor(areaKey, lineName)));
+  const rideNetworkSegments = result.network.segments.filter(
+    (segment) => segment.type === 'ride',
+  );
+  const shapedSegmentCount = rideNetworkSegments.filter(
     (segment) => segment.coordinates.length > 2,
   ).length;
-  assert.ok(shapedSegmentCount / result.network.segments.length > 0.98);
+  assert.ok(shapedSegmentCount / rideNetworkSegments.length > 0.98);
   assert.ok(winner.lines.every((lineName) => hasOfficialLineColor(areaKey, lineName)));
   assert.ok(winner.transferCount > 0);
   assert.ok(winner.walkingLengthMeters > 0);

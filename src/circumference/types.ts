@@ -52,10 +52,14 @@ export interface CircumferenceCandidate {
 
 export interface CircumferenceNetworkSegment {
   readonly coordinates: Coordinate[];
+  readonly distanceMeters?: number;
   readonly from: CircumferenceNode;
   readonly id: string;
   readonly lines: readonly string[];
   readonly to: CircumferenceNode;
+  readonly transferMinutes?: number | null;
+  readonly transferSource?: TransferEdge['source'];
+  readonly type: 'ride' | 'transfer';
 }
 
 export interface CircumferenceNetwork {
