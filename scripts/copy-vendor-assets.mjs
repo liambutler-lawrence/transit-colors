@@ -11,6 +11,11 @@ const assets = [
   ['node_modules/maplibre-gl/dist/maplibre-gl.css', 'maplibre-gl.css'],
   ['node_modules/maplibre-gl/LICENSE.txt', 'maplibre-LICENSE.txt'],
   ['node_modules/pmtiles/dist/pmtiles.js', 'pmtiles.js'],
+  [
+    'node_modules/polygon-clipping/dist/polygon-clipping.umd.min.js',
+    'polygon-clipping.js',
+  ],
+  ['node_modules/polygon-clipping/LICENSE.md', 'polygon-clipping-LICENSE.md'],
 ];
 
 await mkdir(vendorDir, { recursive: true });
@@ -63,6 +68,7 @@ await writeFile(
     '',
     '- MapLibre GL JS 5.13.0 — BSD-3-Clause',
     '- PMTiles 4.4.1 — BSD-3-Clause',
+    '- polygon-clipping 0.15.7 — MIT',
     '- OpenFreeMap Liberty style — served locally with a direct OpenFreeMap tile template',
     '',
     'Do not edit the generated JavaScript or CSS files directly.',

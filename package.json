@@ -14,11 +14,12 @@
     "build:data:schedules": "node scripts/build-gtfs-schedules.mjs",
     "build:data": "npm run build:data:cdmx && npm run build:data:schedules && npm run build:data:nyc",
     "dev": "node scripts/serve.mjs",
-    "check": "node --check scripts/build-cdmx-data.mjs && node --check scripts/cdmx-curated-stations.mjs && node --check scripts/rebuild-cdmx-derived-data.mjs && node --check scripts/build-cdmx-tiles.mjs && node --check scripts/build-nyc-data.mjs && node --check scripts/build-street-access.mjs && node --check scripts/build-gtfs-schedules.mjs && node --check scripts/build-circumference-landmasses.mjs && node --check scripts/copy-vendor-assets.mjs && node --check scripts/serve.mjs && node --check routing.js && node --check circumference.js && node --check app.js && node --test scripts/build-cdmx-data.test.mjs && node routing.test.mjs && node circumference.test.mjs",
+    "check": "node --check scripts/build-cdmx-data.mjs && node --check scripts/cdmx-curated-stations.mjs && node --check scripts/rebuild-cdmx-derived-data.mjs && node --check scripts/build-cdmx-tiles.mjs && node --check scripts/build-nyc-data.mjs && node --check scripts/build-street-access.mjs && node --check scripts/build-gtfs-schedules.mjs && node --check scripts/build-circumference-landmasses.mjs && node --check scripts/copy-vendor-assets.mjs && node --check scripts/serve.mjs && node --check routing.js && node --check circumference.js && node --check circumference-landmass.js && node --check app.js && node --test scripts/build-cdmx-data.test.mjs && node routing.test.mjs && node circumference.test.mjs",
     "test": "node routing.test.mjs && node circumference.test.mjs"
   },
   "devDependencies": {
     "maplibre-gl": "5.13.0",
-    "pmtiles": "4.4.1"
+    "pmtiles": "4.4.1",
+    "polygon-clipping": "0.15.7"
   }
 }

@@ -72,14 +72,14 @@ function canvasCoordinate([longitude, latitude], bounds, width, height) {
 
 /**
  * Renders an outward distance field into a MapLibre canvas source. The optional
- * landmass ring is applied as an alpha mask so the texture terminates exactly
- * at the selected coastline instead of bleeding onto neighboring land.
+ * landmass rings are applied as one alpha mask so the texture terminates at
+ * every touched coastline instead of selecting only the largest landmass.
  */
 export function renderCircumferenceGradient(
   canvas,
   routeCoordinates,
   bounds,
-  landmassRing,
+  landmassRings,
 ) {
   const context = canvas.getContext('2d', { alpha: true });
   const width = canvas.width;
@@ -137,18 +137,24 @@ export function renderCircumferenceGradient(
   context.clearRect(0, 0, width, height);
   context.putImageData(image, 0, 0);
 
-  if (Array.isArray(landmassRing) && landmassRing.length >= 3) {
+  const rings = Array.isArray(landmassRings?.[0]?.[0])
+    ? landmassRings
+    : Array.isArray(landmassRings)
+      ? [landmassRings]
+      : [];
+  if (rings.length > 0) {
     context.save();
     context.globalCompositeOperation = 'destination-in';
     context.beginPath();
-    for (const [index, coordinate] of landmassRing.entries()) {
-      const [x, y] = canvasCoordinate(coordinate, bounds, width, height);
-      if (index === 0) context.moveTo(x, y);
-      else context.lineTo(x, y);
+    for (const ring of rings) {
+      for (const [index, coordinate] of ring.entries()) {
+        const [x, y] = canvasCoordinate(coordinate, bounds, width, height);
+        if (index === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.closePath();
     }
-    context.closePath();
     context.fill();
     context.restore();
   }
 }
-
