@@ -2,10 +2,12 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import polygonClipping from 'polygon-clipping';
 import {
+  junctionContinuationLinePositions,
   buildCircumferenceCandidates,
   lineLengthMeters,
   polygonAreaSquareMeters,
   selectCircumferenceCandidate,
+  tracksShareFromNode,
 } from './circumference.js';
 import { calculateLandmassCoverage } from './circumference-landmass.js';
 import { hasOfficialLineColor, lineColor } from './line-colors.js';
@@ -599,6 +601,73 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
         'PATH · Newark - World Trade Center',
       ),
       false,
+    );
+    const lineLayoutSegment = (firstId, secondId) => {
+      const candidateSegment = winner.segments.find(
+        (segment) =>
+          segment.type === 'ride' &&
+          new Set([segment.from.id, segment.to.id]).has(firstId) &&
+          new Set([segment.from.id, segment.to.id]).has(secondId),
+      );
+      const networkSegment = networkRideSegment(firstId, secondId);
+      assert.ok(candidateSegment);
+      assert.ok(networkSegment);
+      return {
+        coordinates: candidateSegment.coordinates,
+        displayedLines: [
+          ...new Set([...candidateSegment.lines, ...networkSegment.lines]),
+        ].sort(),
+        fromId: candidateSegment.from.id,
+        primaryLine: candidateSegment.primaryLine,
+        toId: candidateSegment.to.id,
+      };
+    };
+    const broadwayNorth = lineLayoutSegment(
+      'gtfs/mta-subway/120',
+      'gtfs/mta-subway/119',
+    );
+    const broadwaySouth = lineLayoutSegment(
+      'gtfs/mta-subway/120',
+      'gtfs/mta-subway/121',
+    );
+    const lenoxBranch = networkRideSegment(
+      'gtfs/mta-subway/120',
+      'gtfs/mta-subway/227',
+    );
+    const westSide96St =
+      stationFeaturesById.get('gtfs/mta-subway/120').geometry.coordinates;
+    assert.equal(
+      tracksShareFromNode(
+        broadwayNorth.coordinates,
+        lenoxBranch.coordinates,
+        westSide96St,
+      ),
+      true,
+    );
+    assert.equal(
+      tracksShareFromNode(
+        broadwaySouth.coordinates,
+        lenoxBranch.coordinates,
+        westSide96St,
+      ),
+      false,
+    );
+    const continuationPositions = junctionContinuationLinePositions(
+      {
+        coordinates: lenoxBranch.coordinates,
+        fromId: lenoxBranch.from.id,
+        lines: lenoxBranch.lines,
+        toId: lenoxBranch.to.id,
+      },
+      [broadwayNorth, broadwaySouth],
+      new Map([['gtfs/mta-subway/120', westSide96St]]),
+    );
+    assert.deepEqual(
+      [...continuationPositions],
+      [
+        ['2', -1],
+        ['3', 1],
+      ],
     );
     assert.equal(
       stationFeaturesById.get('gtfs/mta-subway/D13').properties.route_ref,
