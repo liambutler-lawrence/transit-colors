@@ -18,7 +18,10 @@ import {
   type LandmassCoverage,
 } from '../circumference-landmass.js';
 import { circumferenceGradientCoordinates } from '../circumference-gradient-source.js';
-import { renderCircumferenceGradient } from '../circumference-map.js';
+import {
+  CIRCUMFERENCE_GRADIENT_COAST_LAYER_ID,
+  renderCircumferenceGradient,
+} from '../circumference-map.js';
 import type {
   CircumferenceCandidate,
   CircumferenceGeometryMode,
@@ -108,9 +111,17 @@ export function replaceMetadata(
 }
 
 export function positionCircumferenceGradient(): void {
-  if (map.getLayer('circumference-gradient') && map.getLayer('street-proximity')) {
-    map.moveLayer('circumference-gradient', 'street-proximity');
-  }
+  if (!map.getLayer('circumference-gradient')) return;
+
+  // Keep the overlay below the detailed basemap water polygons. The stored
+  // landmass masks remain the fallback and calculation boundary, while the
+  // visible edge follows the same high-resolution shoreline as the map.
+  const beforeLayer = map.getLayer(CIRCUMFERENCE_GRADIENT_COAST_LAYER_ID)
+    ? CIRCUMFERENCE_GRADIENT_COAST_LAYER_ID
+    : map.getLayer('street-proximity')
+      ? 'street-proximity'
+      : undefined;
+  map.moveLayer('circumference-gradient', beforeLayer);
 }
 
 export function syncCircumferenceVisibility(): void {
@@ -427,9 +438,7 @@ export function renderCircumferenceCandidate(
       circumferenceCanvas,
       candidate.coordinates,
       landmassArea.gradient_bounds,
-      landmassCoverage
-        .map((landmass) => landmass.mask)
-        .filter((mask) => Array.isArray(mask)),
+      landmassCoverage.flatMap((landmass) => landmass.mask ?? []),
     );
     imageSource('circumference-gradient')?.updateImage({
       coordinates: circumferenceGradientCoordinates(landmassArea.gradient_bounds),

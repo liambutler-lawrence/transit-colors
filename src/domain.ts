@@ -160,19 +160,21 @@ export const metadataSchema = z
   })
   .loose();
 
-const polygonSchema = z.array(coordinateSchema).min(4);
+const ringSchema = z.array(coordinateSchema).min(4);
+const polygonSchema = z.array(ringSchema).min(1);
+const multiPolygonSchema = z.array(polygonSchema).min(1);
 const landmassSchema = z.object({
   area_m2: z.number().positive(),
   id: z.string().min(1),
   label: z.string().min(1),
-  mask: polygonSchema.nullable(),
+  mask: multiPolygonSchema.nullable(),
 });
 const landmassAreaSchema = z.object({
   area_m2: z.number().positive(),
   gradient_bounds: z.tuple([z.number(), z.number(), z.number(), z.number()]),
   label: z.string().min(1),
   landmasses: z.array(landmassSchema).min(1),
-  mask: polygonSchema.nullable(),
+  mask: multiPolygonSchema.nullable(),
 });
 
 export const landmassDataSchema = z

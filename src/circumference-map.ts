@@ -3,6 +3,9 @@ import type { Point } from './routing/types.js';
 
 const EARTH_RADIUS_M = 6_371_008.8;
 
+export const CIRCUMFERENCE_GRADIENT_COAST_LAYER_ID = 'water';
+export const CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE = 1024;
+
 type BoundsTuple = [number, number, number, number];
 type Color = [number, number, number];
 
@@ -149,7 +152,7 @@ export function renderCircumferenceGradient(
   canvas: HTMLCanvasElement,
   routeCoordinates: readonly Coordinate[],
   bounds: BoundsTuple,
-  landmassRings: readonly Coordinate[][],
+  landmassPolygons: readonly Coordinate[][][],
 ): void {
   const context = canvas.getContext('2d', { alpha: true });
   if (!context) throw new Error('Canvas 2D rendering is unavailable.');
@@ -214,20 +217,21 @@ export function renderCircumferenceGradient(
   context.clearRect(0, 0, width, height);
   context.putImageData(image, 0, 0);
 
-  const rings = landmassRings;
-  if (rings.length > 0) {
+  if (landmassPolygons.length > 0) {
     context.save();
     context.globalCompositeOperation = 'destination-in';
     context.beginPath();
-    for (const ring of rings) {
-      for (const [index, coordinate] of ring.entries()) {
-        const [x, y] = canvasCoordinate(coordinate, bounds, width, height);
-        if (index === 0) context.moveTo(x, y);
-        else context.lineTo(x, y);
+    for (const polygon of landmassPolygons) {
+      for (const ring of polygon) {
+        for (const [index, coordinate] of ring.entries()) {
+          const [x, y] = canvasCoordinate(coordinate, bounds, width, height);
+          if (index === 0) context.moveTo(x, y);
+          else context.lineTo(x, y);
+        }
+        context.closePath();
       }
-      context.closePath();
     }
-    context.fill();
+    context.fill('evenodd');
     context.restore();
   }
 }

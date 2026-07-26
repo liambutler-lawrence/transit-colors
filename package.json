@@ -41,11 +41,13 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@mapbox/vector-tile": "^2.0.5",
     "@types/geojson": "^7946.0.16",
     "@types/node": "^26.1.1",
     "eslint": "^10.8.0",
     "globals": "^17.7.0",
     "maplibre-gl": "5.13.0",
+    "pbf": "^4.0.2",
     "pmtiles": "4.4.1",
     "polygon-clipping": "0.15.7",
     "prettier": "^3.9.6",
