@@ -188,6 +188,7 @@ export function installHover(): void {
 
   let hoveredCircumferenceSegmentId: string | number | null = null;
   const circumferenceSegmentLayerIds = [
+    'circumference-route-alternative-line',
     'circumference-route-line',
     'circumference-transfer-line',
   ];
