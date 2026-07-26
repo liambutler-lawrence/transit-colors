@@ -118,6 +118,60 @@ function edgeKey(firstId, secondId) {
   return [firstId, secondId].sort().join(EDGE_KEY_SEPARATOR);
 }
 
+function trackGeometryByEdge(schedules) {
+  const geometries = new Map();
+  for (const [fromId, entries] of Object.entries(schedules?.graph?.g ?? {})) {
+    for (const [toId, coordinates] of entries) {
+      if (!Array.isArray(coordinates) || coordinates.length < 2) continue;
+      geometries.set(edgeKey(fromId, toId), {
+        fromId,
+        coordinates,
+      });
+    }
+  }
+  return geometries;
+}
+
+function orientedEdgeCoordinates(
+  fromId,
+  toId,
+  nodes,
+  geometriesByEdge,
+  useTrackGeometry,
+) {
+  const fallback = [
+    nodes.get(fromId).coordinate,
+    nodes.get(toId).coordinate,
+  ];
+  if (!useTrackGeometry) return fallback;
+  const geometry = geometriesByEdge.get(edgeKey(fromId, toId));
+  if (!geometry) return fallback;
+  return geometry.fromId === fromId
+    ? geometry.coordinates.map((coordinate) => [...coordinate])
+    : [...geometry.coordinates]
+        .reverse()
+        .map((coordinate) => [...coordinate]);
+}
+
+function joinSegmentCoordinates(segments) {
+  const coordinates = [];
+  for (const segment of segments) {
+    coordinates.push(
+      ...(coordinates.length
+        ? segment.coordinates.slice(1)
+        : segment.coordinates),
+    );
+  }
+  if (
+    coordinates.length > 0 &&
+    (coordinates[0][0] !== coordinates.at(-1)[0] ||
+      coordinates[0][1] !== coordinates.at(-1)[1])
+  ) {
+    coordinates.push([...coordinates[0]]);
+  }
+  return coordinates;
+}
+
 function serviceFamily(routeId, lineName) {
   return /X$/i.test(String(lineName).trim())
     ? String(routeId).replace(/X$/i, '')
@@ -160,6 +214,9 @@ function shortestAlternatePath(
     for (const neighborId of adjacency.get(currentId) ?? []) {
       const currentEdgeKey = edgeKey(currentId, neighborId);
       if (currentEdgeKey === excludedEdgeKey) continue;
+      // A walking transfer can be topologically close to an express chord, but
+      // it can never describe the physical track that chord follows.
+      if (!familiesByEdge.has(currentEdgeKey)) continue;
       if (
         allowedLineFamilies &&
         ![...(familiesByEdge.get(currentEdgeKey) ?? [])].some((family) =>
@@ -1550,7 +1607,11 @@ function sortLineNames(first, second) {
 export function buildCircumferenceCandidates(
   stationFeatures,
   schedules,
-  { maxCandidates = 12, minimumAreaSquareMeters = 250_000 } = {},
+  {
+    maxCandidates = 12,
+    minimumAreaSquareMeters = 250_000,
+    useTrackGeometry = true,
+  } = {},
 ) {
   const eligibleStations = stationFeatures.filter(
     (feature) =>
@@ -1576,6 +1637,7 @@ export function buildCircumferenceCandidates(
   const familiesByEdge = new Map();
   const linesByNode = new Map([...nodes.keys()].map((nodeId) => [nodeId, new Set()]));
   const transfersByEdge = new Map();
+  const geometriesByEdge = trackGeometryByEdge(schedules);
   const routeIdsByLineName = new Map();
   for (const [routeId, route] of Object.entries(schedules?.routes ?? {})) {
     if (route?.mode !== 'subway') continue;
@@ -1844,28 +1906,37 @@ export function buildCircumferenceCandidates(
     candidatePaths.set(stableCandidateId(path), path);
   }
 
-  const rankedCandidates = [...candidatePaths.values()]
-    .map((path) => {
-      const openCoordinates = path.map((nodeId) => nodes.get(nodeId).coordinate);
-      const coordinates = [...openCoordinates, openCoordinates[0]];
+  const buildGeometryVariant = (trackGeometryEnabled) => {
+    const rankedCandidates = [...candidatePaths.values()].map((path) => {
       const segments = path.map((nodeId, index) => {
         const nextId = path[(index + 1) % path.length];
         const key = edgeKey(nodeId, nextId);
         const transfer = transfersByEdge.get(key);
+        const coordinates = transfer
+          ? [
+              nodes.get(nodeId).coordinate,
+              nodes.get(nextId).coordinate,
+            ]
+          : orientedEdgeCoordinates(
+              nodeId,
+              nextId,
+              nodes,
+              geometriesByEdge,
+              trackGeometryEnabled,
+            );
         return {
           id: stableCandidateId([nodeId, nextId]).replace('route-', 'segment-'),
           from: nodes.get(nodeId),
           to: nodes.get(nextId),
           type: transfer ? 'transfer' : 'ride',
           lines: [...(linesByEdge.get(key) ?? [])].sort(sortLineNames),
-          distanceMeters: distanceMeters(
-            nodes.get(nodeId).coordinate,
-            nodes.get(nextId).coordinate,
-          ),
+          coordinates,
+          distanceMeters: lineLengthMeters(coordinates),
           transferSource: transfer?.source ?? null,
           transferMinutes: transfer?.minutes ?? null,
         };
       });
+      const coordinates = joinSegmentCoordinates(segments);
       const lines = [...new Set(segments.flatMap((segment) => segment.lines))].sort(
         sortLineNames,
       );
@@ -1882,38 +1953,57 @@ export function buildCircumferenceCandidates(
         lines,
         transferCount: segments.filter((segment) => segment.type === 'transfer').length,
         walkingLengthMeters,
-        rideLengthMeters: lineLengthMeters(coordinates) - walkingLengthMeters,
+        rideLengthMeters: segments
+          .filter((segment) => segment.type === 'ride')
+          .reduce((total, segment) => total + segment.distanceMeters, 0),
         areaSquareMeters: polygonAreaSquareMeters(coordinates),
-        lengthMeters: lineLengthMeters(coordinates),
-      };
-    })
-    .filter((candidate) => candidate.areaSquareMeters >= minimumAreaSquareMeters)
-    .sort((first, second) => second.areaSquareMeters - first.areaSquareMeters);
-  const candidates = selectDiverseCandidates(rankedCandidates, maxCandidates);
-  const networkSegments = [...normalizedLinesByEdge]
-    .filter(([key]) => !removedShortcuts.has(key))
-    .map(([key, lineNames]) => {
-      const [fromId, toId] = key.split(EDGE_KEY_SEPARATOR);
-      return {
-        id: `network-${stableCandidateId([fromId, toId]).replace(
-          'route-',
-          '',
-        )}`,
-        from: nodes.get(fromId),
-        to: nodes.get(toId),
-        lines: [...lineNames].sort(sortLineNames),
+        lengthMeters: segments.reduce(
+          (total, segment) => total + segment.distanceMeters,
+          0,
+        ),
       };
     });
+    // Candidate topology is already constrained to a simple station-node cycle.
+    // Do not reject a physical alignment merely because grade-separated tracks
+    // cross in plan view or a short interchange walk crosses another segment.
+    const validCandidates = rankedCandidates
+      .filter((candidate) => candidate.coordinates.length >= 4)
+      .filter((candidate) => candidate.areaSquareMeters >= minimumAreaSquareMeters)
+      .sort((first, second) => second.areaSquareMeters - first.areaSquareMeters);
+    const networkSegments = [...normalizedLinesByEdge]
+      .filter(([key]) => !removedShortcuts.has(key))
+      .map(([key, lineNames]) => {
+        const [fromId, toId] = key.split(EDGE_KEY_SEPARATOR);
+        return {
+          id: `network-${stableCandidateId([fromId, toId]).replace(
+            'route-',
+            '',
+          )}`,
+          from: nodes.get(fromId),
+          to: nodes.get(toId),
+          lines: [...lineNames].sort(sortLineNames),
+          coordinates: orientedEdgeCoordinates(
+            fromId,
+            toId,
+            nodes,
+            geometriesByEdge,
+            trackGeometryEnabled,
+          ),
+        };
+      });
+    return {
+      candidates: selectDiverseCandidates(validCandidates, maxCandidates),
+      network: {
+        stations: [...nodes.values()].filter(
+          (node) => node.lineNames.length > 0,
+        ),
+        segments: networkSegments,
+      },
+      generatedCandidateCount: validCandidates.length,
+    };
+  };
 
-  return {
-    candidates,
-    network: {
-      stations: [...nodes.values()].filter(
-        (node) => node.lineNames.length > 0,
-      ),
-      segments: networkSegments,
-    },
-    methodology: {
+  const commonMethodology = {
       eligibleStationCount: eligibleStations.length,
       platformNodeCount: nodes.size,
       corePlatformNodeCount,
@@ -1932,8 +2022,33 @@ export function buildCircumferenceCandidates(
       biconnectedComponentSizes: biconnectedComponentSizes.sort(
         (first, second) => second - first,
       ),
-      generatedCandidateCount: rankedCandidates.length,
-    },
+      trackGeometryAvailable: geometriesByEdge.size > 0,
+      trackGeometryEdgeCount: geometriesByEdge.size,
+      trackGeometryMethod: schedules?.track_geometry?.method ?? null,
+    };
+  const makeModeResult = (trackGeometryEnabled) => {
+    const variant = buildGeometryVariant(trackGeometryEnabled);
+    return {
+      candidates: variant.candidates,
+      network: variant.network,
+      methodology: {
+        ...commonMethodology,
+        generatedCandidateCount: variant.generatedCandidateCount,
+        trackGeometryEnabled:
+          trackGeometryEnabled && geometriesByEdge.size > 0,
+      },
+    };
+  };
+  const geometryVariants = {
+    track: makeModeResult(true),
+    straight: makeModeResult(false),
+  };
+  const selectedVariant = useTrackGeometry
+    ? geometryVariants.track
+    : geometryVariants.straight;
+  return {
+    ...selectedVariant,
+    geometryVariants,
   };
 }
 

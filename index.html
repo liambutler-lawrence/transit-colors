@@ -231,6 +231,10 @@
 
             <div class="toggles circumference-toggles" aria-label="Circumference layers">
               <label>
+                <input id="toggle-track-geometry" type="checkbox" checked />
+                <span>Track paths</span>
+              </label>
+              <label>
                 <input id="toggle-route-gradient" type="checkbox" checked />
                 <span>Gradient</span>
               </label>
@@ -265,9 +269,11 @@
             </div>
 
             <p class="method-note">
-              The map shows every platform and full extent of each line used by
-              the boundary, in its official color. Route area follows exact
-              line-platform points and walking links between transfer platforms.
+              The map shows every platform and full extent of every eligible
+              line, in its official color. Track paths use the averaged physical
+              alignment published in official GTFS shapes; switch them off to
+              restore straight platform-to-platform edges. The same selected
+              model drives route area, length, landmass stats, and the gradient.
             </p>
           </div>
         </div>
@@ -277,6 +283,6 @@
     <script src="vendor/maplibre-gl.js"></script>
     <script src="vendor/pmtiles.js"></script>
     <script src="vendor/polygon-clipping.js"></script>
-    <script type="module" src="app.js?v=20260725f"></script>
+    <script type="module" src="app.js?v=20260725g"></script>
   </body>
 </html>

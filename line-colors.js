@@ -1,6 +1,7 @@
 // Official agency palettes:
 // CDMX: https://serviciosatlas.sgirpc.cdmx.gob.mx/arcgis/rest/services/AtlasCapasPublicas/Movilidad_Integrada_CDMX/FeatureServer/1
 // NYC: https://www.mta.info/document/168976
+// PATH: published route_color values in the Port Authority GTFS feed
 const LINE_COLORS = {
   cdmx: {
     1: '#F05097',
@@ -45,6 +46,13 @@ const LINE_COLORS = {
     SIR: '#008EB7',
     W: '#F6BC26',
     Z: '#8E5C33',
+    'PATH · Hoboken - 33rd Street': '#4D92FB',
+    'PATH · Hoboken - World Trade Center': '#65C100',
+    'PATH · Newark - World Trade Center': '#D93A30',
+    'PATH · Journal Square - 33rd Street': '#FF9900',
+    'PATH · Journal Square - 33rd Street (via Hoboken)': '#FF9900',
+    'PATH · Newark - Harrison Shuttle Train': '#8C3C96',
+    'PATH · World Trade Center - 33rd Street': '#65C100',
   },
 };
 
