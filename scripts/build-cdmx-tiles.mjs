@@ -9,7 +9,7 @@ import {
   createStreetAccessScorer,
   splitStreetFeature,
   streetJunctionKeys,
-} from '../routing.js';
+} from '../src/routing.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, '..');
@@ -96,13 +96,21 @@ function tileDistance(distance, maxDistance) {
 
 function nearCountsByModeSelection(proximityMaskCounts) {
   const result = {};
-  for (let selectionMask = 0; selectionMask < 1 << MODE_KEYS.length; selectionMask += 1) {
+  for (
+    let selectionMask = 0;
+    selectionMask < 1 << MODE_KEYS.length;
+    selectionMask += 1
+  ) {
     const selectionKey = MODE_KEYS.filter(
       (_, modeIndex) => selectionMask & (1 << modeIndex),
     ).join(',');
     let nearCount = 0;
 
-    for (let proximityMask = 1; proximityMask < proximityMaskCounts.length; proximityMask += 1) {
+    for (
+      let proximityMask = 1;
+      proximityMask < proximityMaskCounts.length;
+      proximityMask += 1
+    ) {
       if (selectionMask & proximityMask) {
         nearCount += proximityMaskCounts[proximityMask];
       }
@@ -124,12 +132,7 @@ function createHistogram() {
   };
 }
 
-function recordSegmentStatistics(
-  feature,
-  histogram,
-  proximityMaskCounts,
-  maxDistance,
-) {
+function recordSegmentStatistics(feature, histogram, proximityMaskCounts, maxDistance) {
   const distance = Number(feature.properties.d);
   if (distance <= 500) histogram.under_500_m += 1;
   if (distance <= 1000) histogram.under_1000_m += 1;
@@ -220,11 +223,7 @@ function createScoringContext(openStations, futureStations) {
   };
 }
 
-async function buildTippecanoeInput(
-  features,
-  stationFeatures,
-  maxDistance,
-) {
+async function buildTippecanoeInput(features, stationFeatures, maxDistance) {
   const output = createWriteStream(temporaryPath, { encoding: 'utf8' });
   const junctionKeys = streetJunctionKeys(features);
   const openStations = stationFeatures.filter(
@@ -249,10 +248,7 @@ async function buildTippecanoeInput(
 
       for (let candidateIndex = 0; candidateIndex < 5; candidateIndex += 1) {
         const suffix = candidateIndex === 0 ? '' : String(candidateIndex + 1);
-        properties[`d${suffix}`] = tileDistance(
-          properties[`d${suffix}`],
-          maxDistance,
-        );
+        properties[`d${suffix}`] = tileDistance(properties[`d${suffix}`], maxDistance);
       }
       for (const property of Object.values(MODE_DISTANCE_PROPERTIES)) {
         properties[property] = tileDistance(properties[property], maxDistance);
@@ -263,12 +259,7 @@ async function buildTippecanoeInput(
         }
       }
 
-      recordSegmentStatistics(
-        feature,
-        histogram,
-        proximityMaskCounts,
-        maxDistance,
-      );
+      recordSegmentStatistics(feature, histogram, proximityMaskCounts, maxDistance);
       await writeLine(output, {
         type: 'Feature',
         geometry: feature.geometry,

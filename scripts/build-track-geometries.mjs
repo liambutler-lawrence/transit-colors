@@ -77,20 +77,14 @@ function namesMatch(first, second) {
 
 function distanceSquared(first, second) {
   const latitudeScale = Math.cos((((first[1] + second[1]) / 2) * Math.PI) / 180);
-  return (
-    ((first[0] - second[0]) * latitudeScale) ** 2 +
-    (first[1] - second[1]) ** 2
-  );
+  return ((first[0] - second[0]) * latitudeScale) ** 2 + (first[1] - second[1]) ** 2;
 }
 
 function allowedSubwayEdges(schedules) {
   const result = new Set();
   for (const [fromId, edges] of Object.entries(schedules.graph?.e ?? {})) {
     for (const [toId, , serviceKey] of edges) {
-      const routeId = String(serviceKey).slice(
-        0,
-        String(serviceKey).lastIndexOf('/'),
-      );
+      const routeId = String(serviceKey).slice(0, String(serviceKey).lastIndexOf('/'));
       if (schedules.routes?.[routeId]?.mode === 'subway') {
         result.add(stationEdgeKey(fromId, toId));
       }
@@ -99,11 +93,7 @@ function allowedSubwayEdges(schedules) {
   return result;
 }
 
-async function buildArea({
-  areaKey,
-  feeds,
-  geometrySource,
-}) {
+async function buildArea({ areaKey, feeds, geometrySource }) {
   const schedulePath = resolve(dataDir, `${areaKey}-schedules.json`);
   const stationPath = resolve(dataDir, `${areaKey}-stations.geojson`);
   const schedules = JSON.parse(await readFile(schedulePath, 'utf8'));
@@ -156,9 +146,7 @@ async function buildArea({
     );
     if (useRouteLongName) {
       for (const route of routes) {
-        const scheduleRoute = schedules.routes?.[
-          `${routePrefix}${route.route_id}`
-        ];
+        const scheduleRoute = schedules.routes?.[`${routePrefix}${route.route_id}`];
         if (!scheduleRoute) continue;
         scheduleRoute.name = `${route.route_short_name} · ${route.route_long_name}`;
         scheduleRoute.color = route.route_color
@@ -173,9 +161,7 @@ async function buildArea({
       if (stationIdCache.has(cacheKey)) return stationIdCache.get(cacheKey);
 
       const parentStopId = parentStopIdByStopId.get(stopId) ?? stopId;
-      const exactId = gtfsIdPrefix
-        ? `gtfs/${gtfsIdPrefix}/${parentStopId}`
-        : null;
+      const exactId = gtfsIdPrefix ? `gtfs/${gtfsIdPrefix}/${parentStopId}` : null;
       if (exactId && stationCoordinateById.has(exactId)) {
         stationIdCache.set(cacheKey, exactId);
         return exactId;

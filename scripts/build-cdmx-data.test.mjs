@@ -20,9 +20,7 @@ test('ordinary bus terminals cannot fall through to commuter rail', () => {
   assert.equal(classifyStation(tags).keep, false);
   assert.equal(isKnownFalsePositiveTags(tags), true);
   assert.deepEqual(
-    buildStationFeatures([
-      { type: 'node', id: 1, lon: -99.7, lat: 19.2, tags },
-    ]),
+    buildStationFeatures([{ type: 'node', id: 1, lon: -99.7, lat: 19.2, tags }]),
     [],
   );
   assert.equal(
@@ -46,9 +44,8 @@ test('known false Mexibús platform is rejected', () => {
   assert.equal(classifyStation(tags).mode, 'brt');
   assert.equal(isKnownFalsePositiveTags(tags), true);
   assert.equal(
-    buildStationFeatures([
-      { type: 'node', id: 2, lon: -99.6, lat: 19.25, tags },
-    ]).length,
+    buildStationFeatures([{ type: 'node', id: 2, lon: -99.6, lat: 19.25, tags }])
+      .length,
     0,
   );
 });
@@ -101,8 +98,7 @@ test('official supplements cover Tren AIFA and Trolebús Lines 10–12', () => {
   assert.deepEqual(
     reconciled.find(
       (feature) =>
-        feature.properties.name === 'Teotongo' &&
-        feature.properties.route_ref === '11',
+        feature.properties.name === 'Teotongo' && feature.properties.route_ref === '11',
     ).geometry.coordinates,
     [-98.9746, 19.3374],
   );

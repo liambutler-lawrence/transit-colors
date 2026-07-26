@@ -10,7 +10,10 @@ const rootDir = resolve(__dirname, '..');
 const dataDir = resolve(rootDir, 'data');
 const cacheDir = resolve(dataDir, '.gtfs-cache');
 const REFRESH_GTFS_CACHE = process.env.REFRESH_GTFS_CACHE === '1';
-const BOUNDS_PADDING_M = Number.parseInt(process.env.STATION_BBOX_PADDING_M ?? '5000', 10);
+const BOUNDS_PADDING_M = Number.parseInt(
+  process.env.STATION_BBOX_PADDING_M ?? '5000',
+  10,
+);
 const COORD_DECIMALS = Number.parseInt(process.env.COORD_DECIMALS ?? '5', 10);
 const NYC_METRO_BOUNDS = {
   south: 40.0,
@@ -147,7 +150,9 @@ async function unzipText(zipPath, filename, required = true) {
     return stdout;
   } catch (error) {
     if (!required) return '';
-    throw new Error(`Could not read ${filename} from ${basename(zipPath)}: ${error.message}`);
+    throw new Error(
+      `Could not read ${filename} from ${basename(zipPath)}: ${error.message}`,
+    );
   }
 }
 
@@ -272,7 +277,10 @@ function departureWindows(departures) {
 function stationRows(stops) {
   const parentIds = new Set(stops.map((stop) => stop.parent_station).filter(Boolean));
   return stops.filter((stop) => {
-    if (!Number.isFinite(Number(stop.stop_lon)) || !Number.isFinite(Number(stop.stop_lat))) {
+    if (
+      !Number.isFinite(Number(stop.stop_lon)) ||
+      !Number.isFinite(Number(stop.stop_lat))
+    ) {
       return false;
     }
     if (stop.location_type === '1' || parentIds.has(stop.stop_id)) return true;
@@ -341,9 +349,7 @@ async function buildFeedData(feed) {
   const routes = parseCsv(routesText);
   const trips = parseCsv(tripsText);
   const stopTimes = parseCsv(stopTimesText);
-  const stopModes = feed.mode
-    ? new Map()
-    : modesByStop(routes, trips, stopTimes);
+  const stopModes = feed.mode ? new Map() : modesByStop(routes, trips, stopTimes);
   const stationStops = stationRows(stops);
   const stationStopIds = new Set(stationStops.map((stop) => stop.stop_id));
   const stationIdByStopId = new Map(
@@ -408,8 +414,8 @@ async function buildFeedData(feed) {
       services: new Map(),
     };
     profile.routes.add(routeKey);
-    const serviceDepartures = profile.services.get(serviceKey) ??
-      Array.from({ length: 7 }, () => []);
+    const serviceDepartures =
+      profile.services.get(serviceKey) ?? Array.from({ length: 7 }, () => []);
     const weekdays = weekdaysByService.get(trip.service_id) ?? new Set([0, 1, 2, 3, 4]);
     const frequencies = frequenciesByTrip.get(trip.trip_id);
     const times = [];
@@ -494,9 +500,8 @@ async function buildFeedData(feed) {
     const toStationId = `gtfs/${feed.key}/${toStopId}`;
     if (fromStationId === toStationId) continue;
     const publishedMinutes = Number(transfer.min_transfer_time) / 60;
-    const minutes = Number.isFinite(publishedMinutes) && publishedMinutes > 0
-      ? publishedMinutes
-      : 3;
+    const minutes =
+      Number.isFinite(publishedMinutes) && publishedMinutes > 0 ? publishedMinutes : 3;
     (transferEdges[fromStationId] ??= []).push([
       toStationId,
       Number(minutes.toFixed(2)),
@@ -507,7 +512,9 @@ async function buildFeedData(feed) {
     .map((stop) => {
       const mode = modeForStop(feed, stop, stopModes);
       return mode
-        ? stationFeature(feed, stop, mode, [...(routeNamesByStation.get(stop.stop_id) ?? [])])
+        ? stationFeature(feed, stop, mode, [
+            ...(routeNamesByStation.get(stop.stop_id) ?? []),
+          ])
         : null;
     })
     .filter(Boolean);
@@ -531,7 +538,8 @@ async function buildFeedData(feed) {
   );
   const routeMetadata = Object.fromEntries(
     routes.map((route) => {
-      const routeMode = feed.mode ?? (route.route_type === '0' ? 'light_rail' : 'commuter_rail');
+      const routeMode =
+        feed.mode ?? (route.route_type === '0' ? 'light_rail' : 'commuter_rail');
       return [
         `${feed.key}/${route.route_id}`,
         {
@@ -591,7 +599,8 @@ function paddedBounds(features) {
   );
   const centerLat = (bounds.south + bounds.north) / 2;
   const latPadding = BOUNDS_PADDING_M / 111_320;
-  const lonPadding = BOUNDS_PADDING_M / (111_320 * Math.cos((centerLat * Math.PI) / 180));
+  const lonPadding =
+    BOUNDS_PADDING_M / (111_320 * Math.cos((centerLat * Math.PI) / 180));
 
   return {
     south: Number((bounds.south - latPadding).toFixed(6)),
@@ -616,9 +625,9 @@ async function writeJson(path, value) {
 async function main() {
   await mkdir(dataDir, { recursive: true });
   const feedData = await Promise.all(FEEDS.map(buildFeedData));
-  const stationFeatures = dedupeStations(feedData.flatMap((feed) => feed.features)).filter(
-    isWithinMetroBounds,
-  );
+  const stationFeatures = dedupeStations(
+    feedData.flatMap((feed) => feed.features),
+  ).filter(isWithinMetroBounds);
 
   if (stationFeatures.length === 0) throw new Error('No NYC metro stations found.');
 
@@ -630,7 +639,8 @@ async function main() {
     station_bbox_padding_m: BOUNDS_PADDING_M,
     station_search_bounds: NYC_METRO_BOUNDS,
     street_source: 'OpenFreeMap OpenStreetMap vector tiles',
-    street_distance_method: 'Nearest-station distances calculated in the browser from loaded vector roads',
+    street_distance_method:
+      'Nearest-station distances calculated in the browser from loaded vector roads',
     street_count: null,
     station_count: stationFeatures.length,
     open_station_count: stationFeatures.length,
@@ -690,7 +700,9 @@ async function main() {
     },
   });
 
-  console.log(`Wrote ${stationFeatures.length.toLocaleString()} stations to data/nyc-stations.geojson.`);
+  console.log(
+    `Wrote ${stationFeatures.length.toLocaleString()} stations to data/nyc-stations.geojson.`,
+  );
   console.log('Wrote data/nyc-metadata.json.');
   console.log('Wrote data/nyc-schedules.json.');
 }

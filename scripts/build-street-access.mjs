@@ -2,7 +2,7 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
-import { assignNearestStations } from '../routing.js';
+import { assignNearestStations } from '../src/routing.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const dataDir = resolve(__dirname, '..', 'data');
@@ -64,7 +64,9 @@ async function buildModeIndexes(stationPool, distancesByMode, label) {
       return index;
     });
     if (indexes.some((index) => !Number.isInteger(index))) {
-      throw new Error(`At least one street could not be matched to a ${label} ${mode} station.`);
+      throw new Error(
+        `At least one street could not be matched to a ${label} ${mode} station.`,
+      );
     }
     indexesByMode[mode] = indexes;
   }
@@ -96,8 +98,8 @@ for (let candidateIndex = 0; candidateIndex < 5; candidateIndex += 1) {
   const indexes = streets.features.map((feature) =>
     stationIndexes.get(feature.properties[`s${propertySuffix}`]),
   );
-  const distances = streets.features.map((feature) =>
-    feature.properties[`d${propertySuffix}`],
+  const distances = streets.features.map(
+    (feature) => feature.properties[`d${propertySuffix}`],
   );
   if (
     indexes.some((index) => !Number.isInteger(index)) ||

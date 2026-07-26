@@ -2,7 +2,9 @@
 // CDMX: https://serviciosatlas.sgirpc.cdmx.gob.mx/arcgis/rest/services/AtlasCapasPublicas/Movilidad_Integrada_CDMX/FeatureServer/1
 // NYC: https://www.mta.info/document/168976
 // PATH: published route_color values in the Port Authority GTFS feed
-const LINE_COLORS = {
+export type LineColorArea = 'cdmx' | 'nyc';
+
+const LINE_COLORS: Record<LineColorArea, Readonly<Record<string, string>>> = {
   cdmx: {
     1: '#F05097',
     2: '#005CB9',
@@ -13,9 +15,9 @@ const LINE_COLORS = {
     7: '#FF610D',
     8: '#009844',
     9: '#51312D',
+    12: '#BFA042',
     A: '#9E1A97',
     B: '#B1B1B1',
-    12: '#BFA042',
     L12: '#BFA042',
   },
   nyc: {
@@ -58,10 +60,13 @@ const LINE_COLORS = {
 
 const FALLBACK_LINE_COLOR = '#64748B';
 
-export function lineColor(areaKey, lineName) {
-  return LINE_COLORS[areaKey]?.[String(lineName)] ?? FALLBACK_LINE_COLOR;
+export function lineColor(areaKey: LineColorArea, lineName: string): string {
+  return LINE_COLORS[areaKey][lineName] ?? FALLBACK_LINE_COLOR;
 }
 
-export function hasOfficialLineColor(areaKey, lineName) {
-  return Boolean(LINE_COLORS[areaKey]?.[String(lineName)]);
+export function hasOfficialLineColor(
+  areaKey: LineColorArea,
+  lineName: string,
+): boolean {
+  return LINE_COLORS[areaKey][lineName] !== undefined;
 }

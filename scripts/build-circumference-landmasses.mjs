@@ -1,10 +1,8 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { polygonAreaSquareMeters } from '../circumference.js';
+import { polygonAreaSquareMeters } from '../src/circumference.js';
 
-const shapefilePath = resolve(
-  process.argv[2] ?? '/tmp/ne-land/ne_10m_land.shp',
-);
+const shapefilePath = resolve(process.argv[2] ?? '/tmp/ne-land/ne_10m_land.shp');
 const outputPath = resolve('data/circumference-landmasses.json');
 
 function readPolygonRecords(buffer) {
@@ -61,7 +59,7 @@ function pointInRing([longitude, latitude], ring) {
     const current = ring[currentIndex];
     const previous = ring[previousIndex];
     if (
-      (current[1] > latitude) !== (previous[1] > latitude) &&
+      current[1] > latitude !== previous[1] > latitude &&
       longitude <
         ((previous[0] - current[0]) * (latitude - current[1])) /
           (previous[1] - current[1]) +
@@ -118,8 +116,7 @@ function clipRingToBounds(ring, [west, south, east, north]) {
     ([longitude]) => longitude >= west,
     (from, to) => [
       west,
-      from[1] +
-        ((to[1] - from[1]) * (west - from[0])) / (to[0] - from[0]),
+      from[1] + ((to[1] - from[1]) * (west - from[0])) / (to[0] - from[0]),
     ],
   );
   result = clip(
@@ -127,16 +124,14 @@ function clipRingToBounds(ring, [west, south, east, north]) {
     ([longitude]) => longitude <= east,
     (from, to) => [
       east,
-      from[1] +
-        ((to[1] - from[1]) * (east - from[0])) / (to[0] - from[0]),
+      from[1] + ((to[1] - from[1]) * (east - from[0])) / (to[0] - from[0]),
     ],
   );
   result = clip(
     result,
     ([, latitude]) => latitude >= south,
     (from, to) => [
-      from[0] +
-        ((to[0] - from[0]) * (south - from[1])) / (to[1] - from[1]),
+      from[0] + ((to[0] - from[0]) * (south - from[1])) / (to[1] - from[1]),
       south,
     ],
   );
@@ -144,18 +139,14 @@ function clipRingToBounds(ring, [west, south, east, north]) {
     result,
     ([, latitude]) => latitude <= north,
     (from, to) => [
-      from[0] +
-        ((to[0] - from[0]) * (north - from[1])) / (to[1] - from[1]),
+      from[0] + ((to[0] - from[0]) * (north - from[1])) / (to[1] - from[1]),
       north,
     ],
   );
 }
 
 const records = readPolygonRecords(await readFile(shapefilePath));
-const americanMainland = ringRecordForPoint(
-  records,
-  [-99.1332, 19.4326],
-);
+const americanMainland = ringRecordForPoint(records, [-99.1332, 19.4326]);
 const nycLandmassDefinitions = [
   {
     id: 'american-mainland',
@@ -191,9 +182,7 @@ const nycLandmasses = nycLandmassDefinitions.flatMap((definition) => {
     {
       id: definition.id,
       label: definition.label,
-      area_m2:
-        definition.area_m2 ??
-        Math.round(polygonAreaSquareMeters(record.ring)),
+      area_m2: definition.area_m2 ?? Math.round(polygonAreaSquareMeters(record.ring)),
       mask: roundedRing(clipRingToBounds(record.ring, nycGradientBounds)),
     },
   ];
@@ -217,19 +206,14 @@ const data = {
         {
           id: 'american-mainland',
           label: 'American mainland',
-          area_m2: Math.round(
-            polygonAreaSquareMeters(americanMainland.ring),
-          ),
+          area_m2: Math.round(polygonAreaSquareMeters(americanMainland.ring)),
           mask: null,
         },
       ],
     },
     nyc: {
       label: 'NYC landmasses',
-      area_m2: nycLandmasses.reduce(
-        (total, landmass) => total + landmass.area_m2,
-        0,
-      ),
+      area_m2: nycLandmasses.reduce((total, landmass) => total + landmass.area_m2, 0),
       gradient_bounds: nycGradientBounds,
       mask: null,
       landmasses: nycLandmasses,

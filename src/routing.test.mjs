@@ -38,7 +38,12 @@ const stations = [
   station('d', 'Delta', 'brt', [-99.11, 19.43], { route_ref: 'L1' }),
 ];
 
-assert.ok(Math.abs(distanceMeters(stations[0].geometry.coordinates, stations[1].geometry.coordinates) - 1_050) < 30);
+assert.ok(
+  Math.abs(
+    distanceMeters(stations[0].geometry.coordinates, stations[1].geometry.coordinates) -
+      1_050,
+  ) < 30,
+);
 
 assert.deepEqual(timeScaleStops(10), {
   yellowMinutes: 10,
@@ -56,37 +61,13 @@ const schedules = {
     a: {
       r: ['line-1'],
       p: {
-        'line-1/0': [
-          [[300, 600, 20]],
-          [],
-          [],
-          [],
-          [],
-          [],
-          [],
-        ],
+        'line-1/0': [[[300, 600, 20]], [], [], [], [], [], []],
       },
-      d: [
-        [[300, 600, 10]],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-      ],
+      d: [[[300, 600, 10]], [], [], [], [], [], []],
     },
     overnight: {
       r: ['night-line'],
-      d: [
-        [],
-        [],
-        [],
-        [],
-        [],
-        [],
-        [[1_440, 1_740, 12]],
-      ],
+      d: [[], [], [], [], [], [], [[1_440, 1_740, 12]]],
     },
   },
 };
@@ -312,10 +293,10 @@ assert.equal(bestAccess.distance, 80);
 // Regression for the original audit: Bedford Av is one continuous L-train
 // ride from the Union Square complex, not a disconnected cross-network trip.
 const nycStations = JSON.parse(
-  await readFile(new URL('./data/nyc-stations.geojson', import.meta.url), 'utf8'),
+  await readFile(new URL('../data/nyc-stations.geojson', import.meta.url), 'utf8'),
 );
 const nycSchedules = JSON.parse(
-  await readFile(new URL('./data/nyc-schedules.json', import.meta.url), 'utf8'),
+  await readFile(new URL('../data/nyc-schedules.json', import.meta.url), 'utf8'),
 );
 assert.ok(
   nycSchedules.graph.e['gtfs/mta-subway/L08'].some(
@@ -337,13 +318,8 @@ for (const node of nycGraph.nodes) {
   for (const serviceKey of nycGraph.scheduleGraph.servicesByStation.get(node.id)) {
     nycWaitsByService.set(
       `${node.id}\u0000${serviceKey}`,
-      scheduledWaitForService(
-        nycSchedules,
-        node.id,
-        serviceKey,
-        1,
-        16 * 60 + 38,
-      ).minutes,
+      scheduledWaitForService(nycSchedules, node.id, serviceKey, 1, 16 * 60 + 38)
+        .minutes,
     );
   }
 }
@@ -384,7 +360,10 @@ assert.equal(bestTrip.mode, 'brt');
 const futureStation = station('future', 'Future', 'subway', [-99.1, 19.43], {
   status: 'construction',
 });
-assert.equal(buildTransitGraph([...stations, futureStation]).nodeById.has('future'), false);
+assert.equal(
+  buildTransitGraph([...stations, futureStation]).nodeById.has('future'),
+  false,
+);
 assert.equal(
   buildTransitGraph([...stations, futureStation], { includeFuture: true }).nodeById.has(
     'future',

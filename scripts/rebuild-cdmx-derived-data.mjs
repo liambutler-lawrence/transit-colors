@@ -40,7 +40,7 @@ const streetElements = (streetCollection.features ?? []).map((feature) => ({
 }));
 
 console.log(
-  `Recomputing ${(streetElements.length).toLocaleString()} streets against ${openStationFeatures.length.toLocaleString()} open stations...`,
+  `Recomputing ${streetElements.length.toLocaleString()} streets against ${openStationFeatures.length.toLocaleString()} open stations...`,
 );
 const streetBuild = buildStreetFeatures(
   streetElements,
@@ -61,10 +61,7 @@ const updatedMetadata = {
   station_statuses: propertyCounts(stationFeatures, 'status'),
   histogram: histogram(streetFeatures),
   sources: [
-    ...new Set([
-      ...(metadata.sources ?? []),
-      ...Object.values(OFFICIAL_SOURCES),
-    ]),
+    ...new Set([...(metadata.sources ?? []), ...Object.values(OFFICIAL_SOURCES)]),
   ],
 };
 
@@ -86,13 +83,10 @@ await Promise.all([
   }),
   writeJson(resolve(dataDir, 'cdmx-street-access.json'), {
     station_ids: openStationFeatures.map((feature) => feature.properties.id),
-    future_station_ids: futureStationFeatures.map(
-      (feature) => feature.properties.id,
-    ),
+    future_station_ids: futureStationFeatures.map((feature) => feature.properties.id),
     street_station_indexes: streetBuild.accessStationIndexes,
     station_indexes_by_mode: streetBuild.modeAccessStationIndexes,
-    future_station_indexes_by_mode:
-      streetBuild.futureModeAccessStationIndexes,
+    future_station_indexes_by_mode: streetBuild.futureModeAccessStationIndexes,
   }),
   writeJson(resolve(dataDir, 'cdmx-metadata.json'), updatedMetadata),
 ]);

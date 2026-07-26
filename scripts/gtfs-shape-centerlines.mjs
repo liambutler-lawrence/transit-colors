@@ -116,10 +116,7 @@ function projectOntoShape(coordinate, shape) {
 function dedupeCoordinates(coordinates) {
   const result = [];
   for (const coordinate of coordinates) {
-    if (
-      !result.length ||
-      distanceMeters(result.at(-1), coordinate) >= 0.75
-    ) {
+    if (!result.length || distanceMeters(result.at(-1), coordinate) >= 0.75) {
       result.push(coordinate);
     }
   }
@@ -176,8 +173,7 @@ export function resampleLine(coordinates, sampleCount) {
   const cumulative = [0];
   for (let index = 1; index < coordinates.length; index += 1) {
     cumulative.push(
-      cumulative.at(-1) +
-        distanceMeters(coordinates[index - 1], coordinates[index]),
+      cumulative.at(-1) + distanceMeters(coordinates[index - 1], coordinates[index]),
     );
   }
   const totalLength = cumulative.at(-1);
@@ -188,8 +184,7 @@ export function resampleLine(coordinates, sampleCount) {
   const result = [];
   let segmentIndex = 1;
   for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += 1) {
-    const targetDistance =
-      (totalLength * sampleIndex) / Math.max(1, sampleCount - 1);
+    const targetDistance = (totalLength * sampleIndex) / Math.max(1, sampleCount - 1);
     while (
       segmentIndex < cumulative.length - 1 &&
       cumulative[segmentIndex] < targetDistance
@@ -221,18 +216,12 @@ export function averageShapeSections(
   const maximumLength = Math.max(...sections.map(lineLengthMeters));
   const sampleCount = Math.max(
     3,
-    Math.min(
-      MAX_SHAPE_SAMPLES,
-      Math.ceil(maximumLength / TARGET_SAMPLE_SPACING_M) + 1,
-    ),
+    Math.min(MAX_SHAPE_SAMPLES, Math.ceil(maximumLength / TARGET_SAMPLE_SPACING_M) + 1),
   );
   const sampled = sections.map((section) => resampleLine(section, sampleCount));
   const average = Array.from({ length: sampleCount }, (_, sampleIndex) => {
     const total = sampled.reduce(
-      (sum, line) => [
-        sum[0] + line[sampleIndex][0],
-        sum[1] + line[sampleIndex][1],
-      ],
+      (sum, line) => [sum[0] + line[sampleIndex][0], sum[1] + line[sampleIndex][1]],
       [0, 0],
     );
     return [
@@ -255,10 +244,7 @@ export function buildGtfsShapeCenterlines({
 }) {
   const shapeById = new Map();
   for (const point of shapes) {
-    const coordinate = [
-      Number(point.shape_pt_lon),
-      Number(point.shape_pt_lat),
-    ];
+    const coordinate = [Number(point.shape_pt_lon), Number(point.shape_pt_lat)];
     if (!coordinate.every(Number.isFinite)) continue;
     const points = shapeById.get(point.shape_id) ?? [];
     points.push({
@@ -295,8 +281,7 @@ export function buildGtfsShapeCenterlines({
     const trip = tripById.get(tripId);
     const shape = shapeById.get(trip.shape_id);
     entries.sort(
-      (first, second) =>
-        Number(first.stop_sequence) - Number(second.stop_sequence),
+      (first, second) => Number(first.stop_sequence) - Number(second.stop_sequence),
     );
     let previous = null;
     for (const entry of entries) {

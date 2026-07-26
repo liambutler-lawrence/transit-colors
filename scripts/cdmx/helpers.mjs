@@ -1,0 +1,903 @@
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
+
+export const __filename = fileURLToPath(import.meta.url);
+export const __dirname = dirname(__filename);
+export const rootDir = resolve(__dirname, '../..');
+export const dataDir = resolve(rootDir, 'data');
+export const cacheDir = resolve(
+  rootDir,
+  process.env.OVERPASS_CACHE_DIR ?? 'data/.overpass-cache',
+);
+
+async function writeJson(path, value) {
+  await writeFile(path, `${JSON.stringify(value)}\n`, 'utf8');
+}
+
+export const OVERPASS_URL =
+  process.env.OVERPASS_URL ?? 'https://overpass-api.de/api/interpreter';
+export const MAX_DISTANCE_M = Number.parseInt(process.env.MAX_DISTANCE_M ?? '5000', 10);
+export const STATION_BBOX_PADDING_M = Number.parseInt(
+  process.env.STATION_BBOX_PADDING_M ?? '5000',
+  10,
+);
+export const COORD_DECIMALS = Number.parseInt(process.env.COORD_DECIMALS ?? '4', 10);
+export const STREET_TILE_ROWS = Number.parseInt(
+  process.env.STREET_TILE_ROWS ?? '4',
+  10,
+);
+export const STREET_TILE_COLS = Number.parseInt(
+  process.env.STREET_TILE_COLS ?? '4',
+  10,
+);
+export const STREET_TILE_DELAY_MS = Number.parseInt(
+  process.env.STREET_TILE_DELAY_MS ?? '5000',
+  10,
+);
+export const OVERPASS_REQUEST_TIMEOUT_MS = Number.parseInt(
+  process.env.OVERPASS_REQUEST_TIMEOUT_MS ?? '120000',
+  10,
+);
+export const OVERPASS_MAX_RETRIES = Number.parseInt(
+  process.env.OVERPASS_MAX_RETRIES ?? '5',
+  10,
+);
+export const OVERPASS_RETRY_DELAY_MS = Number.parseInt(
+  process.env.OVERPASS_RETRY_DELAY_MS ?? '30000',
+  10,
+);
+export const REFRESH_OVERPASS_CACHE = process.env.REFRESH_OVERPASS_CACHE === '1';
+export const STATUS_DATE = new Date(process.env.STATUS_DATE ?? new Date());
+export const CDMX_CENTER = {
+  lat: 19.4326,
+  lon: -99.1332,
+};
+let projectionCenter = CDMX_CENTER;
+export const STATION_SEARCH_AREAS = [
+  { label: 'Ciudad de México', wikidata: 'Q1489' },
+  { label: 'Estado de México', wikidata: 'Q82112' },
+];
+
+export const STREET_TYPES_TO_SKIP =
+  '^(footway|path|cycleway|steps|bridleway|corridor|elevator|escalator|platform|construction|proposed|abandoned)$';
+
+export const RAPID_TRANSIT_QUERY_PATTERN = [
+  'stc metro',
+  'metro cdmx',
+  'sistema de transporte colectivo',
+  'tren ligero',
+  'metrobus',
+  'metrobús',
+  'mexibus',
+  'mexibús',
+  'cablebus',
+  'cablebús',
+  'mexicable',
+  'fc suburbano',
+  'suburbano',
+  'tren interurbano',
+  'el insurgente',
+  'monorail',
+].join('|');
+export const BRT_QUERY_PATTERN = [
+  'metrobus',
+  'metrobús',
+  'mexibus',
+  'mexibús',
+  'trolebus elevado',
+  'trolebús elevado',
+  'trolebus linea 10',
+  'trolebús linea 10',
+  'trolebus línea 10',
+  'trolebús línea 10',
+  'trolebus linea 11',
+  'trolebús linea 11',
+  'trolebus línea 11',
+  'trolebús línea 11',
+  'trolebus linea 12',
+  'trolebús linea 12',
+  'trolebus línea 12',
+  'trolebús línea 12',
+  'linea 10',
+  'línea 10',
+  'linea 11',
+  'línea 11',
+  'linea 12',
+  'línea 12',
+  'chalco',
+  'santa marta',
+  'avenida aztecas',
+  'tasqueña',
+  'taxqueña',
+  'perisur',
+].join('|');
+export const BRT_OPERATOR_QUERY_PATTERN = [
+  'metrobus',
+  'metrobús',
+  'mexibus',
+  'mexibús',
+  'servicio de transportes electricos',
+  'servicio de transportes eléctricos',
+  '\\bste\\b',
+].join('|');
+
+export const MODE_LABELS = {
+  subway: 'Metro',
+  brt: 'BRT',
+  light_rail: 'Light rail',
+  cable_car: 'Cable car',
+  commuter_rail: 'Commuter rail',
+  regional_rail: 'Regional rail',
+  monorail: 'Monorail',
+};
+export const MODE_KEYS = Object.keys(MODE_LABELS);
+export const OVER_RANGE_DISTANCE_M = MAX_DISTANCE_M + 1;
+export const CURATED_REPLACEMENT_DISTANCE_M = 3000;
+
+export const FALSE_POSITIVE_NAME_PATTERNS = [
+  /^plaza maguey$/,
+  /(?:transportes?|servicios) urbanos y suburbanos xinantecatl/,
+  /transporte colectivo urbano y suburbano de pasajeros en autobuses de ruta fija/,
+];
+
+export const FUTURE_NETWORK_RULES = [
+  {
+    pattern: /mexicable linea 3|mexicable línea 3/,
+    status: 'future',
+    status_detail: 'Under construction',
+    reason: 'Mexicable Line 3 is not yet open',
+  },
+  {
+    pattern: /tren ligero texcoco-la paz/,
+    status: 'future',
+    status_detail: 'Planned',
+    reason: 'Tagged as proposed in OSM',
+  },
+];
+
+export function stationQuery() {
+  const stationAreaQuery = STATION_SEARCH_AREAS.map(
+    (area, index) => `area["wikidata"="${area.wikidata}"]->.searchArea${index};`,
+  ).join('\n');
+  const stationAreaSet = `(${STATION_SEARCH_AREAS.map(
+    (_, index) => `.searchArea${index};`,
+  ).join(' ')})->.stationSearchArea;`;
+
+  return `
+[out:json][timeout:180];
+${stationAreaQuery}
+${stationAreaSet}
+(
+  nwr(area.stationSearchArea)["railway"~"^(station|halt|tram_stop)$"];
+  nwr(area.stationSearchArea)["public_transport"="station"];
+  nwr(area.stationSearchArea)["amenity"="bus_station"];
+  nwr(area.stationSearchArea)["public_transport"~"^(platform|stop_position)$"]["network"~"${RAPID_TRANSIT_QUERY_PATTERN}|${BRT_QUERY_PATTERN}",i];
+  nwr(area.stationSearchArea)["public_transport"~"^(platform|stop_position)$"]["operator"~"${RAPID_TRANSIT_QUERY_PATTERN}|${BRT_OPERATOR_QUERY_PATTERN}",i];
+  nwr(area.stationSearchArea)["public_transport"~"^(platform|stop_position)$"]["brand"~"${RAPID_TRANSIT_QUERY_PATTERN}|${BRT_QUERY_PATTERN}",i];
+  nwr(area.stationSearchArea)["highway"="bus_stop"]["network"~"${BRT_QUERY_PATTERN}",i];
+  nwr(area.stationSearchArea)["highway"="bus_stop"]["operator"~"${BRT_OPERATOR_QUERY_PATTERN}",i];
+  nwr(area.stationSearchArea)["highway"="bus_stop"]["brand"~"${BRT_QUERY_PATTERN}",i];
+  nwr(area.stationSearchArea)["trolleybus"="yes"]["network"~"${BRT_QUERY_PATTERN}",i];
+  nwr(area.stationSearchArea)["trolleybus"="yes"]["operator"~"${BRT_OPERATOR_QUERY_PATTERN}",i];
+);
+out center tags;
+`;
+}
+
+export function routeMemberQuery() {
+  const stationAreaQuery = STATION_SEARCH_AREAS.map(
+    (area, index) => `area["wikidata"="${area.wikidata}"]->.searchArea${index};`,
+  ).join('\n');
+  const stationAreaSet = `(${STATION_SEARCH_AREAS.map(
+    (_, index) => `.searchArea${index};`,
+  ).join(' ')})->.stationSearchArea;`;
+
+  return `
+[out:json][timeout:180];
+${stationAreaQuery}
+${stationAreaSet}
+(
+  relation(area.stationSearchArea)["type"="route"]["route"~"^(bus|trolleybus)$"]["network"~"${BRT_QUERY_PATTERN}",i];
+  relation(area.stationSearchArea)["type"="route"]["route"~"^(bus|trolleybus)$"]["operator"~"${BRT_OPERATOR_QUERY_PATTERN}",i];
+  relation(area.stationSearchArea)["type"="route"]["route"~"^(bus|trolleybus)$"]["name"~"${BRT_QUERY_PATTERN}",i];
+  relation(area.stationSearchArea)["type"="route"]["route"~"^(bus|trolleybus)$"]["ref"~"${BRT_QUERY_PATTERN}",i];
+)->.brtRoutes;
+.brtRoutes out body;
+.brtRoutes >;
+out center tags;
+`;
+}
+
+export function streetQuery(tileBbox) {
+  return `
+[out:json][timeout:180];
+(
+  way["highway"]["highway"!~"${STREET_TYPES_TO_SKIP}"](${formatBbox(tileBbox)});
+);
+out tags geom;
+`;
+}
+
+export function formatBbox(bounds) {
+  return `${bounds.south},${bounds.west},${bounds.north},${bounds.east}`;
+}
+
+export function roundCoordinate(value) {
+  return Number(value.toFixed(COORD_DECIMALS));
+}
+
+export function normalizeTag(value = '') {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+}
+
+export function parseOpeningDate(value) {
+  if (!value) return null;
+
+  const trimmed = String(value).trim();
+  const yearMatch = trimmed.match(/^(\d{4})$/);
+  if (yearMatch) {
+    return { date: new Date(`${yearMatch[1]}-01-01T00:00:00Z`), precision: 'year' };
+  }
+
+  const monthMatch = trimmed.match(/^(\d{4})-(\d{2})$/);
+  if (monthMatch) {
+    return {
+      date: new Date(`${monthMatch[1]}-${monthMatch[2]}-01T00:00:00Z`),
+      precision: 'month',
+    };
+  }
+
+  const dayMatch = trimmed.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (dayMatch) {
+    return { date: new Date(`${trimmed}T00:00:00Z`), precision: 'day' };
+  }
+
+  return null;
+}
+
+export function openingDateIsFuture(value) {
+  const parsed = parseOpeningDate(value);
+  if (!parsed || Number.isNaN(parsed.date.getTime())) return false;
+
+  const statusYear = STATUS_DATE.getUTCFullYear();
+  const statusMonth = STATUS_DATE.getUTCMonth();
+
+  if (parsed.precision === 'year') {
+    return parsed.date.getUTCFullYear() > statusYear;
+  }
+
+  if (parsed.precision === 'month') {
+    return (
+      parsed.date.getUTCFullYear() > statusYear ||
+      (parsed.date.getUTCFullYear() === statusYear &&
+        parsed.date.getUTCMonth() > statusMonth)
+    );
+  }
+
+  return parsed.date > STATUS_DATE;
+}
+
+export function openingDateIsPastOrPresent(value) {
+  const parsed = parseOpeningDate(value);
+  if (!parsed || Number.isNaN(parsed.date.getTime())) return false;
+
+  return !openingDateIsFuture(value);
+}
+
+export function hasTagPrefix(tags, prefix) {
+  return Object.keys(tags).some((key) => key.startsWith(prefix));
+}
+
+export function stationStatus(tags = {}) {
+  const transitContext = transitContextForTags(tags);
+  const openingFuture = openingDateIsFuture(tags.opening_date);
+  const openingPastOrPresent = openingDateIsPastOrPresent(tags.opening_date);
+
+  for (const rule of FUTURE_NETWORK_RULES) {
+    if (rule.pattern.test(transitContext)) {
+      return {
+        status: rule.status,
+        status_detail: tags.opening_date
+          ? `${rule.status_detail}; opening ${tags.opening_date}`
+          : rule.status_detail,
+        status_source: rule.reason,
+      };
+    }
+  }
+
+  if (openingFuture) {
+    return {
+      status: 'future',
+      status_detail: `Opening ${tags.opening_date}`,
+      status_source: 'OSM opening_date is in the future',
+    };
+  }
+
+  if (openingPastOrPresent) {
+    return {
+      status: 'open',
+      status_detail: 'Open',
+      status_source: 'OSM opening_date is not in the future',
+    };
+  }
+
+  const railway = normalizeTag(tags.railway);
+  const construction = normalizeTag(tags.construction);
+  const proposed = normalizeTag(tags.proposed);
+  const hasProposedTag = proposed === 'yes' || hasTagPrefix(tags, 'proposed:');
+
+  if (hasProposedTag || railway === 'proposed' || railway === 'prpopsed') {
+    return {
+      status: 'future',
+      status_detail: 'Planned',
+      status_source: 'OSM proposed lifecycle tags',
+    };
+  }
+
+  if (
+    railway === 'construction' ||
+    construction === 'yes' ||
+    construction === 'construction'
+  ) {
+    return {
+      status: 'future',
+      status_detail: 'Under construction',
+      status_source: 'OSM construction lifecycle tags',
+    };
+  }
+
+  return {
+    status: 'open',
+    status_detail: 'Open',
+    status_source: 'No future/construction lifecycle tags',
+  };
+}
+
+export function transitContextForTags(tags = {}) {
+  return [
+    tags.network,
+    tags.operator,
+    tags.brand,
+    tags['network:short'],
+    tags['operator:short'],
+    tags.local_ref,
+    tags.route_ref,
+    tags.ref,
+    tags.name,
+  ]
+    .map((value) => normalizeTag(value))
+    .filter(Boolean)
+    .join(' ');
+}
+
+export function transitProviderContextForTags(tags = {}) {
+  return [
+    tags.network,
+    tags.operator,
+    tags.brand,
+    tags['network:short'],
+    tags['operator:short'],
+  ]
+    .map((value) => normalizeTag(value))
+    .filter(Boolean)
+    .join(' ');
+}
+
+export function isKnownFalsePositiveTags(tags = {}) {
+  const name = normalizeTag(tags.name);
+  return FALSE_POSITIVE_NAME_PATTERNS.some((pattern) => pattern.test(name));
+}
+
+export function isBrtTrolleybus(
+  tags = {},
+  transitContext = transitContextForTags(tags),
+) {
+  const trolleybus = normalizeTag(tags.trolleybus);
+  const route = normalizeTag(tags.route);
+  const hasTrolleybusContext =
+    trolleybus === 'yes' ||
+    route === 'trolleybus' ||
+    /trolebus|trolebus elevado/.test(transitContext);
+  const hasBrtCorridorContext =
+    /trolebus elevado|linea\s*(?:10|11|12)|\bl(?:10|11|12)\b|chalco|santa marta|teotongo|\bxico\b|avenida aztecas|tasquena|taxquena|perisur/.test(
+      transitContext,
+    );
+
+  return hasTrolleybusContext && hasBrtCorridorContext;
+}
+
+export function classifyStation(tags = {}) {
+  const station = normalizeTag(tags.station);
+  const railway = normalizeTag(tags.railway);
+  const operator = normalizeTag(tags.operator);
+  const transitContext = transitContextForTags(tags);
+  const providerContext = transitProviderContextForTags(tags);
+
+  if (
+    station === 'subway' ||
+    /\bstc metro\b|\bmetro cdmx\b|sistema de transporte colectivo/.test(
+      transitContext,
+    ) ||
+    (operator === 'stc' && railway === 'station')
+  ) {
+    return { keep: true, mode: 'subway', system: MODE_LABELS.subway };
+  }
+
+  if (station === 'light_rail' || /tren ligero|ste tren ligero/.test(transitContext)) {
+    return { keep: true, mode: 'light_rail', system: MODE_LABELS.light_rail };
+  }
+
+  if (station === 'monorail') {
+    return { keep: true, mode: 'monorail', system: MODE_LABELS.monorail };
+  }
+
+  if (/cablebus|mexicable/.test(transitContext)) {
+    return { keep: true, mode: 'cable_car', system: MODE_LABELS.cable_car };
+  }
+
+  if (
+    /metrobus|mexibus/.test(transitContext) ||
+    isBrtTrolleybus(tags, transitContext)
+  ) {
+    return { keep: true, mode: 'brt', system: MODE_LABELS.brt };
+  }
+
+  const isRailStop = /^(station|halt|stop)$/.test(railway);
+  if (
+    /\bsuburbano\b|ferrocarriles suburbanos|tren felipe angeles/.test(
+      providerContext,
+    ) ||
+    (isRailStop &&
+      /fc suburbano|tren suburbano|tren felipe angeles/.test(transitContext))
+  ) {
+    return {
+      keep: true,
+      mode: 'commuter_rail',
+      system: MODE_LABELS.commuter_rail,
+    };
+  }
+
+  if (/tren interurbano|el insurgente/.test(transitContext)) {
+    return {
+      keep: true,
+      mode: 'regional_rail',
+      system: MODE_LABELS.regional_rail,
+    };
+  }
+
+  return { keep: false, mode: 'excluded', system: 'Excluded' };
+}
+
+export function isStationLikeTags(tags = {}) {
+  const publicTransport = normalizeTag(tags.public_transport);
+  const highway = normalizeTag(tags.highway);
+  const amenity = normalizeTag(tags.amenity);
+  const railway = normalizeTag(tags.railway);
+
+  return (
+    /^(station|platform|stop_position)$/.test(publicTransport) ||
+    highway === 'bus_stop' ||
+    amenity === 'bus_station' ||
+    /^(station|halt|tram_stop)$/.test(railway)
+  );
+}
+
+export function shouldInheritRouteContext(member, element) {
+  const role = normalizeTag(member.role);
+
+  if (/stop|platform|station/.test(role)) return true;
+  if (!element) return false;
+  if (isStationLikeTags(element.tags)) return true;
+
+  return false;
+}
+
+export function mergeRouteContexts(existing, next) {
+  if (!existing) return next;
+
+  const merged = { ...existing };
+  for (const [key, value] of Object.entries(next)) {
+    if (!value) continue;
+    if (!merged[key]) {
+      merged[key] = value;
+      continue;
+    }
+    if (merged[key] !== value) {
+      const values = new Set(String(merged[key]).split(';').concat(value));
+      merged[key] = [...values].join(';');
+    }
+  }
+  return merged;
+}
+
+export function routeOperatorForContext(routeTags, routeContext) {
+  if (routeTags.operator) return routeTags.operator;
+  if (/mexibus/.test(routeContext)) return 'Mexibús';
+  if (/metrobus/.test(routeContext)) return 'Metrobús';
+  if (/trolebus/.test(routeContext)) return 'STE';
+  return '';
+}
+
+export function routeMemberContexts(elements) {
+  const elementsById = new Map(
+    elements
+      .filter((element) => Number.isFinite(element.id))
+      .map((element) => [`${element.type}/${element.id}`, element]),
+  );
+  const contexts = new Map();
+
+  for (const relation of elements.filter((element) => element.type === 'relation')) {
+    const routeTags = relation.tags ?? {};
+    const routeClass = classifyStation(routeTags);
+    if (!routeClass.keep || routeClass.mode !== 'brt') continue;
+
+    const routeContext = transitContextForTags(routeTags);
+    const routeNetwork =
+      routeTags.network || routeTags.ref || routeTags.name || routeClass.system;
+    const context = {
+      network: routeNetwork,
+      operator: routeOperatorForContext(routeTags, routeContext),
+      route_ref: routeTags.ref ?? '',
+      route_name: routeTags.name ?? '',
+      route_relation: `${relation.type}/${relation.id}`,
+    };
+
+    for (const member of relation.members ?? []) {
+      const key = `${member.type}/${member.ref}`;
+      const element = elementsById.get(key);
+      if (!shouldInheritRouteContext(member, element)) continue;
+      contexts.set(key, mergeRouteContexts(contexts.get(key), context));
+    }
+  }
+
+  console.log(
+    `Inherited BRT route context for ${contexts.size.toLocaleString()} stop/platform members.`,
+  );
+  return contexts;
+}
+
+export function project(lon, lat) {
+  const metersPerDegreeLat = 111_320;
+  const metersPerDegreeLon = 111_320 * Math.cos((projectionCenter.lat * Math.PI) / 180);
+
+  return {
+    x: (lon - projectionCenter.lon) * metersPerDegreeLon,
+    y: (lat - projectionCenter.lat) * metersPerDegreeLat,
+  };
+}
+
+export function pointToSegmentDistanceSquared(point, segmentStart, segmentEnd) {
+  const dx = segmentEnd.x - segmentStart.x;
+  const dy = segmentEnd.y - segmentStart.y;
+
+  if (dx === 0 && dy === 0) {
+    const px = point.x - segmentStart.x;
+    const py = point.y - segmentStart.y;
+    return px * px + py * py;
+  }
+
+  const t = Math.max(
+    0,
+    Math.min(
+      1,
+      ((point.x - segmentStart.x) * dx + (point.y - segmentStart.y) * dy) /
+        (dx * dx + dy * dy),
+    ),
+  );
+
+  const closest = {
+    x: segmentStart.x + t * dx,
+    y: segmentStart.y + t * dy,
+  };
+
+  const px = point.x - closest.x;
+  const py = point.y - closest.y;
+  return px * px + py * py;
+}
+
+export function buildStationGrid(stationFeatures) {
+  const cells = new Map();
+
+  for (const [index, feature] of stationFeatures.entries()) {
+    const [lon, lat] = feature.geometry.coordinates;
+    const projected = project(lon, lat);
+    const cellX = Math.floor(projected.x / MAX_DISTANCE_M);
+    const cellY = Math.floor(projected.y / MAX_DISTANCE_M);
+    const key = `${cellX},${cellY}`;
+    const station = {
+      index,
+      projected,
+      modeIndex: MODE_KEYS.indexOf(feature.properties.mode),
+    };
+
+    if (cells.has(key)) {
+      cells.get(key).push(station);
+    } else {
+      cells.set(key, [station]);
+    }
+  }
+
+  return cells;
+}
+
+export function stationCandidates(projectedLine, stationGrid) {
+  const bounds = projectedLine.reduce(
+    (result, point) => ({
+      minX: Math.min(result.minX, point.x),
+      minY: Math.min(result.minY, point.y),
+      maxX: Math.max(result.maxX, point.x),
+      maxY: Math.max(result.maxY, point.y),
+    }),
+    {
+      minX: Number.POSITIVE_INFINITY,
+      minY: Number.POSITIVE_INFINITY,
+      maxX: Number.NEGATIVE_INFINITY,
+      maxY: Number.NEGATIVE_INFINITY,
+    },
+  );
+  const minCellX = Math.floor((bounds.minX - MAX_DISTANCE_M) / MAX_DISTANCE_M);
+  const minCellY = Math.floor((bounds.minY - MAX_DISTANCE_M) / MAX_DISTANCE_M);
+  const maxCellX = Math.floor((bounds.maxX + MAX_DISTANCE_M) / MAX_DISTANCE_M);
+  const maxCellY = Math.floor((bounds.maxY + MAX_DISTANCE_M) / MAX_DISTANCE_M);
+  const candidates = [];
+
+  for (let cellX = minCellX; cellX <= maxCellX; cellX += 1) {
+    for (let cellY = minCellY; cellY <= maxCellY; cellY += 1) {
+      candidates.push(...(stationGrid.get(`${cellX},${cellY}`) ?? []));
+    }
+  }
+
+  return candidates;
+}
+
+export function nearestStationDistancesMeters(lineCoordinates, stationGrid) {
+  let bestDistanceSquared = Number.POSITIVE_INFINITY;
+  const bestDistanceByMode = MODE_KEYS.map(() => Number.POSITIVE_INFINITY);
+  const bestStationIndexByMode = MODE_KEYS.map(() => -1);
+  let bestStationIndex = -1;
+  const projectedLine = lineCoordinates.map(([lon, lat]) => project(lon, lat));
+  const stations = stationCandidates(projectedLine, stationGrid);
+
+  for (let i = 0; i < projectedLine.length - 1; i += 1) {
+    const segmentStart = projectedLine[i];
+    const segmentEnd = projectedLine[i + 1];
+
+    for (const station of stations) {
+      const distanceSquared = pointToSegmentDistanceSquared(
+        station.projected,
+        segmentStart,
+        segmentEnd,
+      );
+
+      if (distanceSquared < bestDistanceSquared) {
+        bestDistanceSquared = distanceSquared;
+        bestStationIndex = station.index;
+      }
+
+      if (
+        station.modeIndex >= 0 &&
+        distanceSquared < bestDistanceByMode[station.modeIndex]
+      ) {
+        bestDistanceByMode[station.modeIndex] = distanceSquared;
+        bestStationIndexByMode[station.modeIndex] = station.index;
+      }
+    }
+  }
+
+  return {
+    nearest: Math.sqrt(bestDistanceSquared),
+    byMode: bestDistanceByMode.map((distanceSquared) => Math.sqrt(distanceSquared)),
+    stationIndex: bestStationIndex,
+    stationIndexByMode: bestStationIndexByMode,
+  };
+}
+
+export function compactProperties(tags, distanceMeters) {
+  const properties = {
+    d: Math.round(Math.min(distanceMeters, MAX_DISTANCE_M)),
+  };
+
+  if (distanceMeters > MAX_DISTANCE_M) properties.o = 1;
+  if (tags.highway) properties.h = tags.highway;
+  if (tags.name) properties.n = tags.name;
+
+  return properties;
+}
+
+export async function fetchOverpass(query, label) {
+  console.log(`Fetching ${label} from Overpass...`);
+
+  for (let attempt = 1; attempt <= OVERPASS_MAX_RETRIES; attempt += 1) {
+    const response = await fetch(OVERPASS_URL, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'User-Agent':
+          'transit-colors-poc/0.1 (https://github.com/liambutler-lawrence/transit-colors)',
+      },
+      body: query,
+      signal: AbortSignal.timeout(OVERPASS_REQUEST_TIMEOUT_MS),
+    });
+
+    const body = await response.text();
+
+    if (response.ok) {
+      const data = JSON.parse(body);
+      console.log(
+        `Fetched ${data.elements.length.toLocaleString()} ${label} elements.`,
+      );
+      return data;
+    }
+
+    const retryable = [429, 502, 503, 504].includes(response.status);
+    if (retryable && attempt < OVERPASS_MAX_RETRIES) {
+      const waitMs = OVERPASS_RETRY_DELAY_MS * attempt;
+      console.warn(
+        `${label} query returned ${response.status}; retrying in ${Math.round(
+          waitMs / 1000,
+        )}s (${attempt}/${OVERPASS_MAX_RETRIES}).`,
+      );
+      await sleep(waitMs);
+      continue;
+    }
+
+    throw new Error(`${label} query failed: ${response.status}\n${body}`);
+  }
+}
+
+export function sleep(ms) {
+  return new Promise((resolveSleep) => {
+    setTimeout(resolveSleep, ms);
+  });
+}
+
+export function setProjectionCenter(bounds) {
+  projectionCenter = {
+    lat: (bounds.south + bounds.north) / 2,
+    lon: (bounds.west + bounds.east) / 2,
+  };
+}
+
+export function padBoundsMeters(bounds, paddingMeters) {
+  const centerLat = (bounds.south + bounds.north) / 2;
+  const latPadding = paddingMeters / 111_320;
+  const lonPadding = paddingMeters / (111_320 * Math.cos((centerLat * Math.PI) / 180));
+
+  return {
+    south: bounds.south - latPadding,
+    west: bounds.west - lonPadding,
+    north: bounds.north + latPadding,
+    east: bounds.east + lonPadding,
+  };
+}
+
+export function stationBounds(stationFeatures) {
+  if (stationFeatures.length === 0) {
+    throw new Error('No station features found; cannot derive street bbox.');
+  }
+
+  const bounds = stationFeatures.reduce(
+    (result, feature) => {
+      const [lon, lat] = feature.geometry.coordinates;
+      result.south = Math.min(result.south, lat);
+      result.west = Math.min(result.west, lon);
+      result.north = Math.max(result.north, lat);
+      result.east = Math.max(result.east, lon);
+      return result;
+    },
+    {
+      south: Number.POSITIVE_INFINITY,
+      west: Number.POSITIVE_INFINITY,
+      north: Number.NEGATIVE_INFINITY,
+      east: Number.NEGATIVE_INFINITY,
+    },
+  );
+
+  return padBoundsMeters(bounds, STATION_BBOX_PADDING_M);
+}
+
+export function roundedBounds(bounds) {
+  return {
+    south: Number(bounds.south.toFixed(6)),
+    west: Number(bounds.west.toFixed(6)),
+    north: Number(bounds.north.toFixed(6)),
+    east: Number(bounds.east.toFixed(6)),
+  };
+}
+
+export function boundsCacheKey(bounds) {
+  return Object.values(roundedBounds(bounds))
+    .map((value) => String(value).replace('-', 'm').replace('.', 'p'))
+    .join('_');
+}
+
+export function buildStreetTiles(bounds) {
+  const tiles = [];
+  const latStep = (bounds.north - bounds.south) / STREET_TILE_ROWS;
+  const lonStep = (bounds.east - bounds.west) / STREET_TILE_COLS;
+
+  for (let row = 0; row < STREET_TILE_ROWS; row += 1) {
+    for (let col = 0; col < STREET_TILE_COLS; col += 1) {
+      tiles.push({
+        south: bounds.south + row * latStep,
+        west: bounds.west + col * lonStep,
+        north:
+          row === STREET_TILE_ROWS - 1
+            ? bounds.north
+            : bounds.south + (row + 1) * latStep,
+        east:
+          col === STREET_TILE_COLS - 1
+            ? bounds.east
+            : bounds.west + (col + 1) * lonStep,
+      });
+    }
+  }
+
+  return tiles;
+}
+
+export async function fetchElementsWithCache(kind, query) {
+  await mkdir(cacheDir, { recursive: true });
+
+  const cachePath = resolve(cacheDir, `${kind}.json`);
+
+  if (!REFRESH_OVERPASS_CACHE) {
+    try {
+      const cachedData = JSON.parse(await readFile(cachePath, 'utf8'));
+      console.log(`Loaded ${kind} from cache.`);
+      return cachedData.elements;
+    } catch {
+      // Cache miss; fetch below.
+    }
+  }
+
+  const data = await fetchOverpass(query, kind);
+  await writeJson(cachePath, data);
+  return data.elements;
+}
+
+export async function fetchTiledElements(kind, queryForTile, bounds) {
+  await mkdir(cacheDir, { recursive: true });
+
+  const tiles = buildStreetTiles(bounds);
+  const elementsById = new Map();
+  const cacheKey = boundsCacheKey(bounds);
+
+  for (const [index, tile] of tiles.entries()) {
+    const label = `${kind} tile ${index + 1}/${tiles.length}`;
+    const cachePath = resolve(cacheDir, `${kind}-${cacheKey}-${index + 1}.json`);
+    let tileData;
+
+    if (!REFRESH_OVERPASS_CACHE) {
+      try {
+        tileData = JSON.parse(await readFile(cachePath, 'utf8'));
+        console.log(`Loaded ${label} from cache.`);
+      } catch {
+        tileData = null;
+      }
+    }
+
+    if (!tileData) {
+      tileData = await fetchOverpass(queryForTile(tile), label);
+      await writeJson(cachePath, tileData);
+    }
+
+    for (const element of tileData.elements) {
+      elementsById.set(`${element.type}/${element.id}`, element);
+    }
+
+    console.log(
+      `${kind} dedupe total: ${elementsById.size.toLocaleString()} elements.`,
+    );
+
+    if (index < tiles.length - 1 && STREET_TILE_DELAY_MS > 0) {
+      await sleep(STREET_TILE_DELAY_MS);
+    }
+  }
+
+  return [...elementsById.values()];
+}
