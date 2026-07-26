@@ -14,7 +14,6 @@ import type {
 } from './types.js';
 
 export const EARTH_RADIUS_M = 6_371_008.8;
-export const INFERRED_TRANSFER_DISTANCE_M = 350;
 export const INFERRED_TRANSFER_DISTANCE_WITHOUT_PUBLISHED_M = 900;
 export const EDGE_KEY_SEPARATOR = '\u0000';
 export const SHORTCUT_MINIMUM_LENGTH_M = 1_400;
@@ -25,6 +24,8 @@ export const CYCLE_SEARCH_BEAM_WIDTH = 4;
 export const CYCLE_SEARCH_MAX_ROUNDS = 18;
 export const OUTER_CYCLE_MERGE_SEED_LIMIT = 80;
 export const EAR_EXPANSION_SEED_LIMIT = 10;
+export const EAR_EXPANSION_ROUND_SEED_LIMIT = 4;
+export const EAR_EXPANSION_MAX_ROUNDS = 5;
 export const EAR_EXPANSION_PAIR_LIMIT = 42;
 export const SPANNING_TREE_RANDOM_SEEDS = 48;
 export const EXTREME_ANCHOR_PAIR_LIMIT = 28;

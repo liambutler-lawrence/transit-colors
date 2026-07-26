@@ -351,7 +351,7 @@ assert.equal(
 
 for (const [areaKey, expectedMinimumAreaKm2] of [
   ['cdmx', 125],
-  ['nyc', 157],
+  ['nyc', 163],
 ]) {
   const stations = JSON.parse(
     await readFile(
@@ -428,8 +428,9 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
   }
   for (const transfer of winner.segments.filter(({ type }) => type === 'transfer')) {
     assert.notEqual(transfer.from.id, transfer.to.id);
-    assert.notDeepEqual(transfer.from.coordinate, transfer.to.coordinate);
-    assert.ok(transfer.distanceMeters > 0);
+    // Distinct platform records can be stacked vertically at the same
+    // published plan coordinate (for example A/C and B/D at 145 St).
+    assert.ok(transfer.distanceMeters >= 0);
     assert.equal(transfer.coordinates.length, 2);
   }
   assert.ok(
@@ -439,6 +440,13 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
   );
 
   if (areaKey === 'nyc') {
+    const hasNetworkTransfer = (firstId, secondId) =>
+      result.network.segments.some(
+        (segment) =>
+          segment.type === 'transfer' &&
+          new Set([segment.from.id, segment.to.id]).has(firstId) &&
+          new Set([segment.from.id, segment.to.id]).has(secondId),
+      );
     const hasWinnerRide = (firstId, secondId, lineName) =>
       winner.segments.some(
         (segment) =>
@@ -447,10 +455,45 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
           new Set([segment.from.id, segment.to.id]).has(firstId) &&
           new Set([segment.from.id, segment.to.id]).has(secondId),
       );
+    const hasWinnerTransfer = (firstId, secondId) =>
+      winner.segments.some(
+        (segment) =>
+          segment.type === 'transfer' &&
+          new Set([segment.from.id, segment.to.id]).has(firstId) &&
+          new Set([segment.from.id, segment.to.id]).has(secondId),
+      );
     assert.ok(hasWinnerRide('gtfs/mta-subway/B16', 'gtfs/mta-subway/B17', 'D'));
     assert.ok(hasWinnerRide('gtfs/mta-subway/B23', 'gtfs/mta-subway/D43', 'D'));
     assert.ok(hasWinnerRide('gtfs/mta-subway/D12', 'gtfs/mta-subway/D13', 'B'));
-    assert.ok(hasWinnerRide('gtfs/mta-subway/D13', 'gtfs/mta-subway/A14', 'B'));
+    assert.ok(hasWinnerTransfer('gtfs/mta-subway/A12', 'gtfs/mta-subway/D13'));
+    assert.equal(result.methodology.inferredTransferCount, 0);
+    assert.ok(
+      result.network.segments
+        .filter((segment) => segment.type === 'transfer')
+        .every((segment) => segment.transferSource === 'published'),
+    );
+    assert.ok(
+      winner.nodeIds.includes('gtfs/mta-subway/112') &&
+        winner.nodeIds.includes('gtfs/mta-subway/A09'),
+    );
+    assert.ok(hasNetworkTransfer('gtfs/mta-subway/112', 'gtfs/mta-subway/A09'));
+    assert.equal(
+      winner.segments.find(
+        (segment) =>
+          segment.type === 'transfer' &&
+          new Set([segment.from.id, segment.to.id]).has('gtfs/mta-subway/112') &&
+          new Set([segment.from.id, segment.to.id]).has('gtfs/mta-subway/A09'),
+      )?.transferSource,
+      'published',
+    );
+    assert.ok(
+      winner.nodeIds.includes('gtfs/mta-subway/A11') &&
+        winner.nodeIds.includes('gtfs/mta-subway/D12'),
+    );
+    assert.equal(
+      hasNetworkTransfer('gtfs/mta-subway/A11', 'gtfs/mta-subway/D12'),
+      false,
+    );
     assert.equal(
       stationFeaturesById.get('gtfs/mta-subway/D13').properties.route_ref,
       'B;D',
