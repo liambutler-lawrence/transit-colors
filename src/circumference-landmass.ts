@@ -9,7 +9,7 @@ export interface LandmassCoverage {
   readonly id: string;
   readonly insideAreaSquareMeters: number;
   readonly label: string;
-  readonly mask: Coordinate[] | null;
+  readonly mask: Coordinate[][][] | null;
   readonly outsideAreaSquareMeters: number;
 }
 
@@ -49,7 +49,7 @@ export function calculateLandmassCoverage(
     if (landmass.mask == null) {
       insideAreaSquareMeters = polygonAreaSquareMeters(routeCoordinates);
     } else {
-      const intersection = clipping.intersection([routeCoordinates], [landmass.mask]);
+      const intersection = clipping.intersection([routeCoordinates], landmass.mask);
       insideAreaSquareMeters = multiPolygonAreaSquareMeters(intersection);
     }
 

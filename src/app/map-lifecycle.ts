@@ -438,6 +438,7 @@ export function installMapData(stations: StationCollection): void {
     paint: {
       'raster-opacity': 0.9,
       'raster-fade-duration': 0,
+      'raster-resampling': 'linear',
     },
   });
 
@@ -693,7 +694,7 @@ export async function initialize(): Promise<void> {
   try {
     const [basemapStyle, landmasses] = await Promise.all([
       fetchParsed('vendor/openfreemap-liberty.json', styleSpecificationSchema),
-      fetchParsed('data/circumference-landmasses.json?v=20260725d', landmassDataSchema),
+      fetchParsed('data/circumference-landmasses.json?v=20260726a', landmassDataSchema),
     ]);
     runtime.pendingBasemapStyle = basemapStyle;
     runtime.circumferenceLandmasses = landmasses;

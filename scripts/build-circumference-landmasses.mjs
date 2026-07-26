@@ -1,9 +1,17 @@
+import { VectorTile } from '@mapbox/vector-tile';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import Pbf from 'pbf';
+import polygonClipping from 'polygon-clipping';
 import { polygonAreaSquareMeters } from '../src/circumference.js';
 
 const shapefilePath = resolve(process.argv[2] ?? '/tmp/ne-land/ne_10m_land.shp');
 const outputPath = resolve('data/circumference-landmasses.json');
+const OPENFREEMAP_TILE_VERSION = '20260621_080001_pt';
+const OPENFREEMAP_TILE_URL =
+  `https://tiles.openfreemap.org/planet/${OPENFREEMAP_TILE_VERSION}` +
+  '/{z}/{x}/{y}.pbf';
+const SHORELINE_TILE_ZOOM = 12;
 
 function readPolygonRecords(buffer) {
   const records = [];
@@ -89,60 +97,95 @@ function roundedRing(ring) {
   ]);
 }
 
-function clipRingToBounds(ring, [west, south, east, north]) {
-  const clip = (points, inside, intersect) => {
-    const output = [];
+function tileX(longitude, zoom) {
+  return Math.floor(((longitude + 180) / 360) * 2 ** zoom);
+}
+
+function tileY(latitude, zoom) {
+  return Math.floor(
+    ((1 - Math.asinh(Math.tan((latitude * Math.PI) / 180)) / Math.PI) / 2) * 2 ** zoom,
+  );
+}
+
+function tileUrl(x, y, zoom) {
+  return OPENFREEMAP_TILE_URL.replace('{z}', String(zoom))
+    .replace('{x}', String(x))
+    .replace('{y}', String(y));
+}
+
+async function detailedLandPolygonsForBounds(bounds) {
+  const [west, south, east, north] = bounds;
+  const tileCoordinates = [];
+  for (
+    let x = tileX(west, SHORELINE_TILE_ZOOM);
+    x <= tileX(east, SHORELINE_TILE_ZOOM);
+    x += 1
+  ) {
     for (
-      let currentIndex = 0, previousIndex = points.length - 1;
-      currentIndex < points.length;
-      previousIndex = currentIndex, currentIndex += 1
+      let y = tileY(north, SHORELINE_TILE_ZOOM);
+      y <= tileY(south, SHORELINE_TILE_ZOOM);
+      y += 1
     ) {
-      const current = points[currentIndex];
-      const previous = points[previousIndex];
-      const currentInside = inside(current);
-      const previousInside = inside(previous);
-      if (currentInside) {
-        if (!previousInside) output.push(intersect(previous, current));
-        output.push(current);
-      } else if (previousInside) {
-        output.push(intersect(previous, current));
+      tileCoordinates.push([x, y]);
+    }
+  }
+
+  const tiles = await Promise.all(
+    tileCoordinates.map(async ([x, y]) => {
+      const url = tileUrl(x, y, SHORELINE_TILE_ZOOM);
+      const response = await fetch(url);
+      if (!response.ok) {
+        throw new Error(`Could not load shoreline tile ${url}: ${response.status}`);
+      }
+      return {
+        bytes: new Uint8Array(await response.arrayBuffer()),
+        x,
+        y,
+      };
+    }),
+  );
+
+  const waterPolygons = [];
+  for (const { bytes, x, y } of tiles) {
+    const waterLayer = new VectorTile(new Pbf(bytes)).layers.water;
+    for (let index = 0; index < (waterLayer?.length ?? 0); index += 1) {
+      const feature = waterLayer.feature(index).toGeoJSON(x, y, SHORELINE_TILE_ZOOM);
+      if (feature.geometry.type === 'Polygon') {
+        waterPolygons.push(feature.geometry.coordinates);
+      } else if (feature.geometry.type === 'MultiPolygon') {
+        waterPolygons.push(...feature.geometry.coordinates);
       }
     }
-    return output;
-  };
-  let result = ring;
-  result = clip(
-    result,
-    ([longitude]) => longitude >= west,
-    (from, to) => [
-      west,
-      from[1] + ((to[1] - from[1]) * (west - from[0])) / (to[0] - from[0]),
+  }
+
+  let waterUnion = [];
+  for (let index = 0; index < waterPolygons.length; index += 40) {
+    const chunk = polygonClipping.union(...waterPolygons.slice(index, index + 40));
+    waterUnion =
+      waterUnion.length === 0 ? chunk : polygonClipping.union(waterUnion, chunk);
+  }
+  return polygonClipping.difference(
+    [
+      [
+        [
+          [west, south],
+          [east, south],
+          [east, north],
+          [west, north],
+          [west, south],
+        ],
+      ],
     ],
+    waterUnion,
   );
-  result = clip(
-    result,
-    ([longitude]) => longitude <= east,
-    (from, to) => [
-      east,
-      from[1] + ((to[1] - from[1]) * (east - from[0])) / (to[0] - from[0]),
-    ],
-  );
-  result = clip(
-    result,
-    ([, latitude]) => latitude >= south,
-    (from, to) => [
-      from[0] + ((to[0] - from[0]) * (south - from[1])) / (to[1] - from[1]),
-      south,
-    ],
-  );
-  return clip(
-    result,
-    ([, latitude]) => latitude <= north,
-    (from, to) => [
-      from[0] + ((to[0] - from[0]) * (north - from[1])) / (to[1] - from[1]),
-      north,
-    ],
-  );
+}
+
+function landPolygonForPoint(polygons, point) {
+  const polygon = polygons.find(([outerRing]) => pointInRing(point, outerRing));
+  if (!polygon) {
+    throw new Error(`No detailed land polygon contains ${point.join(', ')}.`);
+  }
+  return polygon;
 }
 
 const records = readPolygonRecords(await readFile(shapefilePath));
@@ -151,7 +194,10 @@ const nycLandmassDefinitions = [
   {
     id: 'american-mainland',
     label: 'American mainland',
-    point: [-73.927, 40.83],
+    points: [
+      [-73.927, 40.83],
+      [-74.04, 40.73],
+    ],
   },
   { id: 'manhattan', label: 'Manhattan', point: [-73.985, 40.75] },
   { id: 'long-island', label: 'Long Island', point: [-73.97, 40.68] },
@@ -159,41 +205,46 @@ const nycLandmassDefinitions = [
     id: 'roosevelt-island',
     label: 'Roosevelt Island',
     area_m2: 722_607,
-    ring: [
-      [-73.9612, 40.7503],
-      [-73.959, 40.749],
-      [-73.9411, 40.7721],
-      [-73.9425, 40.7737],
-      [-73.9448, 40.7727],
-      [-73.9617, 40.752],
-    ],
+    point: [-73.949, 40.762],
   },
 ];
 const seenNycRings = new Set();
 const nycGradientBounds = [-74.08, 40.54, -73.7, 40.9];
+const detailedNycLandPolygons = await detailedLandPolygonsForBounds(nycGradientBounds);
 const nycLandmasses = nycLandmassDefinitions.flatMap((definition) => {
-  const record = definition.ring
-    ? { recordNumber: definition.id, ringIndex: 0, ring: definition.ring }
-    : ringRecordForPoint(records, definition.point);
-  const recordKey = `${record.recordNumber}/${record.ringIndex}`;
+  const definitionPoints = definition.points ?? [definition.point];
+  const areaPoint = definitionPoints[0];
+  const record =
+    definition.area_m2 == null ? ringRecordForPoint(records, areaPoint) : null;
+  const recordKey = record
+    ? `${record.recordNumber}/${record.ringIndex}`
+    : definition.id;
   if (seenNycRings.has(recordKey)) return [];
   seenNycRings.add(recordKey);
+  const detailedPolygons = definitionPoints.map((point) =>
+    landPolygonForPoint(detailedNycLandPolygons, point),
+  );
   return [
     {
       id: definition.id,
       label: definition.label,
-      area_m2: definition.area_m2 ?? Math.round(polygonAreaSquareMeters(record.ring)),
-      mask: roundedRing(clipRingToBounds(record.ring, nycGradientBounds)),
+      area_m2:
+        definition.area_m2 ??
+        Math.round(polygonAreaSquareMeters(record?.ring ?? detailedPolygons[0][0])),
+      mask: [...new Set(detailedPolygons)].map((polygon) => polygon.map(roundedRing)),
     },
   ];
 });
 const data = {
-  source: 'Natural Earth 1:10m land polygons',
+  source: 'Natural Earth 1:10m land-area totals',
   source_url:
     'https://www.naturalearthdata.com/downloads/10m-physical-vectors/10m-land/',
   source_version: '5.1.1',
-  supplemental_source:
-    'Roosevelt Island published 2020 Census land area with a manual local shoreline mask',
+  mask_source: 'OpenStreetMap water polygons from the OpenFreeMap basemap',
+  mask_source_url: OPENFREEMAP_TILE_URL,
+  mask_source_version: OPENFREEMAP_TILE_VERSION,
+  mask_source_zoom: SHORELINE_TILE_ZOOM,
+  supplemental_source: 'Roosevelt Island published 2020 Census land area',
   calculation:
     'Chamberlain-Duquette spherical area after exact route/landmass polygon intersection',
   areas: {

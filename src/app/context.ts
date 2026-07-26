@@ -6,6 +6,7 @@ import maplibregl, {
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
 
+import { CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE } from '../circumference-map.js';
 import {
   expressionSpecificationSchema,
   filterSpecificationSchema,
@@ -386,8 +387,8 @@ export const runtime: AppRuntime = {
 
 export const circumferenceCanvas = document.createElement('canvas');
 circumferenceCanvas.id = 'circumference-gradient-canvas';
-circumferenceCanvas.width = 512;
-circumferenceCanvas.height = 512;
+circumferenceCanvas.width = CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE;
+circumferenceCanvas.height = CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE;
 circumferenceCanvas.hidden = true;
 document.body.append(circumferenceCanvas);
 
