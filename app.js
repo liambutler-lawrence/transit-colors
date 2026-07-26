@@ -1,28 +1,29 @@
 import {
   DEFAULT_TIME_SCALE_MINUTES,
   WALKING_METERS_PER_MINUTE,
-  assignNearestStations,
   attachScheduleGraph,
   bestStreetTravelTime,
   buildTransitGraph,
   calculateTransitTimes,
+  createStreetAccessScorer,
   distanceMeters,
   scheduledWaitForService,
   scheduledWaitForStation,
+  splitStreetFeatures,
   timeScaleStops,
-} from './routing.js?v=20260721d';
+} from './routing.js?v=20260725b';
 import {
   buildCircumferenceCandidates,
   selectCircumferenceCandidate,
-} from './circumference.js?v=20260725a';
-import { renderCircumferenceGradient } from './circumference-map.js?v=20260725a';
+} from './circumference.js?v=20260725b';
+import { renderCircumferenceGradient } from './circumference-map.js?v=20260725b';
 
 const AREAS = {
   cdmx: {
     label: 'Mexico City',
     center: [-99.1332, 19.4326],
     zoom: 10.5,
-    streetTiles: 'data/cdmx-streets.pmtiles?v=20260721c',
+    streetTiles: 'data/cdmx-streets.pmtiles?v=20260722a',
     stations: 'data/cdmx-stations.geojson',
     metadata: 'data/cdmx-metadata.json',
     schedules: 'data/cdmx-schedules.json',
@@ -53,10 +54,13 @@ const initialProduct =
     : 'access';
 
 const COLORS = {
-  near: '#0aa66a',
-  midNear: '#ffd43b',
-  midFar: '#f97316',
-  far: '#c7362f',
+  near: '#006837',
+  nearMid: '#39b54a',
+  midNear: '#c7e62c',
+  mid: '#ffe34d',
+  midFar: '#ff9f1c',
+  farMid: '#ef476f',
+  far: '#7a001f',
   future: '#64748b',
 };
 
@@ -178,6 +182,7 @@ const selectionTypeEl = document.querySelector('#selection-type');
 const featureNameEl = document.querySelector('#feature-name');
 const featureSummaryEl = document.querySelector('#feature-summary');
 const featureMetadataEl = document.querySelector('#feature-metadata');
+const routeBreakdownEl = document.querySelector('#route-breakdown');
 const streetToggle = document.querySelector('#toggle-streets');
 const stationToggle = document.querySelector('#toggle-stations');
 const futureStationToggle = document.querySelector('#toggle-future-stations');
@@ -555,10 +560,16 @@ function timeStreetColor(transitTimes, scaleMinutes) {
     totalTime,
     0,
     COLORS.near,
-    stops.yellowMinutes,
+    stops.yellowMinutes / 2,
+    COLORS.nearMid,
+    stops.yellowMinutes * 0.75,
     COLORS.midNear,
+    stops.yellowMinutes,
+    COLORS.mid,
     stops.orangeMinutes,
     COLORS.midFar,
+    (stops.orangeMinutes + stops.redMinutes) / 2,
+    COLORS.farMid,
     stops.redMinutes,
     COLORS.far,
   ];
@@ -1069,10 +1080,16 @@ function streetColorExpression() {
     streetDistanceExpression(),
     0,
     COLORS.near,
-    1000,
+    500,
+    COLORS.nearMid,
+    750,
     COLORS.midNear,
+    1000,
+    COLORS.mid,
     2500,
     COLORS.midFar,
+    3750,
+    COLORS.farMid,
     maxDistanceMeters,
     COLORS.far,
   ];
@@ -1648,6 +1665,8 @@ function resetSelection() {
   featureNameEl.textContent = 'None';
   featureSummaryEl.textContent = 'Hover a highlighted street or station';
   featureMetadataEl.replaceChildren();
+  routeBreakdownEl.replaceChildren();
+  routeBreakdownEl.hidden = true;
 }
 
 function updateAreaChrome(areaKey) {
@@ -1684,7 +1703,170 @@ function updateAreaChrome(areaKey) {
 }
 
 function renderDetails(details) {
+  routeBreakdownEl.replaceChildren();
+  routeBreakdownEl.hidden = true;
   replaceMetadata(featureMetadataEl, details);
+}
+
+function routeStationName(stationId) {
+  return state.stationById.get(stationId)?.properties?.name || 'Station';
+}
+
+function routeMetadata(serviceKey) {
+  if (!serviceKey) return null;
+  const routeId = String(serviceKey).replace(/\/[^/]+$/, '');
+  return state.schedules?.routes?.[routeId] ?? null;
+}
+
+function routeLegLabel(leg) {
+  const route = routeMetadata(leg.serviceKey);
+  const modeLabel = MODE_LABELS[route?.mode ?? leg.mode] ?? 'Transit';
+  return route?.name ? `${modeLabel} ${route.name}` : modeLabel;
+}
+
+function transferDetail(leg) {
+  const fromName = routeStationName(leg.fromStationId);
+  const toName = routeStationName(leg.toStationId);
+  return fromName === toName ? `At ${toName}` : `${fromName} → ${toName}`;
+}
+
+function routeTableRows(travel) {
+  const transitLegs = state.transitTimes?.routeFromStation?.(travel.stationId);
+  if (!Array.isArray(transitLegs)) return null;
+
+  const rows = [
+    {
+      label: 'Walk',
+      detail: `To ${routeStationName(travel.stationId)} · ${formatDistance(
+        travel.distanceMeters,
+      )}`,
+      minutes: travel.walkingMinutes,
+    },
+  ];
+  let pendingWait = null;
+  let previousRideKey = null;
+  let latestTransfer = null;
+
+  for (const leg of transitLegs) {
+    if (leg.type === 'wait') {
+      pendingWait = leg;
+      continue;
+    }
+
+    if (leg.type === 'transfer') {
+      if (latestTransfer) {
+        latestTransfer.toStationId = leg.toStationId;
+        latestTransfer.minutes += leg.minutes;
+        latestTransfer.detail = transferDetail(latestTransfer);
+        continue;
+      }
+
+      const row = {
+        label: 'Transfer',
+        detail: transferDetail(leg),
+        minutes: leg.minutes,
+        fromStationId: leg.fromStationId,
+        toStationId: leg.toStationId,
+      };
+      rows.push(row);
+      latestTransfer = row;
+      continue;
+    }
+
+    if (leg.type !== 'ride') continue;
+
+    const label = routeLegLabel(leg);
+    const rideKey = leg.serviceKey ?? `mode:${leg.mode ?? 'transit'}`;
+    const changedService = previousRideKey !== null && rideKey !== previousRideKey;
+    let boardingWait = 0;
+
+    if (latestTransfer) {
+      if (changedService) latestTransfer.detail += ` · to ${label}`;
+      if (pendingWait) {
+        latestTransfer.minutes += pendingWait.minutes;
+        latestTransfer.detail += ` · ${formatMinutes(pendingWait.minutes)} wait`;
+      }
+    } else if (changedService) {
+      rows.push({
+        label: 'Transfer',
+        detail: `At ${routeStationName(leg.fromStationId)} · to ${label}`,
+        minutes: pendingWait?.minutes ?? 0,
+      });
+    } else {
+      boardingWait = pendingWait?.minutes ?? 0;
+    }
+
+    const detail = `${routeStationName(leg.fromStationId)} → ${routeStationName(
+      leg.toStationId,
+    )}`;
+    rows.push({
+      label,
+      detail:
+        boardingWait > 0
+          ? `${detail} · ${formatMinutes(boardingWait)} wait`
+          : detail,
+      minutes: leg.minutes + boardingWait,
+    });
+    pendingWait = null;
+    previousRideKey = rideKey;
+    latestTransfer = null;
+  }
+
+  if (pendingWait) {
+    rows.push({
+      label: 'Wait',
+      detail: `At ${routeStationName(pendingWait.stationId)}`,
+      minutes: pendingWait.minutes,
+    });
+  }
+
+  return rows;
+}
+
+function renderRouteBreakdown(travel) {
+  const rows = routeTableRows(travel);
+  if (!rows) return;
+
+  const heading = document.createElement('div');
+  heading.className = 'route-breakdown-heading';
+  heading.textContent = 'Route breakdown';
+
+  const table = document.createElement('table');
+  table.setAttribute('aria-label', 'Concise route breakdown');
+  const head = document.createElement('thead');
+  const headRow = document.createElement('tr');
+  for (const label of ['Leg', 'Route', 'Time']) {
+    const cell = document.createElement('th');
+    cell.scope = 'col';
+    cell.textContent = label;
+    headRow.append(cell);
+  }
+  head.append(headRow);
+
+  const body = document.createElement('tbody');
+  rows.forEach((row, index) => {
+    const tableRow = document.createElement('tr');
+    const labelCell = document.createElement('th');
+    labelCell.scope = 'row';
+
+    const stepNumber = document.createElement('span');
+    stepNumber.className = 'route-step-number';
+    stepNumber.textContent = String(index + 1);
+    const stepLabel = document.createElement('span');
+    stepLabel.textContent = row.label;
+    labelCell.append(stepNumber, stepLabel);
+
+    const detailCell = document.createElement('td');
+    detailCell.textContent = row.detail;
+    const timeCell = document.createElement('td');
+    timeCell.textContent = formatMinutes(row.minutes);
+    tableRow.append(labelCell, detailCell, timeCell);
+    body.append(tableRow);
+  });
+
+  table.append(head, body);
+  routeBreakdownEl.replaceChildren(heading, table);
+  routeBreakdownEl.hidden = false;
 }
 
 function showStreetFeature(props) {
@@ -1702,40 +1884,15 @@ function showStreetFeature(props) {
     }
 
     const accessStation = state.stationById.get(travel.stationId)?.properties;
-    const serviceKey = state.transitTimes.serviceByStation?.get(travel.stationId);
-    const serviceStateKey = serviceKey
-      ? `${travel.stationId}\u0000${serviceKey}`
-      : null;
-    const waitDetails =
-      state.waitDetailsByService.get(serviceStateKey) ??
-      state.waitDetailsByStation.get(travel.stationId);
-    const boardingWait = travel.transitMinutes > 0 ? waitDetails?.minutes ?? 0 : 0;
     featureSummaryEl.textContent = `${formatMinutes(travel.totalMinutes)} estimated to ${
       state.destination.properties.name
     }`;
     renderDetails([
       { label: 'Access station', value: accessStation?.name },
-      {
-        label: 'Access walk',
-        value: `${formatMinutes(travel.walkingMinutes)} (${formatDistance(
-          travel.distanceMeters,
-        )})`,
-      },
-      {
-        label: 'Boarding wait',
-        value:
-          travel.transitMinutes === 0
-            ? 'None — destination is the access station'
-            : waitDetails?.scheduled
-              ? `${formatMinutes(boardingWait)} (official weekly headway)`
-              : `${formatMinutes(boardingWait)} (estimated)`,
-      },
-      {
-        label: 'Ride + transfers',
-        value: formatMinutes(Math.max(0, travel.transitMinutes - boardingWait)),
-      },
+      { label: 'Departure', value: departureLabel() },
       { label: 'OSM highway', value: props.h },
     ]);
+    renderRouteBreakdown(travel);
     return;
   }
 
@@ -2142,9 +2299,17 @@ function installHover() {
 }
 
 function loadedLiveRoads() {
-  const features = map.querySourceFeatures('openmaptiles', {
-    sourceLayer: 'transportation',
-  });
+  const roadLayerIds = map
+    .getStyle()
+    .layers.filter(
+      (layer) =>
+        layer.source === 'openmaptiles' &&
+        layer['source-layer'] === 'transportation' &&
+        layer.type === 'line' &&
+        !/(?:_casing$|rail|hatching|path|pedestrian)/.test(layer.id),
+    )
+    .map((layer) => layer.id);
+  const features = map.queryRenderedFeatures({ layers: roadLayerIds });
   const seen = new Set();
   const roads = [];
 
@@ -2173,12 +2338,18 @@ function loadedLiveRoads() {
           h: roadClass,
           class: roadClass,
           brunnel: properties.brunnel || '',
+          d: 0,
         },
       });
     }
   }
 
-  return roads;
+  // Always split shared junctions so one source feature cannot give several
+  // blocks one score. A looser cap keeps the generalized overview lightweight;
+  // local zooms use the same 200m block-scale cap as the precomputed tiles.
+  return splitStreetFeatures(roads, {
+    maxLengthMeters: map.getZoom() < 12 ? 400 : 200,
+  });
 }
 
 async function refreshLiveStreetData(refreshSequence, areaSequence) {
@@ -2205,7 +2376,10 @@ async function refreshLiveStreetData(refreshSequence, areaSequence) {
     updateStatus('Indexing streets');
 
     if (activeStations.length > 0) {
-      await assignNearestStations(roadFeatures, activeStations, { candidateCount: 5 });
+      await createStreetAccessScorer(activeStations, {
+        exhaustive: true,
+        stationFilter: () => true,
+      }).scoreAsync(roadFeatures, { batchSize: 500, candidateCount: 5 });
     } else {
       for (const feature of roadFeatures) {
         feature.properties.d = maxDistanceMeters;

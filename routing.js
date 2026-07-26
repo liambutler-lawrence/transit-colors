@@ -174,6 +174,143 @@ export function distanceMeters([lonA, latA], [lonB, latB]) {
   return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(haversine));
 }
 
+function streetCoordinateKey([lon, lat]) {
+  return `${lon},${lat}`;
+}
+
+function isCoordinate(coordinate) {
+  return (
+    Array.isArray(coordinate) &&
+    coordinate.length >= 2 &&
+    Number.isFinite(coordinate[0]) &&
+    Number.isFinite(coordinate[1])
+  );
+}
+
+/**
+ * Returns coordinates used by more than one road feature. In OSM-derived
+ * street data these shared vertices are the block boundaries at junctions.
+ */
+export function streetJunctionKeys(streetFeatures) {
+  const ownerCounts = new Map();
+
+  for (const feature of streetFeatures) {
+    const featureCoordinates = new Set();
+    for (const coordinate of feature.geometry?.coordinates ?? []) {
+      if (isCoordinate(coordinate)) {
+        featureCoordinates.add(streetCoordinateKey(coordinate));
+      }
+    }
+    for (const key of featureCoordinates) {
+      ownerCounts.set(key, (ownerCounts.get(key) ?? 0) + 1);
+    }
+  }
+
+  const junctionKeys = new Set();
+  for (const [key, ownerCount] of ownerCounts) {
+    if (ownerCount > 1) junctionKeys.add(key);
+  }
+  return junctionKeys;
+}
+
+function interpolateCoordinate(start, end, ratio) {
+  return [
+    start[0] + (end[0] - start[0]) * ratio,
+    start[1] + (end[1] - start[1]) * ratio,
+  ];
+}
+
+function streetSegmentFeature(feature, coordinates) {
+  return {
+    type: 'Feature',
+    geometry: { type: 'LineString', coordinates },
+    properties: { ...(feature.properties ?? {}) },
+  };
+}
+
+/**
+ * Splits one road into block-like scoring units. Shared junctions end a unit,
+ * while the length cap keeps unusually long, unsplit roads locally accurate.
+ */
+export function splitStreetFeature(
+  feature,
+  junctionKeys = new Set(),
+  { maxLengthMeters = 200 } = {},
+) {
+  const sourceCoordinates = feature.geometry?.coordinates ?? [];
+  const coordinates = [];
+  for (const coordinate of sourceCoordinates) {
+    if (!isCoordinate(coordinate)) continue;
+    const previous = coordinates.at(-1);
+    if (
+      !previous ||
+      previous[0] !== coordinate[0] ||
+      previous[1] !== coordinate[1]
+    ) {
+      coordinates.push(coordinate);
+    }
+  }
+  if (coordinates.length < 2) return [];
+
+  const lengthCap =
+    Number.isFinite(maxLengthMeters) && maxLengthMeters > 0
+      ? maxLengthMeters
+      : Number.POSITIVE_INFINITY;
+  const segments = [];
+  let segmentCoordinates = [coordinates[0]];
+  let segmentLength = 0;
+
+  const finishSegment = () => {
+    if (segmentCoordinates.length < 2) return;
+    segments.push(streetSegmentFeature(feature, segmentCoordinates));
+    segmentCoordinates = [segmentCoordinates.at(-1)];
+    segmentLength = 0;
+  };
+
+  for (let coordinateIndex = 1; coordinateIndex < coordinates.length; coordinateIndex += 1) {
+    let edgeStart = coordinates[coordinateIndex - 1];
+    const edgeEnd = coordinates[coordinateIndex];
+    let edgeLength = distanceMeters(edgeStart, edgeEnd);
+
+    while (segmentLength + edgeLength > lengthCap + 1e-6) {
+      const availableLength = lengthCap - segmentLength;
+      if (availableLength <= 1e-6) {
+        finishSegment();
+        continue;
+      }
+
+      const splitCoordinate = interpolateCoordinate(
+        edgeStart,
+        edgeEnd,
+        availableLength / edgeLength,
+      );
+      segmentCoordinates.push(splitCoordinate);
+      finishSegment();
+      edgeStart = splitCoordinate;
+      edgeLength = distanceMeters(edgeStart, edgeEnd);
+    }
+
+    segmentCoordinates.push(edgeEnd);
+    segmentLength += edgeLength;
+
+    const isInteriorJunction =
+      coordinateIndex < coordinates.length - 1 &&
+      junctionKeys.has(streetCoordinateKey(edgeEnd));
+    if (isInteriorJunction) finishSegment();
+  }
+
+  finishSegment();
+  return segments;
+}
+
+/** Splits a road collection into independently scored block segments. */
+export function splitStreetFeatures(streetFeatures, options = {}) {
+  const junctionKeys = streetJunctionKeys(streetFeatures);
+  return streetFeatures.flatMap((feature) =>
+    splitStreetFeature(feature, junctionKeys, options),
+  );
+}
+
 function projectCoordinate([lon, lat], referenceLatitude) {
   return {
     x:
@@ -250,6 +387,213 @@ function stationGrid(stations, cellSize) {
       }
 
       return result;
+    },
+  };
+}
+
+function insertNearestStation(nearestStations, candidate, candidateCount) {
+  let insertIndex = nearestStations.length;
+  while (
+    insertIndex > 0 &&
+    nearestStations[insertIndex - 1].distanceSquared > candidate.distanceSquared
+  ) {
+    insertIndex -= 1;
+  }
+  if (insertIndex >= candidateCount) return;
+  nearestStations.splice(insertIndex, 0, candidate);
+  if (nearestStations.length > candidateCount) nearestStations.pop();
+}
+
+function nearestStationsForLine(
+  projectedLine,
+  bounds,
+  stationIndex,
+  candidateCount,
+  initialPadding,
+  requiredModes = [],
+) {
+  const requiredCount = Math.min(candidateCount, stationIndex.stations.length);
+  let padding = initialPadding;
+  let nearestStations = [];
+  let nearestByMode = new Map();
+
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    nearestStations = [];
+    nearestByMode = new Map();
+    const candidates = stationIndex.exhaustive
+      ? stationIndex.stations
+      : stationIndex.grid.candidates(bounds, padding);
+    for (const station of candidates) {
+      let distanceSquared = Number.POSITIVE_INFINITY;
+      for (let segmentIndex = 0; segmentIndex < projectedLine.length - 1; segmentIndex += 1) {
+        distanceSquared = Math.min(
+          distanceSquared,
+          pointToSegmentDistanceSquared(
+            station.projected,
+            projectedLine[segmentIndex],
+            projectedLine[segmentIndex + 1],
+          ),
+        );
+      }
+      insertNearestStation(
+        nearestStations,
+        { station, distanceSquared },
+        candidateCount,
+      );
+      const nearestForMode = nearestByMode.get(station.mode);
+      if (!nearestForMode || distanceSquared < nearestForMode.distanceSquared) {
+        nearestByMode.set(station.mode, { station, distanceSquared });
+      }
+    }
+
+    const lastRequired = nearestStations[requiredCount - 1];
+    const directCandidatesComplete =
+      requiredCount === 0 ||
+      (nearestStations.length >= requiredCount &&
+        lastRequired &&
+        Math.sqrt(lastRequired.distanceSquared) <= padding);
+    const modeCandidatesComplete = requiredModes.every((mode) => {
+      const candidate = nearestByMode.get(mode);
+      return candidate && Math.sqrt(candidate.distanceSquared) <= padding;
+    });
+    if (stationIndex.exhaustive || (directCandidatesComplete && modeCandidatesComplete)) {
+      break;
+    }
+    padding *= 2;
+  }
+
+  return { nearestByMode, nearestStations };
+}
+
+/**
+ * Builds a reusable spatial scorer for large batches of short street segments.
+ * Each geometry is projected once, then queried for its direct and per-mode
+ * candidates without repeatedly sorting the full nearby station pool.
+ */
+export function createStreetAccessScorer(
+  stationFeatures,
+  {
+    exhaustive = false,
+    stationFilter = (feature) => feature.properties.status === 'open',
+    modeForStation = (feature) => feature.properties.mode,
+  } = {},
+) {
+  const matchingFeatures = stationFeatures.filter(stationFilter);
+  if (matchingFeatures.length === 0) {
+    throw new Error('No stations are available for street access calculations.');
+  }
+
+  const referenceLatitude =
+    matchingFeatures.reduce(
+      (sum, feature) => sum + feature.geometry.coordinates[1],
+      0,
+    ) / matchingFeatures.length;
+  const stations = matchingFeatures.map((feature) => ({
+    id: feature.properties.id,
+    mode: modeForStation(feature),
+    projected: projectCoordinate(feature.geometry.coordinates, referenceLatitude),
+  }));
+  const cellSize = 2_000;
+  const indexForStations = (indexedStations) => ({
+    stations: indexedStations,
+    grid: stationGrid(indexedStations, cellSize),
+    exhaustive: exhaustive || indexedStations.length <= 100,
+  });
+  const allStations = indexForStations(stations);
+  const stationModes = new Set();
+  for (const station of stations) {
+    stationModes.add(station.mode);
+  }
+
+  const scoreFeature = (
+    feature,
+    {
+      candidateCount,
+      directStationProperty,
+      directDistanceProperty,
+      modeProperties,
+    },
+  ) => {
+    const coordinates = feature.geometry?.coordinates ?? [];
+    if (coordinates.length < 2) return;
+
+    const projectedLine = coordinates.map((coordinate) =>
+      projectCoordinate(coordinate, referenceLatitude),
+    );
+    const bounds = lineBounds(projectedLine);
+    const initialPadding = Math.max(
+      500,
+      Number(feature.properties[directDistanceProperty]) + 500 || 5_500,
+    );
+    const requestedModes = Object.keys(modeProperties).filter((mode) =>
+      stationModes.has(mode),
+    );
+    const { nearestByMode, nearestStations } = nearestStationsForLine(
+      projectedLine,
+      bounds,
+      allStations,
+      candidateCount,
+      initialPadding,
+      requestedModes,
+    );
+
+    if (candidateCount > 0) {
+      for (
+        let candidateIndex = 0;
+        candidateIndex < candidateCount;
+        candidateIndex += 1
+      ) {
+        const suffix = candidateIndex === 0 ? '' : String(candidateIndex + 1);
+        const candidate = nearestStations[candidateIndex];
+        if (candidate) {
+          feature.properties[`${directStationProperty}${suffix}`] =
+            candidate.station.id;
+          feature.properties[`${directDistanceProperty}${suffix}`] = Math.round(
+            Math.sqrt(candidate.distanceSquared),
+          );
+        }
+      }
+    }
+
+    for (const [mode, properties] of Object.entries(modeProperties)) {
+      const candidate = nearestByMode.get(mode);
+      if (!candidate) continue;
+      if (properties.station) {
+        feature.properties[properties.station] = candidate.station.id;
+      }
+      if (properties.distance) {
+        feature.properties[properties.distance] = Math.round(
+          Math.sqrt(candidate.distanceSquared),
+        );
+      }
+    }
+  };
+
+  const scoringOptions = (options = {}) => ({
+    candidateCount: options.candidateCount ?? 0,
+    directStationProperty: options.directStationProperty ?? 's',
+    directDistanceProperty: options.directDistanceProperty ?? 'd',
+    modeProperties: options.modeProperties ?? {},
+  });
+
+  return {
+    score(streetFeatures, options = {}) {
+      const resolvedOptions = scoringOptions(options);
+      for (const feature of streetFeatures) {
+        scoreFeature(feature, resolvedOptions);
+      }
+      return streetFeatures;
+    },
+    async scoreAsync(
+      streetFeatures,
+      { batchSize = 2_000, yieldControl = defaultYield, ...options } = {},
+    ) {
+      const resolvedOptions = scoringOptions(options);
+      for (let index = 0; index < streetFeatures.length; index += 1) {
+        scoreFeature(streetFeatures[index], resolvedOptions);
+        if ((index + 1) % batchSize === 0) await yieldControl();
+      }
+      return streetFeatures;
     },
   };
 }
@@ -686,6 +1030,7 @@ export function calculateTransitTimes(
   const minutesByStation = new Map(
     graph.nodes.map((node) => [node.id, Number.POSITIVE_INFINITY]),
   );
+  const nextStationByStation = new Map();
   const queue = new MinHeap();
   for (const id of validDestinationIds) {
     minutesByStation.set(id, 0);
@@ -700,6 +1045,7 @@ export function calculateTransitTimes(
       const nextMinutes = current.minutes + edgeMinutes;
       if (nextMinutes >= minutesByStation.get(neighborId)) continue;
       minutesByStation.set(neighborId, nextMinutes);
+      nextStationByStation.set(neighborId, current.id);
       queue.push({ id: neighborId, minutes: nextMinutes });
     }
   }
@@ -718,7 +1064,84 @@ export function calculateTransitTimes(
     minutesByStation.set(node.id, 90);
   }
 
+  minutesByStation.routeFromStation = (stationId) => {
+    const transitMinutes = minutesByStation.get(stationId);
+    if (!Number.isFinite(transitMinutes) || transitMinutes >= 90) return null;
+
+    const legs = [];
+    const visited = new Set();
+    let currentStationId = stationId;
+
+    while (nextStationByStation.has(currentStationId)) {
+      if (visited.has(currentStationId)) return null;
+      visited.add(currentStationId);
+
+      const nextStationId = nextStationByStation.get(currentStationId);
+      const currentNode = graph.nodeById.get(currentStationId);
+      const nextNode = graph.nodeById.get(nextStationId);
+      const minutes = graph.adjacency.get(currentStationId)?.get(nextStationId);
+      if (!currentNode || !nextNode || !Number.isFinite(minutes)) return null;
+
+      const meters = distanceMeters(currentNode.coordinates, nextNode.coordinates);
+      const isTransfer =
+        meters <= 300 ||
+        (currentNode.normalizedName &&
+          currentNode.normalizedName === nextNode.normalizedName &&
+          meters <= 900);
+      legs.push({
+        type: isTransfer ? 'transfer' : 'ride',
+        fromStationId: currentStationId,
+        toStationId: nextStationId,
+        mode: currentNode.mode,
+        serviceKey: null,
+        minutes,
+      });
+      currentStationId = nextStationId;
+    }
+
+    if (!validDestinationIds.includes(currentStationId)) return null;
+
+    const waitMinutes = Math.max(
+      0,
+      transitMinutes - legs.reduce((sum, leg) => sum + leg.minutes, 0),
+    );
+    const firstRide = legs.find((leg) => leg.type === 'ride');
+    if (waitMinutes > 0) {
+      legs.splice(Math.max(0, legs.indexOf(firstRide)), 0, {
+        type: 'wait',
+        stationId: firstRide?.fromStationId ?? stationId,
+        serviceKey: null,
+        minutes: waitMinutes,
+      });
+    }
+
+    return coalesceRideLegs(legs);
+  };
+
   return minutesByStation;
+}
+
+function coalesceRideLegs(legs) {
+  const coalesced = [];
+
+  for (const leg of legs) {
+    const previous = coalesced.at(-1);
+    const sameService =
+      previous?.type === 'ride' &&
+      leg.type === 'ride' &&
+      previous.serviceKey === leg.serviceKey &&
+      previous.mode === leg.mode &&
+      previous.toStationId === leg.fromStationId;
+
+    if (sameService) {
+      previous.toStationId = leg.toStationId;
+      previous.minutes += leg.minutes;
+    } else {
+      coalesced.push({ ...leg });
+    }
+  }
+
+  return coalesced;
 }
 
 function calculateScheduledTransitTimes(
@@ -733,18 +1156,30 @@ function calculateScheduledTransitTimes(
   );
   const routeMinutes = new Map();
   const serviceByStation = new Map();
+  const baseDecisions = new Map();
+  const routeDecisions = new Map();
   const queue = new MinHeap();
 
-  const relaxBase = (stationId, minutes, serviceKey = null) => {
+  const relaxBase = (stationId, minutes, decision = null) => {
     if (minutes >= (baseMinutes.get(stationId) ?? Number.POSITIVE_INFINITY)) return;
     baseMinutes.set(stationId, minutes);
-    if (serviceKey) serviceByStation.set(stationId, serviceKey);
+    if (decision) {
+      baseDecisions.set(stationId, decision);
+    } else {
+      baseDecisions.delete(stationId);
+    }
+    if (decision?.type === 'board') {
+      serviceByStation.set(stationId, decision.serviceKey);
+    } else {
+      serviceByStation.delete(stationId);
+    }
     queue.push({ id: stationId, kind: 'base', minutes });
   };
-  const relaxRoute = (stationId, serviceKey, minutes) => {
+  const relaxRoute = (stationId, serviceKey, minutes, decision) => {
     const key = routeStateKey(stationId, serviceKey);
     if (minutes >= (routeMinutes.get(key) ?? Number.POSITIVE_INFINITY)) return;
     routeMinutes.set(key, minutes);
+    routeDecisions.set(key, decision);
     queue.push({ id: stationId, serviceKey, kind: 'route', minutes });
   };
 
@@ -758,11 +1193,19 @@ function calculateScheduledTransitTimes(
       // Reverse of alighting: reaching a platform from the destination-side
       // station concourse is free.
       for (const serviceKey of servicesByStation.get(current.id) ?? []) {
-        relaxRoute(current.id, serviceKey, current.minutes);
+        relaxRoute(current.id, serviceKey, current.minutes, {
+          type: 'alight',
+          stationId: current.id,
+        });
       }
       for (const [fromStationId, transferMinutes] of
         reverseTransfers.get(current.id) ?? []) {
-        relaxBase(fromStationId, current.minutes + transferMinutes);
+        relaxBase(fromStationId, current.minutes + transferMinutes, {
+          type: 'transfer',
+          fromStationId,
+          toStationId: current.id,
+          minutes: transferMinutes,
+        });
       }
       continue;
     }
@@ -776,11 +1219,22 @@ function calculateScheduledTransitTimes(
       waitMinutesByService.get(currentKey) ??
       waitMinutesByStation.get(current.id) ??
       DEFAULT_ESTIMATED_WAIT_MINUTES;
-    relaxBase(current.id, current.minutes + serviceWait, current.serviceKey);
+    relaxBase(current.id, current.minutes + serviceWait, {
+      type: 'board',
+      stationId: current.id,
+      serviceKey: current.serviceKey,
+      minutes: serviceWait,
+    });
 
     for (const [fromStationId, rideMinutes] of
       ridePredecessors.get(currentKey) ?? []) {
-      relaxRoute(fromStationId, current.serviceKey, current.minutes + rideMinutes);
+      relaxRoute(fromStationId, current.serviceKey, current.minutes + rideMinutes, {
+        type: 'ride',
+        fromStationId,
+        toStationId: current.id,
+        serviceKey: current.serviceKey,
+        minutes: rideMinutes,
+      });
     }
   }
 
@@ -788,6 +1242,60 @@ function calculateScheduledTransitTimes(
     if (!Number.isFinite(minutes)) baseMinutes.set(stationId, 90);
   }
   baseMinutes.serviceByStation = serviceByStation;
+  baseMinutes.routeFromStation = (stationId) => {
+    const stationMinutes = baseMinutes.get(stationId);
+    if (!Number.isFinite(stationMinutes) || stationMinutes >= 90) return null;
+
+    const legs = [];
+    const visited = new Set();
+    let current = { kind: 'base', stationId };
+
+    while (true) {
+      const stateKey =
+        current.kind === 'base'
+          ? `base\u0000${current.stationId}`
+          : `route\u0000${current.stationId}\u0000${current.serviceKey}`;
+      if (visited.has(stateKey)) return null;
+      visited.add(stateKey);
+
+      if (current.kind === 'base') {
+        const decision = baseDecisions.get(current.stationId);
+        if (!decision) break;
+
+        if (decision.type === 'board') {
+          legs.push({ ...decision, type: 'wait' });
+          current = {
+            kind: 'route',
+            stationId: current.stationId,
+            serviceKey: decision.serviceKey,
+          };
+        } else {
+          legs.push({ ...decision });
+          current = { kind: 'base', stationId: decision.toStationId };
+        }
+        continue;
+      }
+
+      const decision = routeDecisions.get(
+        routeStateKey(current.stationId, current.serviceKey),
+      );
+      if (!decision) return null;
+
+      if (decision.type === 'ride') {
+        legs.push({ ...decision });
+        current = {
+          kind: 'route',
+          stationId: decision.toStationId,
+          serviceKey: current.serviceKey,
+        };
+      } else {
+        current = { kind: 'base', stationId: current.stationId };
+      }
+    }
+
+    if (!destinationIds.includes(current.stationId)) return null;
+    return coalesceRideLegs(legs);
+  };
   return baseMinutes;
 }
 

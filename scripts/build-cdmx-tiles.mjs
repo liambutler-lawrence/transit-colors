@@ -5,20 +5,27 @@ import { readFile, rm, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import {
+  createStreetAccessScorer,
+  splitStreetFeature,
+  streetJunctionKeys,
+} from '../routing.js';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, '..');
 const dataDir = resolve(rootDir, 'data');
 const streetsPath = resolve(dataDir, 'cdmx-streets.geojson');
-const distancesPath = resolve(dataDir, 'cdmx-street-mode-distances.json');
-const accessPath = resolve(dataDir, 'cdmx-street-access.json');
+const stationsPath = resolve(dataDir, 'cdmx-stations.geojson');
 const metadataPath = resolve(dataDir, 'cdmx-metadata.json');
 const temporaryPath = resolve(dataDir, '.cdmx-streets.ndjson');
 const tilesPath = resolve(dataDir, 'cdmx-streets.pmtiles');
 
 const MIN_ZOOM = 8;
 const MAX_ZOOM = 14;
+const MAX_SEGMENT_LENGTH_M = 200;
+const SCORING_BATCH_SIZE = 20_000;
 const NEAR_DISTANCE_M = 2500;
-const TILE_DISTANCE_PRECISION_M = 50;
+const TILE_DISTANCE_PRECISION_M = 25;
 const MODE_DISTANCE_PROPERTIES = {
   subway: 'ds',
   brt: 'db',
@@ -82,72 +89,12 @@ async function writeLine(stream, value) {
   }
 }
 
-function validateData(features, distanceData, streetAccess) {
-  if (distanceData.feature_count !== features.length) {
-    throw new Error(
-      `Street mode distances have ${distanceData.feature_count} features; expected ${features.length}.`,
-    );
-  }
-
-  for (const mode of MODE_KEYS) {
-    const distances = distanceData.distances_by_mode?.[mode];
-    if (!distances || distances.length !== features.length) {
-      throw new Error(`Invalid street distance data for station mode: ${mode}.`);
-    }
-  }
-
-  if (!Array.isArray(streetAccess.station_ids)) {
-    throw new Error('Street access station IDs are missing.');
-  }
-  for (let candidateIndex = 0; candidateIndex < 5; candidateIndex += 1) {
-    const suffix = candidateIndex === 0 ? '' : `_${candidateIndex + 1}`;
-    if (
-      !Array.isArray(streetAccess[`street_station_indexes${suffix}`]) ||
-      streetAccess[`street_station_indexes${suffix}`].length !== features.length ||
-      !Array.isArray(streetAccess[`street_station_distances${suffix}`]) ||
-      streetAccess[`street_station_distances${suffix}`].length !== features.length
-    ) {
-      throw new Error(
-        `Street access candidate ${candidateIndex + 1} does not match the street feature collection.`,
-      );
-    }
-  }
-
-  for (const mode of MODE_KEYS) {
-    const indexes = streetAccess.station_indexes_by_mode?.[mode];
-    if (!indexes || indexes.length !== features.length) {
-      throw new Error(`Invalid open street access data for station mode: ${mode}.`);
-    }
-  }
-
-  for (const mode of Object.keys(distanceData.future_distances_by_mode ?? {})) {
-    const indexes = streetAccess.future_station_indexes_by_mode?.[mode];
-    if (!indexes || indexes.length !== features.length) {
-      throw new Error(`Invalid future street access data for station mode: ${mode}.`);
-    }
-  }
-}
-
 function tileDistance(distance, maxDistance) {
   if (distance > maxDistance) return maxDistance + 1;
   return Math.round(distance / TILE_DISTANCE_PRECISION_M) * TILE_DISTANCE_PRECISION_M;
 }
 
-function nearCountsByModeSelection(featureCount, distancesByMode) {
-  const proximityMaskCounts = new Uint32Array(1 << MODE_KEYS.length);
-
-  for (let featureIndex = 0; featureIndex < featureCount; featureIndex += 1) {
-    let proximityMask = 0;
-
-    for (const [modeIndex, mode] of MODE_KEYS.entries()) {
-      if (distancesByMode[mode][featureIndex] <= NEAR_DISTANCE_M) {
-        proximityMask |= 1 << modeIndex;
-      }
-    }
-
-    proximityMaskCounts[proximityMask] += 1;
-  }
-
+function nearCountsByModeSelection(proximityMaskCounts) {
   const result = {};
   for (let selectionMask = 0; selectionMask < 1 << MODE_KEYS.length; selectionMask += 1) {
     const selectionKey = MODE_KEYS.filter(
@@ -167,53 +114,161 @@ function nearCountsByModeSelection(featureCount, distancesByMode) {
   return result;
 }
 
+function createHistogram() {
+  return {
+    under_500_m: 0,
+    under_1000_m: 0,
+    under_2500_m: 0,
+    under_5000_m: 0,
+    over_5000_m: 0,
+  };
+}
+
+function recordSegmentStatistics(
+  feature,
+  histogram,
+  proximityMaskCounts,
+  maxDistance,
+) {
+  const distance = Number(feature.properties.d);
+  if (distance <= 500) histogram.under_500_m += 1;
+  if (distance <= 1000) histogram.under_1000_m += 1;
+  if (distance <= 2500) histogram.under_2500_m += 1;
+  if (distance <= maxDistance) {
+    histogram.under_5000_m += 1;
+  } else {
+    histogram.over_5000_m += 1;
+  }
+
+  let proximityMask = 0;
+  for (const [modeIndex, mode] of MODE_KEYS.entries()) {
+    if (Number(feature.properties[MODE_DISTANCE_PROPERTIES[mode]]) <= NEAR_DISTANCE_M) {
+      proximityMask |= 1 << modeIndex;
+    }
+  }
+  proximityMaskCounts[proximityMask] += 1;
+}
+
+function scoreStreetSegments(segments, scoringContext, maxDistance) {
+  scoringContext.openScorer.score(segments, {
+    candidateCount: 5,
+    modeProperties: Object.fromEntries(
+      Object.entries(MODE_DISTANCE_PROPERTIES).map(([mode, distance]) => [
+        mode,
+        { station: `__open_${mode}`, distance },
+      ]),
+    ),
+  });
+  for (const segment of segments) {
+    if (segment.properties.d > maxDistance) {
+      segment.properties.o = 1;
+    } else {
+      delete segment.properties.o;
+    }
+    for (const mode of MODE_KEYS) {
+      const stationProperty = `__open_${mode}`;
+      segment.properties[MODE_ACCESS_PROPERTIES[mode]] =
+        scoringContext.openStationIndexes.get(segment.properties[stationProperty]);
+      delete segment.properties[stationProperty];
+    }
+  }
+
+  if (!scoringContext.futureScorer) return;
+  scoringContext.futureScorer.score(segments, {
+    modeProperties: Object.fromEntries(
+      [...scoringContext.futureModes].map((mode) => [
+        mode,
+        {
+          station: `__future_${mode}`,
+          distance: FUTURE_MODE_DISTANCE_PROPERTIES[mode],
+        },
+      ]),
+    ),
+  });
+  for (const segment of segments) {
+    for (const mode of scoringContext.futureModes) {
+      const stationProperty = `__future_${mode}`;
+      segment.properties[FUTURE_MODE_ACCESS_PROPERTIES[mode]] =
+        scoringContext.futureStationIndexes.get(segment.properties[stationProperty]);
+      delete segment.properties[stationProperty];
+    }
+  }
+}
+
+function createScoringContext(openStations, futureStations) {
+  const futureModes = new Set(
+    futureStations
+      .map((feature) => feature.properties.mode)
+      .filter((mode) => FUTURE_MODE_DISTANCE_PROPERTIES[mode]),
+  );
+  return {
+    openScorer: createStreetAccessScorer(openStations, {
+      exhaustive: true,
+      stationFilter: () => true,
+    }),
+    openStationIndexes: new Map(
+      openStations.map((feature, index) => [feature.properties.id, index]),
+    ),
+    futureScorer:
+      futureStations.length > 0
+        ? createStreetAccessScorer(futureStations, { stationFilter: () => true })
+        : null,
+    futureStationIndexes: new Map(
+      futureStations.map((feature, index) => [feature.properties.id, index]),
+    ),
+    futureModes,
+  };
+}
+
 async function buildTippecanoeInput(
   features,
-  distancesByMode,
-  futureDistancesByMode,
-  streetAccess,
+  stationFeatures,
   maxDistance,
 ) {
   const output = createWriteStream(temporaryPath, { encoding: 'utf8' });
+  const junctionKeys = streetJunctionKeys(features);
+  const openStations = stationFeatures.filter(
+    (feature) => feature.properties.status === 'open',
+  );
+  const futureStations = stationFeatures.filter(
+    (feature) => feature.properties.status !== 'open',
+  );
+  const scoringContext = createScoringContext(openStations, futureStations);
+  const histogram = createHistogram();
+  const proximityMaskCounts = new Uint32Array(1 << MODE_KEYS.length);
+  let featureIndex = 0;
+  let sourceFeatureIndex = 0;
+  let batch = [];
 
-  try {
-    for (const [featureIndex, feature] of features.entries()) {
-      const properties = {
-        ...feature.properties,
-        i: featureIndex,
-      };
+  const writeBatch = async () => {
+    if (batch.length === 0) return;
+    scoreStreetSegments(batch, scoringContext, maxDistance);
+
+    for (const feature of batch) {
+      const properties = { ...feature.properties, i: featureIndex };
 
       for (let candidateIndex = 0; candidateIndex < 5; candidateIndex += 1) {
         const suffix = candidateIndex === 0 ? '' : String(candidateIndex + 1);
-        const dataSuffix = candidateIndex === 0 ? '' : `_${candidateIndex + 1}`;
-        properties[`s${suffix}`] = streetAccess.station_ids[
-          streetAccess[`street_station_indexes${dataSuffix}`][featureIndex]
-        ];
         properties[`d${suffix}`] = tileDistance(
-          streetAccess[`street_station_distances${dataSuffix}`][featureIndex],
+          properties[`d${suffix}`],
           maxDistance,
         );
       }
-
-      for (const [mode, property] of Object.entries(MODE_DISTANCE_PROPERTIES)) {
-        properties[property] = tileDistance(
-          distancesByMode[mode][featureIndex],
-          maxDistance,
-        );
-        properties[MODE_ACCESS_PROPERTIES[mode]] =
-          streetAccess.station_indexes_by_mode[mode][featureIndex];
+      for (const property of Object.values(MODE_DISTANCE_PROPERTIES)) {
+        properties[property] = tileDistance(properties[property], maxDistance);
       }
-
-      for (const [mode, distances] of Object.entries(futureDistancesByMode)) {
-        const property = FUTURE_MODE_DISTANCE_PROPERTIES[mode];
-        if (!property || distances.length !== features.length) {
-          throw new Error(`Invalid future street distance data for station mode: ${mode}.`);
+      for (const property of Object.values(FUTURE_MODE_DISTANCE_PROPERTIES)) {
+        if (Number.isFinite(properties[property])) {
+          properties[property] = tileDistance(properties[property], maxDistance);
         }
-        properties[property] = tileDistance(distances[featureIndex], maxDistance);
-        properties[FUTURE_MODE_ACCESS_PROPERTIES[mode]] =
-          streetAccess.future_station_indexes_by_mode[mode][featureIndex];
       }
 
+      recordSegmentStatistics(
+        feature,
+        histogram,
+        proximityMaskCounts,
+        maxDistance,
+      );
       await writeLine(output, {
         type: 'Feature',
         geometry: feature.geometry,
@@ -222,11 +277,24 @@ async function buildTippecanoeInput(
           minzoom: STREET_MIN_ZOOM[feature.properties?.h] ?? 13,
         },
       });
-
-      if ((featureIndex + 1) % 50_000 === 0) {
-        console.log(`Prepared ${(featureIndex + 1).toLocaleString()} street features...`);
-      }
+      featureIndex += 1;
     }
+
+    console.log(`Prepared ${featureIndex.toLocaleString()} street segments...`);
+    batch = [];
+  };
+
+  try {
+    for (const feature of features) {
+      batch.push(
+        ...splitStreetFeature(feature, junctionKeys, {
+          maxLengthMeters: MAX_SEGMENT_LENGTH_M,
+        }),
+      );
+      sourceFeatureIndex += 1;
+      if (batch.length >= SCORING_BATCH_SIZE) await writeBatch();
+    }
+    await writeBatch();
 
     output.end();
     await once(output, 'finish');
@@ -234,6 +302,13 @@ async function buildTippecanoeInput(
     output.destroy();
     throw error;
   }
+
+  return {
+    featureCount: featureIndex,
+    histogram,
+    nearCountsByModeSelection: nearCountsByModeSelection(proximityMaskCounts),
+    sourceFeatureCount: sourceFeatureIndex,
+  };
 }
 
 async function runTippecanoe() {
@@ -260,24 +335,22 @@ async function runTippecanoe() {
 }
 
 async function main() {
-  const [streets, distanceData, streetAccess, metadata] = await Promise.all(
-    [streetsPath, distancesPath, accessPath, metadataPath].map(async (path) =>
+  const [streets, stations, metadata] = await Promise.all(
+    [streetsPath, stationsPath, metadataPath].map(async (path) =>
       JSON.parse(await readFile(path, 'utf8')),
     ),
   );
   const features = streets.features ?? [];
-  const distancesByMode = distanceData.distances_by_mode ?? {};
-  const futureDistancesByMode = distanceData.future_distances_by_mode ?? {};
+  const stationFeatures = stations.features ?? [];
+  const maxDistance = metadata.max_distance_m ?? 5000;
+  console.log(
+    `Splitting and scoring ${features.length.toLocaleString()} source streets for vector tiling...`,
+  );
 
-  validateData(features, distanceData, streetAccess);
-  console.log(`Preparing ${features.length.toLocaleString()} streets for vector tiling...`);
-
-  await buildTippecanoeInput(
+  const segmentBuild = await buildTippecanoeInput(
     features,
-    distancesByMode,
-    futureDistancesByMode,
-    streetAccess,
-    distanceData.max_distance_m ?? 5000,
+    stationFeatures,
+    maxDistance,
   );
 
   try {
@@ -288,16 +361,17 @@ async function main() {
 
   const optimizedMetadata = {
     ...metadata,
+    street_count: segmentBuild.featureCount,
+    street_source_feature_count: segmentBuild.sourceFeatureCount,
+    street_segment_max_length_m: MAX_SEGMENT_LENGTH_M,
+    histogram: segmentBuild.histogram,
     street_tiles_file: 'data/cdmx-streets.pmtiles',
     street_tiles_min_zoom: MIN_ZOOM,
     street_tiles_max_zoom: MAX_ZOOM,
     street_tile_distance_precision_m: TILE_DISTANCE_PRECISION_M,
     near_count_threshold_m: NEAR_DISTANCE_M,
     near_count_mode_order: MODE_KEYS,
-    near_counts_by_mode_selection: nearCountsByModeSelection(
-      features.length,
-      distancesByMode,
-    ),
+    near_counts_by_mode_selection: segmentBuild.nearCountsByModeSelection,
   };
 
   await writeFile(metadataPath, `${JSON.stringify(optimizedMetadata)}\n`, 'utf8');
