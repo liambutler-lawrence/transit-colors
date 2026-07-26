@@ -140,6 +140,7 @@ export const metadataSchema = z
       .object({
         under_2500_m: z.number().int().nonnegative(),
       })
+      .nullable()
       .optional(),
     max_distance_m: z.number().positive(),
     near_count_threshold_m: z.number().nonnegative().optional(),
@@ -155,7 +156,7 @@ export const metadataSchema = z
     station_modes_open: z
       .partialRecord(modeSchema, z.number().int().nonnegative())
       .optional(),
-    street_count: z.number().int().nonnegative().optional(),
+    street_count: z.number().int().nonnegative().nullable().optional(),
   })
   .loose();
 
