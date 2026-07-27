@@ -1,4 +1,5 @@
-const EARTH_RADIUS_M = 6_371_008.8;
+import { geodesicDistanceMeters as distanceMeters } from './wgs84-geodesy.mjs';
+
 const EDGE_KEY_SEPARATOR = '\u0000';
 const MAX_SHAPE_SAMPLES = 64;
 const TARGET_SAMPLE_SPACING_M = 80;
@@ -53,19 +54,6 @@ export function stationEdgeKey(firstId, secondId) {
 
 function toRadians(value) {
   return (value * Math.PI) / 180;
-}
-
-function distanceMeters([longitudeA, latitudeA], [longitudeB, latitudeB]) {
-  const latitudeARadians = toRadians(latitudeA);
-  const latitudeBRadians = toRadians(latitudeB);
-  const latitudeDelta = latitudeBRadians - latitudeARadians;
-  const longitudeDelta = toRadians(longitudeB - longitudeA);
-  const haversine =
-    Math.sin(latitudeDelta / 2) ** 2 +
-    Math.cos(latitudeARadians) *
-      Math.cos(latitudeBRadians) *
-      Math.sin(longitudeDelta / 2) ** 2;
-  return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(haversine));
 }
 
 function lineLengthMeters(coordinates) {

@@ -1,17 +1,12 @@
 import type { Coordinate } from './domain.js';
+import { metersPerDegreeAtLatitude } from './geodesy.js';
 import type { Point } from './routing/types.js';
-
-const EARTH_RADIUS_M = 6_371_008.8;
 
 export const CIRCUMFERENCE_GRADIENT_COAST_LAYER_ID = 'water';
 export const CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE = 1024;
 
 type BoundsTuple = [number, number, number, number];
 type Color = [number, number, number];
-
-function toRadians(value: number): number {
-  return (value * Math.PI) / 180;
-}
 
 function pointInPolygon(point: Point, polygon: readonly Point[]): boolean {
   let inside = false;
@@ -160,9 +155,9 @@ export function renderCircumferenceGradient(
   const height = canvas.height;
   const [west, south, east, north] = bounds;
   const referenceLatitude = (south + north) / 2;
-  const metersPerLongitudeDegree =
-    toRadians(1) * EARTH_RADIUS_M * Math.cos(toRadians(referenceLatitude));
-  const metersPerLatitudeDegree = toRadians(1) * EARTH_RADIUS_M;
+  const metricScale = metersPerDegreeAtLatitude(referenceLatitude);
+  const metersPerLongitudeDegree = metricScale.longitude;
+  const metersPerLatitudeDegree = metricScale.latitude;
   const project = ([longitude, latitude]: Coordinate): Point => ({
     x: (longitude - west) * metersPerLongitudeDegree,
     y: (latitude - south) * metersPerLatitudeDegree,

@@ -1,39 +1,17 @@
 import { createRequire } from 'node:module';
+import {
+  hasSelfIntersection,
+  polylinesProperlyIntersect,
+} from './circumference-geometry.mjs';
+import { signedAreaContributionSquareMeters } from './wgs84-geodesy.mjs';
 
-const EARTH_RADIUS_M = 6_371_008.8;
 const EDGE_SEPARATOR = '\u0000';
 
 function toRadians(value) {
   return (value * Math.PI) / 180;
 }
 
-function normalizeLongitudeDelta(delta) {
-  if (delta > Math.PI) return delta - Math.PI * 2;
-  if (delta < -Math.PI) return delta + Math.PI * 2;
-  return delta;
-}
-
-export function signedAreaContributionSquareMeters(
-  coordinates,
-  referenceLatitudeRadians = 0,
-) {
-  let accumulator = 0;
-  const referenceSine = Math.sin(referenceLatitudeRadians);
-  for (let index = 1; index < coordinates.length; index += 1) {
-    const previous = coordinates[index - 1];
-    const current = coordinates[index];
-    if (!previous || !current) continue;
-    const longitudeDelta = normalizeLongitudeDelta(
-      toRadians(current[0]) - toRadians(previous[0]),
-    );
-    accumulator +=
-      longitudeDelta *
-      (Math.sin(toRadians(previous[1])) +
-        Math.sin(toRadians(current[1])) -
-        2 * referenceSine);
-  }
-  return (accumulator * EARTH_RADIUS_M ** 2) / 2;
-}
+export { signedAreaContributionSquareMeters };
 
 function term(coefficient, variable) {
   if (Math.abs(coefficient) < 1e-12) return '';
@@ -47,66 +25,6 @@ function expression(terms) {
       .filter(Boolean)
       .join(' ') || '0'
   );
-}
-
-function orientation(first, second, third) {
-  return (
-    (second[0] - first[0]) * (third[1] - first[1]) -
-    (second[1] - first[1]) * (third[0] - first[0])
-  );
-}
-
-function segmentsProperlyIntersect(firstStart, firstEnd, secondStart, secondEnd) {
-  const firstOrientation = orientation(firstStart, firstEnd, secondStart);
-  const secondOrientation = orientation(firstStart, firstEnd, secondEnd);
-  const thirdOrientation = orientation(secondStart, secondEnd, firstStart);
-  const fourthOrientation = orientation(secondStart, secondEnd, firstEnd);
-  return (
-    firstOrientation * secondOrientation < -1e-16 &&
-    thirdOrientation * fourthOrientation < -1e-16
-  );
-}
-
-function polylinesProperlyIntersect(first, second) {
-  for (let firstIndex = 1; firstIndex < first.length; firstIndex += 1) {
-    for (let secondIndex = 1; secondIndex < second.length; secondIndex += 1) {
-      if (
-        segmentsProperlyIntersect(
-          first[firstIndex - 1],
-          first[firstIndex],
-          second[secondIndex - 1],
-          second[secondIndex],
-        )
-      ) {
-        return true;
-      }
-    }
-  }
-  return false;
-}
-
-function hasSelfIntersection(coordinates, closed = true) {
-  const segmentCount = coordinates.length - 1;
-  for (let firstIndex = 0; firstIndex < segmentCount; firstIndex += 1) {
-    for (
-      let secondIndex = firstIndex + 2;
-      secondIndex < segmentCount;
-      secondIndex += 1
-    ) {
-      if (closed && firstIndex === 0 && secondIndex === segmentCount - 1) continue;
-      if (
-        segmentsProperlyIntersect(
-          coordinates[firstIndex],
-          coordinates[firstIndex + 1],
-          coordinates[secondIndex],
-          coordinates[secondIndex + 1],
-        )
-      ) {
-        return true;
-      }
-    }
-  }
-  return false;
 }
 
 function edgeKey(firstId, secondId) {
@@ -430,15 +348,42 @@ function buildTopology(network) {
   };
 }
 
+function compressedRideEdgesProperlyIntersect(network, first, second, transferGroups) {
+  for (const firstSegmentIndex of first.originalSegmentIndices) {
+    const firstSegment = network.segments[firstSegmentIndex];
+    for (const secondSegmentIndex of second.originalSegmentIndices) {
+      const secondSegment = network.segments[secondSegmentIndex];
+      const firstGroups = [
+        transferGroups.find(firstSegment.from.id),
+        transferGroups.find(firstSegment.to.id),
+      ];
+      const secondGroups = [
+        transferGroups.find(secondSegment.from.id),
+        transferGroups.find(secondSegment.to.id),
+      ];
+      if (firstGroups.some((groupId) => secondGroups.includes(groupId))) {
+        continue;
+      }
+      if (
+        polylinesProperlyIntersect(firstSegment.coordinates, secondSegment.coordinates)
+      ) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 export function buildExactCircumferenceModel(
   network,
   noGoodCycles = [],
   requiredRootIndex = null,
   includeTransitionAreas = true,
   minimumRideObjective = null,
+  forbiddenRootIndexes = [],
 ) {
   const topology = buildTopology(network);
-  const { arcs, groupIds, incoming, outgoing, rideEdges } = topology;
+  const { arcs, groupIds, incoming, outgoing, rideEdges, transferGroups } = topology;
   const findTransferPath = transferPathFinder(network);
   const stationById = new Map(network.stations.map((station) => [station.id, station]));
   const groupReferenceCoordinates = groupIds.map((groupId) => {
@@ -593,6 +538,11 @@ export function buildExactCircumferenceModel(
       ` edge_direction_${edge.edgeIndex}: x${edge.edgeIndex * 2} + x${edge.edgeIndex * 2 + 1} <= 1`,
     );
   }
+  for (const forbiddenRootIndex of forbiddenRootIndexes) {
+    constraints.push(
+      ` forbidden_root_${forbiddenRootIndex}: y${forbiddenRootIndex} = 0`,
+    );
+  }
 
   let crossingCutCount = 0;
   for (let firstIndex = 0; firstIndex < rideEdges.length; firstIndex += 1) {
@@ -604,14 +554,8 @@ export function buildExactCircumferenceModel(
     ) {
       const second = rideEdges[secondIndex];
       if (
-        first.fromGroup === second.fromGroup ||
-        first.fromGroup === second.toGroup ||
-        first.toGroup === second.fromGroup ||
-        first.toGroup === second.toGroup
+        !compressedRideEdgesProperlyIntersect(network, first, second, transferGroups)
       ) {
-        continue;
-      }
-      if (!polylinesProperlyIntersect(first.coordinates, second.coordinates)) {
         continue;
       }
       constraints.push(
@@ -977,7 +921,17 @@ export async function solveExactMaximumAreaCycle(
     const noGoodCycles = [];
     while (true) {
       optimizationIterations += 1;
-      const model = buildExactCircumferenceModel(network, noGoodCycles, rootIndex);
+      // Assign every possible cycle to its first feedback-set root. This is a
+      // disjoint exhaustive partition, so later roots do not re-prove cycles
+      // already covered by an earlier certificate solve.
+      const model = buildExactCircumferenceModel(
+        network,
+        noGoodCycles,
+        rootIndex,
+        true,
+        null,
+        rootIndexes.slice(0, rootNumber),
+      );
       const solution = highs.solve(model.lp, {
         mip_abs_gap: 0.000001,
         mip_rel_gap: 0,

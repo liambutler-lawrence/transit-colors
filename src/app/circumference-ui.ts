@@ -619,6 +619,10 @@ export function renderCircumferenceCandidate(
         : 'Straight platform-to-platform edges',
     },
     {
+      label: 'Measurements',
+      value: 'WGS84 ellipsoidal geodesics · equal-area coast clipping',
+    },
+    {
       label: 'Network cleanup',
       value:
         methodology.removedShortcutCount > 0

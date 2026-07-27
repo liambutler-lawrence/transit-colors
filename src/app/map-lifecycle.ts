@@ -726,7 +726,7 @@ export async function initialize(): Promise<void> {
   try {
     const [basemapStyle, landmasses] = await Promise.all([
       fetchParsed('vendor/openfreemap-liberty.json', styleSpecificationSchema),
-      fetchParsed('data/circumference-landmasses.json?v=20260726a', landmassDataSchema),
+      fetchParsed('data/circumference-landmasses.json?v=20260727b', landmassDataSchema),
     ]);
     runtime.pendingBasemapStyle = basemapStyle;
     runtime.circumferenceLandmasses = landmasses;

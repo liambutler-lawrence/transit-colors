@@ -19,8 +19,44 @@ const oneDegreeSquare = [
   [0, 1],
   [0, 0],
 ];
-assert.ok(Math.abs(polygonAreaSquareMeters(oneDegreeSquare) / 1_000_000 - 12_364) < 20);
-assert.ok(lineLengthMeters(oneDegreeSquare) / 1000 > 440);
+assert.ok(
+  Math.abs(polygonAreaSquareMeters(oneDegreeSquare) / 1_000_000 - 12_308.778_361) <
+    0.001,
+);
+assert.ok(Math.abs(lineLengthMeters(oneDegreeSquare) / 1000 - 443.770_917) < 0.001);
+const syntheticLandmassCoverage = calculateLandmassCoverage(
+  oneDegreeSquare,
+  {
+    label: 'Synthetic',
+    area_m2: 1_000_000_000_000,
+    mask: null,
+    landmasses: [
+      {
+        id: 'synthetic',
+        label: 'Synthetic',
+        area_m2: 1_000_000_000_000,
+        mask: [
+          [
+            [
+              [-1, -1],
+              [2, -1],
+              [2, 2],
+              [-1, 2],
+              [-1, -1],
+            ],
+          ],
+        ],
+      },
+    ],
+  },
+  polygonClipping,
+);
+assert.ok(
+  Math.abs(
+    syntheticLandmassCoverage[0].insideAreaSquareMeters -
+      polygonAreaSquareMeters(oneDegreeSquare),
+  ) < 0.01,
+);
 assert.equal(lineColor('cdmx', '1'), '#F05097');
 assert.equal(lineColor('cdmx', 'L12'), '#BFA042');
 assert.equal(lineColor('nyc', 'A'), '#0062CF');

@@ -32,7 +32,7 @@ export const AREAS: Record<AreaKey, AreaConfig> = {
     label: 'Mexico City',
     center: [-99.1332, 19.4326],
     zoom: 10.5,
-    circumference: 'data/cdmx-circumference.json?v=20260726a',
+    circumference: 'data/cdmx-circumference.json?v=20260727b',
     streetTiles: 'data/cdmx-streets.pmtiles?v=20260725h',
     stations: 'data/cdmx-stations.geojson?v=20260725h',
     metadata: 'data/cdmx-metadata.json?v=20260725h',
@@ -45,7 +45,7 @@ export const AREAS: Record<AreaKey, AreaConfig> = {
     label: 'New York City metro',
     center: [-73.98, 40.75],
     zoom: 9.5,
-    circumference: 'data/nyc-circumference.json?v=20260727a',
+    circumference: 'data/nyc-circumference.json?v=20260727b',
     liveRoads: true,
     stations: 'data/nyc-stations.geojson?v=20260726a',
     metadata: 'data/nyc-metadata.json?v=20260726a',
@@ -159,7 +159,9 @@ export const map = new maplibregl.Map({
   style: 'vendor/openfreemap-shell.json',
   center: AREAS[initialAreaKey].center,
   zoom: AREAS[initialAreaKey].zoom,
+  minZoom: 1,
   maxZoom: 17,
+  maxPitch: 85,
 });
 window.__transitMap = map;
 
@@ -202,7 +204,13 @@ export const FUTURE_MODE_ACCESS_PROPERTIES = {
   regional_rail: 'ur',
   monorail: 'um',
 } satisfies DistanceProperties;
-map.addControl(new maplibregl.NavigationControl({ showCompass: false }), 'top-right');
+map.addControl(
+  new maplibregl.NavigationControl({
+    showCompass: true,
+    visualizePitch: true,
+  }),
+  'top-right',
+);
 
 export const statusEl = requiredElement('#status', HTMLElement);
 

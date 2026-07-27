@@ -1,4 +1,10 @@
 import type { Coordinate, Schedule } from '../domain.js';
+import {
+  geodesicDistanceMeters,
+  geodesicLineLengthMeters,
+  geodesicPolygonAreaSquareMeters,
+  metersPerDegreeAtLatitude,
+} from '../geodesy.js';
 import type {
   Adjacency,
   CyclePath,
@@ -13,7 +19,6 @@ import type {
   TrackGeometryMap,
 } from './types.js';
 
-export const EARTH_RADIUS_M = 6_371_008.8;
 export const INFERRED_TRANSFER_DISTANCE_WITHOUT_PUBLISHED_M = 900;
 export const EDGE_KEY_SEPARATOR = '\u0000';
 export const SHORTCUT_MINIMUM_LENGTH_M = 1_400;
@@ -52,6 +57,10 @@ export function normalizeLongitudeDelta(delta: number): number {
   return delta;
 }
 
+export const distanceMeters = geodesicDistanceMeters;
+export const lineLengthMeters = geodesicLineLengthMeters;
+export const polygonAreaSquareMeters = geodesicPolygonAreaSquareMeters;
+
 export function normalizeStationName(value: string = ''): string {
   return String(value)
     .normalize('NFD')
@@ -62,69 +71,6 @@ export function normalizeStationName(value: string = ''): string {
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
-}
-
-export function distanceMeters(
-  [lonA, latA]: Coordinate,
-  [lonB, latB]: Coordinate,
-): number {
-  const latARadians = toRadians(latA);
-  const latBRadians = toRadians(latB);
-  const latitudeDelta = latBRadians - latARadians;
-  const longitudeDelta = toRadians(lonB - lonA);
-  const haversine =
-    Math.sin(latitudeDelta / 2) ** 2 +
-    Math.cos(latARadians) * Math.cos(latBRadians) * Math.sin(longitudeDelta / 2) ** 2;
-
-  return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(haversine));
-}
-
-/**
- * Chamberlain-Duquette spherical polygon area. At metro scale this avoids the
- * latitude distortion of ordinary degree-based shoelace calculations while
- * keeping route and landmass measurements in one consistent model.
- */
-export function polygonAreaSquareMeters(coordinates: readonly Coordinate[]): number {
-  if (coordinates.length < 3) return 0;
-
-  const firstCoordinate = coordinates[0];
-  const finalCoordinate = coordinates.at(-1);
-  const ring =
-    coordinates.length > 3 &&
-    firstCoordinate !== undefined &&
-    finalCoordinate !== undefined &&
-    firstCoordinate[0] === finalCoordinate[0] &&
-    firstCoordinate[1] === finalCoordinate[1]
-      ? coordinates.slice(0, -1)
-      : coordinates;
-  let areaAccumulator = 0;
-
-  for (let index = 0; index < ring.length; index += 1) {
-    const current = ring[index];
-    const next = ring[(index + 1) % ring.length];
-    if (current === undefined || next === undefined) continue;
-    const longitudeDelta = normalizeLongitudeDelta(
-      toRadians(next[0]) - toRadians(current[0]),
-    );
-    areaAccumulator +=
-      longitudeDelta *
-      (2 + Math.sin(toRadians(current[1])) + Math.sin(toRadians(next[1])));
-  }
-
-  return Math.abs((areaAccumulator * EARTH_RADIUS_M ** 2) / 2);
-}
-
-export function lineLengthMeters(coordinates: readonly Coordinate[]): number {
-  if (coordinates.length < 2) return 0;
-  let length = 0;
-  for (let index = 1; index < coordinates.length; index += 1) {
-    const previous = coordinates[index - 1];
-    const current = coordinates[index];
-    if (previous !== undefined && current !== undefined) {
-      length += distanceMeters(previous, current);
-    }
-  }
-  return length;
 }
 
 function orientation(first: Coordinate, second: Coordinate, third: Coordinate): number {
@@ -358,10 +304,10 @@ function distanceToSegmentMeters(
   start: Coordinate,
   end: Coordinate,
 ): number {
-  const latitudeRadians = toRadians(point[1]);
+  const scale = metersPerDegreeAtLatitude(point[1]);
   const project = ([longitude, latitude]: Coordinate): readonly [number, number] => [
-    toRadians(longitude - point[0]) * EARTH_RADIUS_M * Math.cos(latitudeRadians),
-    toRadians(latitude - point[1]) * EARTH_RADIUS_M,
+    (longitude - point[0]) * scale.longitude,
+    (latitude - point[1]) * scale.latitude,
   ];
   const [startX, startY] = project(start);
   const [endX, endY] = project(end);
