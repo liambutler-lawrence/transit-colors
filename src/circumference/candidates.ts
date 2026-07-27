@@ -459,6 +459,7 @@ function buildGeometryVariant({
   nodes,
   normalizedLinesByEdge,
   servicePriorityByLine,
+  displayOnlyShortcuts,
   hiddenNetworkShortcuts,
   trackGeometryEnabled,
   transfersByEdge,
@@ -471,6 +472,7 @@ function buildGeometryVariant({
   readonly nodes: NodeMap;
   readonly normalizedLinesByEdge: EdgeStringSets;
   readonly servicePriorityByLine: ReadonlyMap<string, number>;
+  readonly displayOnlyShortcuts: ReadonlySet<EdgeKey>;
   readonly hiddenNetworkShortcuts: ReadonlySet<EdgeKey>;
   readonly trackGeometryEnabled: boolean;
   readonly transfersByEdge: ReadonlyMap<EdgeKey, TransferEdge>;
@@ -559,7 +561,9 @@ function buildGeometryVariant({
     .filter((candidate) => candidate.areaSquareMeters >= minimumAreaSquareMeters)
     .sort((first, second) => second.areaSquareMeters - first.areaSquareMeters);
   const networkRideSegments: CircumferenceNetworkSegment[] = [...normalizedLinesByEdge]
-    .filter(([key]) => !hiddenNetworkShortcuts.has(key))
+    .filter(
+      ([key]) => !hiddenNetworkShortcuts.has(key) || displayOnlyShortcuts.has(key),
+    )
     .map(([key, lineNames]) => {
       const [fromId, toId] = key.split(EDGE_KEY_SEPARATOR);
       if (!fromId || !toId) throw new Error(`Invalid edge key: ${key}`);
@@ -568,6 +572,7 @@ function buildGeometryVariant({
         from: getRequired(nodes, fromId),
         to: getRequired(nodes, toId),
         type: 'ride',
+        display: !displayOnlyShortcuts.has(key),
         lines: [...lineNames].sort(sortLineNames),
         coordinates: orientedEdgeCoordinates(
           fromId,
@@ -839,6 +844,7 @@ export function buildCircumferenceCandidates(
   const candidatePaths = new Map<string, CyclePath>();
   const removedShortcuts = new Set<EdgeKey>();
   const hiddenNetworkShortcuts = new Set<EdgeKey>();
+  const displayOnlyShortcuts = new Set<EdgeKey>();
   const biconnectedComponentSizes: number[] = [];
   let biconnectedComponentCount = 0;
   let corePlatformNodeCount = 0;
@@ -851,6 +857,7 @@ export function buildCircumferenceCandidates(
       ambiguousLineNames,
       normalizedLinesByEdge,
       hiddenNetworkShortcuts,
+      displayOnlyShortcuts,
       geometriesByEdge,
     )) {
       removedShortcuts.add(key);
@@ -988,6 +995,7 @@ export function buildCircumferenceCandidates(
       nodes,
       normalizedLinesByEdge,
       servicePriorityByLine,
+      displayOnlyShortcuts,
       hiddenNetworkShortcuts,
       trackGeometryEnabled,
       transfersByEdge,
@@ -1008,6 +1016,7 @@ export function buildCircumferenceCandidates(
           (first, second) => second - first,
         ),
         generatedCandidateCount: variant.generatedCandidateCount,
+        displayOnlyShortcutCount: displayOnlyShortcuts.size,
         trackGeometryAvailable: geometriesByEdge.size > 0,
         trackGeometryEdgeCount: geometriesByEdge.size,
         trackGeometryEnabled: trackGeometryEnabled && geometriesByEdge.size > 0,

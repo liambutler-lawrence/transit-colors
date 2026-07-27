@@ -53,6 +53,7 @@ export interface CircumferenceCandidate {
 
 export interface CircumferenceNetworkSegment {
   readonly coordinates: Coordinate[];
+  readonly display?: boolean | undefined;
   readonly distanceMeters?: number | undefined;
   readonly from: CircumferenceNode;
   readonly id: string;
@@ -78,6 +79,7 @@ export interface CircumferenceMethodology {
   readonly biconnectedComponentCount: number;
   readonly biconnectedComponentSizes: number[];
   readonly corePlatformNodeCount: number;
+  readonly displayOnlyShortcutCount: number;
   readonly eligibleStationCount: number;
   readonly generatedCandidateCount: number;
   readonly inferredTransferCount: number;

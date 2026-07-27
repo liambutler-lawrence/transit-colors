@@ -673,6 +673,71 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
     );
     assert.equal(continuationLanes.get('2').side, continuationLanes.get('3').side);
     assert.equal(Math.abs(continuationLanes.get('2').side), 1);
+    for (const [fromId, toId] of [
+      ['gtfs/mta-subway/F24', 'gtfs/mta-subway/F25'],
+      ['gtfs/mta-subway/F25', 'gtfs/mta-subway/F26'],
+      ['gtfs/mta-subway/F26', 'gtfs/mta-subway/F27'],
+    ]) {
+      const culverSegment = networkRideSegment(fromId, toId);
+      assert.ok(culverSegment);
+      assert.deepEqual(culverSegment.lines, ['F', 'FX', 'G']);
+    }
+    assert.equal(
+      networkRideSegment('gtfs/mta-subway/F24', 'gtfs/mta-subway/F27'),
+      undefined,
+    );
+    for (const [fromId, toId] of [
+      ['gtfs/mta-subway/710', 'gtfs/mta-subway/711'],
+      ['gtfs/mta-subway/711', 'gtfs/mta-subway/712'],
+      ['gtfs/mta-subway/712', 'gtfs/mta-subway/713'],
+      ['gtfs/mta-subway/713', 'gtfs/mta-subway/714'],
+    ]) {
+      assert.ok(networkRideSegment(fromId, toId)?.lines.includes('7X'));
+    }
+    assert.equal(
+      networkRideSegment('gtfs/mta-subway/710', 'gtfs/mta-subway/712')?.display,
+      false,
+    );
+    assert.equal(
+      networkRideSegment('gtfs/mta-subway/712', 'gtfs/mta-subway/714')?.display,
+      false,
+    );
+    const displayOnlySegments = result.network.segments.filter(
+      (segment) => segment.type === 'ride' && segment.display === false,
+    );
+    assert.equal(displayOnlySegments.length, 14);
+    assert.equal(
+      result.methodology.displayOnlyShortcutCount,
+      displayOnlySegments.length,
+    );
+    const displayedRideSegments = result.network.segments.filter(
+      (segment) => segment.type === 'ride' && segment.display !== false,
+    );
+    for (const shortcut of displayOnlySegments) {
+      for (const lineName of shortcut.lines) {
+        const reachableNodeIds = new Set([shortcut.from.id]);
+        const pendingNodeIds = [shortcut.from.id];
+        while (pendingNodeIds.length > 0) {
+          const nodeId = pendingNodeIds.shift();
+          for (const segment of displayedRideSegments) {
+            if (!segment.lines.includes(lineName)) continue;
+            const nextNodeId =
+              segment.from.id === nodeId
+                ? segment.to.id
+                : segment.to.id === nodeId
+                  ? segment.from.id
+                  : null;
+            if (nextNodeId === null || reachableNodeIds.has(nextNodeId)) continue;
+            reachableNodeIds.add(nextNodeId);
+            pendingNodeIds.push(nextNodeId);
+          }
+        }
+        assert.ok(
+          reachableNodeIds.has(shortcut.to.id),
+          `${lineName} lacks a displayed station-by-station replacement for ${shortcut.from.name} → ${shortcut.to.name}`,
+        );
+      }
+    }
     assert.equal(
       stationFeaturesById.get('gtfs/mta-subway/D13').properties.route_ref,
       'B;D',

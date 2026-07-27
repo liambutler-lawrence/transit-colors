@@ -14,6 +14,7 @@ const circumferenceNodeSchema = z.object({
 const networkSegmentSchema = z.object({
   coordinates: z.array(coordinateSchema).min(2),
   distanceMeters: z.number().nonnegative().optional(),
+  display: z.boolean().optional(),
   from: circumferenceNodeSchema,
   id: z.string().min(1),
   lines: z.array(z.string()),
@@ -45,6 +46,7 @@ const methodologySchema = z.object({
   biconnectedComponentCount: z.number().int().nonnegative(),
   biconnectedComponentSizes: z.array(z.number().int().nonnegative()),
   corePlatformNodeCount: z.number().int().nonnegative(),
+  displayOnlyShortcutCount: z.number().int().nonnegative().default(0),
   eligibleStationCount: z.number().int().nonnegative(),
   generatedCandidateCount: z.number().int().nonnegative(),
   inferredTransferCount: z.number().int().nonnegative(),
