@@ -20,6 +20,11 @@ export interface NetworkLineLayoutSegment {
   readonly toId: string;
 }
 
+export interface JunctionContinuationLane {
+  readonly index: number;
+  readonly side: -1 | 1;
+}
+
 function coordinateAtDistance(
   coordinates: readonly Coordinate[],
   targetDistanceMeters: number,
@@ -105,11 +110,6 @@ export function tracksShareFromNode(
   });
 }
 
-export function boundaryAlternativePosition(index: number): number {
-  const distance = Math.floor(index / 2) + 1;
-  return index % 2 === 0 ? -distance : distance;
-}
-
 function sharedNodeId(
   first: Pick<BoundaryLineLayoutSegment, 'fromId' | 'toId'>,
   second: Pick<NetworkLineLayoutSegment, 'fromId' | 'toId'>,
@@ -130,22 +130,22 @@ function segmentTouchesNode(
   return segment.fromId === nodeId || segment.toId === nodeId;
 }
 
-function sourceLinePosition(
+function sourceLineIndex(
   segment: BoundaryLineLayoutSegment,
   lineName: string,
 ): number | null {
-  if (lineName === segment.primaryLine) return 0;
+  if (lineName === segment.primaryLine) return null;
   const alternativeIndex = segment.displayedLines
     .filter((displayedLine) => displayedLine !== segment.primaryLine)
     .indexOf(lineName);
-  return alternativeIndex === -1 ? null : boundaryAlternativePosition(alternativeIndex);
+  return alternativeIndex === -1 ? null : alternativeIndex;
 }
 
-export function junctionContinuationLinePositions(
+export function junctionContinuationLineLanes(
   networkSegment: NetworkLineLayoutSegment,
   boundarySegments: readonly BoundaryLineLayoutSegment[],
   coordinatesByNodeId: ReadonlyMap<string, Coordinate>,
-): ReadonlyMap<string, number> {
+): ReadonlyMap<string, JunctionContinuationLane> {
   // A stop-to-stop branch can initially use the same physical track as the
   // boundary before reaching its turnout. Preserve the incoming lane slots on
   // that outgoing edge so MapLibre does not recenter the branch at the station.
@@ -180,7 +180,7 @@ export function junctionContinuationLinePositions(
           sensitivity: 'base',
         }),
       );
-    const positions = new Map<string, number>();
+    const lanes = new Map<string, JunctionContinuationLane>();
 
     for (const lineName of networkSegment.lines) {
       const sourceBoundary =
@@ -190,22 +190,23 @@ export function junctionContinuationLinePositions(
             segment.displayedLines.includes(lineName),
         ) ??
         incidentBoundaries.find((segment) => segment.displayedLines.includes(lineName));
-      let linePosition = sourceBoundary
-        ? sourceLinePosition(sourceBoundary, lineName)
-        : null;
-      if (linePosition === null || linePosition === 0) {
+      let lineIndex = sourceBoundary ? sourceLineIndex(sourceBoundary, lineName) : null;
+      if (lineIndex === null) {
         const junctionIndex = junctionAlternativeLines.indexOf(lineName);
         if (junctionIndex === -1) continue;
-        linePosition = boundaryAlternativePosition(junctionIndex);
+        lineIndex = junctionIndex;
       }
       const reversesAtNode =
         sourceBoundary !== undefined &&
         coordinatesStartAtNode(sourceBoundary.coordinates, nodeCoordinate) ===
           coordinatesStartAtNode(networkSegment.coordinates, nodeCoordinate);
-      positions.set(lineName, linePosition * (reversesAtNode ? -1 : 1));
+      lanes.set(lineName, {
+        index: lineIndex,
+        side: reversesAtNode ? -1 : 1,
+      });
     }
 
-    if (positions.size > 0) return positions;
+    if (lanes.size > 0) return lanes;
   }
   return new Map();
 }

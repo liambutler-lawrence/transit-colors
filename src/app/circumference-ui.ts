@@ -9,10 +9,10 @@ import type {
 } from 'geojson';
 
 import {
-  boundaryAlternativePosition,
   buildCircumferenceCandidates,
-  junctionContinuationLinePositions,
+  junctionContinuationLineLanes,
   selectCircumferenceCandidate,
+  type JunctionContinuationLane,
 } from '../circumference.js';
 import {
   calculateLandmassCoverage,
@@ -339,9 +339,9 @@ export function routeFeatureCollection(
       continue;
     }
     const displayedLines = segment.type === 'transfer' ? [''] : segment.lines;
-    const continuationPositions =
+    const continuationLanes: ReadonlyMap<string, JunctionContinuationLane> =
       segment.type === 'ride'
-        ? junctionContinuationLinePositions(
+        ? junctionContinuationLineLanes(
             {
               coordinates: segment.coordinates,
               fromId: segment.from.id,
@@ -351,9 +351,9 @@ export function routeFeatureCollection(
             boundaryLineLayouts,
             coordinatesByNodeId,
           )
-        : new Map<string, number>();
+        : new Map();
     for (const [index, lineName] of displayedLines.entries()) {
-      const continuationPosition = continuationPositions.get(lineName);
+      const continuationLane = continuationLanes.get(lineName);
       const feature: Feature<LineString, GeoJsonProperties> = {
         type: 'Feature',
         id: featureId,
@@ -365,7 +365,7 @@ export function routeFeatureCollection(
           kind:
             segment.type === 'transfer'
               ? 'network-transfer'
-              : continuationPosition === undefined
+              : continuationLane === undefined
                 ? 'network-segment'
                 : 'segment-alternative',
           line: lineName,
@@ -376,9 +376,10 @@ export function routeFeatureCollection(
           line_position:
             segment.type === 'transfer'
               ? 0
-              : (continuationPosition ??
+              : (continuationLane?.index ??
                 centeredLinePosition(index, displayedLines.length)),
-          junction_continuation: continuationPosition !== undefined,
+          line_side: continuationLane?.side ?? 1,
+          junction_continuation: continuationLane !== undefined,
         },
       };
       features.push(feature);
@@ -453,7 +454,8 @@ export function routeFeatureCollection(
               ? 0
               : isPrimaryLine
                 ? 0
-                : boundaryAlternativePosition(alternativeLines.indexOf(lineName)),
+                : alternativeLines.indexOf(lineName),
+          line_side: 1,
           primary_line: primaryLine,
           segment_id: segment.id,
           segment_type: segment.type,
