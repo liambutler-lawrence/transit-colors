@@ -18,6 +18,7 @@ export const INFERRED_TRANSFER_DISTANCE_WITHOUT_PUBLISHED_M = 900;
 export const EDGE_KEY_SEPARATOR = '\u0000';
 export const SHORTCUT_MINIMUM_LENGTH_M = 1_400;
 export const SAME_LINE_SHORTCUT_RATIO = 1.8;
+export const NAMED_EXPRESS_SHORTCUT_RATIO = 6;
 export const CORRIDOR_SHORTCUT_RATIO = 1.6;
 export const CORRIDOR_AVERAGE_WIDTH_M = 900;
 export const SHORTCUT_STATION_ALIGNMENT_M = 160;
@@ -421,9 +422,13 @@ export function removeServiceShortcuts(
   ambiguousLineNames: ReadonlySet<string>,
   normalizedLinesByEdge: MutableEdgeStringSets,
   hiddenNetworkShortcuts: Set<EdgeKey>,
+  displayOnlyShortcuts: Set<EdgeKey>,
   geometriesByEdge: TrackGeometryMap,
 ): Set<EdgeKey> {
   const shortcuts = new Set<EdgeKey>();
+  const allLineNames = new Set(
+    [...linesByEdge.values()].flatMap((lines) => [...lines]),
+  );
   const normalizeLinesOntoPath = (
     nodeIds: readonly NodeId[],
     lineNames: readonly string[],
@@ -448,13 +453,51 @@ export function removeServiceShortcuts(
         getRequired(nodes, fromId).coordinate,
         getRequired(nodes, toId).coordinate,
       );
-      if (directDistance < SHORTCUT_MINIMUM_LENGTH_M) continue;
 
       const directLineNames = [...(linesByEdge.get(key) ?? [])];
       if (
         directLineNames.length > 0 &&
         directLineNames.every((lineName) => ambiguousLineNames.has(lineName))
       ) {
+        continue;
+      }
+
+      const namedExpressBaseLines = new Set(
+        directLineNames.flatMap((lineName) => {
+          const trimmedName = lineName.trim();
+          const baseLineName = trimmedName.slice(0, -1);
+          return trimmedName.length > 1 &&
+            /X$/i.test(trimmedName) &&
+            allLineNames.has(baseLineName) &&
+            !directLineNames.includes(baseLineName)
+            ? [baseLineName]
+            : [];
+        }),
+      );
+      const namedExpressPath =
+        namedExpressBaseLines.size === 0
+          ? null
+          : shortestAlternatePath(
+              adjacency,
+              nodes,
+              linesByEdge,
+              fromId,
+              toId,
+              directDistance * NAMED_EXPRESS_SHORTCUT_RATIO,
+              namedExpressBaseLines,
+            );
+      if (namedExpressPath && namedExpressPath.nodeIds.length > 2) {
+        // Express GTFS edges are bounded by stops, not by physical turnouts.
+        // Normalize a named express edge only against the corresponding base
+        // service's local chain. This cannot delete atomic local edges merely
+        // because a second express chord offers a path around them.
+        normalizeLinesOntoPath(namedExpressPath.nodeIds, directLineNames);
+        hiddenNetworkShortcuts.add(key);
+        if (directDistance >= SHORTCUT_MINIMUM_LENGTH_M) {
+          shortcuts.add(key);
+        } else {
+          displayOnlyShortcuts.add(key);
+        }
         continue;
       }
 
@@ -475,13 +518,22 @@ export function removeServiceShortcuts(
           nodes,
           geometriesByEdge,
         );
-        shortcuts.add(key);
-        if (followsStations !== false) {
-          normalizeLinesOntoPath(sameLinePath.nodeIds, directLineNames);
-          hiddenNetworkShortcuts.add(key);
+        if (directDistance >= SHORTCUT_MINIMUM_LENGTH_M || followsStations === true) {
+          // Some same-line alternatives are genuinely separate alignments,
+          // such as PATH service between Grove Street and Journal Square.
+          if (followsStations !== false) {
+            normalizeLinesOntoPath(sameLinePath.nodeIds, directLineNames);
+            hiddenNetworkShortcuts.add(key);
+            if (directDistance < SHORTCUT_MINIMUM_LENGTH_M) {
+              displayOnlyShortcuts.add(key);
+              continue;
+            }
+          }
+          shortcuts.add(key);
+          continue;
         }
-        continue;
       }
+      if (directDistance < SHORTCUT_MINIMUM_LENGTH_M) continue;
 
       const corridorPath = shortestAlternatePath(
         adjacency,

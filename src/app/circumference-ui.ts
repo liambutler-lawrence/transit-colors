@@ -248,8 +248,8 @@ export function fitCircumferenceCandidate(
   { animate = true }: { readonly animate?: boolean } = {},
 ): void {
   if (!candidate || candidate.coordinates.length === 0) return;
-  const fullLineCoordinates = circumferenceState.network.segments.flatMap(
-    (segment) => segment.coordinates,
+  const fullLineCoordinates = circumferenceState.network.segments.flatMap((segment) =>
+    segment.display === false ? [] : segment.coordinates,
   );
   const bounds = [...candidate.coordinates, ...fullLineCoordinates].reduce(
     (result, coordinate) => result.extend(coordinate),
@@ -331,6 +331,7 @@ export function routeFeatureCollection(
   );
 
   for (const segment of circumferenceState.network.segments) {
+    if (segment.display === false) continue;
     if (
       segment.type === 'ride' &&
       boundaryRideKeys.has(segmentEndpointKey(segment.from.id, segment.to.id))
@@ -621,7 +622,7 @@ export function renderCircumferenceCandidate(
       label: 'Network cleanup',
       value:
         methodology.removedShortcutCount > 0
-          ? `${methodology.removedShortcutCount} limited-stop chords normalized`
+          ? `${methodology.removedShortcutCount + methodology.displayOnlyShortcutCount} limited-stop chords normalized`
           : 'No limited-stop chords detected',
     },
     {
