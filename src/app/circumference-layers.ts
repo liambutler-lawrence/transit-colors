@@ -30,11 +30,11 @@ const boundaryAlternativeOffset = expressionSpecificationSchema.parse([
   ['linear'],
   ['zoom'],
   8,
-  ['*', ['get', 'line_position'], 4.4],
+  ['*', ['get', 'line_side'], ['+', 4.4, ['*', ['get', 'line_position'], 1.8]]],
   12,
-  ['*', ['get', 'line_position'], 7.3],
+  ['*', ['get', 'line_side'], ['+', 7.3, ['*', ['get', 'line_position'], 3.2]]],
   15,
-  ['*', ['get', 'line_position'], 10.5],
+  ['*', ['get', 'line_side'], ['+', 10.5, ['*', ['get', 'line_position'], 5.2]]],
 ]);
 
 export function installCircumferenceLayers(): void {

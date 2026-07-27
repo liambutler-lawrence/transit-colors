@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import polygonClipping from 'polygon-clipping';
 import {
-  junctionContinuationLinePositions,
+  junctionContinuationLineLanes,
   buildCircumferenceCandidates,
   lineLengthMeters,
   polygonAreaSquareMeters,
@@ -652,7 +652,7 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
       ),
       false,
     );
-    const continuationPositions = junctionContinuationLinePositions(
+    const continuationLanes = junctionContinuationLineLanes(
       {
         coordinates: lenoxBranch.coordinates,
         fromId: lenoxBranch.from.id,
@@ -663,10 +663,10 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
       new Map([['gtfs/mta-subway/120', westSide96St]]),
     );
     assert.deepEqual(
-      [...continuationPositions],
+      [...continuationLanes],
       [
-        ['2', -1],
-        ['3', 1],
+        ['2', { index: 0, side: 1 }],
+        ['3', { index: 1, side: 1 }],
       ],
     );
     assert.equal(
