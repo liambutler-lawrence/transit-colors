@@ -9,7 +9,6 @@ import type {
 } from 'geojson';
 
 import {
-  buildCircumferenceCandidates,
   junctionContinuationLineLanes,
   selectCircumferenceCandidate,
   type JunctionContinuationLane,
@@ -590,7 +589,9 @@ export function renderCircumferenceCandidate(
         ? 'Manual ranked override'
         : isSegmentEdited
           ? 'Maximum matching segment edits'
-          : 'Automatic area maximum',
+          : methodology.optimizationStatus === 'optimal'
+            ? 'Proven global platform-edge maximum'
+            : 'Automatic area maximum',
     },
     {
       label: 'Landmasses',
@@ -628,6 +629,15 @@ export function renderCircumferenceCandidate(
       value: `${circumferenceState.candidates.length} diverse of ${methodology.generatedCandidateCount} valid loops`,
     },
     {
+      label: 'Optimization',
+      value:
+        methodology.optimizationStatus === 'optimal'
+          ? `Exact MILP over platform edges · proven offline in ${(
+              (methodology.optimizationMilliseconds ?? 0) / 1_000
+            ).toFixed(1)} s`
+          : 'Heuristic candidate search',
+    },
+    {
       label: 'Segment edits',
       value: isSegmentEdited
         ? `${circumferenceState.requiredSegmentIds.size} required, ${circumferenceState.avoidedSegmentIds.size} avoided`
@@ -638,7 +648,9 @@ export function renderCircumferenceCandidate(
     ? 'This ranked loop is pinned as a manual override for this metro area.'
     : isSegmentEdited
       ? 'Largest-area ranked loop that satisfies the required and avoided segments.'
-      : `Automatic winner from ${methodology.generatedCandidateCount} valid loops, ranked by contained area.`;
+      : methodology.optimizationStatus === 'optimal'
+        ? 'Precomputed exact winner; track mode preserves its topology and recalculates precise track area.'
+        : `Automatic winner from ${methodology.generatedCandidateCount} valid loops, ranked by contained area.`;
 
   positionCircumferenceGradient();
   syncCircumferenceVisibility();
@@ -650,12 +662,17 @@ export function renderCircumferenceCandidate(
 export function renderCircumferenceOptions(): void {
   const automaticOption = document.createElement('option');
   automaticOption.value = '';
-  automaticOption.textContent = 'Automatic · largest inner area';
+  automaticOption.textContent = 'Automatic · proven largest straight-edge area';
+  const rankingCandidates =
+    circumferenceState.geometryVariants?.straight.candidates ??
+    circumferenceState.candidates;
   const candidateOptions = circumferenceState.candidates.map((candidate, index) => {
     const option = document.createElement('option');
+    const rankingCandidate =
+      rankingCandidates.find(({ id }) => id === candidate.id) ?? candidate;
     option.value = candidate.id;
-    option.textContent = `#${index + 1} · ${formatArea(
-      candidate.areaSquareMeters,
+    option.textContent = `#${index + 1} · ranked ${formatArea(
+      rankingCandidate.areaSquareMeters,
     )} · Lines ${candidate.lines.join(', ')}`;
     return option;
   });
@@ -670,7 +687,7 @@ export function prepareCircumferenceRoute(
 ): void {
   if (
     sequence !== runtime.loadSequence ||
-    !state.schedules ||
+    !circumferenceState.geometryVariants ||
     !runtime.circumferenceLandmasses?.areas?.[runtime.activeAreaKey]
   ) {
     return;
@@ -691,21 +708,8 @@ export function prepareCircumferenceRoute(
   const geometryMode: CircumferenceGeometryMode = routeTrackGeometryToggle.checked
     ? 'track'
     : 'straight';
-  let result: CircumferenceModeResult;
-  if (
-    circumferenceState.areaKey === runtime.activeAreaKey &&
-    circumferenceState.geometryVariants
-  ) {
-    result = circumferenceState.geometryVariants[geometryMode];
-  } else {
-    const built = buildCircumferenceCandidates(
-      runtime.loadedStations.features,
-      state.schedules,
-      { useTrackGeometry: routeTrackGeometryToggle.checked },
-    );
-    circumferenceState.geometryVariants = built.geometryVariants;
-    result = built.geometryVariants[geometryMode];
-  }
+  const result: CircumferenceModeResult =
+    circumferenceState.geometryVariants[geometryMode];
   circumferenceState.areaKey = runtime.activeAreaKey;
   circumferenceState.geometryMode = geometryMode;
   circumferenceState.candidates = result.candidates;
@@ -739,5 +743,11 @@ export function prepareCircumferenceRoute(
   renderCircumferenceCandidate(candidate, {
     fit: runtime.activeProduct === 'circumference',
   });
+  if (window.__transitPerformance.circumferenceReadyMs === null) {
+    window.__transitPerformance.circumferenceReadyMs =
+      performance.now() - window.__transitPerformance.startedAt;
+    document.documentElement.dataset['circumferenceReadyMs'] =
+      window.__transitPerformance.circumferenceReadyMs.toFixed(1);
+  }
   if (runtime.activeProduct === 'circumference') updateStatus('Route ready');
 }

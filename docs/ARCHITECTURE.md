@@ -45,15 +45,20 @@ re-export.
 ## Circumference calculation
 
 `src/circumference/graph.ts` contains graph and spherical geometry primitives.
-`src/circumference/cycles.ts` generates candidate cycles. Candidate ranking and route
-construction live in `src/circumference/candidates.ts`.
+`src/circumference/cycles.ts` generates diverse manual-override candidates. Candidate
+ranking and network construction live in `src/circumference/candidates.ts`.
 
-The calculation removes non-cyclic branches and route shortcuts, generates several
-families of valid simple cycles, rejects self-intersections and repeated stations, and
-ranks the remaining loops by geodesic enclosed area. Ride edges use averaged official
-GTFS shape centerlines when available and exact platform-to-platform fallback geometry
-otherwise. Both track and straight variants share the same topology and can be switched
-without rebuilding the graph.
+`scripts/exact-circumference-solver.mjs` proves the automatic winner offline. It
+contracts published free-transfer complexes, removes the graph 2-core's impossible
+branches, compresses degree-two corridors, rejects crossing edges, and solves a
+connected simple-cycle MILP at a feedback vertex set that intersects every possible
+cycle. The maximum is defined on straight platform edges so track-shape tunnel curves
+cannot change route topology. Track mode then recalculates displayed geometry, length,
+and enclosed area from averaged official GTFS centerlines.
+
+The checked-in `data/*-circumference.json` files contain the proven winner, diverse
+manual alternatives, and the complete eligible network. The browser validates and
+renders these files; it never runs the combinatorial search during page load.
 
 The circumference map renders the full eligible subway network in official line colors,
 then emphasizes the selected boundary and its walking transfers.

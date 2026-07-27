@@ -60,6 +60,17 @@ import type {
   TransferEdge,
 } from './types.js';
 
+// The current MTA static GTFS omits this in-complex connection even though the
+// 1 and R/W platforms are connected inside the Whitehall St–South Ferry paid
+// area. Keep the platform nodes distinct and supply only the missing walk.
+const PUBLISHED_TRANSFER_SUPPLEMENTS = [
+  {
+    fromId: 'gtfs/mta-subway/142',
+    minutes: 3,
+    toId: 'gtfs/mta-subway/R27',
+  },
+];
+
 function traceFaces(adjacency: ReadonlyAdjacency, nodes: NodeMap): CyclePath[] {
   const sortedNeighbors = new Map<NodeId, NodeId[]>();
   for (const [nodeId, neighbors] of adjacency) {
@@ -241,18 +252,19 @@ function selectDiverseCandidates(
   return selected;
 }
 
-function sortLineNames(first: string, second: string): number {
+export function sortLineNames(first: string, second: string): number {
   return String(first).localeCompare(String(second), 'en', {
     numeric: true,
     sensitivity: 'base',
   });
 }
 
-function serviceStopPriority(lineName: string, description?: string): number {
+export function serviceStopPriority(lineName: string, description?: string): number {
   const serviceDescription = String(description ?? '');
   const isLocal = /\blocal\b/i.test(serviceDescription);
   const isExpress =
-    /\bexpress\b/i.test(serviceDescription) || /X$/i.test(String(lineName).trim());
+    /\bexpress\b/i.test(serviceDescription) ||
+    /^(?:N|.*X)$/i.test(String(lineName).trim());
   if (isLocal && !isExpress) return 0;
   if (isExpress && !isLocal) return 2;
   return 1;
@@ -352,7 +364,7 @@ function selectRideRunPrimaryLines(
   );
 }
 
-function assignPrimaryLines(
+export function assignPrimaryLines(
   segments: readonly CircumferenceSegment[],
   servicePriorityByLine: ReadonlyMap<string, number>,
 ): CircumferenceSegment[] {
@@ -751,6 +763,16 @@ export function buildCircumferenceCandidates(
       ) {
         publishedTransferCount += 1;
       }
+    }
+  }
+  for (const supplement of PUBLISHED_TRANSFER_SUPPLEMENTS) {
+    if (
+      addTransfer(supplement.fromId, supplement.toId, {
+        source: 'published',
+        minutes: supplement.minutes,
+      })
+    ) {
+      publishedTransferCount += 1;
     }
   }
   // Name matching is only a fallback for feeds that publish no transfer table

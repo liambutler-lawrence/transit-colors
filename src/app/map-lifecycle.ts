@@ -1,6 +1,8 @@
 import type { FeatureIdentifier } from 'maplibre-gl';
 
 import { selectCircumferenceCandidate } from '../circumference.js';
+import { circumferenceGeometryVariantsSchema } from '../circumference/schema.js';
+import type { CircumferenceGeometryVariants } from '../circumference/types.js';
 import { createCircumferenceGradientSource } from '../circumference-gradient-source.js';
 import { createStreetAccessScorer, splitStreetFeatures } from '../routing.js';
 import {
@@ -92,6 +94,7 @@ import {
   routeAutoButton,
   routeAvoidSegmentButton,
   routeChoiceSelect,
+  routeChoiceSummaryEl,
   routeClearSegmentsButton,
   routeGradientToggle,
   routeRequireSegmentButton,
@@ -622,6 +625,18 @@ export function scheduleDestinationSetup(
   }
 }
 
+async function fetchCircumferenceGeometryVariants(
+  url: string,
+): Promise<CircumferenceGeometryVariants> {
+  const response = await fetch(url);
+  if (!response.ok) {
+    throw new Error(
+      `Failed to load precomputed circumference data: ${response.status} ${response.statusText}`,
+    );
+  }
+  return circumferenceGeometryVariantsSchema.parse(await response.json());
+}
+
 export async function loadArea(
   areaKey: AreaKey,
   { initial = false }: { readonly initial?: boolean } = {},
@@ -640,6 +655,7 @@ export async function loadArea(
   resetSelection();
 
   try {
+    const circumferencePromise = fetchCircumferenceGeometryVariants(area.circumference);
     const [stations, metadata] = await Promise.all([
       fetchParsed(area.stations, stationCollectionSchema),
       fetchParsed(area.metadata, metadataSchema),
@@ -670,6 +686,21 @@ export async function loadArea(
     syncStationVisibility();
     syncCircumferenceVisibility();
     updateViewportStatistics();
+    void circumferencePromise
+      .then((geometryVariants) => {
+        if (sequence !== runtime.loadSequence) return;
+        circumferenceState.geometryVariants = geometryVariants;
+        prepareCircumferenceRoute(sequence);
+      })
+      .catch((error: unknown) => {
+        if (sequence !== runtime.loadSequence) return;
+        console.error(error);
+        if (runtime.activeProduct === 'circumference') {
+          updateStatus('Route data missing', { isError: true });
+          routeChoiceSummaryEl.textContent =
+            'Precomputed circumference routes could not be loaded.';
+        }
+      });
     window.__transitPerformance.dataFetchedMs =
       performance.now() - window.__transitPerformance.startedAt;
     scheduleDestinationSetup(area, stations, sequence);
