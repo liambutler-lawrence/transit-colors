@@ -10,7 +10,9 @@ New York City region. It includes:
 
 Circumference routes follow averaged centerlines from official GTFS track shapes by
 default, with an option to compare straight platform-to-platform geometry. The map also
-shows every eligible metro line and platform in its official agency color.
+shows every eligible metro line and platform in its official agency color. At regional
+and world scale it renders as an interactive globe, transitioning continuously to the
+familiar flat-map view at street scale.
 
 The public site is deployed at
 [liambutler-lawrence.github.io/transit-colors](https://liambutler-lawrence.github.io/transit-colors/).
@@ -20,7 +22,8 @@ The public site is deployed at
 - TypeScript with strict compiler and type-aware ESLint rules
 - Zod validation for network and map-feature boundaries
 - Vite
-- MapLibre GL JS and PMTiles
+- MapLibre GL JS globe rendering and PMTiles
+- GeographicLib WGS84 ellipsoidal distance and area calculations
 - OpenFreeMap, OpenStreetMap, official GTFS feeds, and Natural Earth data
 
 The application is entirely static. Runtime data is committed under `data/`; no

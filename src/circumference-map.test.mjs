@@ -7,6 +7,28 @@ import {
   CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE,
 } from './circumference-map.ts';
 
+test('the map starts as an atmospheric globe with a close-zoom transition', async () => {
+  const shellStyle = JSON.parse(
+    await readFile(
+      new URL('../vendor/openfreemap-shell.json', import.meta.url),
+      'utf8',
+    ),
+  );
+
+  assert.equal(shellStyle.projection.type, 'globe');
+  assert.deepEqual(shellStyle.sky['atmosphere-blend'], [
+    'interpolate',
+    ['linear'],
+    ['zoom'],
+    0,
+    1,
+    5,
+    0.85,
+    7,
+    0,
+  ]);
+});
+
 test('the circumference gradient uses the detailed basemap shoreline', async () => {
   const basemap = JSON.parse(
     await readFile(

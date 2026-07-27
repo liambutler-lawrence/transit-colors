@@ -5,6 +5,7 @@ import type {
   StationFeature,
   StreetFeature,
 } from '../domain.js';
+import { geodesicDistanceMeters, metersPerDegreeAtLatitude } from '../geodesy.js';
 import type {
   AssignNearestOptions,
   Bounds,
@@ -23,7 +24,6 @@ export const WALKING_METERS_PER_MINUTE = 80;
 export const DEFAULT_TIME_SCALE_MINUTES = 15;
 export const DEFAULT_ESTIMATED_WAIT_MINUTES = 4;
 
-const EARTH_RADIUS_M = 6_371_008.8;
 export const DEFAULT_TRANSFER_MINUTES = 3;
 
 export function timeScaleStops(value: number | string = DEFAULT_TIME_SCALE_MINUTES): {
@@ -188,10 +188,6 @@ export const MODE_MAX_LINK_M = {
   monorail: 4_000,
 } satisfies Record<Mode, number>;
 
-function toRadians(value: number): number {
-  return (value * Math.PI) / 180;
-}
-
 export function normalize(value: string = ''): string {
   return value
     .normalize('NFD')
@@ -200,20 +196,7 @@ export function normalize(value: string = ''): string {
     .toLowerCase();
 }
 
-export function distanceMeters(
-  [lonA, latA]: Coordinate,
-  [lonB, latB]: Coordinate,
-): number {
-  const latARadians = toRadians(latA);
-  const latBRadians = toRadians(latB);
-  const latitudeDelta = latBRadians - latARadians;
-  const longitudeDelta = toRadians(lonB - lonA);
-  const haversine =
-    Math.sin(latitudeDelta / 2) ** 2 +
-    Math.cos(latARadians) * Math.cos(latBRadians) * Math.sin(longitudeDelta / 2) ** 2;
-
-  return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(haversine));
-}
+export const distanceMeters = geodesicDistanceMeters;
 
 function streetCoordinateKey([lon, lat]: Coordinate): string {
   return `${lon},${lat}`;
@@ -373,9 +356,10 @@ export function splitStreetFeatures(
 }
 
 function projectCoordinate([lon, lat]: Coordinate, referenceLatitude: number): Point {
+  const scale = metersPerDegreeAtLatitude(referenceLatitude);
   return {
-    x: EARTH_RADIUS_M * toRadians(lon) * Math.cos(toRadians(referenceLatitude)),
-    y: EARTH_RADIUS_M * toRadians(lat),
+    x: lon * scale.longitude,
+    y: lat * scale.latitude,
   };
 }
 

@@ -246,7 +246,7 @@ const data = {
   mask_source_zoom: SHORELINE_TILE_ZOOM,
   supplemental_source: 'Roosevelt Island published 2020 Census land area',
   calculation:
-    'Chamberlain-Duquette spherical area after exact route/landmass polygon intersection',
+    'GeographicLib WGS84 ellipsoidal area after local equal-area route/landmass polygon intersection',
   areas: {
     cdmx: {
       label: 'American mainland',

@@ -59,6 +59,7 @@
     "vite": "^8.1.5"
   },
   "dependencies": {
+    "geographiclib-geodesic": "^2.2.0",
     "zod": "^4.4.3"
   }
 }

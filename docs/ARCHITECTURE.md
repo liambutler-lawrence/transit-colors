@@ -44,9 +44,11 @@ re-export.
 
 ## Circumference calculation
 
-`src/circumference/graph.ts` contains graph and spherical geometry primitives.
-`src/circumference/cycles.ts` generates diverse manual-override candidates. Candidate
-ranking and network construction live in `src/circumference/candidates.ts`.
+`src/geodesy.ts` contains projection-independent WGS84 ellipsoidal distance and area
+primitives. `src/circumference/graph.ts` contains the transit graph and delegates its
+measurements to those primitives. `src/circumference/cycles.ts` generates diverse
+manual-override candidates. Candidate ranking and network construction live in
+`src/circumference/candidates.ts`.
 
 `scripts/exact-circumference-solver.mjs` proves the automatic winner offline. It
 contracts published free-transfer complexes, removes the graph 2-core's impossible
@@ -55,6 +57,12 @@ connected simple-cycle MILP at a feedback vertex set that intersects every possi
 cycle. The maximum is defined on straight platform edges so track-shape tunnel curves
 cannot change route topology. Track mode then recalculates displayed geometry, length,
 and enclosed area from averaged official GTFS centerlines.
+
+Landmass intersections are performed in a local WGS84 equal-area workspace for robust
+polygon topology, transformed back to longitude/latitude, and measured on the WGS84
+ellipsoid. The MapLibre camera is independent of these calculations: it renders a freely
+rotatable globe at low zoom and transitions to its flat close-zoom view without changing
+any stored route metrics.
 
 The checked-in `data/*-circumference.json` files contain the proven winner, diverse
 manual alternatives, and the complete eligible network. The browser validates and

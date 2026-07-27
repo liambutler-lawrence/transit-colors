@@ -87,7 +87,9 @@ After downloading and extracting Natural Earth 5.1.1 `ne_10m_land.shp`:
 npm run build:data:landmasses -- /path/to/ne_10m_land.shp
 ```
 
-The result includes the masks and measured areas used by Circumference Lab.
+The result includes the masks and measured areas used by Circumference Lab. Landmass
+totals and clipped route coverage use WGS84 ellipsoidal area; the clipping workspace
+uses a local equal-area transform rather than Web Mercator.
 
 ## Validation
 

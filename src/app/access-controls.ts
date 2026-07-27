@@ -786,8 +786,10 @@ export function applyMapBounds(metadata: Metadata): void {
 
   const padding = compactPanelQuery.matches ? 24 : 48;
 
+  // Keep the selected metro area as the camera target without fencing the
+  // user into its bounding box. Globe mode remains freely pannable and can be
+  // zoomed all the way out, then automatically flattens again at street scale.
   map.setMaxBounds(null);
-  map.setMaxBounds(bounds);
   map.fitBounds(bounds, {
     padding,
     duration: 0,
