@@ -68,8 +68,11 @@ The checked-in `data/*-circumference.json` files contain the proven winner, dive
 manual alternatives, and the complete eligible network. The browser validates and
 renders these files; it never runs the combinatorial search during page load.
 
-The circumference map renders the full eligible subway network in official line colors,
-then emphasizes the selected boundary and its walking transfers.
+The circumference map keeps one independent route state and gradient image source per
+metro area. It merges both complete networks and selected boundaries into one GeoJSON
+source, rendered in official line colors, so changing the focused area never removes the
+other city. The “Focus on…” control changes the camera and the active route controls; it
+does not filter map content.
 
 ## Static data
 

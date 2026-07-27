@@ -31,6 +31,7 @@ import {
   circumferenceMetadataEl,
   circumferenceNameEl,
   circumferenceState,
+  circumferenceStates,
   circumferenceSummaryEl,
   departureLabel,
   destinationSelect,
@@ -501,13 +502,19 @@ export function selectDestination(stationId: string): void {
 }
 
 export function showCircumferenceSegment(properties: SegmentProperties): void {
-  if (!circumferenceState.selected) return;
+  const routeState = circumferenceStates[properties.area_key];
+  if (!routeState.selected) return;
   const isTransfer = properties.segment_type === 'transfer';
-  circumferenceState.inspectedSegmentId = properties.segment_id || '';
+  const isFocusedArea = properties.area_key === runtime.activeAreaKey;
+  circumferenceState.inspectedSegmentId = isFocusedArea
+    ? properties.segment_id || ''
+    : '';
   routeRequireSegmentButton.disabled =
+    !isFocusedArea ||
     !circumferenceState.inspectedSegmentId ||
     circumferenceState.requiredSegmentIds.has(circumferenceState.inspectedSegmentId);
   routeAvoidSegmentButton.disabled =
+    !isFocusedArea ||
     !circumferenceState.inspectedSegmentId ||
     circumferenceState.avoidedSegmentIds.has(circumferenceState.inspectedSegmentId);
   circumferenceNameEl.textContent = isTransfer
@@ -539,15 +546,17 @@ export function showCircumferenceSegment(properties: SegmentProperties): void {
     },
     {
       label: 'Loop area',
-      value: formatArea(circumferenceState.selected.areaSquareMeters),
+      value: formatArea(routeState.selected.areaSquareMeters),
     },
     {
       label: 'Override',
-      value: circumferenceState.requiredSegmentIds.has(properties.segment_id)
-        ? 'Required'
-        : circumferenceState.avoidedSegmentIds.has(properties.segment_id)
-          ? 'Avoided'
-          : 'None',
+      value: !isFocusedArea
+        ? `Focus on ${AREAS[properties.area_key].label} to edit`
+        : circumferenceState.requiredSegmentIds.has(properties.segment_id)
+          ? 'Required'
+          : circumferenceState.avoidedSegmentIds.has(properties.segment_id)
+            ? 'Avoided'
+            : 'None',
     },
   ]);
 }

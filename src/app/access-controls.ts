@@ -816,7 +816,7 @@ export function updateAreaChrome(areaKey: AreaKey): void {
   mapEl.setAttribute(
     'aria-label',
     runtime.activeProduct === 'circumference'
-      ? `${area.label} maximum-area circumferential route map`
+      ? `All maximum-area circumferential routes map, focused on ${area.label}`
       : area.supportsDestination
         ? `${area.label} transit access and travel time map`
         : `${area.label} transit proximity map`,

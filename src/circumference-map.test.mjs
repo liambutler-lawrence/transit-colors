@@ -72,3 +72,24 @@ test('the circumference gradient uses the detailed basemap shoreline', async () 
     2,
   );
 });
+
+test('the circumference picker is a focus control for an always-visible map', async () => {
+  const shell = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const lifecycle = await readFile(
+    new URL('./app/map-lifecycle.ts', import.meta.url),
+    'utf8',
+  );
+  const circumferenceUi = await readFile(
+    new URL('./app/circumference-ui.ts', import.meta.url),
+    'utf8',
+  );
+
+  assert.match(shell, /<span>Focus on…<\/span>/);
+  assert.match(shell, /full\s+eligible network for both metro areas/);
+  assert.match(lifecycle, /AREA_KEYS\.map\(async \(areaKey\)/);
+  assert.match(lifecycle, /circumference-gradient-\$\{areaKey\}/);
+  assert.match(
+    circumferenceUi,
+    /AREA_KEYS\.flatMap\(\(areaKey\) =>[\s\S]*routeFeatureCollection/,
+  );
+});

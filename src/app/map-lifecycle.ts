@@ -48,9 +48,9 @@ import {
 } from './access-controls.js';
 import {
   firstSymbolLayerId,
+  focusCircumferenceArea,
   prepareCircumferenceRoute,
   renderCircumferenceCandidate,
-  resetCircumferenceRoute,
   storeCircumferenceOverride,
   syncCircumferenceVisibility,
 } from './circumference-ui.js';
@@ -68,15 +68,17 @@ import {
 } from './feature-details.js';
 import {
   AREAS,
+  AREA_KEYS,
   COLORS,
   LIVE_ROAD_CLASSES,
   MODE_LABELS,
   accessProductButton,
   activeStationModes,
   areaSelect,
-  circumferenceCanvas,
+  circumferenceCanvases,
   circumferenceProductButton,
   circumferenceState,
+  circumferenceStates,
   destinationSelect,
   featureSummaryEl,
   futureStationFilter,
@@ -94,7 +96,6 @@ import {
   routeAutoButton,
   routeAvoidSegmentButton,
   routeChoiceSelect,
-  routeChoiceSummaryEl,
   routeClearSegmentsButton,
   routeGradientToggle,
   routeRequireSegmentButton,
@@ -103,6 +104,7 @@ import {
   runtime,
   scheduleDaySelect,
   scheduleTimeInput,
+  setActiveCircumferenceState,
   setCurrentDeparture,
   state,
   stationBreakdownEl,
@@ -234,7 +236,13 @@ export function installHover(): void {
     map.on('click', layerId, (event) => {
       const feature = event.features?.[0];
       const properties = segmentPropertiesSchema.safeParse(feature?.properties);
-      if (properties.success) showCircumferenceSegment(properties.data);
+      if (!properties.success) return;
+      if (properties.data.area_key !== runtime.activeAreaKey) {
+        areaSelect.value = properties.data.area_key;
+        areaSelect.dispatchEvent(new Event('change'));
+        return;
+      }
+      showCircumferenceSegment(properties.data);
     });
   }
 }
@@ -421,30 +429,37 @@ export function installMapData(stations: StationCollection): void {
     generateId: true,
   });
 
-  map.addSource(
-    'circumference-gradient',
-    createCircumferenceGradientSource(
-      circumferenceCanvas.toDataURL('image/png'),
-      [-99.42, 19.18, -98.84, 19.66],
-    ),
-  );
-
   map.addSource('circumference-route', {
     type: 'geojson',
     data: { type: 'FeatureCollection', features: [] },
   });
 
-  map.addLayer({
-    id: 'circumference-gradient',
-    type: 'raster',
-    source: 'circumference-gradient',
-    layout: { visibility: 'none' },
-    paint: {
-      'raster-opacity': 0.9,
-      'raster-fade-duration': 0,
-      'raster-resampling': 'linear',
-    },
-  });
+  for (const areaKey of AREA_KEYS) {
+    const sourceId = `circumference-gradient-${areaKey}`;
+    const gradientBounds =
+      runtime.circumferenceLandmasses?.areas[areaKey].gradient_bounds ??
+      (areaKey === 'cdmx'
+        ? [-99.42, 19.18, -98.84, 19.66]
+        : [-74.08, 40.54, -73.7, 40.9]);
+    map.addSource(
+      sourceId,
+      createCircumferenceGradientSource(
+        circumferenceCanvases[areaKey].toDataURL('image/png'),
+        gradientBounds,
+      ),
+    );
+    map.addLayer({
+      id: sourceId,
+      type: 'raster',
+      source: sourceId,
+      layout: { visibility: 'none' },
+      paint: {
+        'raster-opacity': 0.9,
+        'raster-fade-duration': 0,
+        'raster-resampling': 'linear',
+      },
+    });
+  }
 
   map.addLayer(
     {
@@ -648,14 +663,13 @@ export async function loadArea(
 
   if (!initial) beginLoading(`Loading ${area.label}`, 'area');
   runtime.activeAreaKey = areaKey;
+  setActiveCircumferenceState(areaKey);
   setCurrentDeparture(area);
   resetDestinationRouting();
-  resetCircumferenceRoute();
   updateAreaChrome(areaKey);
   resetSelection();
 
   try {
-    const circumferencePromise = fetchCircumferenceGeometryVariants(area.circumference);
     const [stations, metadata] = await Promise.all([
       fetchParsed(area.stations, stationCollectionSchema),
       fetchParsed(area.metadata, metadataSchema),
@@ -686,21 +700,7 @@ export async function loadArea(
     syncStationVisibility();
     syncCircumferenceVisibility();
     updateViewportStatistics();
-    void circumferencePromise
-      .then((geometryVariants) => {
-        if (sequence !== runtime.loadSequence) return;
-        circumferenceState.geometryVariants = geometryVariants;
-        prepareCircumferenceRoute(sequence);
-      })
-      .catch((error: unknown) => {
-        if (sequence !== runtime.loadSequence) return;
-        console.error(error);
-        if (runtime.activeProduct === 'circumference') {
-          updateStatus('Route data missing', { isError: true });
-          routeChoiceSummaryEl.textContent =
-            'Precomputed circumference routes could not be loaded.';
-        }
-      });
+    prepareCircumferenceRoute(sequence);
     window.__transitPerformance.dataFetchedMs =
       performance.now() - window.__transitPerformance.startedAt;
     scheduleDestinationSetup(area, stations, sequence);
@@ -724,12 +724,24 @@ export async function loadArea(
 
 export async function initialize(): Promise<void> {
   try {
-    const [basemapStyle, landmasses] = await Promise.all([
+    const [basemapStyle, landmasses, circumferenceEntries] = await Promise.all([
       fetchParsed('vendor/openfreemap-liberty.json', styleSpecificationSchema),
       fetchParsed('data/circumference-landmasses.json?v=20260727b', landmassDataSchema),
+      Promise.all(
+        AREA_KEYS.map(async (areaKey) => ({
+          areaKey,
+          geometryVariants: await fetchCircumferenceGeometryVariants(
+            AREAS[areaKey].circumference,
+          ),
+        })),
+      ),
     ]);
     runtime.pendingBasemapStyle = basemapStyle;
     runtime.circumferenceLandmasses = landmasses;
+    for (const { areaKey, geometryVariants } of circumferenceEntries) {
+      circumferenceStates[areaKey].geometryVariants = geometryVariants;
+    }
+    setActiveCircumferenceState(initialAreaKey);
     await loadArea(initialAreaKey, { initial: true });
   } catch (error) {
     console.error(error);
@@ -863,7 +875,13 @@ map.on('idle', () => {
 });
 areaSelect.addEventListener('change', () => {
   const areaKey = areaSelect.value;
-  if (isAreaKey(areaKey) && areaKey !== runtime.activeAreaKey) void loadArea(areaKey);
+  if (!isAreaKey(areaKey) || areaKey === runtime.activeAreaKey) return;
+  if (runtime.activeProduct === 'circumference') {
+    runtime.activeAreaKey = areaKey;
+    updateAreaChrome(areaKey);
+    focusCircumferenceArea(areaKey);
+  }
+  void loadArea(areaKey);
 });
 
 accessProductButton.addEventListener('click', () => {
@@ -918,7 +936,9 @@ routeTrackGeometryToggle.addEventListener('change', () => {
     routeTrackGeometryToggle.checked ? 'Following track paths' : 'Using straight edges',
     { isLoading: true },
   );
-  circumferenceState.candidates = [];
+  for (const areaKey of AREA_KEYS) {
+    circumferenceStates[areaKey].candidates = [];
+  }
   requestAnimationFrame(() => {
     prepareCircumferenceRoute();
   });
