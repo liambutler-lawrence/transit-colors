@@ -56,6 +56,8 @@ export const AREAS: Record<AreaKey, AreaConfig> = {
   },
 };
 
+export const AREA_KEYS: readonly AreaKey[] = ['cdmx', 'nyc'];
+
 export function isAreaKey(value: string | null): value is AreaKey {
   return value === 'cdmx' || value === 'nyc';
 }
@@ -395,29 +397,50 @@ export const runtime: AppRuntime = {
   streetAccessStationIds: [],
 };
 
-export const circumferenceCanvas = document.createElement('canvas');
-circumferenceCanvas.id = 'circumference-gradient-canvas';
-circumferenceCanvas.width = CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE;
-circumferenceCanvas.height = CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE;
-circumferenceCanvas.hidden = true;
-document.body.append(circumferenceCanvas);
+function createCircumferenceCanvas(areaKey: AreaKey): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  canvas.id = `circumference-gradient-canvas-${areaKey}`;
+  canvas.width = CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE;
+  canvas.height = CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE;
+  canvas.hidden = true;
+  document.body.append(canvas);
+  return canvas;
+}
 
-export const circumferenceState: CircumferenceState = {
-  areaKey: null,
-  candidates: [],
-  geometryMode: null,
-  geometryVariants: null,
-  network: {
-    segments: [],
-    stations: [],
-  },
-  selected: null,
-  overrideId: '',
-  methodology: null,
-  inspectedSegmentId: '',
-  requiredSegmentIds: new Set<string>(),
-  avoidedSegmentIds: new Set<string>(),
+export const circumferenceCanvases: Record<AreaKey, HTMLCanvasElement> = {
+  cdmx: createCircumferenceCanvas('cdmx'),
+  nyc: createCircumferenceCanvas('nyc'),
 };
+
+function createCircumferenceState(): CircumferenceState {
+  return {
+    areaKey: null,
+    candidates: [],
+    geometryMode: null,
+    geometryVariants: null,
+    network: {
+      segments: [],
+      stations: [],
+    },
+    selected: null,
+    overrideId: '',
+    methodology: null,
+    inspectedSegmentId: '',
+    requiredSegmentIds: new Set<string>(),
+    avoidedSegmentIds: new Set<string>(),
+  };
+}
+
+export const circumferenceStates: Record<AreaKey, CircumferenceState> = {
+  cdmx: createCircumferenceState(),
+  nyc: createCircumferenceState(),
+};
+
+export let circumferenceState = circumferenceStates[initialAreaKey];
+
+export function setActiveCircumferenceState(areaKey: AreaKey): void {
+  circumferenceState = circumferenceStates[areaKey];
+}
 
 export const LIVE_ROAD_CLASSES = new Set([
   'motorway',

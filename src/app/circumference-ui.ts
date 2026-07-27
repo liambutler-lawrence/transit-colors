@@ -32,8 +32,9 @@ import { lineColor } from '../line-colors.js';
 import type { AreaKey, MetadataDetail } from './types.js';
 import {
   AREAS,
+  AREA_KEYS,
   activeStationModes,
-  circumferenceCanvas,
+  circumferenceCanvases,
   circumferenceInnerAreaEl,
   circumferenceLandmassBreakdownEl,
   circumferenceLengthEl,
@@ -42,6 +43,7 @@ import {
   circumferenceOuterAreaEl,
   circumferenceOuterLabelEl,
   circumferenceState,
+  circumferenceStates,
   circumferenceSummaryEl,
   compactPanelQuery,
   formatArea,
@@ -61,6 +63,7 @@ import {
   routeStationsToggle,
   routeTrackGeometryToggle,
   runtime,
+  setActiveCircumferenceState,
   state,
   updateStatus,
 } from './context.js';
@@ -112,8 +115,6 @@ export function replaceMetadata(
 }
 
 export function positionCircumferenceGradient(): void {
-  if (!map.getLayer('circumference-gradient')) return;
-
   // Keep the overlay below the detailed basemap water polygons. The stored
   // landmass masks remain the fallback and calculation boundary, while the
   // visible edge follows the same high-resolution shoreline as the map.
@@ -122,13 +123,24 @@ export function positionCircumferenceGradient(): void {
     : map.getLayer('street-proximity')
       ? 'street-proximity'
       : undefined;
-  map.moveLayer('circumference-gradient', beforeLayer);
+  for (const areaKey of AREA_KEYS) {
+    const layerId = `circumference-gradient-${areaKey}`;
+    if (map.getLayer(layerId)) map.moveLayer(layerId, beforeLayer);
+  }
 }
 
 export function syncCircumferenceVisibility(): void {
   const visible =
-    runtime.activeProduct === 'circumference' && Boolean(circumferenceState.selected);
-  setLayerVisibility('circumference-gradient', visible && routeGradientToggle.checked);
+    runtime.activeProduct === 'circumference' &&
+    AREA_KEYS.some((areaKey) => Boolean(circumferenceStates[areaKey].selected));
+  for (const areaKey of AREA_KEYS) {
+    setLayerVisibility(
+      `circumference-gradient-${areaKey}`,
+      visible &&
+        routeGradientToggle.checked &&
+        Boolean(circumferenceStates[areaKey].selected),
+    );
+  }
   setLayerVisibility('circumference-area', visible && routeAreaToggle.checked);
   setLayerVisibility('circumference-network-casing', visible);
   setLayerVisibility('circumference-network-line', visible);
@@ -199,20 +211,23 @@ export function selectedCircumferenceCandidate(): CircumferenceCandidate | null 
 }
 
 export function resetCircumferenceRoute(): void {
-  circumferenceState.areaKey = null;
-  circumferenceState.candidates = [];
-  circumferenceState.network = {
-    segments: [],
-    stations: [],
-  };
-  circumferenceState.selected = null;
-  circumferenceState.overrideId = '';
-  circumferenceState.methodology = null;
-  circumferenceState.inspectedSegmentId = '';
-  circumferenceState.requiredSegmentIds.clear();
-  circumferenceState.avoidedSegmentIds.clear();
-  circumferenceState.geometryMode = null;
-  circumferenceState.geometryVariants = null;
+  for (const areaKey of AREA_KEYS) {
+    const routeState = circumferenceStates[areaKey];
+    routeState.areaKey = null;
+    routeState.candidates = [];
+    routeState.network = {
+      segments: [],
+      stations: [],
+    };
+    routeState.selected = null;
+    routeState.overrideId = '';
+    routeState.methodology = null;
+    routeState.inspectedSegmentId = '';
+    routeState.requiredSegmentIds.clear();
+    routeState.avoidedSegmentIds.clear();
+    routeState.geometryMode = null;
+    routeState.geometryVariants = null;
+  }
   circumferenceInnerAreaEl.textContent = '--';
   circumferenceOuterAreaEl.textContent = '--';
   circumferenceLengthEl.textContent = '--';
@@ -279,15 +294,18 @@ function sortLineNames(first: string, second: string): number {
 
 export function routeFeatureCollection(
   candidate: CircumferenceCandidate,
+  areaKey: AreaKey,
+  routeState = circumferenceStates[areaKey],
 ): FeatureCollection<Geometry, GeoJsonProperties> {
   const features: Feature<Geometry, GeoJsonProperties>[] = [
     {
       type: 'Feature',
+      id: `${areaKey}:inside`,
       geometry: {
         type: 'Polygon',
         coordinates: [candidate.coordinates],
       },
-      properties: { kind: 'inside' },
+      properties: { area_key: areaKey, kind: 'inside' },
     },
   ];
   let featureId = 0;
@@ -297,7 +315,7 @@ export function routeFeatureCollection(
       .map((segment) => segmentEndpointKey(segment.from.id, segment.to.id)),
   );
   const networkLinesByEdge = new Map<string, readonly string[]>();
-  for (const segment of circumferenceState.network.segments) {
+  for (const segment of routeState.network.segments) {
     if (segment.type !== 'ride') continue;
     networkLinesByEdge.set(
       segmentEndpointKey(segment.from.id, segment.to.id),
@@ -324,13 +342,10 @@ export function routeFeatureCollection(
       };
     });
   const coordinatesByNodeId = new Map(
-    circumferenceState.network.stations.map((station) => [
-      station.id,
-      station.coordinate,
-    ]),
+    routeState.network.stations.map((station) => [station.id, station.coordinate]),
   );
 
-  for (const segment of circumferenceState.network.segments) {
+  for (const segment of routeState.network.segments) {
     if (segment.display === false) continue;
     if (
       segment.type === 'ride' &&
@@ -356,7 +371,7 @@ export function routeFeatureCollection(
       const continuationLane = continuationLanes.get(lineName);
       const feature: Feature<LineString, GeoJsonProperties> = {
         type: 'Feature',
-        id: featureId,
+        id: `${areaKey}:${featureId}`,
         geometry: {
           type: 'LineString',
           coordinates: segment.coordinates,
@@ -369,10 +384,8 @@ export function routeFeatureCollection(
                 ? 'network-segment'
                 : 'segment-alternative',
           line: lineName,
-          color:
-            segment.type === 'transfer'
-              ? ''
-              : lineColor(runtime.activeAreaKey, lineName),
+          color: segment.type === 'transfer' ? '' : lineColor(areaKey, lineName),
+          area_key: areaKey,
           line_position:
             segment.type === 'transfer'
               ? 0
@@ -387,13 +400,13 @@ export function routeFeatureCollection(
     }
   }
 
-  for (const station of circumferenceState.network.stations) {
+  for (const station of routeState.network.stations) {
     const displayedLines = station.lineNames;
     const firstLine = displayedLines[0];
     if (firstLine === undefined) continue;
     const feature: Feature<Point, GeoJsonProperties> = {
       type: 'Feature',
-      id: featureId,
+      id: `${areaKey}:${featureId}`,
       geometry: {
         type: 'Point',
         coordinates: station.coordinate,
@@ -403,7 +416,8 @@ export function routeFeatureCollection(
         name: station.name,
         label: `${station.name} · ${displayedLines.join('/')}`,
         lines: displayedLines.join(', '),
-        color: lineColor(runtime.activeAreaKey, firstLine),
+        area_key: areaKey,
+        color: lineColor(areaKey, firstLine),
       },
     };
     features.push(feature);
@@ -430,7 +444,7 @@ export function routeFeatureCollection(
       const isPrimaryLine = segment.type === 'ride' && lineName === primaryLine;
       const feature: Feature<LineString, GeoJsonProperties> = {
         type: 'Feature',
-        id: featureId,
+        id: `${areaKey}:${featureId}`,
         geometry: {
           type: 'LineString',
           coordinates: segment.coordinates,
@@ -448,7 +462,8 @@ export function routeFeatureCollection(
           to_label: segment.to.label ?? '',
           line: lineName,
           lines: segment.lines.join(', '),
-          color: lineColor(runtime.activeAreaKey, lineName),
+          area_key: areaKey,
+          color: lineColor(areaKey, lineName),
           line_position:
             segment.type === 'transfer'
               ? 0
@@ -479,7 +494,7 @@ export function routeFeatureCollection(
       '';
     const feature: Feature<Point, GeoJsonProperties> = {
       type: 'Feature',
-      id: featureId,
+      id: `${areaKey}:${featureId}`,
       geometry: {
         type: 'Point',
         coordinates: station.coordinate,
@@ -489,7 +504,8 @@ export function routeFeatureCollection(
         name: station.name,
         label: station.label ?? '',
         lines: station.lineNames.join(', '),
-        color: lineColor(runtime.activeAreaKey, firstLine),
+        area_key: areaKey,
+        color: lineColor(areaKey, firstLine),
       },
     };
     features.push(feature);
@@ -521,6 +537,47 @@ export function renderLandmassBreakdown(coverage: readonly LandmassCoverage[]): 
   );
 }
 
+export function combinedRouteFeatureCollection(): FeatureCollection<
+  Geometry,
+  GeoJsonProperties
+> {
+  return {
+    type: 'FeatureCollection',
+    features: AREA_KEYS.flatMap((areaKey) => {
+      const routeState = circumferenceStates[areaKey];
+      return routeState.selected
+        ? routeFeatureCollection(routeState.selected, areaKey, routeState).features
+        : [];
+    }),
+  };
+}
+
+function updateCombinedCircumferenceSource(): void {
+  geoJsonSource('circumference-route')?.setData(combinedRouteFeatureCollection());
+}
+
+function updateCircumferenceGradient(
+  areaKey: AreaKey,
+  candidate: CircumferenceCandidate,
+  coverage?: readonly LandmassCoverage[],
+): void {
+  const landmassArea = runtime.circumferenceLandmasses?.areas[areaKey];
+  if (!landmassArea) return;
+  const landmassCoverage =
+    coverage ?? calculateLandmassCoverage(candidate.coordinates, landmassArea);
+  const canvas = circumferenceCanvases[areaKey];
+  renderCircumferenceGradient(
+    canvas,
+    candidate.coordinates,
+    landmassArea.gradient_bounds,
+    landmassCoverage.flatMap((landmass) => landmass.mask ?? []),
+  );
+  imageSource(`circumference-gradient-${areaKey}`)?.updateImage({
+    coordinates: circumferenceGradientCoordinates(landmassArea.gradient_bounds),
+    url: canvas.toDataURL('image/png'),
+  });
+}
+
 export function renderCircumferenceCandidate(
   candidate: CircumferenceCandidate | null,
   { fit = false }: { readonly fit?: boolean } = {},
@@ -532,6 +589,20 @@ export function renderCircumferenceCandidate(
     circumferenceState.network.segments.flatMap((segment) => segment.lines),
   );
   const fullLineStationCount = circumferenceState.network.stations.length;
+  const allVisibleLineCount = AREA_KEYS.reduce(
+    (total, areaKey) =>
+      total +
+      new Set(
+        circumferenceStates[areaKey].network.segments.flatMap(
+          (segment) => segment.lines,
+        ),
+      ).size,
+    0,
+  );
+  const allVisibleStationCount = AREA_KEYS.reduce(
+    (total, areaKey) => total + circumferenceStates[areaKey].network.stations.length,
+    0,
+  );
   const landmassCoverage = calculateLandmassCoverage(
     candidate.coordinates,
     landmassArea,
@@ -542,20 +613,8 @@ export function renderCircumferenceCandidate(
   routeAvoidSegmentButton.disabled = true;
   routeClearSegmentsButton.disabled = !hasSegmentOverrides();
 
-  geoJsonSource('circumference-route')?.setData(routeFeatureCollection(candidate));
-
-  if (landmassArea) {
-    renderCircumferenceGradient(
-      circumferenceCanvas,
-      candidate.coordinates,
-      landmassArea.gradient_bounds,
-      landmassCoverage.flatMap((landmass) => landmass.mask ?? []),
-    );
-    imageSource('circumference-gradient')?.updateImage({
-      coordinates: circumferenceGradientCoordinates(landmassArea.gradient_bounds),
-      url: circumferenceCanvas.toDataURL('image/png'),
-    });
-  }
+  updateCombinedCircumferenceSource();
+  updateCircumferenceGradient(runtime.activeAreaKey, candidate, landmassCoverage);
 
   const isManual = Boolean(circumferenceState.overrideId);
   const isSegmentEdited = !isManual && hasSegmentOverrides();
@@ -609,8 +668,12 @@ export function renderCircumferenceCandidate(
       )}`,
     },
     {
-      label: 'Eligible lines shown',
+      label: 'Focused network',
       value: `${eligibleLineNames.size} lines · ${fullLineStationCount} platform nodes`,
+    },
+    {
+      label: 'Always visible',
+      value: `${AREA_KEYS.length} metro areas · ${allVisibleLineCount} lines · ${allVisibleStationCount} platform nodes`,
     },
     {
       label: 'Route geometry',
@@ -687,51 +750,54 @@ export function renderCircumferenceOptions(): void {
   routeAutoButton.disabled = !circumferenceState.overrideId && !hasSegmentOverrides();
 }
 
-export function prepareCircumferenceRoute(
-  sequence: number = runtime.loadSequence,
-): void {
+function selectedCandidateForState(
+  routeState: typeof circumferenceState,
+): CircumferenceCandidate | null {
+  return selectCircumferenceCandidate(routeState.candidates, routeState.overrideId, {
+    requiredSegmentIds: [...routeState.requiredSegmentIds],
+    avoidedSegmentIds: [...routeState.avoidedSegmentIds],
+  });
+}
+
+function prepareCircumferenceArea(
+  areaKey: AreaKey,
+  geometryMode: CircumferenceGeometryMode,
+): boolean {
+  const routeState = circumferenceStates[areaKey];
+  if (!routeState.geometryVariants) return false;
   if (
-    sequence !== runtime.loadSequence ||
-    !circumferenceState.geometryVariants ||
-    !runtime.circumferenceLandmasses?.areas?.[runtime.activeAreaKey]
+    routeState.areaKey === areaKey &&
+    routeState.geometryMode === geometryMode &&
+    routeState.candidates.length > 0
   ) {
-    return;
+    return false;
   }
 
-  if (
-    circumferenceState.areaKey === runtime.activeAreaKey &&
-    circumferenceState.geometryMode ===
-      (routeTrackGeometryToggle.checked ? 'track' : 'straight') &&
-    circumferenceState.candidates.length > 0
-  ) {
-    return;
-  }
+  const result: CircumferenceModeResult = routeState.geometryVariants[geometryMode];
+  routeState.areaKey = areaKey;
+  routeState.geometryMode = geometryMode;
+  routeState.candidates = result.candidates;
+  routeState.network = result.network;
+  routeState.methodology = result.methodology;
 
-  if (runtime.activeProduct === 'circumference') {
-    updateStatus('Finding loops', { isLoading: true });
-  }
-  const geometryMode: CircumferenceGeometryMode = routeTrackGeometryToggle.checked
-    ? 'track'
-    : 'straight';
-  const result: CircumferenceModeResult =
-    circumferenceState.geometryVariants[geometryMode];
-  circumferenceState.areaKey = runtime.activeAreaKey;
-  circumferenceState.geometryMode = geometryMode;
-  circumferenceState.candidates = result.candidates;
-  circumferenceState.network = result.network;
-  circumferenceState.methodology = result.methodology;
-  routeTrackGeometryToggle.disabled = !result.methodology.trackGeometryAvailable;
-
-  const storedOverride = storedCircumferenceOverride(runtime.activeAreaKey);
-  circumferenceState.overrideId = result.candidates.some(
+  const storedOverride = storedCircumferenceOverride(areaKey);
+  routeState.overrideId = result.candidates.some(
     (candidate) => candidate.id === storedOverride,
   )
     ? storedOverride
     : '';
-  if (!circumferenceState.overrideId && storedOverride) {
-    storeCircumferenceOverride(runtime.activeAreaKey, '');
+  if (!routeState.overrideId && storedOverride) {
+    storeCircumferenceOverride(areaKey, '');
   }
+  routeState.selected = selectedCandidateForState(routeState);
+  if (routeState.selected) {
+    updateCircumferenceGradient(areaKey, routeState.selected);
+  }
+  return true;
+}
 
+function renderFocusedCircumferenceArea({ fit = false } = {}): void {
+  setActiveCircumferenceState(runtime.activeAreaKey);
   renderCircumferenceOptions();
   const candidate = selectedCircumferenceCandidate();
   if (!candidate) {
@@ -745,9 +811,7 @@ export function prepareCircumferenceRoute(
     return;
   }
 
-  renderCircumferenceCandidate(candidate, {
-    fit: runtime.activeProduct === 'circumference',
-  });
+  renderCircumferenceCandidate(candidate, { fit });
   if (window.__transitPerformance.circumferenceReadyMs === null) {
     window.__transitPerformance.circumferenceReadyMs =
       performance.now() - window.__transitPerformance.startedAt;
@@ -755,4 +819,41 @@ export function prepareCircumferenceRoute(
       window.__transitPerformance.circumferenceReadyMs.toFixed(1);
   }
   if (runtime.activeProduct === 'circumference') updateStatus('Route ready');
+}
+
+export function focusCircumferenceArea(
+  areaKey: AreaKey,
+  { fit = true }: { readonly fit?: boolean } = {},
+): void {
+  setActiveCircumferenceState(areaKey);
+  renderFocusedCircumferenceArea({
+    fit: fit && runtime.activeProduct === 'circumference',
+  });
+}
+
+export function prepareCircumferenceRoute(
+  sequence: number = runtime.loadSequence,
+): void {
+  if (sequence !== runtime.loadSequence || !runtime.circumferenceLandmasses) {
+    return;
+  }
+
+  if (runtime.activeProduct === 'circumference') {
+    updateStatus('Finding loops', { isLoading: true });
+  }
+  const geometryMode: CircumferenceGeometryMode = routeTrackGeometryToggle.checked
+    ? 'track'
+    : 'straight';
+  let changed = false;
+  for (const areaKey of AREA_KEYS) {
+    changed = prepareCircumferenceArea(areaKey, geometryMode) || changed;
+  }
+  routeTrackGeometryToggle.disabled = !AREA_KEYS.every(
+    (areaKey) =>
+      circumferenceStates[areaKey].methodology?.trackGeometryAvailable === true,
+  );
+  updateCombinedCircumferenceSource();
+  renderFocusedCircumferenceArea({
+    fit: changed && runtime.activeProduct === 'circumference',
+  });
 }

@@ -22,7 +22,8 @@ permissions only in the deployment job.
 2. Confirm the **CI** workflow succeeds.
 3. Confirm the **Deploy GitHub Pages** workflow succeeds.
 4. Open the deployment URL and test both metro areas, destination selection, and
-   Circumference Lab.
+   Circumference Lab. At globe scale, confirm that both circumference networks remain
+   visible and that “Focus on…” changes only the camera and active controls.
 
 The Vite `base` is relative, so the same artifact works at the project Pages path and in
 local preview.

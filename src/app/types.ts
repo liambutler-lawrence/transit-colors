@@ -122,6 +122,7 @@ export interface PerformanceLog {
 }
 
 export const segmentPropertiesSchema = z.object({
+  area_key: z.enum(['cdmx', 'nyc']),
   distance_m: z.number(),
   from: z.string(),
   from_label: z.string(),

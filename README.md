@@ -10,9 +10,11 @@ New York City region. It includes:
 
 Circumference routes follow averaged centerlines from official GTFS track shapes by
 default, with an option to compare straight platform-to-platform geometry. The map also
-shows every eligible metro line and platform in its official agency color. At regional
-and world scale it renders as an interactive globe, transitioning continuously to the
-familiar flat-map view at street scale.
+shows every eligible metro line and platform in its official agency color. Both metro
+networks and their selected boundaries stay visible together; the “Focus on…” picker
+only moves the camera and selects which route its controls and measurements describe. At
+regional and world scale the map renders as an interactive globe, transitioning
+continuously to the familiar flat-map view at street scale.
 
 The public site is deployed at
 [liambutler-lawrence.github.io/transit-colors](https://liambutler-lawrence.github.io/transit-colors/).
