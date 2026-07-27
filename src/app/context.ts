@@ -32,6 +32,7 @@ export const AREAS: Record<AreaKey, AreaConfig> = {
     label: 'Mexico City',
     center: [-99.1332, 19.4326],
     zoom: 10.5,
+    circumference: 'data/cdmx-circumference.json?v=20260726a',
     streetTiles: 'data/cdmx-streets.pmtiles?v=20260725h',
     stations: 'data/cdmx-stations.geojson?v=20260725h',
     metadata: 'data/cdmx-metadata.json?v=20260725h',
@@ -44,6 +45,7 @@ export const AREAS: Record<AreaKey, AreaConfig> = {
     label: 'New York City metro',
     center: [-73.98, 40.75],
     zoom: 9.5,
+    circumference: 'data/nyc-circumference.json?v=20260726a',
     liveRoads: true,
     stations: 'data/nyc-stations.geojson?v=20260726a',
     metadata: 'data/nyc-metadata.json?v=20260726a',
@@ -465,6 +467,7 @@ export const allStationModes = new Set<Mode>();
 export const futureStationModes = new Set<Mode>();
 window.__transitPerformance = {
   startedAt: initialLoadingOperation.startedAt,
+  circumferenceReadyMs: null,
   initialReadyMs: null,
   styleLoadedMs: null,
   dataFetchedMs: null,

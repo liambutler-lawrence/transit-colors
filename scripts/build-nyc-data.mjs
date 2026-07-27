@@ -21,6 +21,13 @@ const NYC_METRO_BOUNDS = {
   north: 41.9,
   east: -71.8,
 };
+const PUBLISHED_TRANSFER_SUPPLEMENTS = [
+  {
+    fromId: 'gtfs/mta-subway/142',
+    minutes: 3,
+    toId: 'gtfs/mta-subway/R27',
+  },
+];
 
 const FEEDS = [
   {
@@ -672,6 +679,10 @@ async function main() {
   const routes = Object.assign({}, ...feedData.map((feed) => feed.routes));
   const graphEdges = Object.assign({}, ...feedData.map((feed) => feed.graph.e));
   const graphTransfers = Object.assign({}, ...feedData.map((feed) => feed.graph.t));
+  for (const { fromId, minutes, toId } of PUBLISHED_TRANSFER_SUPPLEMENTS) {
+    (graphTransfers[fromId] ??= []).push([toId, minutes]);
+    (graphTransfers[toId] ??= []).push([fromId, minutes]);
+  }
   await writeJson(resolve(dataDir, 'nyc-schedules.json'), {
     source: 'MTA, NJ Transit, and PATH static GTFS',
     timezone: 'America/New_York',

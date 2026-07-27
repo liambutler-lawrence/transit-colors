@@ -29,6 +29,7 @@ export type Product = 'access' | 'circumference';
 export interface AreaConfig {
   readonly buildCommand: string;
   readonly center: [number, number];
+  readonly circumference: string;
   readonly label: string;
   readonly liveRoads?: boolean;
   readonly metadata: string;
@@ -110,6 +111,7 @@ export interface CompletedOperation extends LoadingOperation {
 }
 
 export interface PerformanceLog {
+  circumferenceReadyMs: number | null;
   dataFetchedMs: number | null;
   firstStreetRenderMs: number | null;
   initialReadyMs: number | null;

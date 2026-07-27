@@ -66,6 +66,19 @@ their endpoints and fall back to a straight edge when no reliable shape section 
 `npm run build:data` refreshes both metro areas, schedules, and track geometry in the
 required order.
 
+## Circumference routes
+
+After station, schedule, and track snapshots are current, run:
+
+```sh
+npm run build:data:circumference
+```
+
+This writes the complete display networks and offline-proven maximum-area route for both
+areas. The exact optimizer uses a feedback-vertex certificate and may take several
+minutes for NYC. That cost is intentionally paid only during a data refresh; the browser
+loads the committed result directly.
+
 ## Landmasses
 
 After downloading and extracting Natural Earth 5.1.1 `ne_10m_land.shp`:

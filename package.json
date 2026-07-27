@@ -27,7 +27,8 @@
     "build:data:landmasses": "tsx scripts/build-circumference-landmasses.mjs",
     "build:data:schedules": "tsx scripts/build-gtfs-schedules.mjs",
     "build:data:tracks": "node scripts/build-track-geometries.mjs",
-    "build:data": "npm run build:data:cdmx && npm run build:data:schedules && npm run build:data:nyc && npm run build:data:tracks",
+    "build:data:circumference": "node --import tsx scripts/build-circumference-data.mjs",
+    "build:data": "npm run build:data:cdmx && npm run build:data:schedules && npm run build:data:nyc && npm run build:data:tracks && npm run build:data:circumference",
     "build": "vite build",
     "dev": "vite",
     "preview": "vite preview",
@@ -36,7 +37,7 @@
     "lint:fix": "eslint . --fix",
     "format": "prettier . --write",
     "format:check": "prettier . --check",
-    "test": "tsx --test src/*.test.mjs scripts/*.test.mjs",
+    "test": "node --import tsx --test src/*.test.mjs scripts/*.test.mjs",
     "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build"
   },
   "devDependencies": {
@@ -46,6 +47,7 @@
     "@types/node": "^26.1.1",
     "eslint": "^10.8.0",
     "globals": "^17.7.0",
+    "highs": "^1.15.2",
     "maplibre-gl": "5.13.0",
     "pbf": "^4.0.2",
     "pmtiles": "4.4.1",

@@ -10,7 +10,7 @@ export type ReadonlyAdjacency = ReadonlyMap<NodeId, ReadonlySet<NodeId>>;
 export interface CircumferenceNode {
   readonly coordinate: Coordinate;
   readonly id: NodeId;
-  label?: string;
+  label?: string | undefined;
   lineNames: string[];
   readonly name: string;
   readonly stationIds: string[];
@@ -53,13 +53,13 @@ export interface CircumferenceCandidate {
 
 export interface CircumferenceNetworkSegment {
   readonly coordinates: Coordinate[];
-  readonly distanceMeters?: number;
+  readonly distanceMeters?: number | undefined;
   readonly from: CircumferenceNode;
   readonly id: string;
   readonly lines: readonly string[];
   readonly to: CircumferenceNode;
-  readonly transferMinutes?: number | null;
-  readonly transferSource?: TransferEdge['source'];
+  readonly transferMinutes?: number | null | undefined;
+  readonly transferSource?: TransferEdge['source'] | undefined;
   readonly type: 'ride' | 'transfer';
 }
 
@@ -81,6 +81,11 @@ export interface CircumferenceMethodology {
   readonly eligibleStationCount: number;
   readonly generatedCandidateCount: number;
   readonly inferredTransferCount: number;
+  readonly optimizationGeometry?: 'straight-platform-edges' | undefined;
+  readonly optimizationIterations?: number | undefined;
+  readonly optimizationMethod?: 'exact-milp' | 'heuristic' | undefined;
+  readonly optimizationMilliseconds?: number | undefined;
+  readonly optimizationStatus?: 'optimal' | undefined;
   readonly platformNodeCount: number;
   readonly publishedTransferCount: number;
   readonly removedShortcutCount: number;
