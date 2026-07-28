@@ -49,6 +49,7 @@ import {
 const HIGHWAY_DATA_URL = 'data/north-america-highway-circumference.json?v=20260728a';
 let highwayData: HighwayCircumferenceData | null = null;
 let highwayPromise: Promise<HighwayCircumferenceData> | null = null;
+let highwayGradientApplied = false;
 
 export function highwayCriterionActive(): boolean {
   return routeCriterionSelect.value === 'motorway';
@@ -87,6 +88,7 @@ function setParentControlHidden(control: Element, hidden: boolean): void {
 
 export function syncCircumferenceCriterionControls(): void {
   const highwayMode = highwayCriterionActive();
+  if (!highwayMode) highwayGradientApplied = false;
   setParentControlHidden(routeTrackGeometryToggle, highwayMode);
   setParentControlHidden(routeStationsToggle, highwayMode);
   circumferenceDepartureControlEl.hidden = highwayMode;
@@ -213,6 +215,9 @@ function positionHighwayGradient(): void {
 }
 
 function updateHighwayGradient(data: HighwayCircumferenceData): void {
+  if (highwayGradientApplied) return;
+  const source = imageSource('circumference-gradient-cdmx');
+  if (!source) return;
   const canvas = circumferenceCanvases.cdmx;
   const gradientBounds = circumferenceGradientBounds(data.route.coordinates);
   renderCircumferenceGradient(
@@ -221,10 +226,11 @@ function updateHighwayGradient(data: HighwayCircumferenceData): void {
     gradientBounds,
     data.landmass.mask,
   );
-  imageSource('circumference-gradient-cdmx')?.updateImage({
+  source.updateImage({
     coordinates: circumferenceGradientCoordinates(gradientBounds),
     url: canvas.toDataURL('image/png'),
   });
+  highwayGradientApplied = true;
 }
 
 export function fitHighwayCircumference({
