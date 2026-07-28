@@ -17,6 +17,18 @@ function copyCoordinate(coordinate) {
   return [coordinate[0], coordinate[1]];
 }
 
+function averageCoordinates(coordinates) {
+  if (coordinates.length === 0) return null;
+  const total = coordinates.reduce(
+    (sum, coordinate) => [sum[0] + coordinate[0], sum[1] + coordinate[1]],
+    [0, 0],
+  );
+  return [
+    Number((total[0] / coordinates.length).toFixed(7)),
+    Number((total[1] / coordinates.length).toFixed(7)),
+  ];
+}
+
 function appendCoordinates(result, additions) {
   const coordinates = additions.map(copyCoordinate);
   if (result.length === 0) {
@@ -130,6 +142,8 @@ export function buildOsmRouteCenterlines({
   stationCoordinateById,
 }) {
   const sectionsByEdge = new Map();
+  const platformCoordinateObservationsById = new Map();
+  const matchedObservations = [];
   let matchedStopCount = 0;
   let routeObservationCount = 0;
 
@@ -139,14 +153,43 @@ export function buildOsmRouteCenterlines({
     const observation = osmRouteObservation(data, relationId);
     if (observation.coordinates.length < 2) continue;
 
-    const stationIds = [];
+    const matchedStops = [];
     for (const stop of observation.stops) {
       const station = matchedStation(stop, candidates, namesMatch);
-      if (!station || stationIds.at(-1) === station.id) continue;
-      stationIds.push(station.id);
+      if (!station || matchedStops.at(-1)?.id === station.id) continue;
+      matchedStops.push({
+        coordinate: stop.coordinate,
+        id: station.id,
+      });
+      const coordinates = platformCoordinateObservationsById.get(station.id) ?? [];
+      coordinates.push(stop.coordinate);
+      platformCoordinateObservationsById.set(station.id, coordinates);
       matchedStopCount += 1;
     }
+    matchedObservations.push({
+      coordinates: observation.coordinates,
+      matchedStops,
+    });
+  }
 
+  // Route relations publish stop positions on the served tracks. Averaging the
+  // two directional observations gives the same physical centerline model used
+  // for diverging track sides, while keeping each line at an interchange on
+  // its own platform corridor instead of at a shared entrance or station
+  // centroid.
+  const platformCoordinateById = new Map(
+    [...platformCoordinateObservationsById].flatMap(([stationId, coordinates]) => {
+      const coordinate = averageCoordinates(coordinates);
+      return coordinate ? [[stationId, coordinate]] : [];
+    }),
+  );
+  const physicalCoordinateById = new Map(stationCoordinateById);
+  for (const [stationId, coordinate] of platformCoordinateById) {
+    physicalCoordinateById.set(stationId, coordinate);
+  }
+
+  for (const observation of matchedObservations) {
+    const stationIds = observation.matchedStops.map(({ id }) => id);
     const isClosedRoute =
       observation.coordinates.length >= 4 &&
       distanceMeters(observation.coordinates[0], observation.coordinates.at(-1)) < 250;
@@ -164,8 +207,8 @@ export function buildOsmRouteCenterlines({
       if (!allowedEdgeKeys.has(key)) continue;
       const section = (isClosedRoute ? extractClosedShapeSection : extractShapeSection)(
         observation.coordinates,
-        stationCoordinateById.get(previousId),
-        stationCoordinateById.get(currentId),
+        physicalCoordinateById.get(previousId),
+        physicalCoordinateById.get(currentId),
       );
       if (!section) continue;
       const [canonicalFromId] = key.split(EDGE_KEY_SEPARATOR);
@@ -187,8 +230,8 @@ export function buildOsmRouteCenterlines({
     const [fromId, toId] = key.split(EDGE_KEY_SEPARATOR);
     const centerline = averageShapeSections(
       sections,
-      stationCoordinateById.get(fromId),
-      stationCoordinateById.get(toId),
+      physicalCoordinateById.get(fromId),
+      physicalCoordinateById.get(toId),
     );
     if (!centerline) continue;
     (geometries[fromId] ??= []).push([toId, centerline]);
@@ -199,6 +242,7 @@ export function buildOsmRouteCenterlines({
     geometries,
     edgeCount: sectionsByEdge.size,
     matchedStopCount,
+    platformCoordinateById,
     routeObservationCount,
     shapeObservationCount,
   };

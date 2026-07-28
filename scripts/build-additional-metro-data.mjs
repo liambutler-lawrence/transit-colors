@@ -66,6 +66,12 @@ export const ADDITIONAL_METROS = {
     groupStop(stop) {
       return stop.parent_station || stop.stop_id;
     },
+    platformFamily(route) {
+      // CE is the Marina Bay extension of the Circle Line and uses the same
+      // platform corridor as CC. Keep one physical node instead of inventing a
+      // zero-length walking transfer between two service labels.
+      return ['CC', 'CE'].includes(route.route_id) ? 'CC' : route.route_id;
+    },
     cleanName(name) {
       return String(name)
         .replace(/\s+(?:[A-Z]{1,3}\d*[A-Z]?)(?:-(?:[A-Z]{1,3}\d*[A-Z]?))*\s*$/u, '')
