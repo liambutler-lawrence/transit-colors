@@ -4,7 +4,10 @@ import test from 'node:test';
 
 import {
   CIRCUMFERENCE_GRADIENT_COAST_LAYER_ID,
+  CIRCUMFERENCE_GRADIENT_MAX_DISTANCE_METERS,
   CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE,
+  circumferenceGradientBounds,
+  circumferenceGradientOpacity,
 } from './circumference-map.ts';
 
 test('the map starts as an atmospheric globe with a close-zoom transition', async () => {
@@ -71,6 +74,26 @@ test('the circumference gradient uses the detailed basemap shoreline', async () 
     ).mask.length,
     2,
   );
+});
+
+test('the circumference gradient has a route-relative transparent 10 km edge', () => {
+  const route = [
+    [-74, 40.7],
+    [-73.9, 40.8],
+    [-74, 40.7],
+  ];
+  const [west, south, east, north] = circumferenceGradientBounds(route);
+
+  assert.equal(CIRCUMFERENCE_GRADIENT_MAX_DISTANCE_METERS, 10_000);
+  assert.ok(west < -74.12);
+  assert.ok(south < 40.61);
+  assert.ok(east > -73.78);
+  assert.ok(north > 40.89);
+  assert.equal(circumferenceGradientOpacity(0), 116);
+  assert.equal(circumferenceGradientOpacity(5_000), 58);
+  assert.equal(circumferenceGradientOpacity(9_999), 1);
+  assert.equal(circumferenceGradientOpacity(10_000), 0);
+  assert.equal(circumferenceGradientOpacity(20_000), 0);
 });
 
 test('the sidebar follows product, mode, results, and selection hierarchy', async () => {

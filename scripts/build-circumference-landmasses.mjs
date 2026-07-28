@@ -209,7 +209,9 @@ const nycLandmassDefinitions = [
   },
 ];
 const seenNycRings = new Set();
-const nycGradientBounds = [-74.08, 40.54, -73.7, 40.9];
+// Detailed shoreline masks must cover every current route plus its 10 km
+// visible gradient band. The runtime texture itself is route-relative.
+const nycGradientBounds = [-74.16, 40.47, -73.67, 40.95];
 const detailedNycLandPolygons = await detailedLandPolygonsForBounds(nycGradientBounds);
 const nycLandmasses = nycLandmassDefinitions.flatMap((definition) => {
   const definitionPoints = definition.points ?? [definition.point];
