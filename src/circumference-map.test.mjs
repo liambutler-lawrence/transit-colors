@@ -181,7 +181,7 @@ test('the sidebar follows product, mode, results, and selection hierarchy', asyn
   assert.doesNotMatch(shell, /<span>Focus on…<\/span>/);
 });
 
-test('circumference result cards focus an always-visible map', async () => {
+test('circle result cards focus an always-visible global network', async () => {
   const shell = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   const lifecycle = await readFile(
     new URL('./app/map-lifecycle.ts', import.meta.url),
@@ -193,12 +193,22 @@ test('circumference result cards focus an always-visible map', async () => {
   );
 
   assert.match(shell, /All metro networks stay visible/);
+  assert.match(shell, /Valid circles by area/);
   assert.match(lifecycle, /AREA_KEYS\.map\(async \(areaKey\)/);
   assert.match(lifecycle, /circumference-gradient-\$\{areaKey\}/);
-  assert.match(lifecycle, /button\[data-focus-area\]/);
-  assert.match(lifecycle, /select\.dataset\['routeArea'\]/);
+  assert.match(lifecycle, /button\[data-focus-area\]\[data-focus-candidate\]/);
+  assert.doesNotMatch(lifecycle, /select\.dataset\['routeArea'\]/);
   assert.match(circumferenceUi, /dataset\['focusArea'\] = areaKey/);
-  assert.match(circumferenceUi, /dataset\['routeArea'\] = areaKey/);
+  assert.match(circumferenceUi, /dataset\['focusCandidate'\] = candidate\.id/);
+  assert.match(
+    circumferenceUi,
+    /AREA_KEYS\.flatMap\(\(areaKey\) => \{[\s\S]*candidates\.map\(\(candidate, index\)/,
+  );
+  assert.match(
+    circumferenceUi,
+    /compareCircleArea\(first\.candidate, second\.candidate\)/,
+  );
+  assert.match(circumferenceUi, /network\.segments\.length > 0/);
   assert.match(
     circumferenceUi,
     /AREA_KEYS\.flatMap\(\(areaKey\) =>[\s\S]*routeFeatureCollection/,

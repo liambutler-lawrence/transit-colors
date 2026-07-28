@@ -129,6 +129,22 @@ test('Atlanta publishes its full branched network without a fake loop', async ()
   assert.deepEqual(segmentByNames('LINDBERGH CENTER', 'LENOX')?.lines, ['GOLD']);
 });
 
+test('Athens publishes each valid circle while Atlanta publishes none', async () => {
+  const [athens, atlanta] = await Promise.all(
+    ['athens', 'atlanta'].map((areaKey) =>
+      readFile(
+        new URL(`../data/${areaKey}-circumference.json`, import.meta.url),
+        'utf8',
+      ).then((data) => circumferenceGeometryVariantsSchema.parse(JSON.parse(data))),
+    ),
+  );
+
+  assert.equal(athens.track.candidates.length, 3);
+  assert.equal(athens.straight.candidates.length, 3);
+  assert.equal(atlanta.track.candidates.length, 0);
+  assert.equal(atlanta.straight.candidates.length, 0);
+});
+
 test('parallel branches taper at their physical split across every metro', async () => {
   const detectedContinuationCounts = {};
   const detectedContinuationDetails = {};
