@@ -12,10 +12,10 @@ import type { MetadataDetail, SegmentProperties } from './types.js';
 import {
   prepareCircumferenceRoute,
   renderCircumferenceCandidate,
-  replaceMetadata,
   selectedCircumferenceCandidate,
   storeCircumferenceOverride,
 } from './circumference-ui.js';
+import { replaceMetadata } from './map-ui-utils.js';
 import {
   selectedStreetTravelTime,
   setLegend,

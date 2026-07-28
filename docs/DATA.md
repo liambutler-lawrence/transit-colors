@@ -13,6 +13,7 @@ Rebuild data only when intentionally refreshing a source snapshot.
 - LTA DataMall-derived Singapore rail data and station codes
 - Official AIFA and Servicio de Transportes Eléctricos station references
 - Natural Earth 1:10m land polygons
+- Natural Earth 1:10m North America roads supplement
 
 Review each source's terms before redistributing a new snapshot. Preserve the in-app
 attribution whenever adding a source.
@@ -106,6 +107,27 @@ the committed results directly.
 MARTA Rail is a branched cross without a geographically meaningful closed passenger
 route. Its full network is still published and rendered in Circumference Lab with an
 explicit no-loop result.
+
+## North American controlled-access highways
+
+Download and extract Natural Earth 5.1.1's North America roads supplement and 1:10m land
+shapefile, then run:
+
+```sh
+npm run build:data:highways -- \
+  /path/to/ne_10m_roads_north_america.shp \
+  data/north-america-highway-circumference.json \
+  /path/to/ne_10m_land.shp
+```
+
+The build retains divided `Freeway` and `Tollway` centerlines, repairs short dangling
+source seams and nine sub-3 km international file-boundary seams, then keeps the largest
+contiguous North American component. It removes terminal branches, compresses degree-two
+corridors, decomposes the graph into vertex-biconnected blocks, and proves the
+maximum-area embedded outer boundary. The committed file contains the complete thin
+display network, thick winning route, source attributes, and WGS84 land-contained and
+coastward areas. The browser lazy-loads this larger snapshot only after the highway
+criterion is selected.
 
 ## Landmasses
 

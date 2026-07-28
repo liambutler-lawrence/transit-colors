@@ -36,11 +36,10 @@ import type {
 } from '../circumference/types.js';
 import type { LandmassArea } from '../domain.js';
 import { lineColor } from '../line-colors.js';
-import type { AreaKey, MetadataDetail } from './types.js';
+import type { AreaKey } from './types.js';
 import {
   AREAS,
   AREA_KEYS,
-  activeStationModes,
   circumferenceCanvases,
   circumferenceMetadataEl,
   circumferenceNameEl,
@@ -72,52 +71,14 @@ import {
   state,
   updateStatus,
 } from './context.js';
-
-export function activeAccessTransitTimes(): Map<string, number> {
-  const result = new Map<string, number>();
-  for (const [stationId, minutes] of state.transitTimes ?? []) {
-    const stationMode = state.stationById.get(stationId)?.properties.mode;
-    result.set(
-      stationId,
-      stationMode !== undefined && activeStationModes.has(stationMode) ? minutes : 90,
-    );
-  }
-  return result;
-}
-
-export function firstSymbolLayerId(): string | undefined {
-  return map.getStyle().layers.find((layer) => layer.type === 'symbol')?.id;
-}
-
-export function setLayerVisibility(id: string, visible: boolean): void {
-  if (map.getLayer(id)) {
-    map.setLayoutProperty(id, 'visibility', visible ? 'visible' : 'none');
-  }
-}
-
-export function replaceMetadata(
-  element: Element,
-  details: readonly MetadataDetail[],
-): void {
-  element.replaceChildren(
-    ...details
-      .filter(
-        (detail) =>
-          detail.value !== undefined && detail.value !== null && detail.value !== '',
-      )
-      .map((detail) => {
-        const term = document.createElement('dt');
-        term.textContent = detail.label;
-
-        const description = document.createElement('dd');
-        description.textContent = String(detail.value);
-
-        const fragment = document.createDocumentFragment();
-        fragment.append(term, description);
-        return fragment;
-      }),
-  );
-}
+import {
+  highwayCriterionActive,
+  highwayDataLoaded,
+  prepareHighwayCircumference,
+  renderHighwayResults,
+  syncCircumferenceCriterionControls,
+} from './highway-circumference-ui.js';
+import { setLayerVisibility } from './map-ui-utils.js';
 
 export function positionCircumferenceGradient(): void {
   // Keep the overlay below the detailed basemap water polygons. The stored
@@ -135,23 +96,36 @@ export function positionCircumferenceGradient(): void {
 }
 
 export function syncCircumferenceVisibility(): void {
+  const highwayMode = highwayCriterionActive();
   const networkVisible =
     runtime.activeProduct === 'circumference' &&
+    !highwayMode &&
     AREA_KEYS.some(
       (areaKey) => circumferenceStates[areaKey].network.segments.length > 0,
     );
   const routeVisible =
     runtime.activeProduct === 'circumference' &&
+    !highwayMode &&
     AREA_KEYS.some((areaKey) => Boolean(circumferenceStates[areaKey].selected));
+  const highwayVisible =
+    runtime.activeProduct === 'circumference' && highwayMode && highwayDataLoaded();
   for (const areaKey of AREA_KEYS) {
     setLayerVisibility(
       `circumference-gradient-${areaKey}`,
-      routeVisible &&
-        routeGradientToggle.checked &&
-        Boolean(circumferenceStates[areaKey].selected),
+      routeGradientToggle.checked &&
+        ((highwayVisible && areaKey === 'cdmx') ||
+          (routeVisible && Boolean(circumferenceStates[areaKey].selected))),
     );
   }
   setLayerVisibility('circumference-area', routeVisible && routeAreaToggle.checked);
+  setLayerVisibility(
+    'highway-circumference-area',
+    highwayVisible && routeAreaToggle.checked,
+  );
+  setLayerVisibility('highway-circumference-network-casing', highwayVisible);
+  setLayerVisibility('highway-circumference-network-line', highwayVisible);
+  setLayerVisibility('highway-circumference-route-casing', highwayVisible);
+  setLayerVisibility('highway-circumference-route-line', highwayVisible);
   setLayerVisibility('circumference-network-casing', networkVisible);
   setLayerVisibility('circumference-network-line', networkVisible);
   setLayerVisibility('circumference-network-transfer-line', networkVisible);
@@ -805,6 +779,10 @@ function createCircumferenceResult({
 }
 
 export function renderCircumferenceResults(): void {
+  if (highwayCriterionActive()) {
+    renderHighwayResults();
+    return;
+  }
   const circles = circumferenceCircleResults();
   if (circles.length === 0) {
     const empty = document.createElement('p');
@@ -1028,6 +1006,11 @@ export function prepareCircumferenceRoute(
   sequence: number = runtime.loadSequence,
 ): void {
   if (sequence !== runtime.loadSequence || !runtime.circumferenceLandmasses) {
+    return;
+  }
+  syncCircumferenceCriterionControls();
+  if (highwayCriterionActive()) {
+    void prepareHighwayCircumference();
     return;
   }
 

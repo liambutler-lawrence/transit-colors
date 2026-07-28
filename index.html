@@ -263,9 +263,7 @@
                 <select id="route-criterion">
                   <option value="metro">Metro · free transfers</option>
                   <option value="passenger-rail" disabled>Passenger rail · next</option>
-                  <option value="motorway" disabled>
-                    Controlled-access roads · next
-                  </option>
+                  <option value="motorway">Controlled-access divided highways</option>
                   <option value="four-lane" disabled>4-lane roads · next</option>
                 </select>
                 <label class="geometry-toggle">
@@ -277,7 +275,10 @@
                 </label>
               </div>
 
-              <fieldset class="departure-control circumference-departure-control">
+              <fieldset
+                id="circumference-departure-control"
+                class="departure-control circumference-departure-control"
+              >
                 <legend>Operating schedule</legend>
                 <div class="departure-inputs">
                   <label>
@@ -308,7 +309,9 @@
                 <span class="section-index">3</span>
                 <div>
                   <span class="section-eyebrow">Results</span>
-                  <h2>Largest independent circles</h2>
+                  <h2 id="circumference-results-heading">
+                    Largest independent circles
+                  </h2>
                 </div>
               </div>
 
@@ -336,7 +339,7 @@
                 <span class="section-index">4</span>
                 <div>
                   <span class="section-eyebrow">Selected item</span>
-                  <h2>Line or transfer details</h2>
+                  <h2 id="circumference-selected-heading">Line or transfer details</h2>
                 </div>
               </div>
 
@@ -362,7 +365,7 @@
                 </div>
               </div>
 
-              <p class="method-note">
+              <p id="circumference-method-note" class="method-note">
                 All metro networks stay visible, including metros without a circle. Each
                 result card is the largest circle that does not reuse another result's
                 rail segments and focuses it on the map; clicking any visible line,
