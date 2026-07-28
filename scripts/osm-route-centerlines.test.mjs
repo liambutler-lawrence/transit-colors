@@ -68,8 +68,43 @@ test('OpenStreetMap directional route relations average between track sides', ()
   assert.equal(result.edgeCount, 1);
   assert.equal(result.routeObservationCount, 2);
   assert.equal(result.shapeObservationCount, 2);
+  assert.deepEqual(result.platformCoordinateById.get('alpha'), [0, 0]);
+  assert.deepEqual(result.platformCoordinateById.get('bravo'), [0.02, 0]);
   const centerline = result.geometries.alpha[0][1];
   assert.deepEqual(centerline[0], [0, 0]);
   assert.deepEqual(centerline.at(-1), [0.02, 0]);
   assert.ok(Math.abs(centerline[Math.floor(centerline.length / 2)][1]) < 1e-9);
+});
+
+test('OpenStreetMap stop positions replace off-track station centroids', () => {
+  const stationCoordinateById = new Map([
+    ['alpha', [0, 0.004]],
+    ['bravo', [0.02, 0.004]],
+  ]);
+  const result = buildOsmRouteCenterlines({
+    allowedEdgeKeys: new Set([stationEdgeKey('alpha', 'bravo')]),
+    namesMatch: (first, second) => first === second,
+    relations: [
+      {
+        data: relationData(102, 0.001),
+        lineName: 'M1',
+        relationId: 102,
+      },
+    ],
+    stationCandidatesByLine: new Map([
+      [
+        'M1',
+        [
+          { coordinate: [0, 0.004], id: 'alpha', name: 'Alpha' },
+          { coordinate: [0.02, 0.004], id: 'bravo', name: 'Bravo' },
+        ],
+      ],
+    ]),
+    stationCoordinateById,
+  });
+
+  assert.deepEqual(result.platformCoordinateById.get('alpha'), [0, 0.001]);
+  assert.deepEqual(result.platformCoordinateById.get('bravo'), [0.02, 0.001]);
+  assert.deepEqual(result.geometries.alpha[0][1][0], [0, 0.001]);
+  assert.deepEqual(result.geometries.alpha[0][1].at(-1), [0.02, 0.001]);
 });

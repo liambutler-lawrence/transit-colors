@@ -40,6 +40,7 @@ const OSM_ROUTE_RELATIONS = {
     { lineName: 'NS', relationIds: [2312797, 445768] },
     { lineName: 'NE', relationIds: [2293545, 7981648] },
     { lineName: 'CC', relationIds: [2076291, 7981669, 7981667] },
+    { lineName: 'CE', relationIds: [2076291, 7981669, 7981667] },
     { lineName: 'DT', relationIds: [2313458, 7981642] },
     { lineName: 'TE', relationIds: [2383439, 9627856] },
     { lineName: 'BP', relationIds: [1159434, 9664084] },
@@ -181,11 +182,27 @@ function geometryEdgeCount(geometries) {
   );
 }
 
+function alignGeometryEndpoints(geometries, stationCoordinateById) {
+  for (const [fromId, entries] of Object.entries(geometries)) {
+    const fromCoordinate = stationCoordinateById.get(fromId);
+    for (const [toId, coordinates] of entries) {
+      const toCoordinate = stationCoordinateById.get(toId);
+      if (!fromCoordinate || !toCoordinate || coordinates.length < 2) continue;
+      coordinates[0] = [...fromCoordinate];
+      coordinates[coordinates.length - 1] = [...toCoordinate];
+    }
+  }
+}
+
 async function buildArea({ areaKey, feeds, geometrySource, osmRouteRelations = [] }) {
   const schedulePath = resolve(dataDir, `${areaKey}-schedules.json`);
   const stationPath = resolve(dataDir, `${areaKey}-stations.geojson`);
-  const schedules = JSON.parse(await readFile(schedulePath, 'utf8'));
-  const stationGeoJson = JSON.parse(await readFile(stationPath, 'utf8'));
+  const metadataPath = resolve(dataDir, `${areaKey}-metadata.json`);
+  const [schedules, stationGeoJson, metadata] = await Promise.all([
+    readFile(schedulePath, 'utf8').then(JSON.parse),
+    readFile(stationPath, 'utf8').then(JSON.parse),
+    readFile(metadataPath, 'utf8').then(JSON.parse),
+  ]);
   const stationFeatures = stationGeoJson.features.filter(
     (feature) =>
       feature.properties.mode === 'subway' &&
@@ -328,9 +345,20 @@ async function buildArea({ areaKey, feeds, geometrySource, osmRouteRelations = [
       stationCoordinateById,
     });
     replaceGeometries(mergedGeometries, osmGeometry.geometries);
+    for (const [stationId, coordinate] of osmGeometry.platformCoordinateById) {
+      stationCoordinateById.set(stationId, coordinate);
+      const feature = stationFeatureById.get(stationId);
+      if (!feature) continue;
+      feature.geometry.coordinates = coordinate;
+      feature.properties.platform_model =
+        'Line-specific physical platform corridor from OSM route stop positions';
+    }
     observationCount += osmGeometry.shapeObservationCount;
   }
 
+  if (osmGeometry !== null) {
+    alignGeometryEndpoints(mergedGeometries, stationCoordinateById);
+  }
   const edgeCount = geometryEdgeCount(mergedGeometries);
   schedules.graph.g = mergedGeometries;
   schedules.track_geometry = {
@@ -341,15 +369,27 @@ async function buildArea({ areaKey, feeds, geometrySource, osmRouteRelations = [
         : 'Station-to-station centerlines averaged between directional OpenStreetMap route relations; official GTFS shapes retained as fallback',
     edge_count: edgeCount,
     shape_observation_count: observationCount,
-    endpoint_model: 'Exact line-platform coordinates',
+    endpoint_model:
+      osmGeometry === null
+        ? 'Exact line-platform coordinates'
+        : 'Exact line-specific physical platform coordinates from OpenStreetMap route stop positions',
     ...(osmGeometry === null
       ? {}
       : {
           osm_matched_stop_count: osmGeometry.matchedStopCount,
+          osm_platform_node_count: osmGeometry.platformCoordinateById.size,
           osm_route_observation_count: osmGeometry.routeObservationCount,
         }),
   };
-  await writeFile(schedulePath, `${JSON.stringify(schedules)}\n`, 'utf8');
+  if (osmGeometry !== null) {
+    metadata.platform_model =
+      'One node per line-specific physical platform corridor, positioned from OpenStreetMap route stop positions; opposite track sides are averaged';
+  }
+  await Promise.all([
+    writeFile(schedulePath, `${JSON.stringify(schedules)}\n`, 'utf8'),
+    writeFile(stationPath, `${JSON.stringify(stationGeoJson)}\n`, 'utf8'),
+    writeFile(metadataPath, `${JSON.stringify(metadata)}\n`, 'utf8'),
+  ]);
 
   const missing = [...allowedSubwayEdges(schedules)].filter((key) => {
     const [fromId, toId] = key.split('\u0000');
@@ -376,54 +416,62 @@ async function buildArea({ areaKey, feeds, geometrySource, osmRouteRelations = [
   }
 }
 
-await buildArea({
-  areaKey: 'cdmx',
-  geometrySource: 'Secretaría de Movilidad de la Ciudad de México (SEMOVI)',
-  feeds: [{ zipPath: CDMX_GTFS_PATH }],
-});
-await buildArea({
-  areaKey: 'nyc',
-  geometrySource: 'MTA New York City Transit and Port Authority Trans-Hudson',
-  feeds: [
-    {
-      zipPath: NYC_GTFS_PATH,
-      routePrefix: 'mta-subway/',
-      gtfsIdPrefix: 'mta-subway',
-    },
-    {
-      zipPath: PATH_GTFS_PATH,
-      routePrefix: 'path/',
-      gtfsIdPrefix: 'path',
-      useRouteLongName: true,
-    },
-  ],
-});
-await buildArea({
-  areaKey: 'singapore',
-  geometrySource:
-    'OpenStreetMap MRT/LRT route relations and LTA-derived Singapore GTFS route shapes',
-  feeds: [
-    {
-      zipPath: SINGAPORE_SHAPES_GTFS_PATH,
-      routePrefix: 'singapore-rail/',
-    },
-  ],
-  osmRouteRelations: OSM_ROUTE_RELATIONS.singapore,
-});
-await buildArea({
-  areaKey: 'atlanta',
-  geometrySource: 'Metropolitan Atlanta Rapid Transit Authority static GTFS',
-  feeds: [
-    {
-      zipPath: ATLANTA_GTFS_PATH,
-      routePrefix: 'marta-rail/',
-    },
-  ],
-});
-await buildArea({
-  areaKey: 'athens',
-  geometrySource:
-    'OpenStreetMap Athens Metro route relations matched to OASA / STASY platform coordinates',
-  feeds: [],
-  osmRouteRelations: OSM_ROUTE_RELATIONS.athens,
-});
+const areas = [
+  {
+    areaKey: 'cdmx',
+    geometrySource: 'Secretaría de Movilidad de la Ciudad de México (SEMOVI)',
+    feeds: [{ zipPath: CDMX_GTFS_PATH }],
+  },
+  {
+    areaKey: 'nyc',
+    geometrySource: 'MTA New York City Transit and Port Authority Trans-Hudson',
+    feeds: [
+      {
+        zipPath: NYC_GTFS_PATH,
+        routePrefix: 'mta-subway/',
+        gtfsIdPrefix: 'mta-subway',
+      },
+      {
+        zipPath: PATH_GTFS_PATH,
+        routePrefix: 'path/',
+        gtfsIdPrefix: 'path',
+        useRouteLongName: true,
+      },
+    ],
+  },
+  {
+    areaKey: 'singapore',
+    geometrySource:
+      'OpenStreetMap MRT/LRT route relations and LTA-derived Singapore GTFS route shapes',
+    feeds: [
+      {
+        zipPath: SINGAPORE_SHAPES_GTFS_PATH,
+        routePrefix: 'singapore-rail/',
+      },
+    ],
+    osmRouteRelations: OSM_ROUTE_RELATIONS.singapore,
+  },
+  {
+    areaKey: 'atlanta',
+    geometrySource: 'Metropolitan Atlanta Rapid Transit Authority static GTFS',
+    feeds: [
+      {
+        zipPath: ATLANTA_GTFS_PATH,
+        routePrefix: 'marta-rail/',
+      },
+    ],
+  },
+  {
+    areaKey: 'athens',
+    geometrySource:
+      'OpenStreetMap Athens Metro route relations matched to OASA / STASY platform coordinates',
+    feeds: [],
+    osmRouteRelations: OSM_ROUTE_RELATIONS.athens,
+  },
+];
+const requestedAreas = new Set(process.argv.slice(2));
+for (const area of areas) {
+  if (requestedAreas.size === 0 || requestedAreas.has(area.areaKey)) {
+    await buildArea(area);
+  }
+}

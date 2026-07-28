@@ -356,6 +356,65 @@ test('Singapore and Athens switch every ride edge between tracks and chords', as
   }
 });
 
+test('Singapore and Athens publish line-platform coordinates and visible walking links', async () => {
+  for (const areaKey of ['singapore', 'athens']) {
+    const [routeData, stations, schedules] = await Promise.all([
+      readFile(
+        new URL(`../data/${areaKey}-circumference.json`, import.meta.url),
+        'utf8',
+      ).then((data) => circumferenceGeometryVariantsSchema.parse(JSON.parse(data))),
+      readFile(
+        new URL(`../data/${areaKey}-stations.geojson`, import.meta.url),
+        'utf8',
+      ).then(JSON.parse),
+      readFile(
+        new URL(`../data/${areaKey}-schedules.json`, import.meta.url),
+        'utf8',
+      ).then(JSON.parse),
+    ]);
+    const coordinateById = new Map(
+      stations.features.map((feature) => [
+        feature.properties.id,
+        feature.geometry.coordinates,
+      ]),
+    );
+
+    assert.equal(
+      schedules.track_geometry.osm_platform_node_count,
+      stations.features.length,
+    );
+    assert.ok(
+      stations.features.every(({ properties }) =>
+        properties.platform_model.startsWith(
+          'Line-specific physical platform corridor',
+        ),
+      ),
+    );
+    for (const segment of routeData.track.network.segments.filter(
+      ({ type }) => type === 'ride',
+    )) {
+      assert.deepEqual(segment.coordinates[0], coordinateById.get(segment.from.id));
+      assert.deepEqual(segment.coordinates.at(-1), coordinateById.get(segment.to.id));
+    }
+
+    const expectedTransferCount =
+      Object.values(schedules.graph.t).reduce(
+        (total, transfers) => total + transfers.length,
+        0,
+      ) / 2;
+    const transferSegments = routeData.track.network.segments.filter(
+      ({ type }) => type === 'transfer',
+    );
+    assert.equal(transferSegments.length, expectedTransferCount);
+    assert.ok(transferSegments.length > 0);
+    assert.ok(
+      transferSegments.every(
+        (segment) => distanceMeters(segment.coordinates[0], segment.coordinates[1]) > 0,
+      ),
+    );
+  }
+});
+
 test('NYC exact winner uses the 1 from South Ferry through 14 St', async () => {
   const routeData = circumferenceGeometryVariantsSchema.parse(
     JSON.parse(
