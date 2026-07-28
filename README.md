@@ -11,10 +11,16 @@ New York City region. It includes:
 Circumference routes follow averaged centerlines from official GTFS track shapes by
 default, with an option to compare straight platform-to-platform geometry. The map also
 shows every eligible metro line and platform in its official agency color. Both metro
-networks and their selected boundaries stay visible together; the “Focus on…” picker
-only moves the camera and selects which route its controls and measurements describe. At
-regional and world scale the map renders as an interactive globe, transitioning
-continuously to the familiar flat-map view at street scale.
+networks and their selected boundaries stay visible together.
+
+The sidebar follows the same product → mode → results → selected item hierarchy for both
+experiences. Circumference result cards show each city's route and landmass split and
+can focus the camera without filtering the map. In the heatmap, moving the map to a
+supported metro area automatically brings its local transit data into the results. Any
+visible street, station, line, platform, or transfer can be inspected directly without
+first changing a city mode. At regional and world scale the map renders as an
+interactive globe, transitioning continuously to the familiar flat-map view at street
+scale.
 
 The public site is deployed at
 [liambutler-lawrence.github.io/transit-colors](https://liambutler-lawrence.github.io/transit-colors/).

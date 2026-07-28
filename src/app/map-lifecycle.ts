@@ -51,6 +51,7 @@ import {
   focusCircumferenceArea,
   prepareCircumferenceRoute,
   renderCircumferenceCandidate,
+  resetCircumferenceItemDetails,
   storeCircumferenceOverride,
   syncCircumferenceVisibility,
 } from './circumference-ui.js';
@@ -77,6 +78,7 @@ import {
   areaSelect,
   circumferenceCanvases,
   circumferenceProductButton,
+  circumferenceResultsEl,
   circumferenceState,
   circumferenceStates,
   destinationSelect,
@@ -240,7 +242,6 @@ export function installHover(): void {
       if (properties.data.area_key !== runtime.activeAreaKey) {
         areaSelect.value = properties.data.area_key;
         areaSelect.dispatchEvent(new Event('change'));
-        return;
       }
       showCircumferenceSegment(properties.data);
     });
@@ -654,7 +655,10 @@ async function fetchCircumferenceGeometryVariants(
 
 export async function loadArea(
   areaKey: AreaKey,
-  { initial = false }: { readonly initial?: boolean } = {},
+  {
+    fit = true,
+    initial = false,
+  }: { readonly fit?: boolean; readonly initial?: boolean } = {},
 ): Promise<void> {
   const area = AREAS[areaKey];
   const sequence = ++runtime.loadSequence;
@@ -691,7 +695,7 @@ export async function loadArea(
       .map((feature) => feature.properties.id);
     renderMetadata(metadata);
     installMapData(stations);
-    applyMapBounds(metadata);
+    if (fit) applyMapBounds(metadata);
 
     if (area.liveRoads && runtime.pendingBasemapStyle) installBasemap();
     syncStationFilters();
@@ -846,8 +850,36 @@ map.on('sourcedata', (event) => {
   }
 });
 
+function nearestConfiguredArea(): AreaKey | null {
+  if (map.getZoom() < 7) return null;
+  const center = map.getCenter();
+  let nearest: { readonly areaKey: AreaKey; readonly distance: number } | null = null;
+  for (const areaKey of AREA_KEYS) {
+    const [longitude, latitude] = AREAS[areaKey].center;
+    const longitudeScale = Math.cos((center.lat * Math.PI) / 180);
+    const distance = Math.hypot(
+      (center.lng - longitude) * longitudeScale,
+      center.lat - latitude,
+    );
+    if (!nearest || distance < nearest.distance) {
+      nearest = { areaKey, distance };
+    }
+  }
+  return nearest && nearest.distance <= 4 ? nearest.areaKey : null;
+}
+
+function followAccessMapFocus(): void {
+  if (runtime.activeProduct !== 'access' || runtime.loadingOperation?.type === 'area') {
+    return;
+  }
+  const areaKey = nearestConfiguredArea();
+  if (!areaKey || areaKey === runtime.activeAreaKey) return;
+  void loadArea(areaKey, { fit: false });
+}
+
 map.on('moveend', () => {
   scheduleLiveStreetRefresh();
+  followAccessMapFocus();
 });
 map.on('idle', () => {
   const sourceId = activeStreetSourceId();
@@ -879,9 +911,43 @@ areaSelect.addEventListener('change', () => {
   if (runtime.activeProduct === 'circumference') {
     runtime.activeAreaKey = areaKey;
     updateAreaChrome(areaKey);
+    resetCircumferenceItemDetails();
     focusCircumferenceArea(areaKey);
   }
-  void loadArea(areaKey);
+  void loadArea(areaKey, { fit: runtime.activeProduct !== 'circumference' });
+});
+
+circumferenceResultsEl.addEventListener('click', (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const focusButton = target.closest<HTMLButtonElement>('button[data-focus-area]');
+  if (!focusButton || !circumferenceResultsEl.contains(focusButton)) return;
+  const areaKey = focusButton.dataset['focusArea'];
+  if (!isAreaKey(areaKey)) return;
+  if (areaKey === runtime.activeAreaKey) {
+    focusCircumferenceArea(areaKey);
+    return;
+  }
+  areaSelect.value = areaKey;
+  areaSelect.dispatchEvent(new Event('change'));
+});
+
+circumferenceResultsEl.addEventListener('change', (event) => {
+  const select = event.target;
+  if (
+    !(select instanceof HTMLSelectElement) ||
+    !circumferenceResultsEl.contains(select)
+  ) {
+    return;
+  }
+  const areaKey = select.dataset['routeArea'];
+  if (!isAreaKey(areaKey)) return;
+  if (areaKey !== runtime.activeAreaKey) {
+    areaSelect.value = areaKey;
+    areaSelect.dispatchEvent(new Event('change'));
+  }
+  routeChoiceSelect.value = select.value;
+  routeChoiceSelect.dispatchEvent(new Event('change'));
 });
 
 accessProductButton.addEventListener('click', () => {
@@ -931,7 +997,6 @@ for (const toggle of [routeGradientToggle, routeStationsToggle, routeAreaToggle]
 }
 
 routeTrackGeometryToggle.addEventListener('change', () => {
-  if (!state.schedules) return;
   updateStatus(
     routeTrackGeometryToggle.checked ? 'Following track paths' : 'Using straight edges',
     { isLoading: true },

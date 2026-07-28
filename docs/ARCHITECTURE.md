@@ -21,6 +21,11 @@ The application modules form a one-way dependency graph from shared context to f
 to lifecycle orchestration. Cross-feature refresh requests use browser events instead of
 circular module imports.
 
+The sidebar is ordered product → mode → results → selected item. Display controls sit
+immediately below the product because they affect every later section for that product.
+Circumference result cards own their city-specific focus and route-variant controls. The
+city selector remains an internal event bridge rather than a user-facing mode.
+
 ## Domain boundaries
 
 `src/domain.ts` defines Zod schemas and inferred types for:
@@ -71,8 +76,13 @@ renders these files; it never runs the combinatorial search during page load.
 The circumference map keeps one independent route state and gradient image source per
 metro area. It merges both complete networks and selected boundaries into one GeoJSON
 source, rendered in official line colors, so changing the focused area never removes the
-other city. The “Focus on…” control changes the camera and the active route controls; it
-does not filter map content.
+other city. Each result card changes the camera and its own route selection without
+filtering map content. Clicking a visible circumference segment first activates its city
+state and then displays that segment in the shared selected-item section.
+
+The heatmap has one active local data area because street and schedule data are loaded
+per region. A `moveend` listener activates the nearest supported metro at local zoom
+without moving the camera, so ordinary map navigation replaces the old city mode switch.
 
 ## Static data
 

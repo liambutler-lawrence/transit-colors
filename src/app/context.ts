@@ -58,7 +58,7 @@ export const AREAS: Record<AreaKey, AreaConfig> = {
 
 export const AREA_KEYS: readonly AreaKey[] = ['cdmx', 'nyc'];
 
-export function isAreaKey(value: string | null): value is AreaKey {
+export function isAreaKey(value: unknown): value is AreaKey {
   return value === 'cdmx' || value === 'nyc';
 }
 
@@ -269,7 +269,7 @@ export const futureStationToggle = requiredElement(
   HTMLInputElement,
 );
 export const areaSelect = requiredElement('#metro-area', HTMLSelectElement);
-export const productTitleEl = requiredElement('#product-title', HTMLElement);
+export const accessResultAreaEl = requiredElement('#access-result-area', HTMLElement);
 export const accessProductButton = requiredElement(
   '#product-access',
   HTMLButtonElement,
@@ -283,24 +283,8 @@ export const circumferenceProductEl = requiredElement(
   '#circumference-product',
   HTMLElement,
 );
-export const circumferenceInnerAreaEl = requiredElement(
-  '#circumference-inner-area',
-  HTMLElement,
-);
-export const circumferenceOuterAreaEl = requiredElement(
-  '#circumference-outer-area',
-  HTMLElement,
-);
-export const circumferenceOuterLabelEl = requiredElement(
-  '#circumference-outer-label',
-  HTMLElement,
-);
-export const circumferenceLengthEl = requiredElement(
-  '#circumference-length',
-  HTMLElement,
-);
-export const circumferenceLandmassBreakdownEl = requiredElement(
-  '#circumference-landmass-breakdown',
+export const circumferenceResultsEl = requiredElement(
+  '#circumference-results',
   HTMLElement,
 );
 export const routeChoiceSelect = requiredElement('#route-choice', HTMLSelectElement);
@@ -323,6 +307,10 @@ export const routeStationsToggle = requiredElement(
 );
 export const routeAreaToggle = requiredElement('#toggle-route-area', HTMLInputElement);
 export const circumferenceNameEl = requiredElement('#circumference-name', HTMLElement);
+export const circumferenceSelectionTypeEl = requiredElement(
+  '#circumference-selection-type',
+  HTMLElement,
+);
 export const circumferenceSummaryEl = requiredElement(
   '#circumference-summary',
   HTMLElement,

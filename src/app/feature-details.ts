@@ -30,6 +30,7 @@ import {
   allStationModes,
   circumferenceMetadataEl,
   circumferenceNameEl,
+  circumferenceSelectionTypeEl,
   circumferenceState,
   circumferenceStates,
   circumferenceSummaryEl,
@@ -517,6 +518,9 @@ export function showCircumferenceSegment(properties: SegmentProperties): void {
     !isFocusedArea ||
     !circumferenceState.inspectedSegmentId ||
     circumferenceState.avoidedSegmentIds.has(circumferenceState.inspectedSegmentId);
+  circumferenceSelectionTypeEl.textContent = isTransfer
+    ? 'Selected walking transfer'
+    : 'Selected route segment';
   circumferenceNameEl.textContent = isTransfer
     ? `${properties.from_label} ⇢ ${properties.to_label}`
     : `${properties.from} → ${properties.to}`;

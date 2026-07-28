@@ -73,7 +73,30 @@ test('the circumference gradient uses the detailed basemap shoreline', async () 
   );
 });
 
-test('the circumference picker is a focus control for an always-visible map', async () => {
+test('the sidebar follows product, mode, results, and selection hierarchy', async () => {
+  const shell = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+
+  const productIndex = shell.indexOf('1 · Product');
+  const accessModeIndex = shell.indexOf('<span class="section-eyebrow">Mode</span>');
+  const accessResultsIndex = shell.indexOf(
+    '<span class="section-eyebrow">Results</span>',
+  );
+  const accessSelectionIndex = shell.indexOf(
+    '<span class="section-eyebrow">Selected item</span>',
+  );
+
+  assert.ok(productIndex >= 0);
+  assert.ok(productIndex < accessModeIndex);
+  assert.ok(accessModeIndex < accessResultsIndex);
+  assert.ok(accessResultsIndex < accessSelectionIndex);
+  assert.match(shell, />\s*Transit heatmap\s*</);
+  assert.match(shell, />\s*Circumference routes\s*</);
+  assert.match(shell, /id="circumference-results"/);
+  assert.match(shell, /id="access-result-area"/);
+  assert.doesNotMatch(shell, /<span>Focus on…<\/span>/);
+});
+
+test('circumference result cards focus an always-visible map', async () => {
   const shell = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   const lifecycle = await readFile(
     new URL('./app/map-lifecycle.ts', import.meta.url),
@@ -84,10 +107,13 @@ test('the circumference picker is a focus control for an always-visible map', as
     'utf8',
   );
 
-  assert.match(shell, /<span>Focus on…<\/span>/);
-  assert.match(shell, /full\s+eligible network for both metro areas/);
+  assert.match(shell, /Both metro networks stay visible/);
   assert.match(lifecycle, /AREA_KEYS\.map\(async \(areaKey\)/);
   assert.match(lifecycle, /circumference-gradient-\$\{areaKey\}/);
+  assert.match(lifecycle, /button\[data-focus-area\]/);
+  assert.match(lifecycle, /select\.dataset\['routeArea'\]/);
+  assert.match(circumferenceUi, /dataset\['focusArea'\] = areaKey/);
+  assert.match(circumferenceUi, /dataset\['routeArea'\] = areaKey/);
   assert.match(
     circumferenceUi,
     /AREA_KEYS\.flatMap\(\(areaKey\) =>[\s\S]*routeFeatureCollection/,
