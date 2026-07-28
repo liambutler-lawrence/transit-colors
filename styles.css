@@ -868,40 +868,22 @@ body {
   grid-column: 1 / -1;
 }
 
-.result-route-control {
-  display: grid;
-  gap: 5px;
-  margin-top: 9px;
-}
-
-.result-route-control label {
-  color: var(--ink);
-  font-size: 0.68rem;
-  font-weight: 800;
-}
-
-.result-route-control select {
-  width: 100%;
-  min-height: 34px;
-  padding: 6px 28px 6px 8px;
-  border: 1px solid #c9b8aa;
-  border-radius: 6px;
-  color: var(--ink);
-  background: #ffffff;
-  font: inherit;
-  font-size: 0.72rem;
-}
-
-.result-route-control select:focus-visible {
-  outline: 3px solid rgba(219, 111, 63, 0.24);
-  outline-offset: 1px;
-}
-
 .result-summary {
   margin: 7px 0 0;
   color: var(--muted);
   font-size: 0.66rem;
   line-height: 1.35;
+}
+
+.result-empty {
+  margin: 0;
+  padding: 12px;
+  border: 1px solid #e4d5ca;
+  border-radius: 10px;
+  color: var(--muted);
+  background: #fffaf5;
+  font-size: 0.75rem;
+  line-height: 1.4;
 }
 
 .landmass-breakdown {

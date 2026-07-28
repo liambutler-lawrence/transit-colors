@@ -930,33 +930,26 @@ areaSelect.addEventListener('change', () => {
 circumferenceResultsEl.addEventListener('click', (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
-  const focusButton = target.closest<HTMLButtonElement>('button[data-focus-area]');
+  const focusButton = target.closest<HTMLButtonElement>(
+    'button[data-focus-area][data-focus-candidate]',
+  );
   if (!focusButton || !circumferenceResultsEl.contains(focusButton)) return;
   const areaKey = focusButton.dataset['focusArea'];
+  const candidateId = focusButton.dataset['focusCandidate'];
   if (!isAreaKey(areaKey)) return;
-  if (areaKey === runtime.activeAreaKey) {
-    focusCircumferenceArea(areaKey);
-    return;
-  }
-  areaSelect.value = areaKey;
-  areaSelect.dispatchEvent(new Event('change'));
-});
-
-circumferenceResultsEl.addEventListener('change', (event) => {
-  const select = event.target;
   if (
-    !(select instanceof HTMLSelectElement) ||
-    !circumferenceResultsEl.contains(select)
+    !candidateId ||
+    !circumferenceStates[areaKey].candidates.some(
+      (candidate) => candidate.id === candidateId,
+    )
   ) {
     return;
   }
-  const areaKey = select.dataset['routeArea'];
-  if (!isAreaKey(areaKey)) return;
   if (areaKey !== runtime.activeAreaKey) {
     areaSelect.value = areaKey;
     areaSelect.dispatchEvent(new Event('change'));
   }
-  routeChoiceSelect.value = select.value;
+  routeChoiceSelect.value = candidateId;
   routeChoiceSelect.dispatchEvent(new Event('change'));
 });
 

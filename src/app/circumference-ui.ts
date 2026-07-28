@@ -20,6 +20,7 @@ import {
 import {
   calculateLandmassCoverage,
   combinedLandmassArea,
+  type LandmassCoverage,
 } from '../circumference-landmass.js';
 import { circumferenceGradientCoordinates } from '../circumference-gradient-source.js';
 import {
@@ -32,8 +33,9 @@ import type {
   CircumferenceGeometryMode,
   CircumferenceModeResult,
 } from '../circumference/types.js';
+import type { LandmassArea } from '../domain.js';
 import { lineColor } from '../line-colors.js';
-import type { AreaKey, CircumferenceState, MetadataDetail } from './types.js';
+import type { AreaKey, MetadataDetail } from './types.js';
 import {
   AREAS,
   AREA_KEYS,
@@ -132,41 +134,46 @@ export function positionCircumferenceGradient(): void {
 }
 
 export function syncCircumferenceVisibility(): void {
-  const visible =
+  const networkVisible =
+    runtime.activeProduct === 'circumference' &&
+    AREA_KEYS.some(
+      (areaKey) => circumferenceStates[areaKey].network.segments.length > 0,
+    );
+  const routeVisible =
     runtime.activeProduct === 'circumference' &&
     AREA_KEYS.some((areaKey) => Boolean(circumferenceStates[areaKey].selected));
   for (const areaKey of AREA_KEYS) {
     setLayerVisibility(
       `circumference-gradient-${areaKey}`,
-      visible &&
+      routeVisible &&
         routeGradientToggle.checked &&
         Boolean(circumferenceStates[areaKey].selected),
     );
   }
-  setLayerVisibility('circumference-area', visible && routeAreaToggle.checked);
-  setLayerVisibility('circumference-network-casing', visible);
-  setLayerVisibility('circumference-network-line', visible);
-  setLayerVisibility('circumference-network-transfer-line', visible);
-  setLayerVisibility('circumference-route-alternative-casing', visible);
-  setLayerVisibility('circumference-route-alternative-line', visible);
-  setLayerVisibility('circumference-route-casing', visible);
-  setLayerVisibility('circumference-route-line', visible);
-  setLayerVisibility('circumference-transfer-line', visible);
+  setLayerVisibility('circumference-area', routeVisible && routeAreaToggle.checked);
+  setLayerVisibility('circumference-network-casing', networkVisible);
+  setLayerVisibility('circumference-network-line', networkVisible);
+  setLayerVisibility('circumference-network-transfer-line', networkVisible);
+  setLayerVisibility('circumference-route-alternative-casing', routeVisible);
+  setLayerVisibility('circumference-route-alternative-line', routeVisible);
+  setLayerVisibility('circumference-route-casing', routeVisible);
+  setLayerVisibility('circumference-route-line', routeVisible);
+  setLayerVisibility('circumference-transfer-line', routeVisible);
   setLayerVisibility(
     'circumference-network-stations',
-    visible && routeStationsToggle.checked,
+    networkVisible && routeStationsToggle.checked,
   );
   setLayerVisibility(
     'circumference-network-labels',
-    visible && routeStationsToggle.checked,
+    networkVisible && routeStationsToggle.checked,
   );
   setLayerVisibility(
     'circumference-route-stations',
-    visible && routeStationsToggle.checked,
+    routeVisible && routeStationsToggle.checked,
   );
   setLayerVisibility(
     'circumference-route-labels',
-    visible && routeStationsToggle.checked,
+    routeVisible && routeStationsToggle.checked,
   );
 }
 
@@ -636,64 +643,101 @@ export function routeFeatureCollection(
   };
 }
 
-function circumferenceCandidateOptions(
-  routeState: CircumferenceState,
-): HTMLOptionElement[] {
-  const automaticOption = document.createElement('option');
-  automaticOption.value = '';
-  automaticOption.textContent = 'Automatic · largest contained area';
-  const rankingCandidates =
-    routeState.geometryVariants?.straight.candidates ?? routeState.candidates;
-  return [
-    automaticOption,
-    ...routeState.candidates.map((candidate, index) => {
-      const option = document.createElement('option');
-      const rankingCandidate =
-        rankingCandidates.find(({ id }) => id === candidate.id) ?? candidate;
-      option.value = candidate.id;
-      option.textContent = `#${index + 1} · ${formatArea(
-        rankingCandidate.areaSquareMeters,
-      )} · ${candidate.lines.join(', ')}`;
-      return option;
-    }),
-  ];
+interface CircumferenceCircleResult {
+  readonly areaKey: AreaKey;
+  readonly areaRank: number;
+  readonly candidate: CircumferenceCandidate;
+  readonly metroCircleCount: number;
 }
 
-function createCircumferenceResult(areaKey: AreaKey): HTMLElement {
+const landmassCoverageCache = new WeakMap<
+  CircumferenceCandidate,
+  {
+    readonly coverage: LandmassCoverage[];
+    readonly landmassArea: LandmassArea;
+  }
+>();
+
+function compareCircleArea(
+  first: CircumferenceCandidate,
+  second: CircumferenceCandidate,
+): number {
+  return (
+    second.areaSquareMeters - first.areaSquareMeters ||
+    first.id.localeCompare(second.id)
+  );
+}
+
+/**
+ * Treat circles—not metro areas—as the result entity. Metros without a valid
+ * cycle contribute no card, while every valid scheduled cycle is globally
+ * ordered by its precise area in the currently selected geometry mode.
+ */
+export function circumferenceCircleResults(): CircumferenceCircleResult[] {
+  return AREA_KEYS.flatMap((areaKey) => {
+    const candidates = [...circumferenceStates[areaKey].candidates].sort(
+      compareCircleArea,
+    );
+    return candidates.map((candidate, index) => ({
+      areaKey,
+      areaRank: index + 1,
+      candidate,
+      metroCircleCount: candidates.length,
+    }));
+  }).sort(
+    (first, second) =>
+      compareCircleArea(first.candidate, second.candidate) ||
+      AREAS[first.areaKey].label.localeCompare(AREAS[second.areaKey].label) ||
+      first.areaRank - second.areaRank,
+  );
+}
+
+function candidateLandmassCoverage(
+  candidate: CircumferenceCandidate,
+  landmassArea: LandmassArea,
+): LandmassCoverage[] {
+  const cached = landmassCoverageCache.get(candidate);
+  if (cached?.landmassArea === landmassArea) return cached.coverage;
+  const coverage = calculateLandmassCoverage(candidate.coordinates, landmassArea);
+  landmassCoverageCache.set(candidate, { coverage, landmassArea });
+  return coverage;
+}
+
+function createCircumferenceResult({
+  areaKey,
+  areaRank,
+  candidate,
+  metroCircleCount,
+}: CircumferenceCircleResult): HTMLElement {
   const routeState = circumferenceStates[areaKey];
-  const candidate = routeState.selected;
+  const isFocused =
+    areaKey === runtime.activeAreaKey && routeState.selected?.id === candidate.id;
   const result = document.createElement('article');
   result.className = 'circumference-result';
-  result.dataset['focused'] = String(areaKey === runtime.activeAreaKey);
+  result.dataset['focused'] = String(isFocused);
 
   const focusButton = document.createElement('button');
   focusButton.type = 'button';
   focusButton.className = 'result-focus-button';
   focusButton.dataset['focusArea'] = areaKey;
+  focusButton.dataset['focusCandidate'] = candidate.id;
   focusButton.setAttribute(
     'aria-label',
-    `Focus map on ${AREAS[areaKey].label} circumference result`,
+    `Focus map on ${AREAS[areaKey].label} circle ${areaRank} of ${metroCircleCount}`,
   );
   const name = document.createElement('h3');
-  name.textContent = AREAS[areaKey].label;
+  name.textContent = `${AREAS[areaKey].label} · Circle ${areaRank}`;
   const description = document.createElement('small');
-  description.textContent = candidate
-    ? `${candidate.lines.length} lines · ${candidate.stations.length} platform nodes`
-    : routeState.areaKey === null
-      ? 'Loading route result…'
-      : routeState.activeLineNames.length === 0
-        ? 'No scheduled metro service'
-        : `${routeState.activeLineNames.length} lines · no closed loop`;
+  description.textContent = `${candidate.lines.length} lines · ${candidate.stations.length} platform nodes`;
   const focusAction = document.createElement('span');
   focusAction.className = 'focus-action';
-  focusAction.textContent = areaKey === runtime.activeAreaKey ? 'Focused' : 'Focus map';
+  focusAction.textContent = isFocused ? 'Focused' : 'Focus map';
   focusButton.append(name, description, focusAction);
   result.append(focusButton);
 
-  if (!candidate) return result;
   const landmassArea = runtime.circumferenceLandmasses?.areas[areaKey];
   const coverage = landmassArea
-    ? calculateLandmassCoverage(candidate.coordinates, landmassArea)
+    ? candidateLandmassCoverage(candidate, landmassArea)
     : [];
   const outerArea = combinedLandmassArea(coverage, 'outsideAreaSquareMeters');
   const metrics = document.createElement('div');
@@ -738,31 +782,15 @@ function createCircumferenceResult(areaKey: AreaKey): HTMLElement {
   }
   result.append(landmasses);
 
-  const routeControl = document.createElement('div');
-  routeControl.className = 'result-route-control';
-  const routeLabel = document.createElement('label');
-  const selectId = `circumference-result-route-${areaKey}`;
-  routeLabel.htmlFor = selectId;
-  routeLabel.textContent = 'Route variant';
-  const routeSelect = document.createElement('select');
-  routeSelect.id = selectId;
-  routeSelect.dataset['routeArea'] = areaKey;
-  routeSelect.replaceChildren(...circumferenceCandidateOptions(routeState));
-  routeSelect.value = routeState.overrideId;
-  routeSelect.disabled = routeState.candidates.length === 0;
-  routeControl.append(routeLabel, routeSelect);
-  result.append(routeControl);
-
   const methodology = routeState.methodology;
   const summary = document.createElement('p');
   summary.className = 'result-summary';
-  const choiceSummary = routeState.overrideId
-    ? 'Pinned ranked result'
-    : routeState.requiredSegmentIds.size || routeState.avoidedSegmentIds.size
-      ? 'Largest result matching segment edits'
-      : methodology?.optimizationStatus === 'optimal'
-        ? 'Proven global maximum'
-        : 'Automatic area maximum';
+  const choiceSummary =
+    routeState.overrideId === candidate.id
+      ? 'Pinned circle'
+      : areaRank === 1 && methodology?.optimizationStatus === 'optimal'
+        ? 'Largest valid circle in this metro'
+        : `Area rank ${areaRank} of ${metroCircleCount} in this metro`;
   summary.textContent = `${choiceSummary} · ${candidate.transferCount} walking ${
     candidate.transferCount === 1 ? 'transfer' : 'transfers'
   } · ${methodology?.trackGeometryEnabled ? 'track geography' : 'straight edges'}`;
@@ -771,9 +799,15 @@ function createCircumferenceResult(areaKey: AreaKey): HTMLElement {
 }
 
 export function renderCircumferenceResults(): void {
-  circumferenceResultsEl.replaceChildren(
-    ...AREA_KEYS.map((areaKey) => createCircumferenceResult(areaKey)),
-  );
+  const circles = circumferenceCircleResults();
+  if (circles.length === 0) {
+    const empty = document.createElement('p');
+    empty.className = 'result-empty';
+    empty.textContent = 'No valid circles operate at this day and time.';
+    circumferenceResultsEl.replaceChildren(empty);
+    return;
+  }
+  circumferenceResultsEl.replaceChildren(...circles.map(createCircumferenceResult));
 }
 
 export function combinedRouteFeatureCollection(): FeatureCollection<
@@ -953,8 +987,8 @@ function renderFocusedCircumferenceArea({ fit = false } = {}): void {
       ? `${AREAS[runtime.activeAreaKey].label} has no eligible metro lines operating ${departureLabel()}.`
       : 'The scheduled lines at this time do not produce a valid simple route.';
     routeChoiceSummaryEl.textContent = noService
-      ? 'All lines and route overlays are hidden for this schedule period.'
-      : 'No ranked routes are available for this schedule period.';
+      ? 'No eligible lines are active in this metro for this schedule period.'
+      : 'The operating lines remain visible, but no closed route exists.';
     renderCircumferenceResults();
     syncCircumferenceVisibility();
     if (fit) fitCircumferenceCandidate(null);
