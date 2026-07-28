@@ -14,6 +14,12 @@ import {
 const areaKeys = process.argv.slice(2);
 const supportedAreaKeys = ['cdmx', 'nyc', 'singapore', 'atlanta', 'athens'];
 const selectedAreaKeys = areaKeys.length > 0 ? areaKeys : supportedAreaKeys;
+const independentCompositeLimits = {
+  singapore: 2,
+};
+const nativeCircularLines = {
+  singapore: new Set(['CC']),
+};
 
 function networkSegmentIds(network) {
   return new Set(network.segments.map((segment) => segment.id));
@@ -21,6 +27,29 @@ function networkSegmentIds(network) {
 
 function isSubset(subset, superset) {
   return [...subset].every((value) => superset.has(value));
+}
+
+function segmentEdgeKey(segment) {
+  return [segment.from.id, segment.to.id].sort().join('\u0000');
+}
+
+function networkWithoutCycleRideSegments(network, nodeIds) {
+  const segmentByEdge = new Map(
+    network.segments.map((segment) => [segmentEdgeKey(segment), segment]),
+  );
+  const removedRideEdges = new Set();
+  for (const [index, fromId] of nodeIds.entries()) {
+    const toId = nodeIds[(index + 1) % nodeIds.length];
+    const segment = segmentByEdge.get([fromId, toId].sort().join('\u0000'));
+    if (segment?.type === 'ride') removedRideEdges.add(segmentEdgeKey(segment));
+  }
+  return {
+    stations: network.stations,
+    segments: network.segments.filter(
+      (segment) =>
+        segment.type !== 'ride' || !removedRideEdges.has(segmentEdgeKey(segment)),
+    ),
+  };
 }
 
 function scheduleTopologies(network, schedules) {
@@ -46,51 +75,123 @@ function scheduleTopologies(network, schedules) {
   );
 }
 
-async function exactSchedulePaths(areaKey, network, schedules, fullExact) {
-  const exactProofs = [
-    {
-      edgeIds: networkSegmentIds(network),
-      nodeIds: fullExact.nodeIds,
-    },
-  ];
-  const noCycleProofs = [];
-  const exactPaths = [fullExact.nodeIds];
-  const topologies = scheduleTopologies(network, schedules);
-  console.log(`${areaKey}: ${topologies.length} distinct weekly service topologies`);
+async function exactIndependentPaths(
+  areaKey,
+  network,
+  { exactProofs, label, maximumPathCount = 1, noCycleProofs, onIteration },
+) {
+  const paths = [];
+  let remainingNetwork = network;
+  let rank = 1;
 
-  for (const [topologyIndex, topology] of topologies.entries()) {
-    const edgeIds = networkSegmentIds(topology.filteredNetwork);
+  while (paths.length < maximumPathCount) {
+    const edgeIds = networkSegmentIds(remainingNetwork);
     const inheritedProof = exactProofs.find(
       (proof) =>
         isSubset(edgeIds, proof.edgeIds) &&
-        isValidSimpleCircumferenceCycle(topology.filteredNetwork, proof.nodeIds),
+        isValidSimpleCircumferenceCycle(remainingNetwork, proof.nodeIds),
     );
-    if (inheritedProof) continue;
-    if (noCycleProofs.some((proofEdgeIds) => isSubset(edgeIds, proofEdgeIds))) {
+    if (inheritedProof) {
+      paths.push(inheritedProof.nodeIds);
+      remainingNetwork = networkWithoutCycleRideSegments(
+        remainingNetwork,
+        inheritedProof.nodeIds,
+      );
+      rank += 1;
       continue;
     }
+    if (noCycleProofs.some((proofEdgeIds) => isSubset(edgeIds, proofEdgeIds))) {
+      break;
+    }
 
-    const label =
-      `${areaKey}: schedule topology ${topologyIndex + 1}/${topologies.length} ` +
-      `(weekday ${topology.weekday}, ${String(Math.floor(topology.minute / 60)).padStart(2, '0')}:${String(topology.minute % 60).padStart(2, '0')}, ` +
-      `${topology.activeService?.lineNames.size ?? 0} lines)`;
-    console.time(label);
+    const solveLabel = `${areaKey}: ${label} independent circle ${rank}`;
+    console.time(solveLabel);
     try {
-      const exact = await solveExactMaximumAreaCycle(topology.filteredNetwork);
-      exactProofs.push({ edgeIds, nodeIds: exact.nodeIds });
-      exactPaths.push(exact.nodeIds);
+      const exact = await solveExactMaximumAreaCycle(remainingNetwork, {
+        onIteration,
+      });
+      exactProofs.push({ ...exact, edgeIds });
+      paths.push(exact.nodeIds);
+      remainingNetwork = networkWithoutCycleRideSegments(
+        remainingNetwork,
+        exact.nodeIds,
+      );
+      rank += 1;
     } catch (error) {
       if (
         error instanceof Error &&
         error.message === 'Exact circumference solve found no valid cycle.'
       ) {
         noCycleProofs.push(edgeIds);
-      } else {
+        break;
+      }
+      throw error;
+    } finally {
+      console.timeEnd(solveLabel);
+    }
+  }
+
+  return paths;
+}
+
+async function exactSingleLinePaths(areaKey, network, lineNames) {
+  const paths = [];
+
+  for (const lineName of [...lineNames].sort()) {
+    const segments = network.segments.filter(
+      (segment) => segment.type === 'ride' && segment.lines.includes(lineName),
+    );
+    const stationIds = new Set(
+      segments.flatMap((segment) => [segment.from.id, segment.to.id]),
+    );
+    const lineNetwork = {
+      stations: network.stations.filter((station) => stationIds.has(station.id)),
+      segments,
+    };
+    try {
+      const exact = await solveExactMaximumAreaCycle(lineNetwork);
+      paths.push(exact.nodeIds);
+      console.log(
+        `${areaKey}: ${lineName} native circle ${(exact.areaSquareMeters / 1_000_000).toFixed(3)} km²`,
+      );
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        error.message !== 'Exact circumference solve found no valid cycle.'
+      ) {
         throw error;
       }
-    } finally {
-      console.timeEnd(label);
     }
+  }
+
+  return paths;
+}
+
+async function exactSchedulePaths(
+  areaKey,
+  network,
+  schedules,
+  exactProofs,
+  maximumPathCount,
+  noCycleProofs,
+) {
+  const exactPaths = exactProofs.map((proof) => proof.nodeIds);
+  const topologies = scheduleTopologies(network, schedules);
+  console.log(`${areaKey}: ${topologies.length} distinct weekly service topologies`);
+
+  for (const [topologyIndex, topology] of topologies.entries()) {
+    const label =
+      `${areaKey}: schedule topology ${topologyIndex + 1}/${topologies.length} ` +
+      `(weekday ${topology.weekday}, ${String(Math.floor(topology.minute / 60)).padStart(2, '0')}:${String(topology.minute % 60).padStart(2, '0')}, ` +
+      `${topology.activeService?.lineNames.size ?? 0} lines)`;
+    exactPaths.push(
+      ...(await exactIndependentPaths(areaKey, topology.filteredNetwork, {
+        exactProofs,
+        label,
+        maximumPathCount,
+        noCycleProofs,
+      })),
+    );
   }
 
   return exactPaths;
@@ -130,10 +231,17 @@ for (const areaKey of selectedAreaKeys) {
     continue;
   }
 
-  console.time(`${areaKey}: exact topology solve`);
-  const exact = await solveExactMaximumAreaCycle(
+  const exactProofs = [];
+  const noCycleProofs = [];
+  const maximumPathCount = independentCompositeLimits[areaKey] ?? 1;
+  const fullExactPaths = await exactIndependentPaths(
+    areaKey,
     generated.geometryVariants.straight.network,
     {
+      exactProofs,
+      label: 'full network',
+      maximumPathCount,
+      noCycleProofs,
       onIteration: ({
         iteration,
         objectiveSquareKilometers,
@@ -149,21 +257,43 @@ for (const areaKey of selectedAreaKeys) {
       },
     },
   );
-  console.timeEnd(`${areaKey}: exact topology solve`);
+  const exact = exactProofs[0];
+  if (!exact || fullExactPaths.length === 0) {
+    throw new Error(
+      `${areaKey}: the exact solver did not return a full-network cycle.`,
+    );
+  }
+  const singleLinePaths = await exactSingleLinePaths(
+    areaKey,
+    generated.geometryVariants.straight.network,
+    nativeCircularLines[areaKey] ?? new Set(),
+  );
+  const nativeCircularCandidateIds = new Set(
+    singleLinePaths.map(
+      (nodeIds) =>
+        candidateFromNetworkPath(generated.geometryVariants.straight.network, nodeIds, {
+          useTrackGeometry: false,
+        }).id,
+    ),
+  );
 
   const scheduleExactPaths = await exactSchedulePaths(
     areaKey,
     generated.geometryVariants.straight.network,
     schedules,
-    exact,
+    exactProofs,
+    maximumPathCount,
+    noCycleProofs,
   );
+  scheduleExactPaths.push(...singleLinePaths);
   const exactStraightCandidate = candidateFromNetworkPath(
     generated.geometryVariants.straight.network,
-    exact.nodeIds,
+    fullExactPaths[0],
     { useTrackGeometry: false },
   );
-  const candidatePaths = [
-    exact.nodeIds,
+  const unsortedCandidatePaths = [
+    ...fullExactPaths,
+    ...singleLinePaths,
     ...generated.geometryVariants.straight.candidates
       .filter(
         (candidate) =>
@@ -175,6 +305,33 @@ for (const areaKey of selectedAreaKeys) {
       )
       .map((candidate) => candidate.nodeIds),
   ];
+  const candidatePaths = unsortedCandidatePaths
+    .filter((nodeIds, index, paths) => {
+      const candidateId = candidateFromNetworkPath(
+        generated.geometryVariants.straight.network,
+        nodeIds,
+        { useTrackGeometry: false },
+      ).id;
+      return (
+        paths.findIndex(
+          (candidatePath) =>
+            candidateFromNetworkPath(
+              generated.geometryVariants.straight.network,
+              candidatePath,
+              { useTrackGeometry: false },
+            ).id === candidateId,
+        ) === index
+      );
+    })
+    .sort(
+      (first, second) =>
+        candidateFromNetworkPath(generated.geometryVariants.straight.network, second, {
+          useTrackGeometry: false,
+        }).areaSquareMeters -
+        candidateFromNetworkPath(generated.geometryVariants.straight.network, first, {
+          useTrackGeometry: false,
+        }).areaSquareMeters,
+    );
   const uniqueScheduleExactPaths = scheduleExactPaths.filter(
     (nodeIds, index, paths) => {
       const candidateId = candidateFromNetworkPath(
@@ -201,11 +358,29 @@ for (const areaKey of selectedAreaKeys) {
       ...baseVariant,
       candidates: candidatePaths.map((nodeIds) =>
         candidateFromNetworkPath(baseVariant.network, nodeIds, {
+          independentCircleKind: nativeCircularCandidateIds.has(
+            candidateFromNetworkPath(
+              generated.geometryVariants.straight.network,
+              nodeIds,
+              { useTrackGeometry: false },
+            ).id,
+          )
+            ? 'native-line'
+            : undefined,
           useTrackGeometry: mode === 'track',
         }),
       ),
       scheduleCandidates: uniqueScheduleExactPaths.map((nodeIds) =>
         candidateFromNetworkPath(baseVariant.network, nodeIds, {
+          independentCircleKind: nativeCircularCandidateIds.has(
+            candidateFromNetworkPath(
+              generated.geometryVariants.straight.network,
+              nodeIds,
+              { useTrackGeometry: false },
+            ).id,
+          )
+            ? 'native-line'
+            : undefined,
           useTrackGeometry: mode === 'track',
         }),
       ),

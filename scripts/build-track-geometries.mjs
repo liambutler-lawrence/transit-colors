@@ -120,12 +120,12 @@ function distanceSquared(first, second) {
   return ((first[0] - second[0]) * latitudeScale) ** 2 + (first[1] - second[1]) ** 2;
 }
 
-function allowedSubwayEdges(schedules) {
+function allowedTransitEdges(schedules, trackModes) {
   const result = new Set();
   for (const [fromId, edges] of Object.entries(schedules.graph?.e ?? {})) {
     for (const [toId, , serviceKey] of edges) {
       const routeId = String(serviceKey).slice(0, String(serviceKey).lastIndexOf('/'));
-      if (schedules.routes?.[routeId]?.mode === 'subway') {
+      if (trackModes.has(schedules.routes?.[routeId]?.mode)) {
         result.add(stationEdgeKey(fromId, toId));
       }
     }
@@ -194,7 +194,13 @@ function alignGeometryEndpoints(geometries, stationCoordinateById) {
   }
 }
 
-async function buildArea({ areaKey, feeds, geometrySource, osmRouteRelations = [] }) {
+async function buildArea({
+  areaKey,
+  feeds,
+  geometrySource,
+  osmRouteRelations = [],
+  trackModes = ['subway'],
+}) {
   const schedulePath = resolve(dataDir, `${areaKey}-schedules.json`);
   const stationPath = resolve(dataDir, `${areaKey}-stations.geojson`);
   const metadataPath = resolve(dataDir, `${areaKey}-metadata.json`);
@@ -203,9 +209,10 @@ async function buildArea({ areaKey, feeds, geometrySource, osmRouteRelations = [
     readFile(stationPath, 'utf8').then(JSON.parse),
     readFile(metadataPath, 'utf8').then(JSON.parse),
   ]);
+  const trackModeSet = new Set(trackModes);
   const stationFeatures = stationGeoJson.features.filter(
     (feature) =>
-      feature.properties.mode === 'subway' &&
+      trackModeSet.has(feature.properties.mode) &&
       feature.properties.status === 'open' &&
       schedules.stations?.[feature.properties.id],
   );
@@ -227,7 +234,7 @@ async function buildArea({ areaKey, feeds, geometrySource, osmRouteRelations = [
       candidatesByRoute.set(routeId, candidates);
     }
   }
-  const allowedEdgeKeys = allowedSubwayEdges(schedules);
+  const allowedEdgeKeys = allowedTransitEdges(schedules, trackModeSet);
   const mergedGeometries = {};
   let observationCount = 0;
   for (const {
@@ -391,7 +398,7 @@ async function buildArea({ areaKey, feeds, geometrySource, osmRouteRelations = [
     writeFile(metadataPath, `${JSON.stringify(metadata)}\n`, 'utf8'),
   ]);
 
-  const missing = [...allowedSubwayEdges(schedules)].filter((key) => {
+  const missing = [...allowedTransitEdges(schedules, trackModeSet)].filter((key) => {
     const [fromId, toId] = key.split('\u0000');
     return !(
       schedules.graph.g?.[fromId]?.some(([targetId]) => targetId === toId) ||
@@ -399,7 +406,7 @@ async function buildArea({ areaKey, feeds, geometrySource, osmRouteRelations = [
     );
   });
   console.log(
-    `${areaKey}: wrote ${edgeCount.toLocaleString()} centerlines from ${observationCount.toLocaleString()} distinct shape observations; ${missing.length.toLocaleString()} subway edges retain straight fallback geometry.`,
+    `${areaKey}: wrote ${edgeCount.toLocaleString()} centerlines from ${observationCount.toLocaleString()} distinct shape observations; ${missing.length.toLocaleString()} tracked rail edges retain straight fallback geometry.`,
   );
   if (missing.length) {
     console.log(
@@ -450,6 +457,7 @@ const areas = [
       },
     ],
     osmRouteRelations: OSM_ROUTE_RELATIONS.singapore,
+    trackModes: ['subway', 'light_rail'],
   },
   {
     areaKey: 'atlanta',

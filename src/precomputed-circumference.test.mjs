@@ -44,7 +44,7 @@ test('precomputed circumference winners are validated and topology-stable', asyn
     );
     assert.equal(
       selectIndependentCircumferenceCandidates(routeData.track.candidates).length,
-      areaKey === 'athens' ? 3 : 1,
+      ['athens', 'singapore'].includes(areaKey) ? 3 : 1,
     );
     assert.ok(routeData.straight.scheduleCandidates.length >= 1);
     for (const [index, candidate] of routeData.straight.candidates.entries()) {
@@ -337,6 +337,30 @@ test('Singapore includes the completed Circle Line closure', async () => {
   assert.ok(routeData.track.candidates[0].areaSquareMeters > 200_000_000);
 });
 
+test('Singapore reports its three major independent MRT circles', async () => {
+  const [routeData, schedules] = await Promise.all([
+    readFile(
+      new URL('../data/singapore-circumference.json', import.meta.url),
+      'utf8',
+    ).then((data) => circumferenceGeometryVariantsSchema.parse(JSON.parse(data))),
+    readFile(new URL('../data/singapore-schedules.json', import.meta.url), 'utf8').then(
+      JSON.parse,
+    ),
+  ]);
+  const independent = selectIndependentCircumferenceCandidates(
+    routeData.track.candidates,
+  );
+
+  assert.equal(independent.length, 3);
+  assert.deepEqual(
+    independent.map((candidate) => candidate.lines),
+    [['CC', 'CG', 'DT', 'EW', 'NS'], ['CC'], ['CC', 'DT', 'NE', 'NS', 'TE']],
+  );
+  assert.equal(schedules.routes['singapore-rail/BP'].mode, 'light_rail');
+  assert.equal(schedules.routes['singapore-rail/SK'].mode, 'light_rail');
+  assert.equal(schedules.routes['singapore-rail/PG'].mode, 'light_rail');
+});
+
 test('Singapore and Athens switch every ride edge between tracks and chords', async () => {
   for (const areaKey of ['singapore', 'athens']) {
     const routeData = circumferenceGeometryVariantsSchema.parse(
@@ -362,9 +386,8 @@ test('Singapore and Athens switch every ride edge between tracks and chords', as
     assert.equal(routeData.track.methodology.trackGeometryAvailable, true);
     assert.equal(routeData.track.methodology.trackGeometryEnabled, true);
     assert.equal(routeData.straight.methodology.trackGeometryEnabled, false);
-    assert.equal(
-      routeData.track.methodology.trackGeometryEdgeCount,
-      trackRideSegments.length,
+    assert.ok(
+      routeData.track.methodology.trackGeometryEdgeCount >= trackRideSegments.length,
     );
     for (const trackSegment of trackRideSegments) {
       const key = [trackSegment.from.id, trackSegment.to.id].sort().join('\u0000');
@@ -423,8 +446,16 @@ test('Singapore and Athens publish line-platform coordinates and visible walking
     }
 
     const expectedTransferCount =
-      Object.values(schedules.graph.t).reduce(
-        (total, transfers) => total + transfers.length,
+      Object.entries(schedules.graph.t).reduce(
+        (total, [fromId, transfers]) =>
+          total +
+          transfers.filter(
+            ([toId]) =>
+              stations.features.find(({ properties }) => properties.id === fromId)
+                ?.properties.mode === 'subway' &&
+              stations.features.find(({ properties }) => properties.id === toId)
+                ?.properties.mode === 'subway',
+          ).length,
         0,
       ) / 2;
     const transferSegments = routeData.track.network.segments.filter(
