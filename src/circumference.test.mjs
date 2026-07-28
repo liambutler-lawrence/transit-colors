@@ -2,10 +2,14 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import polygonClipping from 'polygon-clipping';
 import {
+  activeCircumferenceLines,
   junctionContinuationLineLanes,
   buildCircumferenceCandidates,
+  filterCircumferenceNetwork,
   lineLengthMeters,
   polygonAreaSquareMeters,
+  scheduleCircumferenceMode,
+  serviceDaysActiveAt,
   selectCircumferenceCandidate,
   tracksShareFromNode,
 } from './circumference.js';
@@ -63,6 +67,33 @@ assert.equal(lineColor('nyc', 'A'), '#0062CF');
 assert.equal(lineColor('nyc', '6X'), '#009952');
 assert.equal(lineColor('nyc', 'SIR'), '#008EB7');
 
+const closedServiceDays = Array.from({ length: 7 }, () => []);
+const overnightServiceDays = Array.from({ length: 7 }, () => []);
+overnightServiceDays[6] = [[23 * 60, 25 * 60, 10]];
+assert.equal(serviceDaysActiveAt(closedServiceDays, 0, 30), false);
+assert.equal(serviceDaysActiveAt(overnightServiceDays, 0, 30), true);
+assert.equal(serviceDaysActiveAt(overnightServiceDays, 0, 60), false);
+
+const scheduleLineFixture = {
+  routes: {
+    subwayA: { mode: 'subway', name: 'A' },
+    busA: { mode: 'brt', name: 'A' },
+  },
+  graph: { e: {}, t: {} },
+  stations: {
+    platform: {
+      r: ['subwayA', 'busA'],
+      d: closedServiceDays,
+      p: {
+        'subwayA/0': overnightServiceDays,
+        'busA/0': overnightServiceDays,
+      },
+    },
+  },
+};
+assert.deepEqual([...activeCircumferenceLines(scheduleLineFixture, 0, 30)], ['A']);
+assert.deepEqual([...activeCircumferenceLines(scheduleLineFixture, 0, 60)], []);
+
 const squareStations = [
   ['a', [0, 0]],
   ['b', [0.01, 0]],
@@ -110,6 +141,17 @@ assert.equal(squareResult.candidates[0].stations.length, 4);
 assert.deepEqual(squareResult.candidates[0].lines, ['A']);
 assert.equal(squareResult.network.stations.length, 5);
 assert.equal(squareResult.network.segments.length, 5);
+assert.equal(
+  filterCircumferenceNetwork(squareResult.network, new Set()).segments.length,
+  0,
+);
+const scheduledSquareResult = scheduleCircumferenceMode(
+  squareResult.geometryVariants.track,
+  new Set(['A']),
+  'track',
+);
+assert.equal(scheduledSquareResult.candidates.length, 1);
+assert.deepEqual(scheduledSquareResult.candidates[0].lines, ['A']);
 assert.equal(
   selectCircumferenceCandidate(squareResult.candidates, squareResult.candidates[0].id),
   squareResult.candidates[0],

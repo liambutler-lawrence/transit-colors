@@ -77,6 +77,7 @@ const modeResultSchema = z.object({
     segments: z.array(networkSegmentSchema),
     stations: z.array(circumferenceNodeSchema),
   }),
+  scheduleCandidates: z.array(candidateSchema).default([]),
 });
 
 export const circumferenceGeometryVariantsSchema = z.object({

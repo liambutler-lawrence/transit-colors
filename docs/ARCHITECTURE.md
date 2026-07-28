@@ -63,6 +63,12 @@ cycle. The maximum is defined on straight platform edges so track-shape tunnel c
 cannot change route topology. Track mode then recalculates displayed geometry, length,
 and enclosed area from averaged official GTFS centerlines.
 
+The data build enumerates every distinct line topology produced by the weekly GTFS
+frequency windows. A reduced topology inherits a larger-network certificate when that
+winner remains feasible; otherwise the MILP proves a new winner. Those schedule winners
+are stored with the normal candidate bank, so changing weekday or time in the browser
+only filters lines and selects a pre-certified path.
+
 Landmass intersections are performed in a local WGS84 equal-area workspace for robust
 polygon topology, transformed back to longitude/latitude, and measured on the WGS84
 ellipsoid. The MapLibre camera is independent of these calculations: it renders a freely
@@ -71,7 +77,8 @@ any stored route metrics.
 
 The checked-in `data/*-circumference.json` files contain the proven winner, diverse
 manual alternatives, and the complete eligible network. The browser validates and
-renders these files; it never runs the combinatorial search during page load.
+renders these files; it never runs the combinatorial search during page load or a
+schedule change.
 
 The circumference map keeps one independent route state and gradient image source per
 metro area. It merges both complete networks and selected boundaries into one GeoJSON

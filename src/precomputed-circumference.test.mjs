@@ -29,6 +29,11 @@ test('precomputed circumference winners are validated and topology-stable', asyn
       routeData.track.candidates.map((candidate) => candidate.nodeIds),
       routeData.straight.candidates.map((candidate) => candidate.nodeIds),
     );
+    assert.deepEqual(
+      routeData.track.scheduleCandidates.map((candidate) => candidate.nodeIds),
+      routeData.straight.scheduleCandidates.map((candidate) => candidate.nodeIds),
+    );
+    assert.ok(routeData.straight.scheduleCandidates.length >= 1);
     for (const [index, candidate] of routeData.straight.candidates.entries()) {
       assert.equal(
         isValidSimpleCircumferenceCycle(routeData.straight.network, candidate.nodeIds),

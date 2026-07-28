@@ -276,6 +276,31 @@
                   </span>
                 </label>
               </div>
+
+              <fieldset class="departure-control circumference-departure-control">
+                <legend>Operating schedule</legend>
+                <div class="departure-inputs">
+                  <label>
+                    <span>Day</span>
+                    <select id="circumference-schedule-day">
+                      <option value="0">Monday</option>
+                      <option value="1">Tuesday</option>
+                      <option value="2">Wednesday</option>
+                      <option value="3">Thursday</option>
+                      <option value="4">Friday</option>
+                      <option value="5">Saturday</option>
+                      <option value="6">Sunday</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Time</span>
+                    <input id="circumference-schedule-time" type="time" step="300" />
+                  </label>
+                </div>
+                <p id="circumference-schedule-summary">
+                  Loading official weekly schedules…
+                </p>
+              </fieldset>
             </section>
 
             <section class="sidebar-section results-section">

@@ -42,6 +42,7 @@ export interface AreaConfig {
 }
 
 export interface CircumferenceState {
+  activeLineNames: string[];
   areaKey: AreaKey | null;
   avoidedSegmentIds: Set<string>;
   candidates: CircumferenceCandidate[];
@@ -52,6 +53,7 @@ export interface CircumferenceState {
   network: CircumferenceNetwork;
   overrideId: string;
   requiredSegmentIds: Set<string>;
+  scheduleKey: string;
   selected: CircumferenceCandidate | null;
 }
 
@@ -79,6 +81,7 @@ export interface AppRuntime {
   activeProduct: Product;
   basemapInstallScheduled: boolean;
   circumferenceLandmasses: LandmassState;
+  circumferenceSchedules: Record<AreaKey, Schedule | null>;
   futureStreetAccessStationIds: string[];
   initialLoadComplete: boolean;
   liveStreetRefreshInFlight: boolean;

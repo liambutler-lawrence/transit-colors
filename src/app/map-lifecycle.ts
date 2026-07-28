@@ -79,6 +79,8 @@ import {
   circumferenceCanvases,
   circumferenceProductButton,
   circumferenceResultsEl,
+  circumferenceScheduleDaySelect,
+  circumferenceScheduleTimeInput,
   circumferenceState,
   circumferenceStates,
   destinationSelect,
@@ -601,16 +603,15 @@ export function installMapData(stations: StationCollection): void {
 }
 
 export function scheduleDestinationSetup(
+  areaKey: AreaKey,
   area: AreaConfig,
   stations: StationCollection,
   sequence: number,
 ): void {
   if (!area.supportsDestination) return;
 
-  const start = async (): Promise<void> => {
-    const schedules = await fetchParsed(area.schedules, scheduleSchema).catch(
-      () => null,
-    );
+  const start = (): void => {
+    const schedules = runtime.circumferenceSchedules[areaKey];
     if (sequence !== runtime.loadSequence) return;
 
     const initializeDestination = (): void => {
@@ -632,12 +633,12 @@ export function scheduleDestinationSetup(
     window.addEventListener(
       'transit:ready',
       () => {
-        void start();
+        start();
       },
       { once: true },
     );
   } else {
-    void start();
+    start();
   }
 }
 
@@ -668,7 +669,7 @@ export async function loadArea(
   if (!initial) beginLoading(`Loading ${area.label}`, 'area');
   runtime.activeAreaKey = areaKey;
   setActiveCircumferenceState(areaKey);
-  setCurrentDeparture(area);
+  if (initial) setCurrentDeparture(area);
   resetDestinationRouting();
   updateAreaChrome(areaKey);
   resetSelection();
@@ -707,7 +708,7 @@ export async function loadArea(
     prepareCircumferenceRoute(sequence);
     window.__transitPerformance.dataFetchedMs =
       performance.now() - window.__transitPerformance.startedAt;
-    scheduleDestinationSetup(area, stations, sequence);
+    scheduleDestinationSetup(areaKey, area, stations, sequence);
 
     if (area.liveRoads || runtime.activeProduct === 'circumference') {
       scheduleLiveStreetRefresh();
@@ -737,13 +738,17 @@ export async function initialize(): Promise<void> {
           geometryVariants: await fetchCircumferenceGeometryVariants(
             AREAS[areaKey].circumference,
           ),
+          schedules: await fetchParsed(AREAS[areaKey].schedules, scheduleSchema).catch(
+            () => null,
+          ),
         })),
       ),
     ]);
     runtime.pendingBasemapStyle = basemapStyle;
     runtime.circumferenceLandmasses = landmasses;
-    for (const { areaKey, geometryVariants } of circumferenceEntries) {
+    for (const { areaKey, geometryVariants, schedules } of circumferenceEntries) {
       circumferenceStates[areaKey].geometryVariants = geometryVariants;
+      runtime.circumferenceSchedules[areaKey] = schedules;
     }
     setActiveCircumferenceState(initialAreaKey);
     await loadArea(initialAreaKey, { initial: true });
@@ -1013,8 +1018,18 @@ destinationSelect.addEventListener('change', () => {
   selectDestination(destinationSelect.value);
 });
 
-scheduleDaySelect.addEventListener('change', updateScheduleContext);
-scheduleTimeInput.addEventListener('change', updateScheduleContext);
+scheduleDaySelect.addEventListener('change', () => {
+  updateScheduleContext('access');
+});
+scheduleTimeInput.addEventListener('change', () => {
+  updateScheduleContext('access');
+});
+circumferenceScheduleDaySelect.addEventListener('change', () => {
+  updateScheduleContext('circumference');
+});
+circumferenceScheduleTimeInput.addEventListener('change', () => {
+  updateScheduleContext('circumference');
+});
 
 timeScaleInput.addEventListener('input', () => {
   if (timeScaleInput.value === '') return;
