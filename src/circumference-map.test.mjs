@@ -193,7 +193,7 @@ test('circle result cards focus an always-visible global network', async () => {
   );
 
   assert.match(shell, /All metro networks stay visible/);
-  assert.match(shell, /Valid circles by area/);
+  assert.match(shell, /Largest independent circles/);
   assert.match(lifecycle, /AREA_KEYS\.map\(async \(areaKey\)/);
   assert.match(lifecycle, /circumference-gradient-\$\{areaKey\}/);
   assert.match(lifecycle, /button\[data-focus-area\]\[data-focus-candidate\]/);
@@ -202,7 +202,7 @@ test('circle result cards focus an always-visible global network', async () => {
   assert.match(circumferenceUi, /dataset\['focusCandidate'\] = candidate\.id/);
   assert.match(
     circumferenceUi,
-    /AREA_KEYS\.flatMap\(\(areaKey\) => \{[\s\S]*candidates\.map\(\(candidate, index\)/,
+    /AREA_KEYS\.flatMap\(\(areaKey\) => \{[\s\S]*selectIndependentCircumferenceCandidates/,
   );
   assert.match(
     circumferenceUi,
