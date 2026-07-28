@@ -65,12 +65,64 @@ test('Atlanta publishes its full branched network without a fake loop', async ()
   ]);
   assert.equal(routeData.track.candidates.length, 0);
   assert.equal(routeData.straight.candidates.length, 0);
-  assert.ok(routeData.track.network.stations.length >= 50);
-  assert.ok(routeData.track.network.segments.length >= 50);
-  assert.deepEqual(
-    [...activeCircumferenceService(schedules, 1, 6 * 60 + 30).lineNames].sort(),
-    ['BLUE', 'GOLD', 'GREEN', 'RED'],
+  assert.equal(routeData.track.network.stations.length, 39);
+  assert.equal(
+    routeData.track.network.segments.filter(({ type }) => type === 'ride').length,
+    37,
   );
+  assert.equal(
+    routeData.track.network.segments.filter(({ type }) => type === 'transfer').length,
+    1,
+  );
+  assert.equal(
+    routeData.track.network.segments.filter(
+      ({ type, from, to }) => type === 'ride' && from.name === to.name,
+    ).length,
+    0,
+  );
+
+  const weekdayMorningService = activeCircumferenceService(schedules, 1, 6 * 60 + 30);
+  assert.deepEqual([...weekdayMorningService.lineNames].sort(), [
+    'BLUE',
+    'GOLD',
+    'GREEN',
+    'RED',
+  ]);
+  const scheduledResult = scheduleCircumferenceMode(
+    routeData.track,
+    weekdayMorningService,
+    'track',
+  );
+  const scheduledRideByEdge = new Map(
+    scheduledResult.network.segments
+      .filter(({ type }) => type === 'ride')
+      .map((segment) => [[segment.from.id, segment.to.id].sort().join('::'), segment]),
+  );
+  for (const [fromId, edges] of Object.entries(schedules.graph.e)) {
+    for (const [toId, , serviceKey] of edges) {
+      const separatorIndex = serviceKey.lastIndexOf('/');
+      const route = schedules.routes[serviceKey.slice(0, separatorIndex)];
+      if (route?.mode !== 'subway') continue;
+      const segment = scheduledRideByEdge.get([fromId, toId].sort().join('::'));
+      assert.ok(segment, `Missing MARTA segment ${fromId} → ${toId}`);
+      assert.ok(
+        segment.lines.includes(route.name),
+        `Missing MARTA ${route.name} lane on ${fromId} → ${toId}`,
+      );
+    }
+  }
+
+  const segmentByNames = (firstName, secondName) =>
+    scheduledResult.network.segments.find(
+      (segment) =>
+        segment.type === 'ride' &&
+        new Set([segment.from.name, segment.to.name]).has(firstName) &&
+        new Set([segment.from.name, segment.to.name]).has(secondName),
+    );
+  assert.deepEqual(segmentByNames('AIRPORT', 'COLLEGE PARK')?.lines, ['GOLD', 'RED']);
+  assert.deepEqual(segmentByNames('ASHBY', 'VINE CITY')?.lines, ['BLUE', 'GREEN']);
+  assert.deepEqual(segmentByNames('LINDBERGH CENTER', 'BUCKHEAD')?.lines, ['RED']);
+  assert.deepEqual(segmentByNames('LINDBERGH CENTER', 'LENOX')?.lines, ['GOLD']);
 });
 
 test('Singapore includes the completed Circle Line closure', async () => {

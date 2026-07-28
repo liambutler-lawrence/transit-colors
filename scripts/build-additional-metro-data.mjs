@@ -83,6 +83,12 @@ export const ADDITIONAL_METROS = {
     groupStop(stop) {
       return stop.parent_station || stop.stop_id;
     },
+    platformFamily(route) {
+      const lineName = route.route_short_name || route.route_long_name;
+      if (lineName === 'BLUE' || lineName === 'GREEN') return 'east-west';
+      if (lineName === 'GOLD' || lineName === 'RED') return 'north-south';
+      return route.route_id;
+    },
     cleanName(name) {
       return String(name)
         .replace(/\s+STATION\s*$/iu, '')
@@ -628,14 +634,18 @@ async function buildArea(areaKey, metro) {
     if (!stop || metro.excludeStop?.(stop)) return null;
     const group = metro.groupStop(stop);
     if (!group) return null;
+    const route = routeById.get(trip.route_id);
+    const platformFamily =
+      (route ? metro.platformFamily?.(route, stop) : null) ?? trip.route_id;
     const nodeId =
-      `gtfs/${metro.feedKey}/` + `${safeId(group)}/${safeId(trip.route_id)}`;
+      `gtfs/${metro.feedKey}/` + `${safeId(group)}/${safeId(platformFamily)}`;
     const info = nodeInfoById.get(nodeId) ?? {
       group,
       nodeId,
-      routeId: trip.route_id,
+      routeIds: new Set(),
       stops: new Map(),
     };
+    info.routeIds.add(trip.route_id);
     info.stops.set(stop.stop_id, stop);
     nodeInfoById.set(nodeId, info);
     const groupNodes = nodeIdsByGroup.get(group) ?? new Set();
@@ -710,12 +720,19 @@ async function buildArea(areaKey, metro) {
 
   const features = [];
   for (const info of nodeInfoById.values()) {
-    const route = routeById.get(info.routeId);
+    const routesForPlatform = [...info.routeIds]
+      .map((routeId) => routeById.get(routeId))
+      .filter(Boolean);
     const usedStops = [...info.stops.values()];
     const coordinate = averageCoordinate(usedStops);
-    if (!route || !coordinate) continue;
+    if (routesForPlatform.length === 0 || !coordinate) continue;
     const representativeStop = usedStops[0];
-    const routeName = route.route_short_name || route.route_long_name || route.route_id;
+    const routeNames = routesForPlatform.map(
+      (route) => route.route_short_name || route.route_long_name || route.route_id,
+    );
+    const operators = [
+      ...new Set(routesForPlatform.map((route) => route.agency_id || metro.feedName)),
+    ];
     features.push({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: coordinate },
@@ -728,10 +745,10 @@ async function buildArea(areaKey, metro) {
         status_detail: 'Open',
         status_source: 'Published in current static GTFS',
         network: metro.feedName,
-        operator: route.agency_id || metro.feedName,
+        operator: operators.join('; '),
         ref: representativeStop.stop_code || representativeStop.stop_id,
-        route_ref: routeName,
-        platform_model: 'Route-specific platform group',
+        route_ref: routeNames.join('; '),
+        platform_model: 'Physical track-corridor platform group',
       },
     });
   }
@@ -770,12 +787,13 @@ async function buildArea(areaKey, metro) {
     [...scheduleProfiles]
       .filter(([nodeId]) => stationIds.has(nodeId))
       .map(([nodeId, profile]) => {
-        const routeId = nodeInfoById.get(nodeId)?.routeId;
-        const routeKey = `${metro.feedKey}/${routeId}`;
+        const routeKeys = [...(nodeInfoById.get(nodeId)?.routeIds ?? new Set())]
+          .map((routeId) => `${metro.feedKey}/${routeId}`)
+          .sort();
         return [
           nodeId,
           {
-            r: [routeKey],
+            r: routeKeys,
             d: profile.departures.map(departureWindows),
             p: Object.fromEntries(
               [...profile.services]
@@ -844,7 +862,7 @@ async function buildArea(areaKey, metro) {
     eligible_route_count: eligibleRoutes.length,
     eligible_stop_time_count: eligibleStopTimeCount,
     platform_model:
-      'One node per route-specific platform group; opposite track sides are averaged',
+      'One node per physical track-corridor platform group; opposite track sides are averaged',
   };
 
   await Promise.all([
