@@ -75,11 +75,13 @@ npm run build:data:circumference
 ```
 
 This writes the complete display networks and offline-proven maximum-area routes for
-both areas, including every distinct weekly service topology derived from the published
-schedule windows. The exact optimizer reuses a superset certificate whenever its winner
-remains valid and solves only the reduced topologies that need a different winner. It
-may take several minutes for NYC. That cost is intentionally paid only during a data
-refresh; the browser loads the committed results directly.
+both areas, including every distinct weekly segment-level service topology derived from
+the published route-direction schedule windows. Express stop-to-stop service is
+normalized across the physical track segments it traverses. The exact optimizer reuses a
+superset certificate whenever its winner remains valid and solves only the reduced
+topologies that need a different winner. It may take several minutes for NYC. That cost
+is intentionally paid only during a data refresh; the browser loads the committed
+results directly.
 
 ## Landmasses
 

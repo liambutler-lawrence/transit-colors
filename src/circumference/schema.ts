@@ -18,6 +18,12 @@ const networkSegmentSchema = z.object({
   from: circumferenceNodeSchema,
   id: z.string().min(1),
   lines: z.array(z.string()),
+  lineServiceEdges: z
+    .record(
+      z.string(),
+      z.array(z.tuple([z.string().min(1), z.string().min(1), z.string().min(1)])),
+    )
+    .optional(),
   to: circumferenceNodeSchema,
   transferMinutes: z.number().nonnegative().nullable().optional(),
   transferSource: transferSourceSchema.optional(),

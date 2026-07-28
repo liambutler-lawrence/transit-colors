@@ -37,6 +37,13 @@ import {
   transferWaypointCycles,
   waypointExtremeCycles,
 } from './cycles.js';
+import {
+  addEdgeString,
+  copyEdgeStringSets,
+  circumferenceRouteMetadata,
+  lineServiceEdges,
+  serviceEdgeToken,
+} from './service-edges.js';
 import type {
   Adjacency,
   BuildCircumferenceOptions,
@@ -454,10 +461,12 @@ function buildGeometryVariant({
   candidatePaths,
   geometriesByEdge,
   linesByEdge,
+  lineNameByRouteId,
   maxCandidates,
   minimumAreaSquareMeters,
   nodes,
   normalizedLinesByEdge,
+  normalizedServiceEdgesByEdge,
   servicePriorityByLine,
   displayOnlyShortcuts,
   hiddenNetworkShortcuts,
@@ -467,10 +476,12 @@ function buildGeometryVariant({
   readonly candidatePaths: readonly CyclePath[];
   readonly geometriesByEdge: TrackGeometryMap;
   readonly linesByEdge: EdgeStringSets;
+  readonly lineNameByRouteId: ReadonlyMap<string, string>;
   readonly maxCandidates: number;
   readonly minimumAreaSquareMeters: number;
   readonly nodes: NodeMap;
   readonly normalizedLinesByEdge: EdgeStringSets;
+  readonly normalizedServiceEdgesByEdge: EdgeStringSets;
   readonly servicePriorityByLine: ReadonlyMap<string, number>;
   readonly displayOnlyShortcuts: ReadonlySet<EdgeKey>;
   readonly hiddenNetworkShortcuts: ReadonlySet<EdgeKey>;
@@ -574,6 +585,11 @@ function buildGeometryVariant({
         type: 'ride',
         display: !displayOnlyShortcuts.has(key),
         lines: [...lineNames].sort(sortLineNames),
+        lineServiceEdges: lineServiceEdges(
+          normalizedServiceEdgesByEdge.get(key) ?? new Set(),
+          lineNames,
+          lineNameByRouteId,
+        ),
         coordinates: orientedEdgeCoordinates(
           fromId,
           toId,
@@ -656,30 +672,14 @@ export function buildCircumferenceCandidates(
   );
   const linesByEdge: MutableEdgeStringSets = new Map();
   const familiesByEdge: MutableEdgeStringSets = new Map();
+  const serviceEdgesByEdge: MutableEdgeStringSets = new Map();
   const linesByNode = new Map<NodeId, Set<string>>(
     [...nodes.keys()].map((nodeId) => [nodeId, new Set<string>()]),
   );
   const transfersByEdge = new Map<EdgeKey, TransferEdge>();
   const geometriesByEdge = trackGeometryByEdge(schedules);
-  const routeIdsByLineName = new Map<string, Set<string>>();
-  const servicePriorityByLine = new Map<string, number>();
-  for (const [routeId, route] of Object.entries(schedules.routes)) {
-    if (route.mode !== 'subway') continue;
-    const lineName = route.name || routeId;
-    const routeIds = routeIdsByLineName.get(lineName) ?? new Set();
-    routeIds.add(routeId);
-    routeIdsByLineName.set(lineName, routeIds);
-    const priority = serviceStopPriority(lineName, route.description);
-    servicePriorityByLine.set(
-      lineName,
-      Math.min(servicePriorityByLine.get(lineName) ?? priority, priority),
-    );
-  }
-  const ambiguousLineNames = new Set(
-    [...routeIdsByLineName]
-      .filter(([, routeIds]) => routeIds.size > 1)
-      .map(([lineName]) => lineName),
-  );
+  const { ambiguousLineNames, lineNameByRouteId, servicePriorityByLine } =
+    circumferenceRouteMetadata(schedules, serviceStopPriority);
 
   for (const [fromStationId, edges] of Object.entries(schedules.graph.e)) {
     if (!stationById.has(fromStationId)) continue;
@@ -702,6 +702,11 @@ export function buildCircumferenceCandidates(
       const families = familiesByEdge.get(key) ?? new Set();
       families.add(serviceFamily(routeId, lineName));
       familiesByEdge.set(key, families);
+      addEdgeString(
+        serviceEdgesByEdge,
+        key,
+        serviceEdgeToken(serviceKey, fromStationId, toStationId),
+      );
       getRequired(linesByNode, fromStationId).add(lineName);
       getRequired(linesByNode, toStationId).add(lineName);
     }
@@ -838,9 +843,8 @@ export function buildCircumferenceCandidates(
       : node.name;
   }
 
-  const normalizedLinesByEdge: MutableEdgeStringSets = new Map(
-    [...linesByEdge].map(([key, lineNames]) => [key, new Set(lineNames)]),
-  );
+  const normalizedLinesByEdge = copyEdgeStringSets(linesByEdge);
+  const normalizedServiceEdgesByEdge = copyEdgeStringSets(serviceEdgesByEdge);
   const candidatePaths = new Map<string, CyclePath>();
   const removedShortcuts = new Set<EdgeKey>();
   const hiddenNetworkShortcuts = new Set<EdgeKey>();
@@ -854,8 +858,10 @@ export function buildCircumferenceCandidates(
       nodes,
       linesByEdge,
       familiesByEdge,
+      serviceEdgesByEdge,
       ambiguousLineNames,
       normalizedLinesByEdge,
+      normalizedServiceEdgesByEdge,
       hiddenNetworkShortcuts,
       displayOnlyShortcuts,
       geometriesByEdge,
@@ -990,10 +996,12 @@ export function buildCircumferenceCandidates(
       candidatePaths: [...candidatePaths.values()],
       geometriesByEdge,
       linesByEdge,
+      lineNameByRouteId,
       maxCandidates,
       minimumAreaSquareMeters,
       nodes,
       normalizedLinesByEdge,
+      normalizedServiceEdgesByEdge,
       servicePriorityByLine,
       displayOnlyShortcuts,
       hiddenNetworkShortcuts,

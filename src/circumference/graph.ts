@@ -365,8 +365,10 @@ export function removeServiceShortcuts(
   nodes: NodeMap,
   linesByEdge: EdgeStringSets,
   familiesByEdge: EdgeStringSets,
+  serviceEdgesByEdge: EdgeStringSets,
   ambiguousLineNames: ReadonlySet<string>,
   normalizedLinesByEdge: MutableEdgeStringSets,
+  normalizedServiceEdgesByEdge: MutableEdgeStringSets,
   hiddenNetworkShortcuts: Set<EdgeKey>,
   displayOnlyShortcuts: Set<EdgeKey>,
   geometriesByEdge: TrackGeometryMap,
@@ -378,6 +380,7 @@ export function removeServiceShortcuts(
   const normalizeLinesOntoPath = (
     nodeIds: readonly NodeId[],
     lineNames: readonly string[],
+    serviceEdges: readonly string[],
   ): void => {
     for (let index = 1; index < nodeIds.length; index += 1) {
       const previousId = nodeIds[index - 1];
@@ -387,6 +390,12 @@ export function removeServiceShortcuts(
       const normalizedLines = normalizedLinesByEdge.get(key) ?? new Set<string>();
       for (const lineName of lineNames) normalizedLines.add(lineName);
       normalizedLinesByEdge.set(key, normalizedLines);
+      const normalizedServiceEdges =
+        normalizedServiceEdgesByEdge.get(key) ?? new Set<string>();
+      for (const serviceEdge of serviceEdges) {
+        normalizedServiceEdges.add(serviceEdge);
+      }
+      normalizedServiceEdgesByEdge.set(key, normalizedServiceEdges);
     }
   };
 
@@ -401,6 +410,7 @@ export function removeServiceShortcuts(
       );
 
       const directLineNames = [...(linesByEdge.get(key) ?? [])];
+      const directServiceEdges = [...(serviceEdgesByEdge.get(key) ?? [])];
       if (
         directLineNames.length > 0 &&
         directLineNames.every((lineName) => ambiguousLineNames.has(lineName))
@@ -437,7 +447,11 @@ export function removeServiceShortcuts(
         // Normalize a named express edge only against the corresponding base
         // service's local chain. This cannot delete atomic local edges merely
         // because a second express chord offers a path around them.
-        normalizeLinesOntoPath(namedExpressPath.nodeIds, directLineNames);
+        normalizeLinesOntoPath(
+          namedExpressPath.nodeIds,
+          directLineNames,
+          directServiceEdges,
+        );
         hiddenNetworkShortcuts.add(key);
         if (directDistance >= SHORTCUT_MINIMUM_LENGTH_M) {
           shortcuts.add(key);
@@ -468,7 +482,11 @@ export function removeServiceShortcuts(
           // Some same-line alternatives are genuinely separate alignments,
           // such as PATH service between Grove Street and Journal Square.
           if (followsStations !== false) {
-            normalizeLinesOntoPath(sameLinePath.nodeIds, directLineNames);
+            normalizeLinesOntoPath(
+              sameLinePath.nodeIds,
+              directLineNames,
+              directServiceEdges,
+            );
             hiddenNetworkShortcuts.add(key);
             if (directDistance < SHORTCUT_MINIMUM_LENGTH_M) {
               displayOnlyShortcuts.add(key);
@@ -504,7 +522,11 @@ export function removeServiceShortcuts(
       if (averageWidth <= CORRIDOR_AVERAGE_WIDTH_M) {
         shortcuts.add(key);
         if (followsStations !== false) {
-          normalizeLinesOntoPath(corridorPath.nodeIds, directLineNames);
+          normalizeLinesOntoPath(
+            corridorPath.nodeIds,
+            directLineNames,
+            directServiceEdges,
+          );
           hiddenNetworkShortcuts.add(key);
         }
       }

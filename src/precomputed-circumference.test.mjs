@@ -3,6 +3,10 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
 import { isValidSimpleCircumferenceCycle } from '../scripts/exact-circumference-solver.mjs';
+import {
+  activeCircumferenceService,
+  scheduleCircumferenceMode,
+} from './circumference.ts';
 import { circumferenceGeometryVariantsSchema } from './circumference/schema.ts';
 
 const AREA_KEYS = ['cdmx', 'nyc'];
@@ -83,5 +87,45 @@ test('NYC exact winner uses the 1 from South Ferry through 14 St', async () => {
         segment.to.id === 'gtfs/mta-subway/R27',
     )?.primaryLine,
     'R',
+  );
+});
+
+test('NYC Monday noon uses branch-specific service and a certified route', async () => {
+  const [routeData, schedules] = await Promise.all([
+    readFile(new URL('../data/nyc-circumference.json', import.meta.url), 'utf8').then(
+      (data) => circumferenceGeometryVariantsSchema.parse(JSON.parse(data)),
+    ),
+    readFile(new URL('../data/nyc-schedules.json', import.meta.url), 'utf8').then(
+      JSON.parse,
+    ),
+  ]);
+  const noonService = activeCircumferenceService(schedules, 0, 12 * 60);
+  const result = scheduleCircumferenceMode(routeData.track, noonService, 'track');
+  const rideLines = (firstId, secondId) =>
+    result.network.segments.find(
+      (segment) =>
+        segment.type === 'ride' &&
+        new Set([segment.from.id, segment.to.id]).has(firstId) &&
+        new Set([segment.from.id, segment.to.id]).has(secondId),
+    )?.lines;
+
+  assert.deepEqual(rideLines('gtfs/mta-subway/249', 'gtfs/mta-subway/250'), ['3', '4']);
+  assert.deepEqual(rideLines('gtfs/mta-subway/250', 'gtfs/mta-subway/251'), ['3']);
+  assert.deepEqual(rideLines('gtfs/mta-subway/256', 'gtfs/mta-subway/257'), ['3']);
+  assert.deepEqual(rideLines('gtfs/mta-subway/246', 'gtfs/mta-subway/247'), ['2', '5']);
+  assert.equal(
+    result.network.stations.find((station) => station.id === 'gtfs/mta-subway/250')
+      ?.label,
+    'Crown Hts-Utica Av · 3/4',
+  );
+  assert.equal(
+    result.network.stations.find((station) => station.id === 'gtfs/mta-subway/251')
+      ?.label,
+    'Sutter Av-Rutland Rd · 3',
+  );
+  assert.ok(result.candidates[0]);
+  assert.equal(
+    isValidSimpleCircumferenceCycle(result.network, result.candidates[0].nodeIds),
+    true,
   );
 });

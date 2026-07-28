@@ -16,6 +16,11 @@ function positiveModulo(value: number, divisor: number): number {
 
 type ServiceDays = Schedule['stations'][string]['d'];
 
+export interface ActiveCircumferenceService {
+  readonly lineNames: ReadonlySet<string>;
+  readonly serviceKeysByStation: ReadonlyMap<string, ReadonlySet<string>>;
+}
+
 /**
  * Tests whether a weekly GTFS frequency profile is operating at the selected
  * local wall-clock time. The previous service day is included because GTFS
@@ -42,82 +47,150 @@ export function serviceDaysActiveAt(
 }
 
 /**
- * Returns the published subway line names operating at the selected weekly
- * schedule instant. A line is visible when at least one of its route-direction
- * profiles is actively serving at least one platform.
+ * Returns the exact route-direction profiles operating at each platform at the
+ * selected weekly instant. Keeping the station dimension is essential: a line
+ * can run on one branch while another branch with the same public line name is
+ * closed or served only overnight.
  */
+export function activeCircumferenceService(
+  schedules: Schedule | null,
+  weekday: number,
+  minuteOfDay: number,
+): ActiveCircumferenceService | null {
+  if (!schedules) return null;
+  const activeLines = new Set<string>();
+  const activeServiceKeysByStation = new Map<string, Set<string>>();
+  const fallbackRouteIdsByStation = new Map<string, Set<string>>();
+
+  for (const [stationId, station] of Object.entries(schedules.stations)) {
+    if (station.p) {
+      for (const [serviceKey, serviceDays] of Object.entries(station.p)) {
+        if (!serviceDaysActiveAt(serviceDays, weekday, minuteOfDay)) continue;
+        const routeId = routeIdForService(serviceKey);
+        const route = schedules.routes[routeId];
+        if (route?.mode !== 'subway') continue;
+        activeLines.add(route.name || routeId);
+        const stationServices =
+          activeServiceKeysByStation.get(stationId) ?? new Set<string>();
+        stationServices.add(serviceKey);
+        activeServiceKeysByStation.set(stationId, stationServices);
+      }
+    } else if (serviceDaysActiveAt(station.d, weekday, minuteOfDay)) {
+      const fallbackRouteIds = new Set<string>();
+      for (const routeId of station.r) {
+        const route = schedules.routes[routeId];
+        if (route?.mode !== 'subway') continue;
+        activeLines.add(route.name || routeId);
+        fallbackRouteIds.add(routeId);
+      }
+      fallbackRouteIdsByStation.set(stationId, fallbackRouteIds);
+    }
+  }
+
+  // Older schedule files may lack per-service profiles. In that fallback,
+  // activate every direction key for a route at the station rather than
+  // inventing a single "/0" direction.
+  for (const [stationId, routeIds] of fallbackRouteIdsByStation) {
+    const stationServices =
+      activeServiceKeysByStation.get(stationId) ?? new Set<string>();
+    for (const [, , serviceKey] of schedules.graph.e[stationId] ?? []) {
+      if (routeIds.has(routeIdForService(serviceKey))) {
+        stationServices.add(serviceKey);
+      }
+    }
+    activeServiceKeysByStation.set(stationId, stationServices);
+  }
+
+  return {
+    lineNames: activeLines,
+    serviceKeysByStation: activeServiceKeysByStation,
+  };
+}
+
 export function activeCircumferenceLines(
   schedules: Schedule | null,
   weekday: number,
   minuteOfDay: number,
 ): Set<string> | null {
-  if (!schedules) return null;
-  const activeLines = new Set<string>();
-
-  for (const station of Object.values(schedules.stations)) {
-    const serviceProfiles: Record<string, ServiceDays> = station.p
-      ? { ...station.p }
-      : {};
-    if (!station.p) {
-      for (const routeId of station.r) {
-        serviceProfiles[`${routeId}/0`] = station.d;
-      }
-    }
-    for (const [serviceKey, serviceDays] of Object.entries(serviceProfiles)) {
-      if (!serviceDaysActiveAt(serviceDays, weekday, minuteOfDay)) continue;
-      const routeId = routeIdForService(serviceKey);
-      const route = schedules.routes[routeId];
-      if (route?.mode !== 'subway') continue;
-      activeLines.add(route.name || routeId);
-    }
-  }
-
-  return activeLines;
+  const service = activeCircumferenceService(schedules, weekday, minuteOfDay);
+  return service ? new Set(service.lineNames) : null;
 }
 
 function filteredNode(
   node: CircumferenceNode,
-  activeLines: ReadonlySet<string> | null,
+  activeLines: ReadonlySet<string>,
 ): CircumferenceNode {
+  const lineNames = node.lineNames.filter((lineName) => activeLines.has(lineName));
   return {
     ...node,
-    lineNames:
-      activeLines === null
-        ? [...node.lineNames]
-        : node.lineNames.filter((lineName) => activeLines.has(lineName)),
+    label: lineNames.length ? `${node.name} · ${lineNames.join('/')}` : node.name,
+    lineNames,
   };
 }
 
+function activeSegmentLines(
+  segment: CircumferenceNetworkSegment,
+  activeService: ActiveCircumferenceService,
+): string[] {
+  return segment.lines.filter((lineName) => {
+    const serviceEdges = segment.lineServiceEdges?.[lineName];
+    if (!serviceEdges?.length) return activeService.lineNames.has(lineName);
+    return serviceEdges.some(([serviceKey, fromId, toId]) => {
+      const fromServices = activeService.serviceKeysByStation.get(fromId);
+      const toServices = activeService.serviceKeysByStation.get(toId);
+      return (
+        fromServices?.has(serviceKey) === true && toServices?.has(serviceKey) === true
+      );
+    });
+  });
+}
+
 /**
- * Removes inactive line appearances from shared track segments, then removes
- * track and transfer segments whose endpoint platforms are no longer served.
+ * Removes inactive route-pattern appearances from each shared track segment,
+ * then removes track and transfer segments whose endpoint platforms are no
+ * longer served. Express stop-to-stop service edges are normalized over their
+ * physical local-station chain when the network is built, so an express line
+ * remains visible between its stops without falsely serving intermediate
+ * platforms.
  */
 export function filterCircumferenceNetwork(
   network: CircumferenceNetwork,
-  activeLines: ReadonlySet<string> | null,
+  activeService: ActiveCircumferenceService | null,
 ): CircumferenceNetwork {
-  if (activeLines === null) return network;
+  if (activeService === null) return network;
 
   const activeRideSegments = network.segments.flatMap((segment) => {
     if (segment.type !== 'ride') return [];
-    const lines = segment.lines.filter((lineName) => activeLines.has(lineName));
+    const lines = activeSegmentLines(segment, activeService);
     return lines.length > 0 ? [{ segment, lines }] : [];
   });
+  const activeLinesByNode = new Map<string, Set<string>>();
+  for (const { segment, lines } of activeRideSegments) {
+    for (const nodeId of [segment.from.id, segment.to.id]) {
+      const nodeLines = activeLinesByNode.get(nodeId) ?? new Set<string>();
+      for (const lineName of lines) nodeLines.add(lineName);
+      activeLinesByNode.set(nodeId, nodeLines);
+    }
+  }
   const servedNodeIds = new Set(
     activeRideSegments.flatMap(({ segment }) => [segment.from.id, segment.to.id]),
   );
   const nodeById = new Map<string, CircumferenceNode>();
   for (const station of network.stations) {
     if (!servedNodeIds.has(station.id)) continue;
-    const node = filteredNode(station, activeLines);
+    const node = filteredNode(station, activeLinesByNode.get(station.id) ?? new Set());
     nodeById.set(node.id, node);
   }
 
   const segments: CircumferenceNetworkSegment[] = activeRideSegments.map(
     ({ segment, lines }) => ({
       ...segment,
-      from: nodeById.get(segment.from.id) ?? filteredNode(segment.from, activeLines),
-      to: nodeById.get(segment.to.id) ?? filteredNode(segment.to, activeLines),
+      from:
+        nodeById.get(segment.from.id) ??
+        filteredNode(segment.from, activeLinesByNode.get(segment.from.id) ?? new Set()),
+      to:
+        nodeById.get(segment.to.id) ??
+        filteredNode(segment.to, activeLinesByNode.get(segment.to.id) ?? new Set()),
       lines,
     }),
   );
@@ -131,8 +204,12 @@ export function filterCircumferenceNetwork(
     }
     segments.push({
       ...segment,
-      from: nodeById.get(segment.from.id) ?? filteredNode(segment.from, activeLines),
-      to: nodeById.get(segment.to.id) ?? filteredNode(segment.to, activeLines),
+      from:
+        nodeById.get(segment.from.id) ??
+        filteredNode(segment.from, activeLinesByNode.get(segment.from.id) ?? new Set()),
+      to:
+        nodeById.get(segment.to.id) ??
+        filteredNode(segment.to, activeLinesByNode.get(segment.to.id) ?? new Set()),
       lines: [...segment.lines],
     });
   }
@@ -160,21 +237,18 @@ function networkPathExists(
 
 export function scheduleLineStateKey(
   network: CircumferenceNetwork,
-  activeLines: ReadonlySet<string> | null,
+  activeService: ActiveCircumferenceService | null,
 ): string {
-  if (activeLines === null) return 'all';
-  return [
-    ...new Set(
-      network.segments.flatMap((segment) =>
-        segment.type === 'ride'
-          ? segment.lines.filter((lineName) => activeLines.has(lineName))
-          : [],
-      ),
-    ),
-  ]
-    .sort((first, second) =>
-      first.localeCompare(second, 'en', { numeric: true, sensitivity: 'base' }),
+  if (activeService === null) return 'all';
+  return network.segments
+    .flatMap((segment) =>
+      segment.type === 'ride'
+        ? activeSegmentLines(segment, activeService).map(
+            (lineName) => `${segment.id}\u0001${lineName}`,
+          )
+        : [],
     )
+    .sort()
     .join('\u0000');
 }
 
@@ -185,10 +259,10 @@ export function scheduleLineStateKey(
  */
 export function scheduleCircumferenceMode(
   result: CircumferenceModeResult,
-  activeLines: ReadonlySet<string> | null,
+  activeService: ActiveCircumferenceService | null,
   geometryMode: CircumferenceGeometryMode,
 ): CircumferenceModeResult {
-  const network = filterCircumferenceNetwork(result.network, activeLines);
+  const network = filterCircumferenceNetwork(result.network, activeService);
   const rebuildCandidates = (
     candidates: readonly CircumferenceCandidate[],
   ): CircumferenceCandidate[] =>

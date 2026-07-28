@@ -63,11 +63,13 @@ cycle. The maximum is defined on straight platform edges so track-shape tunnel c
 cannot change route topology. Track mode then recalculates displayed geometry, length,
 and enclosed area from averaged official GTFS centerlines.
 
-The data build enumerates every distinct line topology produced by the weekly GTFS
+The data build records the source GTFS route-direction edge for every displayed track
+segment, including express edges normalized over their physical local-station chain. It
+then enumerates every distinct segment-level topology produced by the weekly GTFS
 frequency windows. A reduced topology inherits a larger-network certificate when that
 winner remains feasible; otherwise the MILP proves a new winner. Those schedule winners
 are stored with the normal candidate bank, so changing weekday or time in the browser
-only filters lines and selects a pre-certified path.
+only filters line appearances and selects a pre-certified path.
 
 Landmass intersections are performed in a local WGS84 equal-area workspace for robust
 polygon topology, transformed back to longitude/latitude, and measured on the WGS84

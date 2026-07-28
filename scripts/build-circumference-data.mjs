@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 
 import {
-  activeCircumferenceLines,
+  activeCircumferenceService,
   buildCircumferenceCandidates,
   candidateFromNetworkPath,
   filterCircumferenceNetwork,
@@ -26,12 +26,12 @@ function scheduleTopologies(network, schedules) {
   const result = new Map();
   for (let weekday = 0; weekday < 7; weekday += 1) {
     for (let minute = 0; minute < 1_440; minute += 1) {
-      const activeLines = activeCircumferenceLines(schedules, weekday, minute);
-      const filteredNetwork = filterCircumferenceNetwork(network, activeLines);
+      const activeService = activeCircumferenceService(schedules, weekday, minute);
+      const filteredNetwork = filterCircumferenceNetwork(network, activeService);
       const key = [...networkSegmentIds(filteredNetwork)].sort().join('\u0000');
       if (!result.has(key)) {
         result.set(key, {
-          activeLines,
+          activeService,
           filteredNetwork,
           minute,
           weekday,
@@ -72,7 +72,7 @@ async function exactSchedulePaths(areaKey, network, schedules, fullExact) {
     const label =
       `${areaKey}: schedule topology ${topologyIndex + 1}/${topologies.length} ` +
       `(weekday ${topology.weekday}, ${String(Math.floor(topology.minute / 60)).padStart(2, '0')}:${String(topology.minute % 60).padStart(2, '0')}, ` +
-      `${topology.activeLines?.size ?? 0} lines)`;
+      `${topology.activeService?.lineNames.size ?? 0} lines)`;
     console.time(label);
     try {
       const exact = await solveExactMaximumAreaCycle(topology.filteredNetwork);
