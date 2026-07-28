@@ -124,8 +124,12 @@ export function syncCircumferenceVisibility(): void {
   );
   setLayerVisibility('highway-circumference-network-casing', highwayVisible);
   setLayerVisibility('highway-circumference-network-line', highwayVisible);
+  setLayerVisibility('highway-circumference-network-connector-casing', highwayVisible);
+  setLayerVisibility('highway-circumference-network-connector-line', highwayVisible);
   setLayerVisibility('highway-circumference-route-casing', highwayVisible);
   setLayerVisibility('highway-circumference-route-line', highwayVisible);
+  setLayerVisibility('highway-circumference-route-connector-casing', highwayVisible);
+  setLayerVisibility('highway-circumference-route-connector-line', highwayVisible);
   setLayerVisibility('circumference-network-casing', networkVisible);
   setLayerVisibility('circumference-network-line', networkVisible);
   setLayerVisibility('circumference-network-transfer-line', networkVisible);

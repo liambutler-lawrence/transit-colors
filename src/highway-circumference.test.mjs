@@ -29,6 +29,8 @@ test('North America highway data publishes one exact maximum and full network', 
   assert.ok(data.route.areaSquareMeters > 4_000_000_000_000);
   assert.ok(data.route.lengthMeters > 15_000_000);
   assert.equal(hasProperSelfIntersection(data.route.coordinates), false);
+  assert.equal(data.methodology.interchangeConnectorCount, 1);
+  assert.equal(data.methodology.osmPrecisionMainlineCount, 2);
 
   const countries = new Set(
     data.network.features.flatMap((feature) => feature.properties.country.split(' / ')),
@@ -63,7 +65,55 @@ test('highway map collection separates thin network, thick route, and inside', (
   const kinds = new Set(collection.features.map((feature) => feature.properties?.kind));
   assert.deepEqual(
     kinds,
-    new Set(['highway-inside', 'highway-network', 'highway-route']),
+    new Set([
+      'highway-inside',
+      'highway-network-mainline',
+      'highway-network-connector',
+      'highway-route-mainline',
+    ]),
   );
-  assert.equal(collection.features.length, data.network.features.length + 2);
+  assert.equal(
+    collection.features.length,
+    data.network.features.length + data.route.segments.length + 1,
+  );
+});
+
+test('Norwalk uses paired OSM mainlines and one explicit ramp connector', () => {
+  const i95 = data.network.features.find(
+    (feature) => feature.properties.id === 'ne-road-49175-0',
+  );
+  const us7 = data.network.features.find(
+    (feature) => feature.properties.id === 'ne-road-7118-0',
+  );
+  const connector = data.network.features.find(
+    (feature) => feature.properties.id === 'osm-interchange-norwalk-i95-us7',
+  );
+  assert.equal(i95?.properties.role, 'mainline');
+  assert.equal(us7?.properties.role, 'mainline');
+  assert.equal(connector?.properties.role, 'connector');
+  assert.deepEqual(us7?.geometry.coordinates[0], [-73.41898, 41.11031]);
+  assert.ok(
+    i95?.geometry.coordinates.some(
+      (coordinate) =>
+        coordinate[0] === connector?.geometry.coordinates[0]?.[0] &&
+        coordinate[1] === connector?.geometry.coordinates[0]?.[1],
+    ),
+  );
+  assert.ok(
+    us7?.geometry.coordinates.some(
+      (coordinate) =>
+        coordinate[0] === connector?.geometry.coordinates.at(-1)?.[0] &&
+        coordinate[1] === connector?.geometry.coordinates.at(-1)?.[1],
+    ),
+  );
+  assert.equal(
+    data.route.coordinates.some(
+      ([longitude, latitude]) =>
+        longitude > -73.435 &&
+        longitude < -73.41 &&
+        latitude > 41.115 &&
+        latitude < 41.15,
+    ),
+    false,
+  );
 });

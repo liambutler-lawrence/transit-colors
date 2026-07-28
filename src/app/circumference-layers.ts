@@ -30,7 +30,7 @@ export function installCircumferenceLayers(): void {
     id: 'highway-circumference-network-casing',
     type: 'line',
     source: 'highway-circumference',
-    filter: ['==', ['get', 'kind'], 'highway-network'],
+    filter: ['==', ['get', 'kind'], 'highway-network-mainline'],
     layout: {
       visibility: 'none',
       'line-cap': 'round',
@@ -47,7 +47,7 @@ export function installCircumferenceLayers(): void {
     id: 'highway-circumference-network-line',
     type: 'line',
     source: 'highway-circumference',
-    filter: ['==', ['get', 'kind'], 'highway-network'],
+    filter: ['==', ['get', 'kind'], 'highway-network-mainline'],
     layout: {
       visibility: 'none',
       'line-cap': 'round',
@@ -66,10 +66,45 @@ export function installCircumferenceLayers(): void {
   });
 
   map.addLayer({
+    id: 'highway-circumference-network-connector-casing',
+    type: 'line',
+    source: 'highway-circumference',
+    filter: ['==', ['get', 'kind'], 'highway-network-connector'],
+    layout: {
+      visibility: 'none',
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#fffaf2',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 3, 1.8, 7, 3.2, 12, 6],
+      'line-opacity': 0.84,
+    },
+  });
+
+  map.addLayer({
+    id: 'highway-circumference-network-connector-line',
+    type: 'line',
+    source: 'highway-circumference',
+    filter: ['==', ['get', 'kind'], 'highway-network-connector'],
+    layout: {
+      visibility: 'none',
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#c36c2f',
+      'line-dasharray': [1.2, 1.4],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 3, 0.7, 7, 1.35, 12, 2.6],
+      'line-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 1, 0.84],
+    },
+  });
+
+  map.addLayer({
     id: 'highway-circumference-route-casing',
     type: 'line',
     source: 'highway-circumference',
-    filter: ['==', ['get', 'kind'], 'highway-route'],
+    filter: ['==', ['get', 'kind'], 'highway-route-mainline'],
     layout: {
       visibility: 'none',
       'line-cap': 'round',
@@ -86,7 +121,7 @@ export function installCircumferenceLayers(): void {
     id: 'highway-circumference-route-line',
     type: 'line',
     source: 'highway-circumference',
-    filter: ['==', ['get', 'kind'], 'highway-route'],
+    filter: ['==', ['get', 'kind'], 'highway-route-mainline'],
     layout: {
       visibility: 'none',
       'line-cap': 'round',
@@ -96,6 +131,41 @@ export function installCircumferenceLayers(): void {
       'line-color': '#aa311f',
       'line-width': ['interpolate', ['linear'], ['zoom'], 3, 3.4, 7, 5.8, 12, 10],
       'line-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 1, 0.94],
+    },
+  });
+
+  map.addLayer({
+    id: 'highway-circumference-route-connector-casing',
+    type: 'line',
+    source: 'highway-circumference',
+    filter: ['==', ['get', 'kind'], 'highway-route-connector'],
+    layout: {
+      visibility: 'none',
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#fffaf2',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 3, 4.8, 7, 7.2, 12, 12],
+      'line-opacity': 0.96,
+    },
+  });
+
+  map.addLayer({
+    id: 'highway-circumference-route-connector-line',
+    type: 'line',
+    source: 'highway-circumference',
+    filter: ['==', ['get', 'kind'], 'highway-route-connector'],
+    layout: {
+      visibility: 'none',
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#d2692e',
+      'line-dasharray': [1.4, 1.2],
+      'line-width': ['interpolate', ['linear'], ['zoom'], 3, 2.8, 7, 4.8, 12, 8],
+      'line-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 1, 0.96],
     },
   });
 

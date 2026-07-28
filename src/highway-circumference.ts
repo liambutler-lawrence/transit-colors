@@ -17,6 +17,7 @@ const highwayFeaturePropertiesSchema = z.object({
   id: z.string().min(1),
   name: z.string(),
   number: z.string(),
+  role: z.enum(['mainline', 'connector', 'source-seam']),
   state: z.string(),
   type: z.string(),
 });
@@ -51,6 +52,8 @@ export const highwayCircumferenceDataSchema = z.object({
     faceCount: z.number().int().positive(),
     giantNetworkEdgeCount: z.number().int().positive(),
     giantNetworkNodeCount: z.number().int().positive(),
+    interchangeConnectorCount: z.number().int().nonnegative(),
+    osmPrecisionMainlineCount: z.number().int().nonnegative(),
     optimizationMethod: z.literal('exact-planar-biconnected-outer-boundary'),
     optimizationStatus: z.literal('optimal'),
     sourceFeatureCount: z.number().int().positive(),
@@ -69,7 +72,19 @@ export const highwayCircumferenceDataSchema = z.object({
     id: z.string().min(1),
     lengthMeters: z.number().positive(),
     outsideLandAreaSquareMeters: z.number().nonnegative(),
+    segments: z
+      .array(
+        z.object({
+          coordinates: z.array(coordinateSchema).min(2),
+          id: z.string().min(1),
+          role: z.enum(['mainline', 'connector']),
+        }),
+      )
+      .min(1),
   }),
+  precision_source: z.string().min(1),
+  precision_source_license: z.string().min(1),
+  precision_source_url: z.url(),
   source: z.string().min(1),
   source_url: z.url(),
   source_version: z.string().min(1),
@@ -79,7 +94,12 @@ export type HighwayCircumferenceData = z.infer<typeof highwayCircumferenceDataSc
 export type HighwayFeatureProperties = z.infer<typeof highwayFeaturePropertiesSchema>;
 
 export const highwayMapFeaturePropertiesSchema = highwayFeaturePropertiesSchema.extend({
-  kind: z.enum(['highway-network', 'highway-route']),
+  kind: z.enum([
+    'highway-network-mainline',
+    'highway-network-connector',
+    'highway-route-mainline',
+    'highway-route-connector',
+  ]),
 });
 
 export function highwayLandmassArea(data: HighwayCircumferenceData): LandmassArea {
@@ -107,25 +127,31 @@ export function highwayFeatureCollection(
       kind: 'highway-inside',
     },
   };
-  const route: Feature<LineString, GeoJsonProperties> = {
-    type: 'Feature',
-    id: data.route.id,
-    geometry: {
-      type: 'LineString',
-      coordinates: data.route.coordinates,
-    },
-    properties: {
-      class: 'Controlled-access boundary',
-      country: data.route.countries.join(', '),
-      divided: 'Divided',
-      id: data.route.id,
-      kind: 'highway-route',
-      name: 'Maximum-area highway circle',
-      number: '',
-      state: '',
-      type: 'Boundary',
-    },
-  };
+  const route = data.route.segments.map(
+    (segment): Feature<LineString, GeoJsonProperties> => ({
+      type: 'Feature',
+      id: segment.id,
+      geometry: {
+        type: 'LineString',
+        coordinates: segment.coordinates,
+      },
+      properties: {
+        class:
+          segment.role === 'connector'
+            ? 'Boundary interchange connector'
+            : 'Controlled-access boundary',
+        country: data.route.countries.join(', '),
+        divided: segment.role === 'connector' ? 'Separated ramps' : 'Divided',
+        id: data.route.id,
+        kind: `highway-route-${segment.role}`,
+        name: 'Maximum-area highway circle',
+        number: '',
+        role: segment.role,
+        state: '',
+        type: segment.role === 'connector' ? 'Connector' : 'Boundary',
+      },
+    }),
+  );
   return {
     type: 'FeatureCollection',
     features: [
@@ -135,11 +161,14 @@ export function highwayFeatureCollection(
           ...feature,
           properties: {
             ...feature.properties,
-            kind: 'highway-network',
+            kind:
+              feature.properties.role === 'mainline'
+                ? 'highway-network-mainline'
+                : 'highway-network-connector',
           },
         }),
       ),
-      route,
+      ...route,
     ],
   };
 }

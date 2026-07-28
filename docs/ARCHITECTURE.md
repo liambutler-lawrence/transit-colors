@@ -86,14 +86,18 @@ schedule change.
 
 The highway criterion uses a separate compact runtime schema in
 `src/highway-circumference.ts`. Its offline builder operates on the Natural Earth
-divided-road centerline graph: endpoint seam repair, largest-component selection, 2-core
-pruning, degree-two compression, iterative Tarjan vertex-biconnected decomposition, and
-geographic rotation-system face traversal. Every simple cycle lies inside one
-biconnected block; for each embedded planar block the outer face contains all bounded
-faces and is therefore its exact maximum-area cycle. The selected boundary is also
-checked for proper geometric self-crossings. This reduces roughly 367,000 source edges
-to about 2,300 proof corridors and solves in seconds rather than placing a continental
-graph in the browser or metro MILP.
+divided-road centerline graph with local OSM precision overrides. Each override pairs
+lane-qualified one-way carriageways into a sampled centerline, classifies direct
+motorway-link paths as connector edges, and inserts their endpoints into the mainline
+geometry. Geometry crossings never create graph nodes; topology comes from explicit
+shared source nodes. The continental stages are endpoint seam repair, largest-component
+selection, 2-core pruning, degree-two compression, iterative Tarjan vertex-biconnected
+decomposition, and geographic rotation-system face traversal. Every simple cycle lies
+inside one biconnected block; for each embedded planar block the outer face contains all
+bounded faces and is therefore its exact maximum-area cycle. The selected boundary is
+also checked for proper geometric self-crossings. This reduces roughly 367,000 source
+edges to about 2,300 proof corridors and solves in seconds rather than placing a
+continental graph in the browser or metro MILP.
 
 The circumference map keeps one independent route state and gradient image source per
 metro area. It merges all complete networks and selected boundaries into one GeoJSON

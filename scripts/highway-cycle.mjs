@@ -134,7 +134,7 @@ function properlyIntersects(firstStart, firstEnd, secondStart, secondEnd) {
   );
 }
 
-export function hasProperSelfIntersection(coordinates) {
+export function properSelfIntersectionSegments(coordinates) {
   const cellSize = 0.05;
   const cells = new Map();
   for (let segmentIndex = 0; segmentIndex + 1 < coordinates.length; segmentIndex += 1) {
@@ -173,7 +173,7 @@ export function hasProperSelfIntersection(coordinates) {
               coordinates[otherIndex + 1],
             )
           ) {
-            return true;
+            return [otherIndex, segmentIndex];
           }
         }
         const cell = cells.get(cellKey) ?? [];
@@ -182,7 +182,11 @@ export function hasProperSelfIntersection(coordinates) {
       }
     }
   }
-  return false;
+  return null;
+}
+
+export function hasProperSelfIntersection(coordinates) {
+  return properSelfIntersectionSegments(coordinates) !== null;
 }
 
 /**
@@ -330,7 +334,17 @@ export function solveLargestPlanarHighwayCycle(nodes, edges) {
     throw new Error('No simple highway cycle was found.');
   }
   if (hasProperSelfIntersection(best.coordinates)) {
-    throw new Error('Maximum highway boundary crosses itself in map geometry.');
+    const [first, second] = properSelfIntersectionSegments(best.coordinates);
+    throw new Error(
+      `Maximum highway boundary crosses itself in map geometry at segments ${first} and ${second}: ${JSON.stringify(
+        [
+          best.coordinates[first],
+          best.coordinates[first + 1],
+          best.coordinates[second],
+          best.coordinates[second + 1],
+        ],
+      )}.`,
+    );
   }
   return {
     ...best,

@@ -16,6 +16,9 @@ const outputPath = resolve(
   process.argv[3] ?? 'data/north-america-highway-circumference.json',
 );
 const landmassSourcePath = resolve(process.argv[4] ?? '/tmp/ne-land/ne_10m_land.shp');
+const interchangeOverridePath = resolve(
+  process.argv[5] ?? 'data/highway-interchanges/norwalk-i95-us7.json',
+);
 const SNAP_DISTANCE_METERS = 75;
 const CROSS_BORDER_SEAM_DISTANCE_METERS = 3_000;
 
@@ -200,6 +203,80 @@ function eligibleRoad(properties) {
   return (
     ['Freeway', 'Tollway'].includes(properties.type) && properties.divided === 'Divided'
   );
+}
+
+function nearestCoordinateIndex(coordinates, target) {
+  let bestIndex = -1;
+  let bestDistance = Infinity;
+  for (const [index, coordinate] of coordinates.entries()) {
+    const distance = geodesicDistanceMeters(coordinate, target);
+    if (distance < bestDistance) {
+      bestDistance = distance;
+      bestIndex = index;
+    }
+  }
+  if (bestDistance > 5) {
+    throw new Error(
+      `Precision override anchor is ${bestDistance.toFixed(1)}m from its source feature.`,
+    );
+  }
+  return bestIndex;
+}
+
+function applyInterchangeOverride(parts, override) {
+  for (const mainline of override.mainlines) {
+    const part = parts.find(
+      (candidate) => candidate.featureId === mainline.targetFeatureId,
+    );
+    if (!part) {
+      throw new Error(`Missing precision override target ${mainline.targetFeatureId}.`);
+    }
+    if (mainline.replacementMode === 'full') {
+      part.coordinates = mainline.coordinates;
+    } else {
+      const firstIndex = nearestCoordinateIndex(
+        part.coordinates,
+        mainline.coordinates[0],
+      );
+      const lastIndex = nearestCoordinateIndex(
+        part.coordinates,
+        mainline.coordinates.at(-1),
+      );
+      const startIndex = Math.min(firstIndex, lastIndex);
+      const endIndex = Math.max(firstIndex, lastIndex);
+      const replacement =
+        firstIndex <= lastIndex
+          ? mainline.coordinates
+          : [...mainline.coordinates].reverse();
+      part.coordinates = [
+        ...part.coordinates.slice(0, startIndex),
+        ...replacement,
+        ...part.coordinates.slice(endIndex + 1),
+      ];
+    }
+    part.centerlineSource = override.source;
+    part.osmWayIds = mainline.wayIds;
+  }
+  for (const connector of override.connectors) {
+    parts.push({
+      centerlineSource: override.source,
+      coordinates: connector.coordinates,
+      featureId: connector.id,
+      osmWayIds: connector.wayIds,
+      partIndex: 0,
+      properties: {
+        class: 'Direct freeway interchange',
+        country: 'United States',
+        divided: 'Separated ramps',
+        note: `${connector.fromRef} ↔ ${connector.toRef}`,
+        number: '',
+        state: 'Connecticut',
+        type: 'Connector',
+      },
+      recordNumber: connector.id,
+      role: 'connector',
+    });
+  }
 }
 
 function buildRawGraph(parts) {
@@ -547,11 +624,14 @@ function compressTwoCore(coordinatesByNodeId, edges, core) {
   return { edges: corridors, nodes };
 }
 
-const [shapeBuffer, dbfBuffer, landmassBuffer] = await Promise.all([
-  readFile(sourcePath),
-  readFile(dbfPath),
-  readFile(landmassSourcePath),
-]);
+const [shapeBuffer, dbfBuffer, landmassBuffer, interchangeOverrideBuffer] =
+  await Promise.all([
+    readFile(sourcePath),
+    readFile(dbfPath),
+    readFile(landmassSourcePath),
+    readFile(interchangeOverridePath, 'utf8'),
+  ]);
+const interchangeOverride = JSON.parse(interchangeOverrideBuffer);
 const shapeRecords = readPolylineRecords(shapeBuffer);
 const propertiesRecords = readDbfRecords(dbfBuffer);
 const parts = shapeRecords.flatMap((shapeRecord) => {
@@ -562,14 +642,18 @@ const parts = shapeRecords.flatMap((shapeRecord) => {
       ? []
       : [
           {
+            centerlineSource: 'Natural Earth',
             coordinates,
+            featureId: `ne-road-${shapeRecord.recordNumber}-${partIndex}`,
             partIndex,
             properties,
             recordNumber: shapeRecord.recordNumber,
+            role: 'mainline',
           },
         ],
   );
 });
+applyInterchangeOverride(parts, interchangeOverride);
 
 console.time('Build divided-highway graph');
 const rawGraph = buildRawGraph(parts);
@@ -638,9 +722,10 @@ const networkFeatures = [...giantPartIndices]
         class: part.properties.class,
         country: part.properties.country,
         divided: part.properties.divided,
-        id: `ne-road-${part.recordNumber}-${part.partIndex}`,
+        id: part.featureId,
         name: part.properties.note || part.properties.number || '',
         number: part.properties.number || '',
+        role: part.role,
         state: part.properties.state || '',
         type: part.properties.type,
       },
@@ -669,6 +754,7 @@ for (const [index, connector] of crossBorderConnectors.entries()) {
       id: `cross-border-seam-${index + 1}`,
       name: 'Source seam connector',
       number: '',
+      role: 'source-seam',
       state: '',
       type: 'Connector',
     },
@@ -680,6 +766,24 @@ const boundaryPartIndices = new Set(
   ]),
 );
 const routeCoordinates = exact.coordinates.map(roundCoordinate);
+const routeSegments = exact.edgeIndices.map((edgeIndex, index) => {
+  const corridor = compressed.edges[edgeIndex];
+  const fromId = exact.nodeIds[index];
+  const coordinates =
+    corridor.fromId === fromId
+      ? corridor.coordinates
+      : [...corridor.coordinates].reverse();
+  const role = [...corridor.partIndices].some(
+    (partIndex) => parts[partIndex].role === 'connector',
+  )
+    ? 'connector'
+    : 'mainline';
+  return {
+    coordinates: coordinates.map(roundCoordinate),
+    id: `${role}-boundary-${index + 1}`,
+    role,
+  };
+});
 const americanMainlandRing = readPolygonRecords(landmassBuffer).find((ring) =>
   pointInRing([-99.1332, 19.4326], ring),
 );
@@ -732,12 +836,17 @@ if (!landmassCoverage) {
   throw new Error('The highway boundary does not intersect North American land.');
 }
 const output = {
-  source: 'Natural Earth 1:10m North America roads supplement',
+  source:
+    'Natural Earth 1:10m North America roads supplement with OpenStreetMap precision interchanges',
   source_url: 'https://www.naturalearthdata.com/downloads/10m-cultural-vectors/roads/',
   source_version: '5.1.1',
-  criterion: 'Divided Freeway and Tollway centerlines',
+  precision_source: interchangeOverride.source,
+  precision_source_url: interchangeOverride.sourceUrl,
+  precision_source_license: interchangeOverride.license,
+  criterion:
+    'Separated controlled-access mainlines (2+ lanes per direction) with direct ramp-only interchange connectors',
   centerline_method:
-    'Natural Earth generalized road centerline for each divided controlled-access highway',
+    'Average of paired OSM carriageways at precision interchanges; Natural Earth generalized centerlines elsewhere',
   landmass_source: 'Natural Earth 1:10m land polygons',
   landmass_source_url:
     'https://www.naturalearthdata.com/downloads/10m-physical-vectors/10m-land/',
@@ -770,6 +879,7 @@ const output = {
     id: 'north-america-controlled-access-maximum',
     lengthMeters: exact.lengthMeters,
     outsideLandAreaSquareMeters: landmassCoverage.outsideAreaSquareMeters,
+    segments: routeSegments,
   },
   methodology: {
     biconnectedBlockCount: exact.biconnectedBlockCount,
@@ -780,6 +890,8 @@ const output = {
     faceCount: exact.faceCount,
     giantNetworkEdgeCount: largestComponent.edges.length,
     giantNetworkNodeCount: largestComponent.nodeIds.size,
+    interchangeConnectorCount: interchangeOverride.connectors.length,
+    osmPrecisionMainlineCount: interchangeOverride.mainlines.length,
     optimizationMethod: 'exact-planar-biconnected-outer-boundary',
     optimizationStatus: 'optimal',
     sourceFeatureCount: networkFeatures.length,

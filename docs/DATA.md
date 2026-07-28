@@ -111,23 +111,37 @@ explicit no-loop result.
 ## North American controlled-access highways
 
 Download and extract Natural Earth 5.1.1's North America roads supplement and 1:10m land
-shapefile, then run:
+shapefile. The committed OSM precision override can be regenerated from an ignored
+Overpass response before rebuilding the continental result:
+
+```sh
+npm run build:data:highway-interchanges
+```
+
+Then run:
 
 ```sh
 npm run build:data:highways -- \
   /path/to/ne_10m_roads_north_america.shp \
   data/north-america-highway-circumference.json \
-  /path/to/ne_10m_land.shp
+  /path/to/ne_10m_land.shp \
+  data/highway-interchanges/norwalk-i95-us7.json
 ```
 
-The build retains divided `Freeway` and `Tollway` centerlines, repairs short dangling
-source seams and nine sub-3 km international file-boundary seams, then keeps the largest
-contiguous North American component. It removes terminal branches, compresses degree-two
-corridors, decomposes the graph into vertex-biconnected blocks, and proves the
-maximum-area embedded outer boundary. The committed file contains the complete thin
-display network, thick winning route, source attributes, and WGS84 land-contained and
-coastward areas. The browser lazy-loads this larger snapshot only after the highway
-criterion is selected.
+The build retains divided `Freeway` and `Tollway` centerlines. At a precision
+interchange it requires OSM `motorway`, `oneway=yes`, and at least two lanes for each
+mainline carriageway, averages the paired sides every 25 meters, and admits only
+signal-free `motorway_link` paths that join two eligible mainlines. Ramp connectors and
+mainlines stay distinct. Only identical explicit node IDs create a junction, so a bridge
+or other grade-separated geometric crossing cannot become an intersection. The builder
+also repairs short dangling source seams and nine sub-3 km international file-boundary
+seams, then keeps the largest contiguous North American component.
+
+It removes terminal branches, compresses degree-two corridors, decomposes the graph into
+vertex-biconnected blocks, and proves the maximum-area embedded outer boundary. The
+committed file contains the complete thin display network, segmented thick winning
+route, source attributes, and WGS84 land-contained and coastward areas. The browser
+lazy-loads this larger snapshot only after the highway criterion is selected.
 
 ## Landmasses
 

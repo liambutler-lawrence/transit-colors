@@ -18,10 +18,12 @@ period. Atlanta correctly reports that its branched rail network has no closed l
 rather than manufacturing one from concurrent services.
 
 The controlled-access criterion displays the contiguous North American divided freeway
-and tollway network. Natural Earth's generalized road centerlines represent the path
-between carriageways. An offline planar graph proof highlights its largest simple
-circle, while WGS84 land clipping reports both contained land and the remaining North
-American mainland area out to the coast.
+and tollway network. Mainlines and direct ramp-only interchange connectors are distinct
+graph and display features. Natural Earth's generalized centerlines provide continental
+coverage; OSM precision patches average the paired carriageways and attach ramps only at
+shared physical nodes in detailed interchanges. An offline planar graph proof highlights
+the largest simple circle, while WGS84 land clipping reports both contained land and the
+remaining North American mainland area out to the coast.
 
 The sidebar follows the same product → mode → results → selected item hierarchy for both
 experiences. Circumference result cards show each city's route and landmass split and

@@ -46,7 +46,7 @@ import {
   updateStatus,
 } from './context.js';
 
-const HIGHWAY_DATA_URL = 'data/north-america-highway-circumference.json?v=20260728a';
+const HIGHWAY_DATA_URL = 'data/north-america-highway-circumference.json?v=20260728b';
 let highwayData: HighwayCircumferenceData | null = null;
 let highwayPromise: Promise<HighwayCircumferenceData> | null = null;
 let highwayGradientApplied = false;
@@ -77,8 +77,12 @@ export function syncHighwayLayerVisibility(): void {
   setLayerVisibility('highway-circumference-area', visible && routeAreaToggle.checked);
   setLayerVisibility('highway-circumference-network-casing', visible);
   setLayerVisibility('highway-circumference-network-line', visible);
+  setLayerVisibility('highway-circumference-network-connector-casing', visible);
+  setLayerVisibility('highway-circumference-network-connector-line', visible);
   setLayerVisibility('highway-circumference-route-casing', visible);
   setLayerVisibility('highway-circumference-route-line', visible);
+  setLayerVisibility('highway-circumference-route-connector-casing', visible);
+  setLayerVisibility('highway-circumference-route-connector-line', visible);
 }
 
 function setParentControlHidden(control: Element, hidden: boolean): void {
@@ -99,7 +103,7 @@ export function syncCircumferenceCriterionControls(): void {
     ? 'Highway details'
     : 'Line or transfer details';
   circumferenceMethodNoteEl.textContent = highwayMode
-    ? 'The complete contiguous divided controlled-access network remains visible. The thick route is the exact maximum-area simple boundary in the embedded highway graph; select any visible road to inspect its source attributes.'
+    ? 'Solid lines are separated 2+ lane controlled-access mainlines; dashed lines are direct, ramp-only freeway connectors. Only shared physical nodes form graph junctions—grade-separated crossings do not. The thick route is the exact maximum-area simple boundary.'
     : 'All metro networks stay visible, including metros without a circle. Each result card is the largest circle that does not reuse another result’s rail segments and focuses it on the map; clicking any visible line, platform, transfer, street, or station updates this final section directly.';
 }
 
@@ -140,7 +144,9 @@ function highwayResultCard(data: HighwayCircumferenceData): HTMLElement {
   const description = document.createElement('small');
   description.textContent = `${data.methodology.sourceFeatureCount.toLocaleString(
     'en-US',
-  )} divided-highway features · ${data.route.boundaryRoadFeatureCount.toLocaleString(
+  )} highway features · ${data.methodology.interchangeConnectorCount.toLocaleString(
+    'en-US',
+  )} verified interchange connector · ${data.route.boundaryRoadFeatureCount.toLocaleString(
     'en-US',
   )} on boundary`;
   const focusAction = document.createElement('span');
@@ -187,7 +193,7 @@ function highwayResultCard(data: HighwayCircumferenceData): HTMLElement {
   const summary = document.createElement('p');
   summary.className = 'result-summary';
   summary.textContent =
-    'Proven largest embedded simple circle · divided freeway/tollway centerlines · WGS84 ellipsoidal area';
+    'Proven largest embedded simple circle · mainlines plus direct ramp-only connectors · WGS84 ellipsoidal area';
   result.append(summary);
   return result;
 }
@@ -254,7 +260,7 @@ function renderHighwayCircumference({
   circumferenceSelectionTypeEl.textContent = 'Selected highway circle';
   circumferenceNameEl.textContent = 'North America controlled-access maximum';
   circumferenceSummaryEl.textContent =
-    'Largest-area simple loop in the contiguous divided freeway and tollway network.';
+    'Largest-area simple loop in separated controlled-access mainlines connected only by valid ramp paths.';
   replaceMetadata([
     {
       label: 'Contained land',
@@ -278,6 +284,10 @@ function renderHighwayCircumference({
       )} corridors`,
     },
     { label: 'Source', value: `${data.source} v${data.source_version}` },
+    {
+      label: 'Precision geometry',
+      value: `${data.precision_source} · ${data.precision_source_license}`,
+    },
   ]);
   routeChoiceSummaryEl.textContent =
     'Automatic exact winner; source seams and route segments remain manually overridable in the data build.';
@@ -298,14 +308,29 @@ export function showHighwayFeature(properties: HighwayFeatureProperties): void {
   const data = highwayData;
   if (!data) return;
   const boundary = properties.id === data.route.id;
+  const connector = properties.role === 'connector';
+  const seam = properties.role === 'source-seam';
   circumferenceSelectionTypeEl.textContent = boundary
     ? 'Selected highway boundary'
-    : 'Selected controlled-access road';
+    : connector
+      ? 'Selected freeway connector'
+      : seam
+        ? 'Selected source seam'
+        : 'Selected controlled-access mainline';
   circumferenceNameEl.textContent =
     properties.name || properties.number || 'Unnamed controlled-access highway';
   circumferenceSummaryEl.textContent = boundary
     ? 'Highlighted maximum-area controlled-access highway circle'
-    : [properties.type, properties.number, properties.state, properties.country]
+    : [
+        connector
+          ? 'Direct ramp-only highway interchange'
+          : seam
+            ? 'International source seam repair'
+            : properties.type,
+        properties.number,
+        properties.state,
+        properties.country,
+      ]
         .filter(Boolean)
         .join(' · ');
   replaceMetadata([
@@ -357,7 +382,9 @@ export async function prepareHighwayCircumference({
 export function installHighwayHover(): void {
   let hoveredId: string | number | null = null;
   for (const layerId of [
+    'highway-circumference-route-connector-line',
     'highway-circumference-route-line',
+    'highway-circumference-network-connector-line',
     'highway-circumference-network-line',
   ]) {
     map.on('mousemove', layerId, (event) => {
