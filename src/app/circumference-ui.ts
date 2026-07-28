@@ -736,22 +736,27 @@ function createCircumferenceResult({
   result.append(focusButton);
 
   const landmassArea = runtime.circumferenceLandmasses?.areas[areaKey];
-  const coverage = landmassArea
-    ? candidateLandmassCoverage(candidate, landmassArea)
-    : [];
+  const coverage =
+    isFocused && landmassArea ? candidateLandmassCoverage(candidate, landmassArea) : [];
   const outerArea = combinedLandmassArea(coverage, 'outsideAreaSquareMeters');
   const metrics = document.createElement('div');
   metrics.className = 'result-metrics';
-  const metricValues: readonly (readonly [string, string])[] = [
-    ['Inside', formatArea(candidate.areaSquareMeters)],
-    [
-      coverage.length === 1
-        ? 'Outside · 1 landmass'
-        : `Outside · ${coverage.length} landmasses`,
-      formatArea(outerArea),
-    ],
-    ['Route', formatRouteLength(candidate.lengthMeters)],
-  ];
+  const metricValues: readonly (readonly [string, string])[] = isFocused
+    ? [
+        ['Inside', formatArea(candidate.areaSquareMeters)],
+        [
+          coverage.length === 1
+            ? 'Outside · 1 landmass'
+            : `Outside · ${coverage.length} landmasses`,
+          formatArea(outerArea),
+        ],
+        ['Route', formatRouteLength(candidate.lengthMeters)],
+      ]
+    : [
+        ['Inside', formatArea(candidate.areaSquareMeters)],
+        ['Route', formatRouteLength(candidate.lengthMeters)],
+        ['Walking transfers', candidate.transferCount.toLocaleString('en-US')],
+      ];
   for (const [label, value] of metricValues) {
     const metric = document.createElement('div');
     metric.className = 'result-metric';
