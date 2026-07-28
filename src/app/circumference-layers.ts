@@ -1,40 +1,16 @@
 import { map } from './context.js';
 import { expressionSpecificationSchema } from './types.js';
 
-const routeLineOffset = expressionSpecificationSchema.parse([
+const featureLineOffset = expressionSpecificationSchema.parse([
   'interpolate',
   ['linear'],
   ['zoom'],
   8,
-  ['*', ['get', 'line_position'], 3.2],
+  ['get', 'line_offset_8'],
   12,
-  ['*', ['get', 'line_position'], 5.2],
+  ['get', 'line_offset_12'],
   15,
-  ['*', ['get', 'line_position'], 7.5],
-]);
-
-const networkLineOffset = expressionSpecificationSchema.parse([
-  'interpolate',
-  ['linear'],
-  ['zoom'],
-  8,
-  ['*', ['get', 'line_position'], 1.8],
-  12,
-  ['*', ['get', 'line_position'], 3.2],
-  15,
-  ['*', ['get', 'line_position'], 5.2],
-]);
-
-const boundaryAlternativeOffset = expressionSpecificationSchema.parse([
-  'interpolate',
-  ['linear'],
-  ['zoom'],
-  8,
-  ['*', ['get', 'line_side'], ['+', 4.4, ['*', ['get', 'line_position'], 1.8]]],
-  12,
-  ['*', ['get', 'line_side'], ['+', 7.3, ['*', ['get', 'line_position'], 3.2]]],
-  15,
-  ['*', ['get', 'line_side'], ['+', 10.5, ['*', ['get', 'line_position'], 5.2]]],
+  ['get', 'line_offset_15'],
 ]);
 
 export function installCircumferenceLayers(): void {
@@ -63,7 +39,7 @@ export function installCircumferenceLayers(): void {
     paint: {
       'line-color': '#fffaf2',
       'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2.8, 12, 5, 15, 7],
-      'line-offset': networkLineOffset,
+      'line-offset': featureLineOffset,
       'line-opacity': 0.68,
     },
   });
@@ -81,7 +57,7 @@ export function installCircumferenceLayers(): void {
     paint: {
       'line-color': ['get', 'color'],
       'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1.4, 12, 2.8, 15, 4.6],
-      'line-offset': networkLineOffset,
+      'line-offset': featureLineOffset,
       'line-opacity': 0.68,
     },
   });
@@ -155,7 +131,7 @@ export function installCircumferenceLayers(): void {
     paint: {
       'line-color': '#fffaf2',
       'line-width': ['interpolate', ['linear'], ['zoom'], 8, 2.8, 12, 5, 15, 7],
-      'line-offset': boundaryAlternativeOffset,
+      'line-offset': featureLineOffset,
       'line-opacity': 0.82,
     },
   });
@@ -173,7 +149,7 @@ export function installCircumferenceLayers(): void {
     paint: {
       'line-color': ['get', 'color'],
       'line-width': ['interpolate', ['linear'], ['zoom'], 8, 1.4, 12, 2.8, 15, 4.6],
-      'line-offset': boundaryAlternativeOffset,
+      'line-offset': featureLineOffset,
       'line-opacity': 0.78,
     },
   });
@@ -191,7 +167,7 @@ export function installCircumferenceLayers(): void {
     paint: {
       'line-color': '#fffaf2',
       'line-width': ['interpolate', ['linear'], ['zoom'], 8, 5.5, 12, 9, 15, 13],
-      'line-offset': routeLineOffset,
+      'line-offset': featureLineOffset,
       'line-opacity': 0.94,
     },
   });
@@ -209,7 +185,7 @@ export function installCircumferenceLayers(): void {
     paint: {
       'line-color': ['get', 'color'],
       'line-width': ['interpolate', ['linear'], ['zoom'], 8, 3, 12, 6, 15, 10],
-      'line-offset': routeLineOffset,
+      'line-offset': featureLineOffset,
       'line-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 1, 0.92],
       'line-blur': 0.05,
     },

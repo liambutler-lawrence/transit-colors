@@ -5,6 +5,10 @@ import test from 'node:test';
 import { isValidSimpleCircumferenceCycle } from '../scripts/exact-circumference-solver.mjs';
 import {
   activeCircumferenceService,
+  distanceMeters,
+  junctionContinuationLineLanes,
+  junctionContinuationSections,
+  lineLengthMeters,
   scheduleCircumferenceMode,
 } from './circumference.ts';
 import { circumferenceGeometryVariantsSchema } from './circumference/schema.ts';
@@ -123,6 +127,157 @@ test('Atlanta publishes its full branched network without a fake loop', async ()
   assert.deepEqual(segmentByNames('ASHBY', 'VINE CITY')?.lines, ['BLUE', 'GREEN']);
   assert.deepEqual(segmentByNames('LINDBERGH CENTER', 'BUCKHEAD')?.lines, ['RED']);
   assert.deepEqual(segmentByNames('LINDBERGH CENTER', 'LENOX')?.lines, ['GOLD']);
+});
+
+test('parallel branches taper at their physical split across every metro', async () => {
+  const detectedContinuationCounts = {};
+  const detectedContinuationDetails = {};
+  for (const areaKey of ['cdmx', 'nyc', 'singapore', 'atlanta', 'athens']) {
+    const routeData = circumferenceGeometryVariantsSchema.parse(
+      JSON.parse(
+        await readFile(
+          new URL(`../data/${areaKey}-circumference.json`, import.meta.url),
+          'utf8',
+        ),
+      ),
+    );
+    const network = routeData.track.network;
+    const edgeKey = (fromId, toId) => [fromId, toId].sort().join('\u0000');
+    const networkLinesByEdge = new Map(
+      network.segments
+        .filter(({ type }) => type === 'ride')
+        .map((segment) => [edgeKey(segment.from.id, segment.to.id), segment.lines]),
+    );
+    const boundaryLayouts = (routeData.track.candidates[0]?.segments ?? [])
+      .filter(({ type }) => type === 'ride')
+      .map((segment) => ({
+        coordinates: segment.coordinates,
+        displayedLines: [
+          ...new Set([
+            ...segment.lines,
+            ...(networkLinesByEdge.get(edgeKey(segment.from.id, segment.to.id)) ?? []),
+          ]),
+        ].sort(),
+        fromId: segment.from.id,
+        primaryLine: segment.primaryLine ?? segment.lines[0] ?? '',
+        toId: segment.to.id,
+      }));
+    const boundaryEdges = new Set(
+      boundaryLayouts.map(({ fromId, toId }) => edgeKey(fromId, toId)),
+    );
+    const networkLayouts = network.segments
+      .filter((segment) => segment.type === 'ride' && segment.display !== false)
+      .map((segment) => ({
+        coordinates: segment.coordinates,
+        fromId: segment.from.id,
+        lines: segment.lines,
+        toId: segment.to.id,
+      }));
+    const coordinatesByNodeId = new Map(
+      network.stations.map((station) => [station.id, station.coordinate]),
+    );
+    let detectedContinuations = 0;
+    const continuationDetails = [];
+
+    for (const segment of network.segments.filter(
+      (candidate) =>
+        candidate.type === 'ride' &&
+        candidate.display !== false &&
+        !boundaryEdges.has(edgeKey(candidate.from.id, candidate.to.id)),
+    )) {
+      const lanes = junctionContinuationLineLanes(
+        {
+          coordinates: segment.coordinates,
+          fromId: segment.from.id,
+          lines: segment.lines,
+          toId: segment.to.id,
+        },
+        boundaryLayouts,
+        coordinatesByNodeId,
+        networkLayouts,
+      );
+      for (const [lineName, lane] of lanes) {
+        detectedContinuations += 1;
+        continuationDetails.push({
+          distanceMeters: lane.sharedDistanceMeters,
+          lineName,
+          segment: `${segment.from.name} → ${segment.to.name}`,
+        });
+        assert.ok(lane.sharedDistanceMeters >= 60);
+        assert.ok(
+          lane.sharedDistanceMeters <= lineLengthMeters(segment.coordinates) + 0.01,
+        );
+        const nodeCoordinate = coordinatesByNodeId.get(lane.nodeId);
+        assert.ok(nodeCoordinate);
+        const sections = junctionContinuationSections(
+          segment.coordinates,
+          nodeCoordinate,
+          lane,
+        );
+        assert.ok(sections.length >= 1);
+        assert.ok(
+          sections.every(
+            ({ continuationFraction, coordinates }) =>
+              continuationFraction >= 0 &&
+              continuationFraction <= 1 &&
+              coordinates.length >= 2,
+          ),
+        );
+        const startsAtNode =
+          distanceMeters(segment.coordinates[0], nodeCoordinate) <=
+          distanceMeters(segment.coordinates.at(-1), nodeCoordinate);
+        for (let index = 1; index < sections.length; index += 1) {
+          const previous = sections[index - 1];
+          const current = sections[index];
+          assert.ok(
+            startsAtNode
+              ? previous.continuationFraction >= current.continuationFraction
+              : previous.continuationFraction <= current.continuationFraction,
+          );
+          assert.ok(
+            distanceMeters(previous.coordinates.at(-1), current.coordinates[0]) < 0.1,
+          );
+        }
+        if (lane.sharedDistanceMeters + 180 < lineLengthMeters(segment.coordinates)) {
+          assert.ok(
+            sections.some(
+              ({ continuationFraction }) =>
+                continuationFraction > 0 && continuationFraction < 1,
+            ),
+          );
+          assert.ok(
+            sections.some(({ continuationFraction }) => continuationFraction === 0),
+          );
+        }
+      }
+    }
+    detectedContinuationCounts[areaKey] = detectedContinuations;
+    detectedContinuationDetails[areaKey] = continuationDetails;
+  }
+
+  assert.ok(detectedContinuationCounts.nyc >= 20);
+  assert.equal(detectedContinuationCounts.atlanta, 4);
+  assert.deepEqual(
+    detectedContinuationDetails.atlanta
+      .map(({ lineName, segment }) => `${segment} · ${lineName}`)
+      .sort(),
+    [
+      'ASHBY → BANKHEAD · GREEN',
+      'ASHBY → WEST LAKE · BLUE',
+      'LENOX → LINDBERGH CENTER · GOLD',
+      'LINDBERGH CENTER → BUCKHEAD · RED',
+    ],
+  );
+  for (const detail of detectedContinuationDetails.atlanta.filter(({ segment }) =>
+    segment.includes('ASHBY'),
+  )) {
+    assert.ok(detail.distanceMeters >= 120 && detail.distanceMeters <= 360);
+  }
+  for (const detail of detectedContinuationDetails.atlanta.filter(({ segment }) =>
+    segment.includes('LINDBERGH CENTER'),
+  )) {
+    assert.ok(detail.distanceMeters >= 900 && detail.distanceMeters <= 1_500);
+  }
 });
 
 test('Singapore includes the completed Circle Line closure', async () => {
