@@ -731,7 +731,7 @@ export async function initialize(): Promise<void> {
   try {
     const [basemapStyle, landmasses, circumferenceEntries] = await Promise.all([
       fetchParsed('vendor/openfreemap-liberty.json', styleSpecificationSchema),
-      fetchParsed('data/circumference-landmasses.json?v=20260727c', landmassDataSchema),
+      fetchParsed('data/circumference-landmasses.json?v=20260727d', landmassDataSchema),
       Promise.all(
         AREA_KEYS.map(async (areaKey) => ({
           areaKey,

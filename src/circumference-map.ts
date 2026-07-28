@@ -10,28 +10,6 @@ const CIRCUMFERENCE_GRADIENT_TRANSPARENT_PADDING_METERS = 500;
 
 type Color = [number, number, number];
 
-function pointInPolygon(point: Point, polygon: readonly Point[]): boolean {
-  let inside = false;
-  for (
-    let currentIndex = 0, previousIndex = polygon.length - 1;
-    currentIndex < polygon.length;
-    previousIndex = currentIndex, currentIndex += 1
-  ) {
-    const current = polygon[currentIndex];
-    const previous = polygon[previousIndex];
-    if (!current || !previous) continue;
-    if (
-      current.y > point.y !== previous.y > point.y &&
-      point.x <
-        ((previous.x - current.x) * (point.y - current.y)) / (previous.y - current.y) +
-          current.x
-    ) {
-      inside = !inside;
-    }
-  }
-  return inside;
-}
-
 function pointToSegmentDistance(point: Point, start: Point, end: Point): number {
   const deltaX = end.x - start.x;
   const deltaY = end.y - start.y;
@@ -191,9 +169,9 @@ export function circumferenceGradientOpacity(
 }
 
 /**
- * Renders an outward distance field into a MapLibre canvas source. The optional
- * landmass rings are applied as one alpha mask so the texture terminates at
- * every touched coastline instead of selecting only the largest landmass.
+ * Renders an unsigned route-distance field into a MapLibre canvas source. The
+ * optional land rings are applied as one alpha mask so the texture radiates
+ * across nearby land on both sides of the route and terminates at every coast.
  */
 export function renderCircumferenceGradient(
   canvas: HTMLCanvasElement,
@@ -233,7 +211,6 @@ export function renderCircumferenceGradient(
     for (let pixelX = 0; pixelX < width; pixelX += 1) {
       const longitude = west + ((pixelX + 0.5) / width) * (east - west);
       const point = project([longitude, latitude]);
-      if (pointInPolygon(point, route)) continue;
 
       let distance = Number.POSITIVE_INFINITY;
       for (const segment of segments) {

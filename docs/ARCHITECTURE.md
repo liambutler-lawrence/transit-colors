@@ -88,10 +88,11 @@ filtering map content. Clicking a visible circumference segment first activates 
 state and then displays that segment in the shared selected-item section.
 
 Each gradient image uses bounds derived from its selected route rather than a city box.
-The outward field fades to full transparency at 10 km and includes an additional
-transparent texture margin, so the finite raster has no visible rectangular edge.
-Touched-landmass masks and the detailed basemap water layer still terminate the field at
-coastlines before that maximum distance.
+The unsigned route-distance field radiates across land on both sides of the boundary,
+fades to full transparency at 10 km, and includes an additional transparent texture
+margin, so the finite raster has no visible rectangular edge. An area-level nearby-land
+mask—independent from the landmasses used in the result statistics—and the detailed
+basemap water layer terminate the field at coastlines before that maximum distance.
 
 The heatmap has one active local data area because street and schedule data are loaded
 per region. A `moveend` listener activates the nearest supported metro at local zoom
