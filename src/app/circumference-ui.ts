@@ -263,7 +263,7 @@ export function resetCircumferenceItemDetails(
   circumferenceNameEl.textContent = heading;
   circumferenceSummaryEl.textContent =
     heading === 'Click a line or walking link'
-      ? 'Any visible route can be inspected directly, in either city.'
+      ? 'Any visible route can be inspected directly, in any city.'
       : 'The route results will appear as soon as their data is ready.';
   circumferenceMetadataEl.replaceChildren();
   circumferenceState.inspectedSegmentId = '';
@@ -276,11 +276,12 @@ export function fitCircumferenceCandidate(
   candidate: CircumferenceCandidate | null,
   { animate = true }: { readonly animate?: boolean } = {},
 ): void {
-  if (!candidate || candidate.coordinates.length === 0) return;
   const fullLineCoordinates = circumferenceState.network.segments.flatMap((segment) =>
     segment.display === false ? [] : segment.coordinates,
   );
-  const bounds = [...candidate.coordinates, ...fullLineCoordinates].reduce(
+  const focusCoordinates = [...(candidate?.coordinates ?? []), ...fullLineCoordinates];
+  if (focusCoordinates.length === 0) return;
+  const bounds = focusCoordinates.reduce(
     (result, coordinate) => result.extend(coordinate),
     new maplibregl.LngLatBounds(),
   );
@@ -307,24 +308,27 @@ function sortLineNames(first: string, second: string): number {
 }
 
 export function routeFeatureCollection(
-  candidate: CircumferenceCandidate,
+  candidate: CircumferenceCandidate | null,
   areaKey: AreaKey,
   routeState = circumferenceStates[areaKey],
 ): FeatureCollection<Geometry, GeoJsonProperties> {
-  const features: Feature<Geometry, GeoJsonProperties>[] = [
-    {
-      type: 'Feature',
-      id: `${areaKey}:inside`,
-      geometry: {
-        type: 'Polygon',
-        coordinates: [candidate.coordinates],
-      },
-      properties: { area_key: areaKey, kind: 'inside' },
-    },
-  ];
+  const features: Feature<Geometry, GeoJsonProperties>[] = candidate
+    ? [
+        {
+          type: 'Feature',
+          id: `${areaKey}:inside`,
+          geometry: {
+            type: 'Polygon',
+            coordinates: [candidate.coordinates],
+          },
+          properties: { area_key: areaKey, kind: 'inside' },
+        },
+      ]
+    : [];
+  const candidateSegments = candidate?.segments ?? [];
   let featureId = 0;
   const boundaryRideKeys = new Set(
-    candidate.segments
+    candidateSegments
       .filter((segment) => segment.type === 'ride')
       .map((segment) => segmentEndpointKey(segment.from.id, segment.to.id)),
   );
@@ -336,7 +340,7 @@ export function routeFeatureCollection(
       segment.lines,
     );
   }
-  const boundaryLineLayouts = candidate.segments
+  const boundaryLineLayouts = candidateSegments
     .filter((segment) => segment.type === 'ride')
     .map((segment) => {
       const displayedLines = [
@@ -438,7 +442,7 @@ export function routeFeatureCollection(
     featureId += 1;
   }
 
-  for (const segment of candidate.segments) {
+  for (const segment of candidateSegments) {
     const displayedLines =
       segment.type === 'transfer'
         ? ['']
@@ -498,11 +502,11 @@ export function routeFeatureCollection(
     }
   }
 
-  for (const [index, station] of candidate.stations.entries()) {
+  for (const [index, station] of (candidate?.stations ?? []).entries()) {
     const firstLine =
-      candidate.segments[index]?.primaryLine ??
-      candidate.segments[
-        (index - 1 + candidate.segments.length) % candidate.segments.length
+      candidateSegments[index]?.primaryLine ??
+      candidateSegments[
+        (index - 1 + candidateSegments.length) % candidateSegments.length
       ]?.primaryLine ??
       station.lineNames[0] ??
       '';
@@ -680,9 +684,7 @@ export function combinedRouteFeatureCollection(): FeatureCollection<
     type: 'FeatureCollection',
     features: AREA_KEYS.flatMap((areaKey) => {
       const routeState = circumferenceStates[areaKey];
-      return routeState.selected
-        ? routeFeatureCollection(routeState.selected, areaKey, routeState).features
-        : [];
+      return routeFeatureCollection(routeState.selected, areaKey, routeState).features;
     }),
   };
 }
@@ -855,6 +857,7 @@ function renderFocusedCircumferenceArea({ fit = false } = {}): void {
       : 'No ranked routes are available for this schedule period.';
     renderCircumferenceResults();
     syncCircumferenceVisibility();
+    if (fit) fitCircumferenceCandidate(null);
     if (runtime.activeProduct === 'circumference') {
       updateStatus(noService ? 'No scheduled service' : 'No loop');
     }
@@ -906,7 +909,7 @@ export function prepareCircumferenceRoute(
       }`;
     },
   ).join(' · ')}`;
-  routeTrackGeometryToggle.disabled = !AREA_KEYS.every(
+  routeTrackGeometryToggle.disabled = !AREA_KEYS.some(
     (areaKey) =>
       circumferenceStates[areaKey].methodology?.trackGeometryAvailable === true,
   );

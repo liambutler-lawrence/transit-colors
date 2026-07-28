@@ -23,7 +23,7 @@ import type {
 } from '../domain.js';
 import type { TransitGraph, TransitTimes, WaitResult } from '../routing/types.js';
 
-export type AreaKey = 'cdmx' | 'nyc';
+export type AreaKey = 'cdmx' | 'nyc' | 'singapore' | 'atlanta' | 'athens';
 export type Product = 'access' | 'circumference';
 
 export interface AreaConfig {
@@ -125,7 +125,7 @@ export interface PerformanceLog {
 }
 
 export const segmentPropertiesSchema = z.object({
-  area_key: z.enum(['cdmx', 'nyc']),
+  area_key: z.enum(['cdmx', 'nyc', 'singapore', 'atlanta', 'athens']),
   distance_m: z.number(),
   from: z.string(),
   from_label: z.string(),

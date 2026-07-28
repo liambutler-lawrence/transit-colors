@@ -23,7 +23,7 @@ permissions only in the deployment job.
 3. Confirm the **Deploy GitHub Pages** workflow succeeds.
 4. Open the deployment URL and test both products. Confirm the sidebar reads in product,
    mode, results, and selected-item order; each circumference result card focuses its
-   city without hiding either network; map clicks work in either city; and moving the
+   city without hiding any network; map clicks work in every city; and moving the
    heatmap to a supported metro activates its local results without recentering.
 
 The Vite `base` is relative, so the same artifact works at the project Pages path and in

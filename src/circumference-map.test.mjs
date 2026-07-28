@@ -192,7 +192,7 @@ test('circumference result cards focus an always-visible map', async () => {
     'utf8',
   );
 
-  assert.match(shell, /Both metro networks stay visible/);
+  assert.match(shell, /All metro networks stay visible/);
   assert.match(lifecycle, /AREA_KEYS\.map\(async \(areaKey\)/);
   assert.match(lifecycle, /circumference-gradient-\$\{areaKey\}/);
   assert.match(lifecycle, /button\[data-focus-area\]/);

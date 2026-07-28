@@ -83,9 +83,9 @@ renders these files; it never runs the combinatorial search during page load or 
 schedule change.
 
 The circumference map keeps one independent route state and gradient image source per
-metro area. It merges both complete networks and selected boundaries into one GeoJSON
+metro area. It merges all complete networks and selected boundaries into one GeoJSON
 source, rendered in official line colors, so changing the focused area never removes the
-other city. Each result card changes the camera and its own route selection without
+other cities. Each result card changes the camera and its own route selection without
 filtering map content. Clicking a visible circumference segment first activates its city
 state and then displays that segment in the shared selected-item section.
 
@@ -103,8 +103,8 @@ without moving the camera, so ordinary map navigation replaces the old city mode
 ## Static data
 
 Small GeoJSON and JSON datasets are read directly. CDMX streets are distributed as
-PMTiles so the browser requests only visible ranges. NYC roads are derived from visible
-OpenFreeMap road features at runtime.
+PMTiles so the browser requests only visible ranges. Roads for the other four areas are
+derived from visible OpenFreeMap road features at runtime.
 
 Downloaded GTFS and Overpass responses are caches, not source artifacts, and are
 excluded from version control and production builds.

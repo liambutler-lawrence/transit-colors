@@ -8,6 +8,9 @@ Rebuild data only when intentionally refreshing a source snapshot.
 - OpenStreetMap contributors through the Overpass API
 - Mexico City open-data GTFS
 - MTA, NJ Transit, and PATH static GTFS feeds
+- MARTA static GTFS
+- OASA / STASY static GTFS
+- LTA DataMall-derived Singapore rail data and station codes
 - Official AIFA and Servicio de Transportes Eléctricos station references
 - Natural Earth 1:10m land polygons
 
@@ -41,6 +44,23 @@ npm run build:data:nyc
 The builder combines subway, PATH, commuter rail, light rail, and regional GTFS feeds
 inside the configured metropolitan bounds.
 
+## Singapore, Atlanta, and Athens
+
+```sh
+npm run build:data:additional
+```
+
+The shared builder streams large GTFS stop-time tables, filters to rail routes, and
+creates line-specific platform nodes with explicit paid-area transfers. Individual
+refresh commands are also available as `build:data:singapore`, `build:data:atlanta`, and
+`build:data:athens`.
+
+Singapore's current snapshot is corrected against LTA's station-code topology because
+its derived GTFS omits interchange calls from trip sequences. It includes the Circle
+Line Stage 6 stations opened on 12 July 2026 and uses LTA's published operating span and
+frequency guidance. The smaller shape-bearing snapshot supplies physical centerlines for
+older segments; newer sections explicitly retain straight fallback geometry.
+
 ## Schedules
 
 ```sh
@@ -63,8 +83,8 @@ station-to-station observations, resamples them to a common interval, and averag
 distinct directions or track sides. Centerlines retain exact platform coordinates as
 their endpoints and fall back to a straight edge when no reliable shape section exists.
 
-`npm run build:data` refreshes both metro areas, schedules, and track geometry in the
-required order.
+`npm run build:data` refreshes all five metro areas, schedules, and track geometry in
+the required order.
 
 ## Circumference routes
 
@@ -74,14 +94,18 @@ After station, schedule, and track snapshots are current, run:
 npm run build:data:circumference
 ```
 
-This writes the complete display networks and offline-proven maximum-area routes for
-both areas, including every distinct weekly segment-level service topology derived from
-the published route-direction schedule windows. Express stop-to-stop service is
-normalized across the physical track segments it traverses. The exact optimizer reuses a
-superset certificate whenever its winner remains valid and solves only the reduced
-topologies that need a different winner. It may take several minutes for NYC. That cost
-is intentionally paid only during a data refresh; the browser loads the committed
-results directly.
+This writes the complete display networks and offline-proven maximum-area routes for all
+loop-forming areas, including every distinct weekly segment-level service topology
+derived from the published route-direction schedule windows. Express stop-to-stop
+service is normalized across the physical track segments it traverses. The exact
+optimizer reuses a superset certificate whenever its winner remains valid and solves
+only the reduced topologies that need a different winner. It may take several minutes
+for NYC. That cost is intentionally paid only during a data refresh; the browser loads
+the committed results directly.
+
+MARTA Rail is a branched cross without a geographically meaningful closed passenger
+route. Its full network is still published and rendered in Circumference Lab with an
+explicit no-loop result.
 
 ## Landmasses
 
