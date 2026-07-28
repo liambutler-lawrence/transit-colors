@@ -439,7 +439,12 @@ body {
 }
 
 .circumference-legend .legend-bar {
-  background: linear-gradient(90deg, #ee5b38 0%, #f1b843 46%, #179187 100%);
+  background: linear-gradient(
+    90deg,
+    rgba(238, 91, 56, 0.72) 0%,
+    rgba(241, 184, 67, 0.4) 46%,
+    rgba(23, 145, 135, 0) 100%
+  );
 }
 
 .circumference-legend .legend-labels span:nth-child(2) {

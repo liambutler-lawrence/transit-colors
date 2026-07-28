@@ -80,6 +80,12 @@ other city. Each result card changes the camera and its own route selection with
 filtering map content. Clicking a visible circumference segment first activates its city
 state and then displays that segment in the shared selected-item section.
 
+Each gradient image uses bounds derived from its selected route rather than a city box.
+The outward field fades to full transparency at 10 km and includes an additional
+transparent texture margin, so the finite raster has no visible rectangular edge.
+Touched-landmass masks and the detailed basemap water layer still terminate the field at
+coastlines before that maximum distance.
+
 The heatmap has one active local data area because street and schedule data are loaded
 per region. A `moveend` listener activates the nearest supported metro at local zoom
 without moving the camera, so ordinary map navigation replaces the old city mode switch.

@@ -21,6 +21,7 @@ import {
 import { circumferenceGradientCoordinates } from '../circumference-gradient-source.js';
 import {
   CIRCUMFERENCE_GRADIENT_COAST_LAYER_ID,
+  circumferenceGradientBounds,
   renderCircumferenceGradient,
 } from '../circumference-map.js';
 import type {
@@ -690,14 +691,15 @@ function updateCircumferenceGradient(
   const landmassCoverage =
     coverage ?? calculateLandmassCoverage(candidate.coordinates, landmassArea);
   const canvas = circumferenceCanvases[areaKey];
+  const gradientBounds = circumferenceGradientBounds(candidate.coordinates);
   renderCircumferenceGradient(
     canvas,
     candidate.coordinates,
-    landmassArea.gradient_bounds,
+    gradientBounds,
     landmassCoverage.flatMap((landmass) => landmass.mask ?? []),
   );
   imageSource(`circumference-gradient-${areaKey}`)?.updateImage({
-    coordinates: circumferenceGradientCoordinates(landmassArea.gradient_bounds),
+    coordinates: circumferenceGradientCoordinates(gradientBounds),
     url: canvas.toDataURL('image/png'),
   });
 }

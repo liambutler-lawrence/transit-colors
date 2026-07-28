@@ -1,11 +1,13 @@
 import type { Coordinate } from './domain.js';
 import { metersPerDegreeAtLatitude } from './geodesy.js';
+import type { BoundsTuple } from './circumference-gradient-source.js';
 import type { Point } from './routing/types.js';
 
 export const CIRCUMFERENCE_GRADIENT_COAST_LAYER_ID = 'water';
 export const CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE = 1024;
+export const CIRCUMFERENCE_GRADIENT_MAX_DISTANCE_METERS = 10_000;
+const CIRCUMFERENCE_GRADIENT_TRANSPARENT_PADDING_METERS = 500;
 
-type BoundsTuple = [number, number, number, number];
 type Color = [number, number, number];
 
 function pointInPolygon(point: Point, polygon: readonly Point[]): boolean {
@@ -139,6 +141,56 @@ function canvasCoordinate(
 }
 
 /**
+ * Produces a route-relative texture envelope with a fully transparent border.
+ * The image source remains finite, but the visible field has no rectangular
+ * edge because every boundary lies beyond the 10 km fade distance.
+ */
+export function circumferenceGradientBounds(
+  routeCoordinates: readonly Coordinate[],
+  maxDistanceMeters = CIRCUMFERENCE_GRADIENT_MAX_DISTANCE_METERS,
+): BoundsTuple {
+  const first = routeCoordinates[0];
+  if (!first) throw new Error('A route is required to position its gradient.');
+
+  let west = first[0];
+  let south = first[1];
+  let east = first[0];
+  let north = first[1];
+  for (const [longitude, latitude] of routeCoordinates.slice(1)) {
+    west = Math.min(west, longitude);
+    south = Math.min(south, latitude);
+    east = Math.max(east, longitude);
+    north = Math.max(north, latitude);
+  }
+
+  const paddingMeters =
+    maxDistanceMeters + CIRCUMFERENCE_GRADIENT_TRANSPARENT_PADDING_METERS;
+  const southernScale = metersPerDegreeAtLatitude(south);
+  const northernScale = metersPerDegreeAtLatitude(north);
+  const latitudeScale = Math.min(southernScale.latitude, northernScale.latitude);
+  const longitudeScale = Math.max(
+    1,
+    Math.min(southernScale.longitude, northernScale.longitude),
+  );
+
+  return [
+    Math.max(-180, west - paddingMeters / longitudeScale),
+    Math.max(-90, south - paddingMeters / latitudeScale),
+    Math.min(180, east + paddingMeters / longitudeScale),
+    Math.min(90, north + paddingMeters / latitudeScale),
+  ];
+}
+
+export function circumferenceGradientOpacity(
+  distanceMeters: number,
+  maxDistanceMeters = CIRCUMFERENCE_GRADIENT_MAX_DISTANCE_METERS,
+): number {
+  if (distanceMeters >= maxDistanceMeters) return 0;
+  const amount = Math.max(0, distanceMeters) / maxDistanceMeters;
+  return Math.max(1, Math.round(116 * (1 - amount)));
+}
+
+/**
  * Renders an outward distance field into a MapLibre canvas source. The optional
  * landmass rings are applied as one alpha mask so the texture terminates at
  * every touched coastline instead of selecting only the largest landmass.
@@ -148,6 +200,7 @@ export function renderCircumferenceGradient(
   routeCoordinates: readonly Coordinate[],
   bounds: BoundsTuple,
   landmassPolygons: readonly Coordinate[][][],
+  maxDistanceMeters = CIRCUMFERENCE_GRADIENT_MAX_DISTANCE_METERS,
 ): void {
   const context = canvas.getContext('2d', { alpha: true });
   if (!context) throw new Error('Canvas 2D rendering is unavailable.');
@@ -174,16 +227,6 @@ export function renderCircumferenceGradient(
     return start ? [{ end, start }] : [];
   });
   const image = context.createImageData(width, height);
-  const distanceScaleMeters = Math.max(
-    20_000,
-    Math.min(
-      55_000,
-      Math.hypot(
-        (east - west) * metersPerLongitudeDegree,
-        (north - south) * metersPerLatitudeDegree,
-      ) * 0.32,
-    ),
-  );
 
   for (let pixelY = 0; pixelY < height; pixelY += 1) {
     const latitude = north - ((pixelY + 0.5) / height) * (north - south);
@@ -199,13 +242,15 @@ export function renderCircumferenceGradient(
           pointToSegmentDistance(point, segment.start, segment.end),
         );
       }
-      const amount = Math.min(1, distance / distanceScaleMeters);
+      const opacity = circumferenceGradientOpacity(distance, maxDistanceMeters);
+      if (opacity === 0) continue;
+      const amount = Math.min(1, distance / maxDistanceMeters);
       const [red, green, blue] = gradientColor(amount);
       const offset = (pixelY * width + pixelX) * 4;
       image.data[offset] = red;
       image.data[offset + 1] = green;
       image.data[offset + 2] = blue;
-      image.data[offset + 3] = Math.round(116 - amount * 62);
+      image.data[offset + 3] = opacity;
     }
   }
 
