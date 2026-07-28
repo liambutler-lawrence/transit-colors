@@ -41,6 +41,7 @@ export interface CircumferenceCandidate {
   readonly areaSquareMeters: number;
   readonly coordinates: Coordinate[];
   readonly id: string;
+  readonly independentCircleKind?: 'native-line' | undefined;
   readonly lengthMeters: number;
   readonly lines: readonly string[];
   readonly nodeIds: readonly NodeId[];

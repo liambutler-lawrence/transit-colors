@@ -270,6 +270,7 @@ export function scheduleCircumferenceMode(
       .filter((candidate) => networkPathExists(network, candidate.nodeIds))
       .map((candidate) =>
         candidateFromNetworkPath(network, candidate.nodeIds, {
+          independentCircleKind: candidate.independentCircleKind,
           useTrackGeometry: geometryMode === 'track',
         }),
       );

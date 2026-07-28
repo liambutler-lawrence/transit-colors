@@ -75,6 +75,7 @@ assert.equal(lineColor('athens', 'M3'), '#0057A8');
 const independentCandidate = (id, areaSquareMeters, rideSegmentIds) => ({
   id,
   areaSquareMeters,
+  lines: ['A', 'B'],
   segments: rideSegmentIds.map((segmentId) => ({
     id: segmentId,
     type: 'ride',
@@ -84,10 +85,26 @@ assert.deepEqual(
   selectIndependentCircumferenceCandidates([
     independentCandidate('overlapping-alternative', 90, ['trunk', 'west']),
     independentCandidate('eastern-circle', 70, ['east-a', 'east-b']),
-    independentCandidate('largest-circle', 100, ['trunk', 'north']),
+    {
+      ...independentCandidate('native-circle', 80, ['trunk', 'native']),
+      independentCircleKind: 'native-line',
+      lines: ['Circle'],
+    },
+    {
+      ...independentCandidate('native-circle-alternative', 75, [
+        'trunk',
+        'native-other',
+      ]),
+      independentCircleKind: 'native-line',
+      lines: ['Circle'],
+    },
+    {
+      ...independentCandidate('largest-circle', 100, ['trunk', 'north']),
+      lines: ['A', 'B'],
+    },
     independentCandidate('southern-circle', 60, ['south-a', 'south-b']),
   ]).map(({ id }) => id),
-  ['largest-circle', 'eastern-circle', 'southern-circle'],
+  ['largest-circle', 'native-circle', 'eastern-circle', 'southern-circle'],
 );
 
 const closedServiceDays = Array.from({ length: 7 }, () => []);

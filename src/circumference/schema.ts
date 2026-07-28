@@ -39,6 +39,7 @@ const candidateSchema = z.object({
   areaSquareMeters: z.number().nonnegative(),
   coordinates: z.array(coordinateSchema).min(3),
   id: z.string().min(1),
+  independentCircleKind: z.literal('native-line').optional(),
   lengthMeters: z.number().nonnegative(),
   lines: z.array(z.string()),
   nodeIds: z.array(z.string().min(1)).min(3),

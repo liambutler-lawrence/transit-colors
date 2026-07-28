@@ -22,7 +22,13 @@ import type {
 export function candidateFromNetworkPath(
   network: CircumferenceNetwork,
   path: readonly NodeId[],
-  { useTrackGeometry = true }: { readonly useTrackGeometry?: boolean } = {},
+  {
+    independentCircleKind,
+    useTrackGeometry = true,
+  }: {
+    readonly independentCircleKind?: CircumferenceCandidate['independentCircleKind'];
+    readonly useTrackGeometry?: boolean;
+  } = {},
 ): CircumferenceCandidate {
   const nodes = new Map(network.stations.map((station) => [station.id, station]));
   const segmentsByEdge = new Map(
@@ -83,6 +89,7 @@ export function candidateFromNetworkPath(
     .reduce((total, segment) => total + segment.distanceMeters, 0);
   return {
     id: stableCandidateId(path),
+    independentCircleKind,
     nodeIds: [...path],
     stations: path.map((nodeId) => getRequired(nodes, nodeId)),
     coordinates,

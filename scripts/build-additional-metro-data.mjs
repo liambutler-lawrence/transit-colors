@@ -28,6 +28,7 @@ export const ADDITIONAL_METROS = {
       'https://cdn.rushowl.app/rushtrail-app/gtfs-feed/gtfs-feed-lta.zip',
     timezone: 'Asia/Singapore',
     routeTypes: new Set(['1', '400', '401']),
+    lightRailRouteIds: new Set(['BP', 'SK', 'PG']),
     syntheticNetwork: true,
     supplementalStops: [
       {
@@ -739,14 +740,19 @@ async function buildArea(areaKey, metro) {
     const operators = [
       ...new Set(routesForPlatform.map((route) => route.agency_id || metro.feedName)),
     ];
+    const mode = routesForPlatform.some(
+      (route) => !metro.lightRailRouteIds?.has(route.route_id),
+    )
+      ? 'subway'
+      : 'light_rail';
     features.push({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: coordinate },
       properties: {
         id: info.nodeId,
         name: metro.cleanName(representativeStop.stop_name ?? ''),
-        mode: 'subway',
-        system: 'Metro',
+        mode,
+        system: mode === 'subway' ? 'Metro' : 'Light rail',
         status: 'open',
         status_detail: 'Open',
         status_source: 'Published in current static GTFS',
@@ -818,7 +824,7 @@ async function buildArea(areaKey, metro) {
       `${metro.feedKey}/${route.route_id}`,
       {
         agency: route.agency_id || metro.feedName,
-        mode: 'subway',
+        mode: metro.lightRailRouteIds?.has(route.route_id) ? 'light_rail' : 'subway',
         name: route.route_short_name || route.route_long_name || route.route_id,
         description: route.route_long_name || route.route_desc || '',
         color: route.route_color
@@ -838,6 +844,14 @@ async function buildArea(areaKey, metro) {
       t: graphTransfers,
     },
   };
+  const stationModes = Object.fromEntries(
+    [...new Set(features.map((feature) => feature.properties.mode))]
+      .sort()
+      .map((mode) => [
+        mode,
+        features.filter((feature) => feature.properties.mode === mode).length,
+      ]),
+  );
   const metadata = {
     city: metro.city,
     generated_at: new Date().toISOString(),
@@ -851,8 +865,8 @@ async function buildArea(areaKey, metro) {
     station_count: features.length,
     open_station_count: features.length,
     future_station_count: 0,
-    station_modes: { subway: features.length },
-    station_modes_open: { subway: features.length },
+    station_modes: stationModes,
+    station_modes_open: stationModes,
     station_modes_future: {},
     station_statuses: { open: features.length },
     distance_station_scope: 'open stations only',
