@@ -157,6 +157,50 @@ test('Singapore includes the completed Circle Line closure', async () => {
   assert.ok(routeData.track.candidates[0].areaSquareMeters > 200_000_000);
 });
 
+test('Singapore and Athens switch every ride edge between tracks and chords', async () => {
+  for (const areaKey of ['singapore', 'athens']) {
+    const routeData = circumferenceGeometryVariantsSchema.parse(
+      JSON.parse(
+        await readFile(
+          new URL(`../data/${areaKey}-circumference.json`, import.meta.url),
+          'utf8',
+        ),
+      ),
+    );
+    const straightRideByEdge = new Map(
+      routeData.straight.network.segments
+        .filter(({ type }) => type === 'ride')
+        .map((segment) => [
+          [segment.from.id, segment.to.id].sort().join('\u0000'),
+          segment,
+        ]),
+    );
+    const trackRideSegments = routeData.track.network.segments.filter(
+      ({ type }) => type === 'ride',
+    );
+
+    assert.equal(routeData.track.methodology.trackGeometryAvailable, true);
+    assert.equal(routeData.track.methodology.trackGeometryEnabled, true);
+    assert.equal(routeData.straight.methodology.trackGeometryEnabled, false);
+    assert.equal(
+      routeData.track.methodology.trackGeometryEdgeCount,
+      trackRideSegments.length,
+    );
+    for (const trackSegment of trackRideSegments) {
+      const key = [trackSegment.from.id, trackSegment.to.id].sort().join('\u0000');
+      const straightSegment = straightRideByEdge.get(key);
+      assert.ok(straightSegment);
+      assert.ok(trackSegment.coordinates.length > 2);
+      assert.equal(straightSegment.coordinates.length, 2);
+      assert.notDeepEqual(trackSegment.coordinates, straightSegment.coordinates);
+    }
+    assert.ok(
+      routeData.track.candidates[0].coordinates.length >
+        routeData.straight.candidates[0].coordinates.length,
+    );
+  }
+});
+
 test('NYC exact winner uses the 1 from South Ferry through 14 St', async () => {
   const routeData = circumferenceGeometryVariantsSchema.parse(
     JSON.parse(

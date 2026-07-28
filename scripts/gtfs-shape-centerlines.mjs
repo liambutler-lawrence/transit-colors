@@ -154,6 +154,46 @@ export function extractShapeSection(shape, fromCoordinate, toCoordinate) {
   return deduped;
 }
 
+export function extractClosedShapeSection(shape, fromCoordinate, toCoordinate) {
+  if (!Array.isArray(shape) || shape.length < 4) return null;
+  const closedShape =
+    distanceMeters(shape[0], shape.at(-1)) < 0.75 ? shape : [...shape, shape[0]];
+  const edgeCount = closedShape.length - 1;
+  const fromProjection = projectOntoShape(fromCoordinate, closedShape);
+  const toProjection = projectOntoShape(toCoordinate, closedShape);
+  if (!fromProjection || !toProjection) return null;
+
+  const forwardSection = (startProjection, endProjection) => {
+    let endPosition = endProjection.position;
+    while (endPosition <= startProjection.position) endPosition += edgeCount;
+    const section = [startProjection.coordinate];
+    for (
+      let index = Math.floor(startProjection.position) + 1;
+      index <= Math.floor(endPosition);
+      index += 1
+    ) {
+      section.push(closedShape[index % edgeCount]);
+    }
+    section.push(endProjection.coordinate);
+    return section;
+  };
+  const candidates = [
+    forwardSection(fromProjection, toProjection),
+    forwardSection(toProjection, fromProjection).reverse(),
+  ]
+    .map((section) => dedupeCoordinates([fromCoordinate, ...section, toCoordinate]))
+    .filter((section) => section.length >= 2)
+    .sort((first, second) => lineLengthMeters(first) - lineLengthMeters(second));
+  const shortest = candidates[0];
+  if (!shortest) return null;
+  const directLength = distanceMeters(fromCoordinate, toCoordinate);
+  const sectionLength = lineLengthMeters(shortest);
+  return sectionLength >= directLength * 0.95 &&
+    sectionLength <= Math.max(12_000, directLength * 8)
+    ? shortest
+    : null;
+}
+
 export function resampleLine(coordinates, sampleCount) {
   if (coordinates.length === 0 || sampleCount <= 0) return [];
   if (coordinates.length === 1 || sampleCount === 1) return [coordinates[0]];
