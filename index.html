@@ -18,6 +18,7 @@
       <section class="panel" aria-label="Map details">
         <div class="panel-header">
           <div class="panel-heading">
+            <span class="hierarchy-label">1 · Product</span>
             <div class="product-tabs" role="tablist" aria-label="Map product">
               <button
                 id="product-access"
@@ -26,7 +27,7 @@
                 aria-selected="true"
                 aria-controls="access-product"
               >
-                Street gradient
+                Transit heatmap
               </button>
               <button
                 id="product-circumference"
@@ -35,17 +36,9 @@
                 aria-selected="false"
                 aria-controls="circumference-product"
               >
-                Circumference
+                Circumference routes
               </button>
             </div>
-            <label class="area-control" for="metro-area">
-              <span>Focus on…</span>
-              <select id="metro-area">
-                <option value="cdmx">Mexico City</option>
-                <option value="nyc">NYC metro area</option>
-              </select>
-            </label>
-            <h1 id="product-title">Transit Street Gradient</h1>
           </div>
           <div class="panel-actions">
             <span id="status" class="status loading">Loading map</span>
@@ -68,112 +61,159 @@
 
         <div id="panel-content" class="panel-content">
           <div id="access-product" class="product-panel" role="tabpanel">
-            <div class="metric-grid">
-              <div class="metric">
-                <span class="metric-label">Streets in view</span>
-                <strong id="street-count">--</strong>
+            <section class="sidebar-section display-section">
+              <div class="section-heading compact-heading">
+                <div>
+                  <span class="section-eyebrow">Map display</span>
+                  <h2>Visible layers</h2>
+                </div>
               </div>
-              <div class="metric">
-                <span class="metric-label">Stations in view</span>
-                <strong id="station-count">--</strong>
-              </div>
-              <div class="metric">
-                <span id="near-count-label" class="metric-label">Within 2.5 km</span>
-                <strong id="near-count">--</strong>
-              </div>
-            </div>
-
-            <div id="legend" class="legend" aria-label="Distance legend">
-              <div class="legend-bar"></div>
-              <div id="legend-labels" class="legend-labels">
-                <span>0 km</span>
-                <span>1</span>
-                <span>2.5</span>
-                <span>5 km</span>
-              </div>
-            </div>
-
-            <div class="destination-control">
-              <label for="destination-select">Destination station</label>
-              <select id="destination-select" disabled>
-                <option value="">Nearest station only</option>
-              </select>
-              <p id="destination-summary">
-                Choose a station here or click an open station on the map.
-              </p>
-            </div>
-
-            <fieldset class="departure-control">
-              <legend>Departure</legend>
-              <div class="departure-inputs">
+              <div class="toggles" aria-label="Heatmap layer controls">
                 <label>
-                  <span>Day</span>
-                  <select id="schedule-day">
-                    <option value="0">Monday</option>
-                    <option value="1">Tuesday</option>
-                    <option value="2">Wednesday</option>
-                    <option value="3">Thursday</option>
-                    <option value="4">Friday</option>
-                    <option value="5">Saturday</option>
-                    <option value="6">Sunday</option>
-                  </select>
+                  <input id="toggle-streets" type="checkbox" checked />
+                  <span>Streets</span>
                 </label>
                 <label>
-                  <span>Time</span>
-                  <input id="schedule-time" type="time" step="300" />
+                  <input id="toggle-stations" type="checkbox" checked />
+                  <span>Stations</span>
+                </label>
+                <label>
+                  <input id="toggle-future-stations" type="checkbox" />
+                  <span>Future</span>
                 </label>
               </div>
-              <p id="schedule-summary">Loading official weekly schedules…</p>
-            </fieldset>
+            </section>
 
-            <fieldset class="time-scale-control">
-              <legend>Time color scale</legend>
-              <div class="time-scale-input">
-                <label for="time-scale-minutes">Green → yellow at</label>
-                <input
-                  id="time-scale-minutes"
-                  type="number"
-                  min="1"
-                  max="120"
-                  step="5"
-                  value="15"
-                  inputmode="numeric"
-                />
-                <span>min</span>
+            <section class="sidebar-section mode-section">
+              <div class="section-heading">
+                <span class="section-index">2</span>
+                <div>
+                  <span class="section-eyebrow">Mode</span>
+                  <h2>Transit access</h2>
+                </div>
               </div>
-              <p id="time-scale-summary">
-                Yellow at 15 min, orange at 30 min, and red at 60 min.
-              </p>
-            </fieldset>
 
-            <div class="toggles" aria-label="Layer controls">
-              <label>
-                <input id="toggle-streets" type="checkbox" checked />
-                <span>Streets</span>
-              </label>
-              <label>
-                <input id="toggle-stations" type="checkbox" checked />
-                <span>Stations</span>
-              </label>
-              <label>
-                <input id="toggle-future-stations" type="checkbox" />
-                <span>Future</span>
-              </label>
-            </div>
+              <div class="control-group">
+                <span class="control-label">Eligible transit</span>
+                <div
+                  id="station-breakdown"
+                  class="station-breakdown"
+                  aria-label="Station mode counts"
+                ></div>
+              </div>
 
-            <div
-              id="station-breakdown"
-              class="station-breakdown"
-              aria-label="Station mode counts"
-            ></div>
+              <div class="destination-control">
+                <label for="destination-select">Optional destination</label>
+                <select id="destination-select" disabled>
+                  <option value="">Nearest station only</option>
+                </select>
+                <p id="destination-summary">
+                  Choose a station here or click any open station on the map.
+                </p>
+              </div>
 
-            <div class="selection" aria-live="polite">
-              <span id="selection-type" class="metric-label">Selected feature</span>
-              <strong id="feature-name">None</strong>
-              <span id="feature-summary">Hover a highlighted street or station</span>
-              <dl id="feature-metadata" class="feature-metadata"></dl>
-              <div id="route-breakdown" class="route-breakdown" hidden></div>
-            </div>
+              <fieldset class="departure-control">
+                <legend>Departure</legend>
+                <div class="departure-inputs">
+                  <label>
+                    <span>Day</span>
+                    <select id="schedule-day">
+                      <option value="0">Monday</option>
+                      <option value="1">Tuesday</option>
+                      <option value="2">Wednesday</option>
+                      <option value="3">Thursday</option>
+                      <option value="4">Friday</option>
+                      <option value="5">Saturday</option>
+                      <option value="6">Sunday</option>
+                    </select>
+                  </label>
+                  <label>
+                    <span>Time</span>
+                    <input id="schedule-time" type="time" step="300" />
+                  </label>
+                </div>
+                <p id="schedule-summary">Loading official weekly schedules…</p>
+              </fieldset>
+            </section>
+
+            <section class="sidebar-section results-section">
+              <div class="section-heading">
+                <span class="section-index">3</span>
+                <div>
+                  <span class="section-eyebrow">Results</span>
+                  <h2>
+                    Visible area
+                    <span id="access-result-area" class="heading-context"
+                      >Mexico City</span
+                    >
+                  </h2>
+                </div>
+              </div>
+
+              <fieldset class="time-scale-control">
+                <legend>Time color scale</legend>
+                <div class="time-scale-input">
+                  <label for="time-scale-minutes">Green → yellow at</label>
+                  <input
+                    id="time-scale-minutes"
+                    type="number"
+                    min="1"
+                    max="120"
+                    step="5"
+                    value="15"
+                    inputmode="numeric"
+                  />
+                  <span>min</span>
+                </div>
+                <p id="time-scale-summary">
+                  Yellow at 15 min, orange at 30 min, and red at 60 min.
+                </p>
+              </fieldset>
+
+              <div class="metric-grid">
+                <div class="metric">
+                  <span class="metric-label">Streets in view</span>
+                  <strong id="street-count">--</strong>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Stations in view</span>
+                  <strong id="station-count">--</strong>
+                </div>
+                <div class="metric">
+                  <span id="near-count-label" class="metric-label">Within 2.5 km</span>
+                  <strong id="near-count">--</strong>
+                </div>
+              </div>
+
+              <div id="legend" class="legend" aria-label="Distance legend">
+                <div class="legend-bar"></div>
+                <div id="legend-labels" class="legend-labels">
+                  <span>0 km</span>
+                  <span>1</span>
+                  <span>2.5</span>
+                  <span>5 km</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="sidebar-section selected-section">
+              <div class="section-heading">
+                <span class="section-index">4</span>
+                <div>
+                  <span class="section-eyebrow">Selected item</span>
+                  <h2>Map details</h2>
+                </div>
+              </div>
+              <div class="selection" aria-live="polite">
+                <span id="selection-type" class="metric-label">Nothing selected</span>
+                <strong id="feature-name">Click a street or station</strong>
+                <span id="feature-summary"
+                  >Move anywhere on the map—visible items work directly.</span
+                >
+                <dl id="feature-metadata" class="feature-metadata"></dl>
+                <div id="route-breakdown" class="route-breakdown" hidden></div>
+              </div>
+            </section>
           </div>
 
           <div
@@ -182,114 +222,146 @@
             role="tabpanel"
             hidden
           >
-            <div class="metric-grid circumference-metrics">
-              <div class="metric">
-                <span class="metric-label">Contained area</span>
-                <strong id="circumference-inner-area">--</strong>
+            <section class="sidebar-section display-section">
+              <div class="section-heading compact-heading">
+                <div>
+                  <span class="section-eyebrow">Map display</span>
+                  <h2>Visible layers</h2>
+                </div>
               </div>
-              <div class="metric">
-                <span id="circumference-outer-label" class="metric-label"
-                  >To coast</span
-                >
-                <strong id="circumference-outer-area">--</strong>
-              </div>
-              <div class="metric">
-                <span class="metric-label">Route length</span>
-                <strong id="circumference-length">--</strong>
-              </div>
-            </div>
-            <div
-              id="circumference-landmass-breakdown"
-              class="landmass-breakdown"
-              aria-label="Touched landmass area breakdown"
-            ></div>
 
-            <div
-              class="legend circumference-legend"
-              aria-label="Outward distance gradient"
-            >
-              <div class="legend-bar"></div>
-              <div class="legend-labels">
-                <span>Route</span>
-                <span>Outward across land</span>
-                <span>Coast</span>
+              <div
+                class="toggles circumference-toggles"
+                aria-label="Circumference layers"
+              >
+                <label>
+                  <input id="toggle-route-gradient" type="checkbox" checked />
+                  <span>Gradient</span>
+                </label>
+                <label>
+                  <input id="toggle-route-stations" type="checkbox" checked />
+                  <span>All stops</span>
+                </label>
+                <label>
+                  <input id="toggle-route-area" type="checkbox" checked />
+                  <span>Inside</span>
+                </label>
               </div>
-            </div>
+            </section>
 
-            <div class="route-control">
-              <label for="route-criterion">Circumference criterion</label>
-              <select id="route-criterion">
-                <option value="metro">Metro · free transfers</option>
-                <option value="passenger-rail" disabled>Passenger rail · next</option>
-                <option value="motorway" disabled>
-                  Controlled-access roads · next
-                </option>
-                <option value="four-lane" disabled>4-lane roads · next</option>
-              </select>
+            <section class="sidebar-section mode-section">
+              <div class="section-heading">
+                <span class="section-index">2</span>
+                <div>
+                  <span class="section-eyebrow">Mode</span>
+                  <h2>Route criteria</h2>
+                </div>
+              </div>
 
-              <label for="route-choice">Route override</label>
-              <div class="route-choice-row">
-                <select id="route-choice" disabled>
-                  <option value="">Automatic · largest inner area</option>
+              <div class="route-control criterion-control">
+                <label for="route-criterion">Circumference criterion</label>
+                <select id="route-criterion">
+                  <option value="metro">Metro · free transfers</option>
+                  <option value="passenger-rail" disabled>Passenger rail · next</option>
+                  <option value="motorway" disabled>
+                    Controlled-access roads · next
+                  </option>
+                  <option value="four-lane" disabled>4-lane roads · next</option>
                 </select>
-                <button id="route-auto" type="button" disabled>Reset</button>
+                <label class="geometry-toggle">
+                  <input id="toggle-track-geometry" type="checkbox" checked />
+                  <span>
+                    <strong>Follow track paths</strong>
+                    <small>Turn off for straight platform-to-platform edges.</small>
+                  </span>
+                </label>
               </div>
-              <p id="route-choice-summary">
-                Building closed loops from the metro network…
+            </section>
+
+            <section class="sidebar-section results-section">
+              <div class="section-heading">
+                <span class="section-index">3</span>
+                <div>
+                  <span class="section-eyebrow">Results</span>
+                  <h2>Maximum-area circles</h2>
+                </div>
+              </div>
+
+              <div
+                id="circumference-results"
+                class="circumference-results"
+                aria-live="polite"
+              ></div>
+
+              <div
+                class="legend circumference-legend"
+                aria-label="Outward distance gradient"
+              >
+                <div class="legend-bar"></div>
+                <div class="legend-labels">
+                  <span>Route</span>
+                  <span>Outward across land</span>
+                  <span>Coast</span>
+                </div>
+              </div>
+            </section>
+
+            <section class="sidebar-section selected-section">
+              <div class="section-heading">
+                <span class="section-index">4</span>
+                <div>
+                  <span class="section-eyebrow">Selected item</span>
+                  <h2>Line or transfer details</h2>
+                </div>
+              </div>
+
+              <div class="selection circumference-selection" aria-live="polite">
+                <span id="circumference-selection-type" class="metric-label"
+                  >Nothing selected</span
+                >
+                <strong id="circumference-name">Click a line or walking link</strong>
+                <span id="circumference-summary">
+                  Any visible route can be inspected directly, in either city.
+                </span>
+                <dl id="circumference-metadata" class="feature-metadata"></dl>
+                <div class="segment-actions" aria-label="Segment overrides">
+                  <button id="route-require-segment" type="button" disabled>
+                    Require segment
+                  </button>
+                  <button id="route-avoid-segment" type="button" disabled>
+                    Avoid segment
+                  </button>
+                  <button id="route-clear-segments" type="button" disabled>
+                    Clear edits
+                  </button>
+                </div>
+              </div>
+
+              <p class="method-note">
+                Both metro networks stay visible. Result cards only focus the camera;
+                clicking a visible line, platform, transfer, street, or station updates
+                this final section directly.
               </p>
-            </div>
-
-            <div
-              class="toggles circumference-toggles"
-              aria-label="Circumference layers"
-            >
-              <label>
-                <input id="toggle-track-geometry" type="checkbox" checked />
-                <span>Track paths</span>
-              </label>
-              <label>
-                <input id="toggle-route-gradient" type="checkbox" checked />
-                <span>Gradient</span>
-              </label>
-              <label>
-                <input id="toggle-route-stations" type="checkbox" checked />
-                <span>All stops</span>
-              </label>
-              <label>
-                <input id="toggle-route-area" type="checkbox" checked />
-                <span>Inside</span>
-              </label>
-            </div>
-
-            <div class="selection circumference-selection" aria-live="polite">
-              <span class="metric-label">Selected circumference</span>
-              <strong id="circumference-name">Waiting for route data</strong>
-              <span id="circumference-summary">
-                The automatic choice maximizes contained area.
-              </span>
-              <dl id="circumference-metadata" class="feature-metadata"></dl>
-              <div class="segment-actions" aria-label="Segment overrides">
-                <button id="route-require-segment" type="button" disabled>
-                  Require segment
-                </button>
-                <button id="route-avoid-segment" type="button" disabled>
-                  Avoid segment
-                </button>
-                <button id="route-clear-segments" type="button" disabled>
-                  Clear edits
-                </button>
-              </div>
-            </div>
-
-            <p class="method-note">
-              The map always shows the selected boundary, every platform, and the full
-              eligible network for both metro areas in official colors. “Focus on…”
-              moves the camera and chooses which route its controls and stats describe.
-              Track paths use averaged official GTFS shapes; switch them off to restore
-              straight platform-to-platform edges. The same selected model drives route
-              area, length, landmass stats, and the gradient.
-            </p>
+            </section>
           </div>
+        </div>
+
+        <div class="internal-controls" hidden>
+          <label>
+            Active data area
+            <select id="metro-area">
+              <option value="cdmx">Mexico City</option>
+              <option value="nyc">NYC metro area</option>
+            </select>
+          </label>
+          <label>
+            Active route
+            <select id="route-choice" disabled>
+              <option value="">Automatic · largest inner area</option>
+            </select>
+          </label>
+          <button id="route-auto" type="button" disabled>Reset</button>
+          <p id="route-choice-summary">Building closed loops from the metro network…</p>
         </div>
       </section>
     </main>

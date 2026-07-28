@@ -29,25 +29,21 @@ import type {
   CircumferenceModeResult,
 } from '../circumference/types.js';
 import { lineColor } from '../line-colors.js';
-import type { AreaKey, MetadataDetail } from './types.js';
+import type { AreaKey, CircumferenceState, MetadataDetail } from './types.js';
 import {
   AREAS,
   AREA_KEYS,
   activeStationModes,
   circumferenceCanvases,
-  circumferenceInnerAreaEl,
-  circumferenceLandmassBreakdownEl,
-  circumferenceLengthEl,
   circumferenceMetadataEl,
   circumferenceNameEl,
-  circumferenceOuterAreaEl,
-  circumferenceOuterLabelEl,
+  circumferenceResultsEl,
+  circumferenceSelectionTypeEl,
   circumferenceState,
   circumferenceStates,
   circumferenceSummaryEl,
   compactPanelQuery,
   formatArea,
-  formatDistance,
   formatRouteLength,
   geoJsonSource,
   imageSource,
@@ -228,13 +224,8 @@ export function resetCircumferenceRoute(): void {
     routeState.geometryMode = null;
     routeState.geometryVariants = null;
   }
-  circumferenceInnerAreaEl.textContent = '--';
-  circumferenceOuterAreaEl.textContent = '--';
-  circumferenceLengthEl.textContent = '--';
-  circumferenceLandmassBreakdownEl.replaceChildren();
-  circumferenceNameEl.textContent = 'Waiting for route data';
-  circumferenceSummaryEl.textContent = 'The automatic choice maximizes contained area.';
-  circumferenceMetadataEl.replaceChildren();
+  circumferenceResultsEl.replaceChildren();
+  resetCircumferenceItemDetails('Waiting for route data');
   routeChoiceSelect.replaceChildren(
     Object.assign(document.createElement('option'), {
       value: '',
@@ -256,6 +247,22 @@ export function resetCircumferenceRoute(): void {
     });
   }
   syncCircumferenceVisibility();
+}
+
+export function resetCircumferenceItemDetails(
+  heading = 'Click a line or walking link',
+): void {
+  circumferenceSelectionTypeEl.textContent = 'Nothing selected';
+  circumferenceNameEl.textContent = heading;
+  circumferenceSummaryEl.textContent =
+    heading === 'Click a line or walking link'
+      ? 'Any visible route can be inspected directly, in either city.'
+      : 'The route results will appear as soon as their data is ready.';
+  circumferenceMetadataEl.replaceChildren();
+  circumferenceState.inspectedSegmentId = '';
+  routeRequireSegmentButton.disabled = true;
+  routeAvoidSegmentButton.disabled = true;
+  routeClearSegmentsButton.disabled = !hasSegmentOverrides();
 }
 
 export function fitCircumferenceCandidate(
@@ -518,22 +525,139 @@ export function routeFeatureCollection(
   };
 }
 
-export function renderLandmassBreakdown(coverage: readonly LandmassCoverage[]): void {
-  circumferenceLandmassBreakdownEl.replaceChildren(
-    ...coverage.map((landmass) => {
-      const item = document.createElement('div');
-      item.className = 'landmass-stat';
-      const name = document.createElement('strong');
-      name.textContent = landmass.label;
-      const inside = document.createElement('span');
-      inside.textContent = `${formatArea(landmass.insideAreaSquareMeters)} inside`;
-      const outside = document.createElement('span');
-      outside.textContent = `${formatArea(
-        landmass.outsideAreaSquareMeters,
-      )} outside to coast`;
-      item.append(name, inside, outside);
-      return item;
+function circumferenceCandidateOptions(
+  routeState: CircumferenceState,
+): HTMLOptionElement[] {
+  const automaticOption = document.createElement('option');
+  automaticOption.value = '';
+  automaticOption.textContent = 'Automatic · largest contained area';
+  const rankingCandidates =
+    routeState.geometryVariants?.straight.candidates ?? routeState.candidates;
+  return [
+    automaticOption,
+    ...routeState.candidates.map((candidate, index) => {
+      const option = document.createElement('option');
+      const rankingCandidate =
+        rankingCandidates.find(({ id }) => id === candidate.id) ?? candidate;
+      option.value = candidate.id;
+      option.textContent = `#${index + 1} · ${formatArea(
+        rankingCandidate.areaSquareMeters,
+      )} · ${candidate.lines.join(', ')}`;
+      return option;
     }),
+  ];
+}
+
+function createCircumferenceResult(areaKey: AreaKey): HTMLElement {
+  const routeState = circumferenceStates[areaKey];
+  const candidate = routeState.selected;
+  const result = document.createElement('article');
+  result.className = 'circumference-result';
+  result.dataset['focused'] = String(areaKey === runtime.activeAreaKey);
+
+  const focusButton = document.createElement('button');
+  focusButton.type = 'button';
+  focusButton.className = 'result-focus-button';
+  focusButton.dataset['focusArea'] = areaKey;
+  focusButton.setAttribute(
+    'aria-label',
+    `Focus map on ${AREAS[areaKey].label} circumference result`,
+  );
+  const name = document.createElement('h3');
+  name.textContent = AREAS[areaKey].label;
+  const description = document.createElement('small');
+  description.textContent = candidate
+    ? `${candidate.lines.length} lines · ${candidate.stations.length} platform nodes`
+    : 'Loading route result…';
+  const focusAction = document.createElement('span');
+  focusAction.className = 'focus-action';
+  focusAction.textContent = areaKey === runtime.activeAreaKey ? 'Focused' : 'Focus map';
+  focusButton.append(name, description, focusAction);
+  result.append(focusButton);
+
+  if (!candidate) return result;
+  const landmassArea = runtime.circumferenceLandmasses?.areas[areaKey];
+  const coverage = landmassArea
+    ? calculateLandmassCoverage(candidate.coordinates, landmassArea)
+    : [];
+  const outerArea = combinedLandmassArea(coverage, 'outsideAreaSquareMeters');
+  const metrics = document.createElement('div');
+  metrics.className = 'result-metrics';
+  const metricValues: readonly (readonly [string, string])[] = [
+    ['Inside', formatArea(candidate.areaSquareMeters)],
+    [
+      coverage.length === 1
+        ? 'Outside · 1 landmass'
+        : `Outside · ${coverage.length} landmasses`,
+      formatArea(outerArea),
+    ],
+    ['Route', formatRouteLength(candidate.lengthMeters)],
+  ];
+  for (const [label, value] of metricValues) {
+    const metric = document.createElement('div');
+    metric.className = 'result-metric';
+    const metricLabel = document.createElement('span');
+    metricLabel.textContent = label;
+    const metricValue = document.createElement('strong');
+    metricValue.textContent = value;
+    metric.append(metricLabel, metricValue);
+    metrics.append(metric);
+  }
+  result.append(metrics);
+
+  const landmasses = document.createElement('div');
+  landmasses.className = 'result-landmasses';
+  for (const landmass of coverage) {
+    const row = document.createElement('div');
+    row.className = 'result-landmass';
+    const landmassName = document.createElement('strong');
+    landmassName.textContent = landmass.label;
+    const inside = document.createElement('span');
+    inside.textContent = `${formatArea(landmass.insideAreaSquareMeters)} inside`;
+    const outside = document.createElement('span');
+    outside.textContent = `${formatArea(
+      landmass.outsideAreaSquareMeters,
+    )} outside to coast`;
+    row.append(landmassName, inside, outside);
+    landmasses.append(row);
+  }
+  result.append(landmasses);
+
+  const routeControl = document.createElement('div');
+  routeControl.className = 'result-route-control';
+  const routeLabel = document.createElement('label');
+  const selectId = `circumference-result-route-${areaKey}`;
+  routeLabel.htmlFor = selectId;
+  routeLabel.textContent = 'Route variant';
+  const routeSelect = document.createElement('select');
+  routeSelect.id = selectId;
+  routeSelect.dataset['routeArea'] = areaKey;
+  routeSelect.replaceChildren(...circumferenceCandidateOptions(routeState));
+  routeSelect.value = routeState.overrideId;
+  routeSelect.disabled = routeState.candidates.length === 0;
+  routeControl.append(routeLabel, routeSelect);
+  result.append(routeControl);
+
+  const methodology = routeState.methodology;
+  const summary = document.createElement('p');
+  summary.className = 'result-summary';
+  const choiceSummary = routeState.overrideId
+    ? 'Pinned ranked result'
+    : routeState.requiredSegmentIds.size || routeState.avoidedSegmentIds.size
+      ? 'Largest result matching segment edits'
+      : methodology?.optimizationStatus === 'optimal'
+        ? 'Proven global maximum'
+        : 'Automatic area maximum';
+  summary.textContent = `${choiceSummary} · ${candidate.transferCount} walking ${
+    candidate.transferCount === 1 ? 'transfer' : 'transfers'
+  } · ${methodology?.trackGeometryEnabled ? 'track geography' : 'straight edges'}`;
+  result.append(summary);
+  return result;
+}
+
+export function renderCircumferenceResults(): void {
+  circumferenceResultsEl.replaceChildren(
+    ...AREA_KEYS.map((areaKey) => createCircumferenceResult(areaKey)),
   );
 }
 
@@ -585,133 +709,21 @@ export function renderCircumferenceCandidate(
   if (!candidate) return;
   const landmassArea = runtime.circumferenceLandmasses?.areas[runtime.activeAreaKey];
   if (!landmassArea) return;
-  const eligibleLineNames = new Set(
-    circumferenceState.network.segments.flatMap((segment) => segment.lines),
-  );
-  const fullLineStationCount = circumferenceState.network.stations.length;
-  const allVisibleLineCount = AREA_KEYS.reduce(
-    (total, areaKey) =>
-      total +
-      new Set(
-        circumferenceStates[areaKey].network.segments.flatMap(
-          (segment) => segment.lines,
-        ),
-      ).size,
-    0,
-  );
-  const allVisibleStationCount = AREA_KEYS.reduce(
-    (total, areaKey) => total + circumferenceStates[areaKey].network.stations.length,
-    0,
-  );
+  const candidateChanged = circumferenceState.selected?.id !== candidate.id;
   const landmassCoverage = calculateLandmassCoverage(
     candidate.coordinates,
     landmassArea,
   );
   circumferenceState.selected = candidate;
-  circumferenceState.inspectedSegmentId = '';
-  routeRequireSegmentButton.disabled = true;
-  routeAvoidSegmentButton.disabled = true;
-  routeClearSegmentsButton.disabled = !hasSegmentOverrides();
+  if (candidateChanged) resetCircumferenceItemDetails();
 
   updateCombinedCircumferenceSource();
   updateCircumferenceGradient(runtime.activeAreaKey, candidate, landmassCoverage);
 
   const isManual = Boolean(circumferenceState.overrideId);
   const isSegmentEdited = !isManual && hasSegmentOverrides();
-  const outerArea = combinedLandmassArea(landmassCoverage, 'outsideAreaSquareMeters');
-  circumferenceInnerAreaEl.textContent = formatArea(candidate.areaSquareMeters);
-  circumferenceOuterAreaEl.textContent = formatArea(outerArea);
-  circumferenceLengthEl.textContent = formatRouteLength(candidate.lengthMeters);
-  circumferenceOuterLabelEl.textContent = landmassCoverage.length
-    ? `Outside across ${landmassCoverage.length} landmass${
-        landmassCoverage.length === 1 ? '' : 'es'
-      }`
-    : 'Outside to coast';
-  renderLandmassBreakdown(landmassCoverage);
   const methodology = circumferenceState.methodology;
   if (!methodology) return;
-  circumferenceNameEl.textContent = `${AREAS[runtime.activeAreaKey].label} ${
-    isManual
-      ? 'pinned loop'
-      : isSegmentEdited
-        ? 'segment-edited loop'
-        : 'maximum-area loop'
-  }`;
-  circumferenceSummaryEl.textContent = `${
-    candidate.stations.length
-  } line-platform nodes, including ${candidate.transferCount} walking ${
-    candidate.transferCount === 1 ? 'transfer' : 'transfers'
-  }, across lines ${candidate.lines.join(', ')}.`;
-  replaceMetadata(circumferenceMetadataEl, [
-    {
-      label: 'Choice',
-      value: isManual
-        ? 'Manual ranked override'
-        : isSegmentEdited
-          ? 'Maximum matching segment edits'
-          : methodology.optimizationStatus === 'optimal'
-            ? 'Proven global platform-edge maximum'
-            : 'Automatic area maximum',
-    },
-    {
-      label: 'Landmasses',
-      value: landmassCoverage.map((landmass) => landmass.label).join(', '),
-    },
-    {
-      label: 'Free transfers',
-      value: `${methodology.publishedTransferCount} published walks, ${methodology.inferredTransferCount} inferred walks`,
-    },
-    {
-      label: 'Selected walking links',
-      value: `${candidate.transferCount} · ${formatDistance(
-        candidate.walkingLengthMeters,
-      )}`,
-    },
-    {
-      label: 'Focused network',
-      value: `${eligibleLineNames.size} lines · ${fullLineStationCount} platform nodes`,
-    },
-    {
-      label: 'Always visible',
-      value: `${AREA_KEYS.length} metro areas · ${allVisibleLineCount} lines · ${allVisibleStationCount} platform nodes`,
-    },
-    {
-      label: 'Route geometry',
-      value: methodology.trackGeometryEnabled
-        ? `${methodology.trackGeometryEdgeCount} averaged GTFS track centerlines`
-        : 'Straight platform-to-platform edges',
-    },
-    {
-      label: 'Measurements',
-      value: 'WGS84 ellipsoidal geodesics · equal-area coast clipping',
-    },
-    {
-      label: 'Network cleanup',
-      value:
-        methodology.removedShortcutCount > 0
-          ? `${methodology.removedShortcutCount + methodology.displayOnlyShortcutCount} limited-stop chords normalized`
-          : 'No limited-stop chords detected',
-    },
-    {
-      label: 'Candidates',
-      value: `${circumferenceState.candidates.length} diverse of ${methodology.generatedCandidateCount} valid loops`,
-    },
-    {
-      label: 'Optimization',
-      value:
-        methodology.optimizationStatus === 'optimal'
-          ? `Exact MILP over platform edges · proven offline in ${(
-              (methodology.optimizationMilliseconds ?? 0) / 1_000
-            ).toFixed(1)} s`
-          : 'Heuristic candidate search',
-    },
-    {
-      label: 'Segment edits',
-      value: isSegmentEdited
-        ? `${circumferenceState.requiredSegmentIds.size} required, ${circumferenceState.avoidedSegmentIds.size} avoided`
-        : undefined,
-    },
-  ]);
   routeChoiceSummaryEl.textContent = isManual
     ? 'This ranked loop is pinned as a manual override for this metro area.'
     : isSegmentEdited
@@ -720,6 +732,7 @@ export function renderCircumferenceCandidate(
         ? 'Precomputed exact winner; track mode preserves its topology and recalculates precise track area.'
         : `Automatic winner from ${methodology.generatedCandidateCount} valid loops, ranked by contained area.`;
 
+  renderCircumferenceResults();
   positionCircumferenceGradient();
   syncCircumferenceVisibility();
   if (fit && runtime.activeProduct === 'circumference') {

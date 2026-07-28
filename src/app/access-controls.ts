@@ -39,6 +39,7 @@ import {
   MODE_COLORS,
   MODE_DISTANCE_PROPERTIES,
   MODE_LABELS,
+  accessResultAreaEl,
   accessProductButton,
   accessProductEl,
   activeStationModes,
@@ -73,7 +74,6 @@ import {
   nearCountLabelEl,
   openStationFilter,
   openStationLayers,
-  productTitleEl,
   routeBreakdownEl,
   runtime,
   scheduleSummaryEl,
@@ -109,9 +109,6 @@ export function setActiveProduct(
   circumferenceProductButton.tabIndex = circumferenceActive ? 0 : -1;
   accessProductEl.hidden = circumferenceActive;
   circumferenceProductEl.hidden = !circumferenceActive;
-  productTitleEl.textContent = circumferenceActive
-    ? 'Circumference Lab'
-    : 'Transit Street Gradient';
 
   syncStreetVisibility();
   syncStationVisibility();
@@ -798,9 +795,10 @@ export function applyMapBounds(metadata: Metadata): void {
 
 export function resetSelection(): void {
   runtime.selectedStreetProperties = null;
-  selectionTypeEl.textContent = 'Selected feature';
-  featureNameEl.textContent = 'None';
-  featureSummaryEl.textContent = 'Hover a highlighted street or station';
+  selectionTypeEl.textContent = 'Nothing selected';
+  featureNameEl.textContent = 'Click a street or station';
+  featureSummaryEl.textContent =
+    'Move anywhere on the map—visible items work directly.';
   featureMetadataEl.replaceChildren();
   routeBreakdownEl.replaceChildren();
   routeBreakdownEl.hidden = true;
@@ -809,6 +807,7 @@ export function resetSelection(): void {
 export function updateAreaChrome(areaKey: AreaKey): void {
   const area = AREAS[areaKey];
   areaSelect.value = areaKey;
+  accessResultAreaEl.textContent = area.label;
   document.title =
     runtime.activeProduct === 'circumference'
       ? `Circumference Lab — ${area.label}`
