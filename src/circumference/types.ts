@@ -58,11 +58,19 @@ export interface CircumferenceNetworkSegment {
   readonly from: CircumferenceNode;
   readonly id: string;
   readonly lines: readonly string[];
+  readonly lineServiceEdges?:
+    Readonly<Record<string, readonly CircumferenceServiceEdge[]>> | undefined;
   readonly to: CircumferenceNode;
   readonly transferMinutes?: number | null | undefined;
   readonly transferSource?: TransferEdge['source'] | undefined;
   readonly type: 'ride' | 'transfer';
 }
+
+export type CircumferenceServiceEdge = readonly [
+  serviceKey: string,
+  fromId: NodeId,
+  toId: NodeId,
+];
 
 export interface CircumferenceNetwork {
   readonly segments: CircumferenceNetworkSegment[];

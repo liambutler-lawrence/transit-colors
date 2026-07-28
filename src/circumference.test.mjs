@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import polygonClipping from 'polygon-clipping';
 import {
   activeCircumferenceLines,
+  activeCircumferenceService,
   junctionContinuationLineLanes,
   buildCircumferenceCandidates,
   filterCircumferenceNetwork,
@@ -142,12 +143,24 @@ assert.deepEqual(squareResult.candidates[0].lines, ['A']);
 assert.equal(squareResult.network.stations.length, 5);
 assert.equal(squareResult.network.segments.length, 5);
 assert.equal(
-  filterCircumferenceNetwork(squareResult.network, new Set()).segments.length,
+  filterCircumferenceNetwork(squareResult.network, {
+    lineNames: new Set(),
+    serviceKeysByStation: new Map(),
+  }).segments.length,
   0,
 );
+const activeSquareService = {
+  lineNames: new Set(['A']),
+  serviceKeysByStation: new Map(
+    ['a', 'b', 'c', 'd', 'spur'].map((stationId) => [
+      stationId,
+      new Set(['line/0', 'line/1']),
+    ]),
+  ),
+};
 const scheduledSquareResult = scheduleCircumferenceMode(
   squareResult.geometryVariants.track,
-  new Set(['A']),
+  activeSquareService,
   'track',
 );
 assert.equal(scheduledSquareResult.candidates.length, 1);
@@ -620,6 +633,44 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
           new Set([segment.from.id, segment.to.id]).has(firstId) &&
           new Set([segment.from.id, segment.to.id]).has(secondId),
       );
+    const mondayNoonService = activeCircumferenceService(schedules, 0, 12 * 60);
+    const mondayNoonNetwork = filterCircumferenceNetwork(
+      result.network,
+      mondayNoonService,
+    );
+    const mondayNoonRideLines = (firstId, secondId) =>
+      mondayNoonNetwork.segments.find(
+        (segment) =>
+          segment.type === 'ride' &&
+          new Set([segment.from.id, segment.to.id]).has(firstId) &&
+          new Set([segment.from.id, segment.to.id]).has(secondId),
+      )?.lines;
+    assert.deepEqual(
+      mondayNoonRideLines('gtfs/mta-subway/249', 'gtfs/mta-subway/250'),
+      ['3', '4'],
+    );
+    assert.deepEqual(
+      mondayNoonRideLines('gtfs/mta-subway/250', 'gtfs/mta-subway/251'),
+      ['3'],
+    );
+    assert.deepEqual(
+      mondayNoonRideLines('gtfs/mta-subway/256', 'gtfs/mta-subway/257'),
+      ['3'],
+    );
+    assert.deepEqual(
+      mondayNoonRideLines('gtfs/mta-subway/246', 'gtfs/mta-subway/247'),
+      ['2', '5'],
+    );
+    assert.equal(
+      mondayNoonNetwork.stations.find((station) => station.id === 'gtfs/mta-subway/250')
+        ?.label,
+      'Crown Hts-Utica Av · 3/4',
+    );
+    assert.equal(
+      mondayNoonNetwork.stations.find((station) => station.id === 'gtfs/mta-subway/251')
+        ?.label,
+      'Sutter Av-Rutland Rd · 3',
+    );
     assert.ok(hasWinnerRide('gtfs/mta-subway/B16', 'gtfs/mta-subway/B17', 'D'));
     assert.ok(hasWinnerRide('gtfs/mta-subway/B23', 'gtfs/mta-subway/D43', 'D'));
     assert.ok(hasWinnerRide('gtfs/mta-subway/D12', 'gtfs/mta-subway/D13', 'B'));

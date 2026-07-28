@@ -45,7 +45,7 @@ export const AREAS: Record<AreaKey, AreaConfig> = {
     label: 'New York City metro',
     center: [-73.98, 40.75],
     zoom: 9.5,
-    circumference: 'data/nyc-circumference.json?v=20260727c',
+    circumference: 'data/nyc-circumference.json?v=20260727e',
     liveRoads: true,
     stations: 'data/nyc-stations.geojson?v=20260726a',
     metadata: 'data/nyc-metadata.json?v=20260726a',

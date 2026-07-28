@@ -9,7 +9,7 @@ import type {
 } from 'geojson';
 
 import {
-  activeCircumferenceLines,
+  activeCircumferenceService,
   junctionContinuationLineLanes,
   scheduleCircumferenceMode,
   scheduleLineStateKey,
@@ -785,12 +785,12 @@ function prepareCircumferenceArea(
   const routeState = circumferenceStates[areaKey];
   if (!routeState.geometryVariants) return false;
   const baseResult = routeState.geometryVariants[geometryMode];
-  const activeLines = activeCircumferenceLines(
+  const activeService = activeCircumferenceService(
     runtime.circumferenceSchedules[areaKey],
     state.scheduleWeekday,
     state.scheduleMinute,
   );
-  const scheduleKey = scheduleLineStateKey(baseResult.network, activeLines);
+  const scheduleKey = scheduleLineStateKey(baseResult.network, activeService);
   if (
     routeState.areaKey === areaKey &&
     routeState.geometryMode === geometryMode &&
@@ -801,7 +801,7 @@ function prepareCircumferenceArea(
 
   const result: CircumferenceModeResult = scheduleCircumferenceMode(
     baseResult,
-    activeLines,
+    activeService,
     geometryMode,
   );
   routeState.areaKey = areaKey;
