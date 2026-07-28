@@ -19,7 +19,6 @@ import {
 import {
   calculateLandmassCoverage,
   combinedLandmassArea,
-  type LandmassCoverage,
 } from '../circumference-landmass.js';
 import { circumferenceGradientCoordinates } from '../circumference-gradient-source.js';
 import {
@@ -695,19 +694,17 @@ function updateCombinedCircumferenceSource(): void {
 function updateCircumferenceGradient(
   areaKey: AreaKey,
   candidate: CircumferenceCandidate,
-  coverage?: readonly LandmassCoverage[],
 ): void {
   const landmassArea = runtime.circumferenceLandmasses?.areas[areaKey];
   if (!landmassArea) return;
-  const landmassCoverage =
-    coverage ?? calculateLandmassCoverage(candidate.coordinates, landmassArea);
   const canvas = circumferenceCanvases[areaKey];
   const gradientBounds = circumferenceGradientBounds(candidate.coordinates);
   renderCircumferenceGradient(
     canvas,
     candidate.coordinates,
     gradientBounds,
-    landmassCoverage.flatMap((landmass) => landmass.mask ?? []),
+    landmassArea.mask ??
+      landmassArea.landmasses.flatMap((landmass) => landmass.mask ?? []),
   );
   imageSource(`circumference-gradient-${areaKey}`)?.updateImage({
     coordinates: circumferenceGradientCoordinates(gradientBounds),
@@ -723,15 +720,11 @@ export function renderCircumferenceCandidate(
   const landmassArea = runtime.circumferenceLandmasses?.areas[runtime.activeAreaKey];
   if (!landmassArea) return;
   const candidateChanged = circumferenceState.selected?.id !== candidate.id;
-  const landmassCoverage = calculateLandmassCoverage(
-    candidate.coordinates,
-    landmassArea,
-  );
   circumferenceState.selected = candidate;
   if (candidateChanged) resetCircumferenceItemDetails();
 
   updateCombinedCircumferenceSource();
-  updateCircumferenceGradient(runtime.activeAreaKey, candidate, landmassCoverage);
+  updateCircumferenceGradient(runtime.activeAreaKey, candidate);
 
   const isManual = Boolean(circumferenceState.overrideId);
   const isSegmentEdited = !isManual && hasSegmentOverrides();

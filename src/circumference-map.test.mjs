@@ -8,6 +8,7 @@ import {
   CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE,
   circumferenceGradientBounds,
   circumferenceGradientOpacity,
+  renderCircumferenceGradient,
 } from './circumference-map.ts';
 
 test('the map starts as an atmospheric globe with a close-zoom transition', async () => {
@@ -74,7 +75,36 @@ test('the circumference gradient uses the detailed basemap shoreline', async () 
     ).mask.length,
     2,
   );
+  assert.ok(landmasses.areas.nyc.mask.length > 4);
+  assert.ok(
+    landmasses.areas.nyc.mask.some(([outerRing]) =>
+      pointInRing([-74.075, 40.643], outerRing),
+    ),
+    'the nearby-land mask includes Staten Island',
+  );
 });
+
+function pointInRing([longitude, latitude], ring) {
+  let inside = false;
+  for (
+    let currentIndex = 0, previousIndex = ring.length - 1;
+    currentIndex < ring.length;
+    previousIndex = currentIndex, currentIndex += 1
+  ) {
+    const current = ring[currentIndex];
+    const previous = ring[previousIndex];
+    if (
+      current[1] > latitude !== previous[1] > latitude &&
+      longitude <
+        ((previous[0] - current[0]) * (latitude - current[1])) /
+          (previous[1] - current[1]) +
+          current[0]
+    ) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
 
 test('the circumference gradient has a route-relative transparent 10 km edge', () => {
   const route = [
@@ -94,6 +124,38 @@ test('the circumference gradient has a route-relative transparent 10 km edge', (
   assert.equal(circumferenceGradientOpacity(9_999), 1);
   assert.equal(circumferenceGradientOpacity(10_000), 0);
   assert.equal(circumferenceGradientOpacity(20_000), 0);
+});
+
+test('the circumference gradient radiates on both sides of a closed route', () => {
+  let renderedImage;
+  const context = {
+    clearRect() {},
+    createImageData(width, height) {
+      return { data: new Uint8ClampedArray(width * height * 4) };
+    },
+    putImageData(image) {
+      renderedImage = image;
+    },
+  };
+  const canvas = {
+    getContext: () => context,
+    height: 21,
+    width: 21,
+  };
+  const bounds = [-0.02, -0.02, 0.02, 0.02];
+  const route = [
+    [-0.01, -0.01],
+    [0.01, -0.01],
+    [0.01, 0.01],
+    [-0.01, 0.01],
+    [-0.01, -0.01],
+  ];
+
+  renderCircumferenceGradient(canvas, route, bounds, [], 5_000);
+
+  const alphaAt = (x, y) => renderedImage.data[(y * canvas.width + x) * 4 + 3];
+  assert.ok(alphaAt(10, 10) > 0, 'inside-side pixel has gradient alpha');
+  assert.ok(alphaAt(3, 10) > 0, 'outside-side pixel has gradient alpha');
 });
 
 test('the sidebar follows product, mode, results, and selection hierarchy', async () => {

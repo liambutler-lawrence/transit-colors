@@ -209,8 +209,9 @@ const nycLandmassDefinitions = [
   },
 ];
 const seenNycRings = new Set();
-// Detailed shoreline masks must cover every current route plus its 10 km
-// visible gradient band. The runtime texture itself is route-relative.
+// The area-level mask covers every land polygon near the routes, including
+// islands that do not contribute to a selected route's area result. The
+// runtime texture itself remains route-relative and fades out after 10 km.
 const nycGradientBounds = [-74.16, 40.47, -73.67, 40.95];
 const detailedNycLandPolygons = await detailedLandPolygonsForBounds(nycGradientBounds);
 const nycLandmasses = nycLandmassDefinitions.flatMap((definition) => {
@@ -268,7 +269,7 @@ const data = {
       label: 'NYC landmasses',
       area_m2: nycLandmasses.reduce((total, landmass) => total + landmass.area_m2, 0),
       gradient_bounds: nycGradientBounds,
-      mask: null,
+      mask: detailedNycLandPolygons.map((polygon) => polygon.map(roundedRing)),
       landmasses: nycLandmasses,
     },
   },
