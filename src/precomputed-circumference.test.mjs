@@ -10,6 +10,7 @@ import {
   junctionContinuationSections,
   lineLengthMeters,
   scheduleCircumferenceMode,
+  selectIndependentCircumferenceCandidates,
 } from './circumference.ts';
 import { circumferenceGeometryVariantsSchema } from './circumference/schema.ts';
 
@@ -40,6 +41,10 @@ test('precomputed circumference winners are validated and topology-stable', asyn
     assert.deepEqual(
       routeData.track.scheduleCandidates.map((candidate) => candidate.nodeIds),
       routeData.straight.scheduleCandidates.map((candidate) => candidate.nodeIds),
+    );
+    assert.equal(
+      selectIndependentCircumferenceCandidates(routeData.track.candidates).length,
+      areaKey === 'athens' ? 3 : 1,
     );
     assert.ok(routeData.straight.scheduleCandidates.length >= 1);
     for (const [index, candidate] of routeData.straight.candidates.entries()) {
@@ -129,7 +134,7 @@ test('Atlanta publishes its full branched network without a fake loop', async ()
   assert.deepEqual(segmentByNames('LINDBERGH CENTER', 'LENOX')?.lines, ['GOLD']);
 });
 
-test('Athens publishes each valid circle while Atlanta publishes none', async () => {
+test('Athens publishes three independent circles while Atlanta publishes none', async () => {
   const [athens, atlanta] = await Promise.all(
     ['athens', 'atlanta'].map((areaKey) =>
       readFile(
@@ -141,6 +146,10 @@ test('Athens publishes each valid circle while Atlanta publishes none', async ()
 
   assert.equal(athens.track.candidates.length, 3);
   assert.equal(athens.straight.candidates.length, 3);
+  assert.equal(
+    selectIndependentCircumferenceCandidates(athens.track.candidates).length,
+    3,
+  );
   assert.equal(atlanta.track.candidates.length, 0);
   assert.equal(atlanta.straight.candidates.length, 0);
 });

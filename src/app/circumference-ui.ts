@@ -15,6 +15,7 @@ import {
   scheduleCircumferenceMode,
   scheduleLineStateKey,
   selectCircumferenceCandidate,
+  selectIndependentCircumferenceCandidates,
   type JunctionContinuationLane,
 } from '../circumference.js';
 import {
@@ -675,8 +676,8 @@ function compareCircleArea(
  */
 export function circumferenceCircleResults(): CircumferenceCircleResult[] {
   return AREA_KEYS.flatMap((areaKey) => {
-    const candidates = [...circumferenceStates[areaKey].candidates].sort(
-      compareCircleArea,
+    const candidates = selectIndependentCircumferenceCandidates(
+      circumferenceStates[areaKey].candidates,
     );
     return candidates.map((candidate, index) => ({
       areaKey,
@@ -795,7 +796,7 @@ function createCircumferenceResult({
       ? 'Pinned circle'
       : areaRank === 1 && methodology?.optimizationStatus === 'optimal'
         ? 'Largest valid circle in this metro'
-        : `Area rank ${areaRank} of ${metroCircleCount} in this metro`;
+        : `Independent circle ${areaRank} of ${metroCircleCount} in this metro`;
   summary.textContent = `${choiceSummary} · ${candidate.transferCount} walking ${
     candidate.transferCount === 1 ? 'transfer' : 'transfers'
   } · ${methodology?.trackGeometryEnabled ? 'track geography' : 'straight edges'}`;
