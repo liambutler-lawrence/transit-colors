@@ -14,7 +14,9 @@ application, deterministic derived datasets, and scripts that refresh those data
    loading state, and destination options.
 5. `src/app/feature-details.ts` manages selections and schedule-aware route details.
 6. `src/app/circumference-ui.ts` renders loop candidates and landmass coverage.
-7. `src/app/circumference-layers.ts` owns the complete-line, selected-route, transfer,
+7. `src/app/highway-circumference-ui.ts` lazy-loads and renders the continental highway
+   criterion.
+8. `src/app/circumference-layers.ts` owns the complete-line, selected-route, transfer,
    station, and label layer definitions.
 
 The application modules form a one-way dependency graph from shared context to features
@@ -81,6 +83,17 @@ The checked-in `data/*-circumference.json` files contain the proven winner, dive
 manual alternatives, and the complete eligible network. The browser validates and
 renders these files; it never runs the combinatorial search during page load or a
 schedule change.
+
+The highway criterion uses a separate compact runtime schema in
+`src/highway-circumference.ts`. Its offline builder operates on the Natural Earth
+divided-road centerline graph: endpoint seam repair, largest-component selection, 2-core
+pruning, degree-two compression, iterative Tarjan vertex-biconnected decomposition, and
+geographic rotation-system face traversal. Every simple cycle lies inside one
+biconnected block; for each embedded planar block the outer face contains all bounded
+faces and is therefore its exact maximum-area cycle. The selected boundary is also
+checked for proper geometric self-crossings. This reduces roughly 367,000 source edges
+to about 2,300 proof corridors and solves in seconds rather than placing a continental
+graph in the browser or metro MILP.
 
 The circumference map keeps one independent route state and gradient image source per
 metro area. It merges all complete networks and selected boundaries into one GeoJSON

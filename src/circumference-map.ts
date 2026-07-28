@@ -204,6 +204,30 @@ export function renderCircumferenceGradient(
     const start = route[index];
     return start ? [{ end, start }] : [];
   });
+  const segmentCellSize = Math.max(1, maxDistanceMeters);
+  const segmentsByCell = new Map<string, typeof segments>();
+  for (const segment of segments) {
+    const west = Math.min(segment.start.x, segment.end.x) - maxDistanceMeters;
+    const east = Math.max(segment.start.x, segment.end.x) + maxDistanceMeters;
+    const south = Math.min(segment.start.y, segment.end.y) - maxDistanceMeters;
+    const north = Math.max(segment.start.y, segment.end.y) + maxDistanceMeters;
+    for (
+      let cellX = Math.floor(west / segmentCellSize);
+      cellX <= Math.floor(east / segmentCellSize);
+      cellX += 1
+    ) {
+      for (
+        let cellY = Math.floor(south / segmentCellSize);
+        cellY <= Math.floor(north / segmentCellSize);
+        cellY += 1
+      ) {
+        const cellKey = `${cellX},${cellY}`;
+        const cell = segmentsByCell.get(cellKey) ?? [];
+        cell.push(segment);
+        segmentsByCell.set(cellKey, cell);
+      }
+    }
+  }
   const image = context.createImageData(width, height);
 
   for (let pixelY = 0; pixelY < height; pixelY += 1) {
@@ -213,7 +237,10 @@ export function renderCircumferenceGradient(
       const point = project([longitude, latitude]);
 
       let distance = Number.POSITIVE_INFINITY;
-      for (const segment of segments) {
+      const cellKey = `${Math.floor(point.x / segmentCellSize)},${Math.floor(
+        point.y / segmentCellSize,
+      )}`;
+      for (const segment of segmentsByCell.get(cellKey) ?? []) {
         distance = Math.min(
           distance,
           pointToSegmentDistance(point, segment.start, segment.end),

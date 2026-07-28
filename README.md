@@ -5,8 +5,8 @@ York City, Singapore, Atlanta, and Athens. It includes:
 
 - street-level distance to selected transit modes;
 - schedule-adjusted travel time to a selected station; and
-- a Circumference Lab that finds large, closed metro loops and measures the land they
-  enclose.
+- a Circumference Lab that finds large closed metro or divided-highway loops and
+  measures the land they enclose.
 
 Circumference routes follow averaged centerlines from official GTFS track shapes by
 default where shape data is published, with an option to compare straight
@@ -16,6 +16,12 @@ selected boundaries stay visible together. The shared weekday/time setting filte
 city's operating lines and selects the proven maximum-area boundary for that service
 period. Atlanta correctly reports that its branched rail network has no closed loop,
 rather than manufacturing one from concurrent services.
+
+The controlled-access criterion displays the contiguous North American divided freeway
+and tollway network. Natural Earth's generalized road centerlines represent the path
+between carriageways. An offline planar graph proof highlights its largest simple
+circle, while WGS84 land clipping reports both contained land and the remaining North
+American mainland area out to the coast.
 
 The sidebar follows the same product → mode → results → selected item hierarchy for both
 experiences. Circumference result cards show each city's route and landmass split and

@@ -14,6 +14,7 @@ import {
   type AppState,
   type AreaConfig,
   type AreaKey,
+  type CircumferenceCriterion,
   type CircumferenceState,
   type DistanceProperties,
   type LoadingOperation,
@@ -119,6 +120,8 @@ export const initialAreaKey: AreaKey = isAreaKey(requestedAreaKey)
   : 'cdmx';
 export const initialProduct: Product =
   initialSearchParams.get('product') === 'circumference' ? 'circumference' : 'access';
+export const initialCircumferenceCriterion: CircumferenceCriterion =
+  initialSearchParams.get('criterion') === 'motorway' ? 'motorway' : 'metro';
 
 export const COLORS = {
   near: '#006837',
@@ -345,6 +348,27 @@ export const circumferenceResultsEl = requiredElement(
   '#circumference-results',
   HTMLElement,
 );
+export const circumferenceResultsHeadingEl = requiredElement(
+  '#circumference-results-heading',
+  HTMLElement,
+);
+export const circumferenceMethodNoteEl = requiredElement(
+  '#circumference-method-note',
+  HTMLElement,
+);
+export const circumferenceSelectedHeadingEl = requiredElement(
+  '#circumference-selected-heading',
+  HTMLElement,
+);
+export const circumferenceDepartureControlEl = requiredElement(
+  '#circumference-departure-control',
+  HTMLFieldSetElement,
+);
+export const routeCriterionSelect = requiredElement(
+  '#route-criterion',
+  HTMLSelectElement,
+);
+routeCriterionSelect.value = initialCircumferenceCriterion;
 export const routeChoiceSelect = requiredElement('#route-choice', HTMLSelectElement);
 export const routeAutoButton = requiredElement('#route-auto', HTMLButtonElement);
 export const routeChoiceSummaryEl = requiredElement(

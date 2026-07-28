@@ -719,6 +719,11 @@ body {
   cursor: pointer;
 }
 
+.geometry-toggle[hidden],
+.circumference-toggles label[hidden] {
+  display: none;
+}
+
 .geometry-toggle input {
   width: 17px;
   height: 17px;

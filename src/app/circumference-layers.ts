@@ -15,6 +15,91 @@ const featureLineOffset = expressionSpecificationSchema.parse([
 
 export function installCircumferenceLayers(): void {
   map.addLayer({
+    id: 'highway-circumference-area',
+    type: 'fill',
+    source: 'highway-circumference',
+    filter: ['==', ['get', 'kind'], 'highway-inside'],
+    layout: { visibility: 'none' },
+    paint: {
+      'fill-color': '#fff1d8',
+      'fill-opacity': 0.34,
+    },
+  });
+
+  map.addLayer({
+    id: 'highway-circumference-network-casing',
+    type: 'line',
+    source: 'highway-circumference',
+    filter: ['==', ['get', 'kind'], 'highway-network'],
+    layout: {
+      visibility: 'none',
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#fffaf2',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 3, 1.8, 7, 3.2, 12, 6],
+      'line-opacity': 0.78,
+    },
+  });
+
+  map.addLayer({
+    id: 'highway-circumference-network-line',
+    type: 'line',
+    source: 'highway-circumference',
+    filter: ['==', ['get', 'kind'], 'highway-network'],
+    layout: {
+      visibility: 'none',
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#52616c',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 3, 0.78, 7, 1.55, 12, 3],
+      'line-opacity': [
+        'case',
+        ['boolean', ['feature-state', 'hover'], false],
+        0.95,
+        0.68,
+      ],
+    },
+  });
+
+  map.addLayer({
+    id: 'highway-circumference-route-casing',
+    type: 'line',
+    source: 'highway-circumference',
+    filter: ['==', ['get', 'kind'], 'highway-route'],
+    layout: {
+      visibility: 'none',
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#fffaf2',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 3, 5.8, 7, 8.5, 12, 14],
+      'line-opacity': 0.96,
+    },
+  });
+
+  map.addLayer({
+    id: 'highway-circumference-route-line',
+    type: 'line',
+    source: 'highway-circumference',
+    filter: ['==', ['get', 'kind'], 'highway-route'],
+    layout: {
+      visibility: 'none',
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#aa311f',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 3, 3.4, 7, 5.8, 12, 10],
+      'line-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 1, 0.94],
+    },
+  });
+
+  map.addLayer({
     id: 'circumference-area',
     type: 'fill',
     source: 'circumference-route',

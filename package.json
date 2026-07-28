@@ -32,6 +32,7 @@
     "build:data:schedules": "tsx scripts/build-gtfs-schedules.mjs",
     "build:data:tracks": "node scripts/build-track-geometries.mjs",
     "build:data:circumference": "node --import tsx scripts/build-circumference-data.mjs",
+    "build:data:highways": "node --import tsx scripts/build-highway-circumference-data.mjs",
     "build:data": "npm run build:data:cdmx && npm run build:data:schedules && npm run build:data:nyc && npm run build:data:additional && npm run build:data:tracks && npm run build:data:circumference",
     "build": "vite build",
     "dev": "vite",

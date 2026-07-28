@@ -47,7 +47,6 @@ import {
   visibleTiledStreets,
 } from './access-controls.js';
 import {
-  firstSymbolLayerId,
   focusCircumferenceArea,
   prepareCircumferenceRoute,
   renderCircumferenceCandidate,
@@ -56,6 +55,11 @@ import {
   syncCircumferenceVisibility,
 } from './circumference-ui.js';
 import { installCircumferenceLayers } from './circumference-layers.js';
+import {
+  fitHighwayCircumference,
+  installHighwayHover,
+} from './highway-circumference-ui.js';
+import { firstSymbolLayerId } from './map-ui-utils.js';
 import {
   applyInspectedSegmentOverride,
   applyTimeScale,
@@ -101,6 +105,7 @@ import {
   routeAvoidSegmentButton,
   routeChoiceSelect,
   routeClearSegmentsButton,
+  routeCriterionSelect,
   routeGradientToggle,
   routeRequireSegmentButton,
   routeStationsToggle,
@@ -248,6 +253,8 @@ export function installHover(): void {
       showCircumferenceSegment(properties.data);
     });
   }
+
+  installHighwayHover();
 }
 
 export function loadedLiveRoads(): StreetFeature[] {
@@ -435,6 +442,12 @@ export function installMapData(stations: StationCollection): void {
   map.addSource('circumference-route', {
     type: 'geojson',
     data: { type: 'FeatureCollection', features: [] },
+  });
+
+  map.addSource('highway-circumference', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
+    generateId: true,
   });
 
   for (const areaKey of AREA_KEYS) {
@@ -930,6 +943,13 @@ areaSelect.addEventListener('change', () => {
 circumferenceResultsEl.addEventListener('click', (event) => {
   const target = event.target;
   if (!(target instanceof Element)) return;
+  const highwayFocusButton = target.closest<HTMLButtonElement>(
+    'button[data-focus-highway]',
+  );
+  if (highwayFocusButton && circumferenceResultsEl.contains(highwayFocusButton)) {
+    fitHighwayCircumference();
+    return;
+  }
   const focusButton = target.closest<HTMLButtonElement>(
     'button[data-focus-area][data-focus-candidate]',
   );
@@ -959,6 +979,16 @@ accessProductButton.addEventListener('click', () => {
 
 circumferenceProductButton.addEventListener('click', () => {
   setActiveProduct('circumference');
+});
+
+routeCriterionSelect.addEventListener('change', () => {
+  resetCircumferenceItemDetails(
+    routeCriterionSelect.value === 'motorway'
+      ? 'Loading controlled-access highways'
+      : 'Click a line or walking link',
+  );
+  updateAreaChrome(runtime.activeAreaKey);
+  prepareCircumferenceRoute();
 });
 
 routeChoiceSelect.addEventListener('change', () => {

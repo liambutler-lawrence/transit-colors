@@ -23,13 +23,16 @@ import {
   type Product,
 } from './types.js';
 import {
-  activeAccessTransitTimes,
   fitCircumferenceCandidate,
   positionCircumferenceGradient,
   prepareCircumferenceRoute,
-  setLayerVisibility,
   syncCircumferenceVisibility,
 } from './circumference-ui.js';
+import {
+  fitHighwayCircumference,
+  highwayCriterionActive,
+} from './highway-circumference-ui.js';
+import { activeAccessTransitTimes, setLayerVisibility } from './map-ui-utils.js';
 import {
   AREAS,
   COLORS,
@@ -75,6 +78,7 @@ import {
   openStationFilter,
   openStationLayers,
   routeBreakdownEl,
+  routeCriterionSelect,
   runtime,
   scheduleSummaryEl,
   selectionTypeEl,
@@ -117,7 +121,9 @@ export function setActiveProduct(
 
   if (circumferenceActive) {
     prepareCircumferenceRoute();
-    if (fit && circumferenceState.selected) {
+    if (fit && highwayCriterionActive()) {
+      fitHighwayCircumference();
+    } else if (fit && circumferenceState.selected) {
       fitCircumferenceCandidate(circumferenceState.selected);
     }
     updateStatus(circumferenceState.selected ? 'Route ready' : 'Loading routes', {
@@ -832,8 +838,14 @@ export function updateAreaChrome(areaKey: AreaKey): void {
   }
   if (runtime.activeProduct === 'circumference') {
     url.searchParams.set('product', 'circumference');
+    if (routeCriterionSelect.value === 'motorway') {
+      url.searchParams.set('criterion', 'motorway');
+    } else {
+      url.searchParams.delete('criterion');
+    }
   } else {
     url.searchParams.delete('product');
+    url.searchParams.delete('criterion');
   }
   window.history.replaceState({}, '', url);
 }

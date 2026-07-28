@@ -194,6 +194,11 @@ test('circle result cards focus an always-visible global network', async () => {
 
   assert.match(shell, /All metro networks stay visible/);
   assert.match(shell, /Largest independent circles/);
+  assert.match(
+    shell,
+    /<option value="motorway">Controlled-access divided highways<\/option>/,
+  );
+  assert.match(shell, /id="circumference-results-heading"/);
   assert.match(lifecycle, /AREA_KEYS\.map\(async \(areaKey\)/);
   assert.match(lifecycle, /circumference-gradient-\$\{areaKey\}/);
   assert.match(lifecycle, /button\[data-focus-area\]\[data-focus-candidate\]/);
