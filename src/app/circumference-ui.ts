@@ -11,6 +11,7 @@ import type {
 import {
   activeCircumferenceService,
   junctionContinuationLineLanes,
+  junctionContinuationSections,
   scheduleCircumferenceMode,
   scheduleLineStateKey,
   selectCircumferenceCandidate,
@@ -296,6 +297,53 @@ function centeredLinePosition(index: number, count: number): number {
   return index - (count - 1) / 2;
 }
 
+interface LineOffsets {
+  readonly atZoom8: number;
+  readonly atZoom12: number;
+  readonly atZoom15: number;
+}
+
+function networkLineOffsets(position: number): LineOffsets {
+  return {
+    atZoom8: position * 1.8,
+    atZoom12: position * 3.2,
+    atZoom15: position * 5.2,
+  };
+}
+
+function boundaryAlternativeLineOffsets(position: number, side: -1 | 1): LineOffsets {
+  return {
+    atZoom8: side * (4.4 + position * 1.8),
+    atZoom12: side * (7.3 + position * 3.2),
+    atZoom15: side * (10.5 + position * 5.2),
+  };
+}
+
+function interpolatedLineOffsets(
+  continuation: LineOffsets,
+  normal: LineOffsets,
+  continuationFraction: number,
+): LineOffsets {
+  return {
+    atZoom8:
+      normal.atZoom8 + (continuation.atZoom8 - normal.atZoom8) * continuationFraction,
+    atZoom12:
+      normal.atZoom12 +
+      (continuation.atZoom12 - normal.atZoom12) * continuationFraction,
+    atZoom15:
+      normal.atZoom15 +
+      (continuation.atZoom15 - normal.atZoom15) * continuationFraction,
+  };
+}
+
+function lineOffsetProperties(offsets: LineOffsets): GeoJsonProperties {
+  return {
+    line_offset_8: offsets.atZoom8,
+    line_offset_12: offsets.atZoom12,
+    line_offset_15: offsets.atZoom15,
+  };
+}
+
 function segmentEndpointKey(fromId: string, toId: string): string {
   return [fromId, toId].sort().join('\u0000');
 }
@@ -359,6 +407,14 @@ export function routeFeatureCollection(
         toId: segment.to.id,
       };
     });
+  const networkLineLayouts = routeState.network.segments
+    .filter((segment) => segment.type === 'ride' && segment.display !== false)
+    .map((segment) => ({
+      coordinates: segment.coordinates,
+      fromId: segment.from.id,
+      lines: segment.lines,
+      toId: segment.to.id,
+    }));
   const coordinatesByNodeId = new Map(
     routeState.network.stations.map((station) => [station.id, station.coordinate]),
   );
@@ -383,38 +439,77 @@ export function routeFeatureCollection(
             },
             boundaryLineLayouts,
             coordinatesByNodeId,
+            networkLineLayouts,
           )
         : new Map();
     for (const [index, lineName] of displayedLines.entries()) {
       const continuationLane = continuationLanes.get(lineName);
-      const feature: Feature<LineString, GeoJsonProperties> = {
-        type: 'Feature',
-        id: `${areaKey}:${featureId}`,
-        geometry: {
-          type: 'LineString',
-          coordinates: segment.coordinates,
-        },
-        properties: {
-          kind:
-            segment.type === 'transfer'
-              ? 'network-transfer'
-              : continuationLane === undefined
-                ? 'network-segment'
-                : 'segment-alternative',
-          line: lineName,
-          color: segment.type === 'transfer' ? '' : lineColor(areaKey, lineName),
-          area_key: areaKey,
-          line_position:
-            segment.type === 'transfer'
-              ? 0
-              : (continuationLane?.index ??
-                centeredLinePosition(index, displayedLines.length)),
-          line_side: continuationLane?.side ?? 1,
-          junction_continuation: continuationLane !== undefined,
-        },
-      };
-      features.push(feature);
-      featureId += 1;
+      const normalPosition =
+        segment.type === 'transfer'
+          ? 0
+          : centeredLinePosition(index, displayedLines.length);
+      const normalOffsets = networkLineOffsets(normalPosition);
+      const nodeCoordinate = continuationLane
+        ? coordinatesByNodeId.get(continuationLane.nodeId)
+        : undefined;
+      const continuationSections =
+        continuationLane && nodeCoordinate
+          ? junctionContinuationSections(
+              segment.coordinates,
+              nodeCoordinate,
+              continuationLane,
+            )
+          : [
+              {
+                continuationFraction: 0,
+                coordinates: segment.coordinates,
+              },
+            ];
+      const continuationOffsets =
+        continuationLane?.style === 'boundary-alternative'
+          ? boundaryAlternativeLineOffsets(
+              continuationLane.index,
+              continuationLane.side,
+            )
+          : continuationLane
+            ? networkLineOffsets(continuationLane.index * continuationLane.side)
+            : normalOffsets;
+
+      for (const section of continuationSections) {
+        if (section.coordinates.length < 2) continue;
+        const offsets = interpolatedLineOffsets(
+          continuationOffsets,
+          normalOffsets,
+          section.continuationFraction,
+        );
+        const feature: Feature<LineString, GeoJsonProperties> = {
+          type: 'Feature',
+          id: `${areaKey}:${featureId}`,
+          geometry: {
+            type: 'LineString',
+            coordinates: [...section.coordinates],
+          },
+          properties: {
+            kind:
+              segment.type === 'transfer'
+                ? 'network-transfer'
+                : continuationLane?.style === 'boundary-alternative' &&
+                    section.continuationFraction > 0
+                  ? 'segment-alternative'
+                  : 'network-segment',
+            line: lineName,
+            color: segment.type === 'transfer' ? '' : lineColor(areaKey, lineName),
+            area_key: areaKey,
+            line_position: continuationLane?.index ?? normalPosition,
+            line_side: continuationLane?.side ?? 1,
+            junction_continuation: continuationLane !== undefined,
+            continuation_fraction: section.continuationFraction,
+            ...lineOffsetProperties(offsets),
+          },
+        };
+        features.push(feature);
+        featureId += 1;
+      }
     }
   }
 
@@ -460,6 +555,15 @@ export function routeFeatureCollection(
     );
     for (const lineName of displayedLines) {
       const isPrimaryLine = segment.type === 'ride' && lineName === primaryLine;
+      const linePosition =
+        segment.type === 'transfer'
+          ? 0
+          : isPrimaryLine
+            ? 0
+            : alternativeLines.indexOf(lineName);
+      const offsets = isPrimaryLine
+        ? networkLineOffsets(0)
+        : boundaryAlternativeLineOffsets(linePosition, 1);
       const feature: Feature<LineString, GeoJsonProperties> = {
         type: 'Feature',
         id: `${areaKey}:${featureId}`,
@@ -482,13 +586,9 @@ export function routeFeatureCollection(
           lines: segment.lines.join(', '),
           area_key: areaKey,
           color: lineColor(areaKey, lineName),
-          line_position:
-            segment.type === 'transfer'
-              ? 0
-              : isPrimaryLine
-                ? 0
-                : alternativeLines.indexOf(lineName),
+          line_position: linePosition,
           line_side: 1,
+          ...lineOffsetProperties(offsets),
           primary_line: primaryLine,
           segment_id: segment.id,
           segment_type: segment.type,
