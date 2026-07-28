@@ -208,6 +208,7 @@ test('circle result cards focus an always-visible global network', async () => {
     circumferenceUi,
     /compareCircleArea\(first\.candidate, second\.candidate\)/,
   );
+  assert.match(circumferenceUi, /isFocused && landmassArea/);
   assert.match(circumferenceUi, /network\.segments\.length > 0/);
   assert.match(
     circumferenceUi,
