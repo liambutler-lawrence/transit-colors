@@ -9,7 +9,10 @@ import type {
 } from 'geojson';
 
 import {
+  activeCircumferenceLines,
   junctionContinuationLineLanes,
+  scheduleCircumferenceMode,
+  scheduleLineStateKey,
   selectCircumferenceCandidate,
   type JunctionContinuationLane,
 } from '../circumference.js';
@@ -39,11 +42,13 @@ import {
   circumferenceMetadataEl,
   circumferenceNameEl,
   circumferenceResultsEl,
+  circumferenceScheduleSummaryEl,
   circumferenceSelectionTypeEl,
   circumferenceState,
   circumferenceStates,
   circumferenceSummaryEl,
   compactPanelQuery,
+  departureLabel,
   formatArea,
   formatRouteLength,
   geoJsonSource,
@@ -210,6 +215,7 @@ export function selectedCircumferenceCandidate(): CircumferenceCandidate | null 
 export function resetCircumferenceRoute(): void {
   for (const areaKey of AREA_KEYS) {
     const routeState = circumferenceStates[areaKey];
+    routeState.activeLineNames = [];
     routeState.areaKey = null;
     routeState.candidates = [];
     routeState.network = {
@@ -222,6 +228,7 @@ export function resetCircumferenceRoute(): void {
     routeState.inspectedSegmentId = '';
     routeState.requiredSegmentIds.clear();
     routeState.avoidedSegmentIds.clear();
+    routeState.scheduleKey = '';
     routeState.geometryMode = null;
     routeState.geometryVariants = null;
   }
@@ -569,7 +576,11 @@ function createCircumferenceResult(areaKey: AreaKey): HTMLElement {
   const description = document.createElement('small');
   description.textContent = candidate
     ? `${candidate.lines.length} lines · ${candidate.stations.length} platform nodes`
-    : 'Loading route result…';
+    : routeState.areaKey === null
+      ? 'Loading route result…'
+      : routeState.activeLineNames.length === 0
+        ? 'No scheduled metro service'
+        : `${routeState.activeLineNames.length} lines · no closed loop`;
   const focusAction = document.createElement('span');
   focusAction.className = 'focus-action';
   focusAction.textContent = areaKey === runtime.activeAreaKey ? 'Focused' : 'Focus map';
@@ -780,20 +791,39 @@ function prepareCircumferenceArea(
 ): boolean {
   const routeState = circumferenceStates[areaKey];
   if (!routeState.geometryVariants) return false;
+  const baseResult = routeState.geometryVariants[geometryMode];
+  const activeLines = activeCircumferenceLines(
+    runtime.circumferenceSchedules[areaKey],
+    state.scheduleWeekday,
+    state.scheduleMinute,
+  );
+  const scheduleKey = scheduleLineStateKey(baseResult.network, activeLines);
   if (
     routeState.areaKey === areaKey &&
     routeState.geometryMode === geometryMode &&
-    routeState.candidates.length > 0
+    routeState.scheduleKey === scheduleKey
   ) {
     return false;
   }
 
-  const result: CircumferenceModeResult = routeState.geometryVariants[geometryMode];
+  const result: CircumferenceModeResult = scheduleCircumferenceMode(
+    baseResult,
+    activeLines,
+    geometryMode,
+  );
   routeState.areaKey = areaKey;
   routeState.geometryMode = geometryMode;
+  routeState.scheduleKey = scheduleKey;
   routeState.candidates = result.candidates;
   routeState.network = result.network;
   routeState.methodology = result.methodology;
+  routeState.activeLineNames = [
+    ...new Set(
+      result.network.segments.flatMap((segment) =>
+        segment.type === 'ride' ? segment.lines : [],
+      ),
+    ),
+  ].sort(sortLineNames);
 
   const storedOverride = storedCircumferenceOverride(areaKey);
   routeState.overrideId = result.candidates.some(
@@ -801,7 +831,11 @@ function prepareCircumferenceArea(
   )
     ? storedOverride
     : '';
-  if (!routeState.overrideId && storedOverride) {
+  if (
+    !routeState.overrideId &&
+    storedOverride &&
+    !baseResult.candidates.some((candidate) => candidate.id === storedOverride)
+  ) {
     storeCircumferenceOverride(areaKey, '');
   }
   routeState.selected = selectedCandidateForState(routeState);
@@ -816,12 +850,20 @@ function renderFocusedCircumferenceArea({ fit = false } = {}): void {
   renderCircumferenceOptions();
   const candidate = selectedCircumferenceCandidate();
   if (!candidate) {
-    circumferenceNameEl.textContent = 'No closed metro loop found';
-    circumferenceSummaryEl.textContent =
-      'The current criterion does not produce a valid simple route.';
-    routeChoiceSummaryEl.textContent = 'No ranked routes are available.';
+    const noService = circumferenceState.activeLineNames.length === 0;
+    circumferenceNameEl.textContent = noService
+      ? 'No scheduled metro service'
+      : 'No closed metro loop found';
+    circumferenceSummaryEl.textContent = noService
+      ? `${AREAS[runtime.activeAreaKey].label} has no eligible metro lines operating ${departureLabel()}.`
+      : 'The scheduled lines at this time do not produce a valid simple route.';
+    routeChoiceSummaryEl.textContent = noService
+      ? 'All lines and route overlays are hidden for this schedule period.'
+      : 'No ranked routes are available for this schedule period.';
+    renderCircumferenceResults();
+    syncCircumferenceVisibility();
     if (runtime.activeProduct === 'circumference') {
-      updateStatus('No loop', { isError: true });
+      updateStatus(noService ? 'No scheduled service' : 'No loop');
     }
     return;
   }
@@ -863,6 +905,14 @@ export function prepareCircumferenceRoute(
   for (const areaKey of AREA_KEYS) {
     changed = prepareCircumferenceArea(areaKey, geometryMode) || changed;
   }
+  circumferenceScheduleSummaryEl.textContent = `${departureLabel()} local time · ${AREA_KEYS.map(
+    (areaKey) => {
+      const lineCount = circumferenceStates[areaKey].activeLineNames.length;
+      return `${AREAS[areaKey].label}: ${
+        lineCount === 0 ? 'no service' : `${lineCount} lines`
+      }`;
+    },
+  ).join(' · ')}`;
   routeTrackGeometryToggle.disabled = !AREA_KEYS.every(
     (areaKey) =>
       circumferenceStates[areaKey].methodology?.trackGeometryAvailable === true,
@@ -871,4 +921,7 @@ export function prepareCircumferenceRoute(
   renderFocusedCircumferenceArea({
     fit: changed && runtime.activeProduct === 'circumference',
   });
+  if (runtime.activeProduct === 'circumference' && circumferenceState.selected) {
+    updateStatus('Route ready');
+  }
 }

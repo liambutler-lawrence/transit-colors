@@ -11,7 +11,10 @@ New York City region. It includes:
 Circumference routes follow averaged centerlines from official GTFS track shapes by
 default, with an option to compare straight platform-to-platform geometry. The map also
 shows every eligible metro line and platform in its official agency color. Both metro
-networks and their selected boundaries stay visible together.
+networks and their selected boundaries stay visible together. The shared weekday/time
+setting filters each city's published operating lines and selects the proven
+maximum-area boundary for that service period; CDMX correctly has no visible service
+during its fully closed madrugada hours.
 
 The sidebar follows the same product → mode → results → selected item hierarchy for both
 experiences. Circumference result cards show each city's route and landmass split and

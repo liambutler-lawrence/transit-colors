@@ -10,6 +10,7 @@ import type { AccessTravel, RideLeg, WaitLeg, WaitResult } from '../routing/type
 import type { Schedule, StationProperties, StreetProperties } from '../domain.js';
 import type { MetadataDetail, SegmentProperties } from './types.js';
 import {
+  prepareCircumferenceRoute,
   renderCircumferenceCandidate,
   replaceMetadata,
   selectedCircumferenceCandidate,
@@ -30,6 +31,8 @@ import {
   allStationModes,
   circumferenceMetadataEl,
   circumferenceNameEl,
+  circumferenceScheduleDaySelect,
+  circumferenceScheduleTimeInput,
   circumferenceSelectionTypeEl,
   circumferenceState,
   circumferenceStates,
@@ -44,7 +47,6 @@ import {
   formatDistance,
   formatInteger,
   formatMinutes,
-  formatTimeInput,
   futureStationModes,
   futureStationToggle,
   map,
@@ -61,6 +63,7 @@ import {
   scheduleTimeInput,
   selectionTypeEl,
   state,
+  syncDepartureInputs,
   timeScaleInput,
   timeScaleSummaryEl,
   updateStatus,
@@ -410,18 +413,24 @@ export function applyScheduleContext(): void {
   }
 }
 
-export function updateScheduleContext(): void {
-  const parsedDay = Number(scheduleDaySelect.value);
-  const timeMatch = /^(\d{2}):(\d{2})$/.exec(scheduleTimeInput.value);
+export function updateScheduleContext(
+  source: 'access' | 'circumference' = 'access',
+): void {
+  const daySelect =
+    source === 'circumference' ? circumferenceScheduleDaySelect : scheduleDaySelect;
+  const timeInput =
+    source === 'circumference' ? circumferenceScheduleTimeInput : scheduleTimeInput;
+  const parsedDay = Number(daySelect.value);
+  const timeMatch = /^(\d{2}):(\d{2})$/.exec(timeInput.value);
   if (Number.isInteger(parsedDay) && parsedDay >= 0 && parsedDay <= 6) {
     state.scheduleWeekday = parsedDay;
   }
   if (timeMatch) {
     state.scheduleMinute = Number(timeMatch[1]) * 60 + Number(timeMatch[2]);
-  } else {
-    scheduleTimeInput.value = formatTimeInput(state.scheduleMinute);
   }
+  syncDepartureInputs();
   applyScheduleContext();
+  prepareCircumferenceRoute();
 }
 
 export function applyTimeScale(): void {

@@ -74,10 +74,12 @@ After station, schedule, and track snapshots are current, run:
 npm run build:data:circumference
 ```
 
-This writes the complete display networks and offline-proven maximum-area route for both
-areas. The exact optimizer uses a feedback-vertex certificate and may take several
-minutes for NYC. That cost is intentionally paid only during a data refresh; the browser
-loads the committed result directly.
+This writes the complete display networks and offline-proven maximum-area routes for
+both areas, including every distinct weekly service topology derived from the published
+schedule windows. The exact optimizer reuses a superset certificate whenever its winner
+remains valid and solves only the reduced topologies that need a different winner. It
+may take several minutes for NYC. That cost is intentionally paid only during a data
+refresh; the browser loads the committed results directly.
 
 ## Landmasses
 

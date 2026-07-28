@@ -102,6 +102,7 @@ export interface CircumferenceModeResult {
   readonly candidates: CircumferenceCandidate[];
   readonly methodology: CircumferenceMethodology;
   readonly network: CircumferenceNetwork;
+  readonly scheduleCandidates?: CircumferenceCandidate[] | undefined;
 }
 
 export type CircumferenceGeometryMode = 'straight' | 'track';

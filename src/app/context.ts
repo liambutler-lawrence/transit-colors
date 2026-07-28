@@ -32,7 +32,7 @@ export const AREAS: Record<AreaKey, AreaConfig> = {
     label: 'Mexico City',
     center: [-99.1332, 19.4326],
     zoom: 10.5,
-    circumference: 'data/cdmx-circumference.json?v=20260727b',
+    circumference: 'data/cdmx-circumference.json?v=20260727c',
     streetTiles: 'data/cdmx-streets.pmtiles?v=20260725h',
     stations: 'data/cdmx-stations.geojson?v=20260725h',
     metadata: 'data/cdmx-metadata.json?v=20260725h',
@@ -45,7 +45,7 @@ export const AREAS: Record<AreaKey, AreaConfig> = {
     label: 'New York City metro',
     center: [-73.98, 40.75],
     zoom: 9.5,
-    circumference: 'data/nyc-circumference.json?v=20260727b',
+    circumference: 'data/nyc-circumference.json?v=20260727c',
     liveRoads: true,
     stations: 'data/nyc-stations.geojson?v=20260726a',
     metadata: 'data/nyc-metadata.json?v=20260726a',
@@ -249,6 +249,18 @@ export const destinationSummaryEl = requiredElement(
 export const scheduleDaySelect = requiredElement('#schedule-day', HTMLSelectElement);
 export const scheduleTimeInput = requiredElement('#schedule-time', HTMLInputElement);
 export const scheduleSummaryEl = requiredElement('#schedule-summary', HTMLElement);
+export const circumferenceScheduleDaySelect = requiredElement(
+  '#circumference-schedule-day',
+  HTMLSelectElement,
+);
+export const circumferenceScheduleTimeInput = requiredElement(
+  '#circumference-schedule-time',
+  HTMLInputElement,
+);
+export const circumferenceScheduleSummaryEl = requiredElement(
+  '#circumference-schedule-summary',
+  HTMLElement,
+);
 export const timeScaleInput = requiredElement('#time-scale-minutes', HTMLInputElement);
 export const timeScaleSummaryEl = requiredElement('#time-scale-summary', HTMLElement);
 export const destinationControlEl = requiredElement(
@@ -366,6 +378,10 @@ export const runtime: AppRuntime = {
   activeProduct: initialProduct,
   basemapInstallScheduled: false,
   circumferenceLandmasses: null,
+  circumferenceSchedules: {
+    cdmx: null,
+    nyc: null,
+  },
   futureStreetAccessStationIds: [],
   initialLoadComplete: false,
   liveStreetRefreshInFlight: false,
@@ -402,6 +418,7 @@ export const circumferenceCanvases: Record<AreaKey, HTMLCanvasElement> = {
 
 function createCircumferenceState(): CircumferenceState {
   return {
+    activeLineNames: [],
     areaKey: null,
     candidates: [],
     geometryMode: null,
@@ -416,6 +433,7 @@ function createCircumferenceState(): CircumferenceState {
     inspectedSegmentId: '',
     requiredSegmentIds: new Set<string>(),
     avoidedSegmentIds: new Set<string>(),
+    scheduleKey: '',
   };
 }
 
@@ -608,8 +626,16 @@ export function setCurrentDeparture(area: AreaConfig): void {
   const departure = currentDeparture(area.timezone);
   state.scheduleWeekday = departure.weekday;
   state.scheduleMinute = departure.minute;
-  scheduleDaySelect.value = String(departure.weekday);
-  scheduleTimeInput.value = formatTimeInput(departure.minute);
+  syncDepartureInputs();
+}
+
+export function syncDepartureInputs(): void {
+  for (const select of [scheduleDaySelect, circumferenceScheduleDaySelect]) {
+    select.value = String(state.scheduleWeekday);
+  }
+  for (const input of [scheduleTimeInput, circumferenceScheduleTimeInput]) {
+    input.value = formatTimeInput(state.scheduleMinute);
+  }
 }
 
 export function departureLabel(): string {
