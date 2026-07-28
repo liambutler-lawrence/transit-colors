@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -9,11 +9,14 @@ import {
   stationEdgeKey,
 } from './gtfs-shape-centerlines.mjs';
 import { metroLineRefsForStation } from './cdmx-platforms.mjs';
+import { buildOsmRouteCenterlines } from './osm-route-centerlines.mjs';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const rootDir = resolve(__dirname, '..');
 const dataDir = resolve(rootDir, 'data');
 const cacheDir = resolve(dataDir, '.gtfs-cache');
+const osmRouteCacheDir = resolve(cacheDir, 'osm-route-relations');
+const REFRESH_OSM_ROUTE_CACHE = process.env.REFRESH_OSM_ROUTE_CACHE === '1';
 const NYC_GTFS_PATH = resolve(
   process.env.NYC_SUBWAY_GTFS_PATH ?? resolve(cacheDir, 'mta-subway.zip'),
 );
@@ -29,6 +32,35 @@ const SINGAPORE_SHAPES_GTFS_PATH = resolve(
 const ATLANTA_GTFS_PATH = resolve(
   process.env.ATLANTA_GTFS_PATH ?? resolve(cacheDir, 'atlanta.zip'),
 );
+
+const OSM_ROUTE_RELATIONS = {
+  singapore: [
+    { lineName: 'EW', relationIds: [2312796, 445764] },
+    { lineName: 'CG', relationIds: [7981690, 7981691] },
+    { lineName: 'NS', relationIds: [2312797, 445768] },
+    { lineName: 'NE', relationIds: [2293545, 7981648] },
+    { lineName: 'CC', relationIds: [2076291, 7981669, 7981667] },
+    { lineName: 'DT', relationIds: [2313458, 7981642] },
+    { lineName: 'TE', relationIds: [2383439, 9627856] },
+    { lineName: 'BP', relationIds: [1159434, 9664084] },
+    {
+      lineName: 'SK',
+      relationIds: [2312985, 9663107, 1146941, 9663108],
+    },
+    {
+      lineName: 'PG',
+      relationIds: [1146942, 9663919, 2312984, 9663920],
+    },
+  ],
+  athens: [
+    { lineName: 'M1', relationIds: [445858, 7963473] },
+    { lineName: 'M2', relationIds: [7963539, 3095900] },
+    {
+      lineName: 'M3',
+      relationIds: [3165353, 7927355, 445945, 2473157],
+    },
+  ],
+};
 
 function readZipCsv(zipPath, filename) {
   return parseCsv(
@@ -49,7 +81,7 @@ function normalizeName(value = '') {
       ' ',
     )
     .replace(/\b(norte|sur|oriente|poniente)\b/g, ' ')
-    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/[^\p{L}\p{N}]+/gu, ' ')
     .trim();
 }
 
@@ -100,7 +132,56 @@ function allowedSubwayEdges(schedules) {
   return result;
 }
 
-async function buildArea({ areaKey, feeds, geometrySource }) {
+async function readOsmRouteRelation(relationId) {
+  await mkdir(osmRouteCacheDir, { recursive: true });
+  const cachePath = resolve(osmRouteCacheDir, `${relationId}.json`);
+  if (!REFRESH_OSM_ROUTE_CACHE) {
+    try {
+      return JSON.parse(await readFile(cachePath, 'utf8'));
+    } catch {
+      // Cache miss; download the current relation below.
+    }
+  }
+  const response = await fetch(
+    `https://api.openstreetmap.org/api/0.6/relation/${relationId}/full.json`,
+    {
+      headers: {
+        'User-Agent':
+          'transit-colors-poc/0.1 (https://github.com/liambutler-lawrence/transit-colors)',
+      },
+      redirect: 'follow',
+      signal: AbortSignal.timeout(120_000),
+    },
+  );
+  if (!response.ok) {
+    throw new Error(
+      `OpenStreetMap relation ${relationId} download failed: ${response.status}`,
+    );
+  }
+  const text = await response.text();
+  await writeFile(cachePath, text, 'utf8');
+  return JSON.parse(text);
+}
+
+function replaceGeometries(target, replacements) {
+  for (const [fromId, entries] of Object.entries(replacements)) {
+    const existing = target[fromId] ?? [];
+    const replacementTargets = new Set(entries.map(([toId]) => toId));
+    target[fromId] = [
+      ...existing.filter(([toId]) => !replacementTargets.has(toId)),
+      ...entries,
+    ];
+  }
+}
+
+function geometryEdgeCount(geometries) {
+  return Object.values(geometries).reduce(
+    (total, entries) => total + entries.length,
+    0,
+  );
+}
+
+async function buildArea({ areaKey, feeds, geometrySource, osmRouteRelations = [] }) {
   const schedulePath = resolve(dataDir, `${areaKey}-schedules.json`);
   const stationPath = resolve(dataDir, `${areaKey}-stations.geojson`);
   const schedules = JSON.parse(await readFile(schedulePath, 'utf8'));
@@ -131,7 +212,6 @@ async function buildArea({ areaKey, feeds, geometrySource }) {
   }
   const allowedEdgeKeys = allowedSubwayEdges(schedules);
   const mergedGeometries = {};
-  let edgeCount = 0;
   let observationCount = 0;
   for (const {
     zipPath,
@@ -210,17 +290,64 @@ async function buildArea({ areaKey, feeds, geometrySource }) {
     for (const [fromId, entries] of Object.entries(result.geometries)) {
       (mergedGeometries[fromId] ??= []).push(...entries);
     }
-    edgeCount += result.edgeCount;
     observationCount += result.observationCount;
   }
+
+  let osmGeometry = null;
+  if (osmRouteRelations.length > 0) {
+    const stationCandidatesByLine = new Map();
+    for (const feature of stationFeatures) {
+      for (const routeId of schedules.stations[feature.properties.id]?.r ?? []) {
+        const lineName = schedules.routes?.[routeId]?.name;
+        if (!lineName) continue;
+        const candidates = stationCandidatesByLine.get(lineName) ?? [];
+        candidates.push({
+          coordinate: feature.geometry.coordinates,
+          id: feature.properties.id,
+          name: feature.properties.name,
+        });
+        stationCandidatesByLine.set(lineName, candidates);
+      }
+    }
+    const relations = (
+      await Promise.all(
+        osmRouteRelations.flatMap(({ lineName, relationIds }) =>
+          relationIds.map(async (relationId) => ({
+            data: await readOsmRouteRelation(relationId),
+            lineName,
+            relationId,
+          })),
+        ),
+      )
+    ).flat();
+    osmGeometry = buildOsmRouteCenterlines({
+      allowedEdgeKeys,
+      namesMatch,
+      relations,
+      stationCandidatesByLine,
+      stationCoordinateById,
+    });
+    replaceGeometries(mergedGeometries, osmGeometry.geometries);
+    observationCount += osmGeometry.shapeObservationCount;
+  }
+
+  const edgeCount = geometryEdgeCount(mergedGeometries);
   schedules.graph.g = mergedGeometries;
   schedules.track_geometry = {
     source: geometrySource,
     method:
-      'Station-to-station centerlines averaged from distinct official GTFS trip shapes',
+      osmGeometry === null
+        ? 'Station-to-station centerlines averaged from distinct official GTFS trip shapes'
+        : 'Station-to-station centerlines averaged between directional OpenStreetMap route relations; official GTFS shapes retained as fallback',
     edge_count: edgeCount,
     shape_observation_count: observationCount,
     endpoint_model: 'Exact line-platform coordinates',
+    ...(osmGeometry === null
+      ? {}
+      : {
+          osm_matched_stop_count: osmGeometry.matchedStopCount,
+          osm_route_observation_count: osmGeometry.routeObservationCount,
+        }),
   };
   await writeFile(schedulePath, `${JSON.stringify(schedules)}\n`, 'utf8');
 
@@ -274,13 +401,14 @@ await buildArea({
 await buildArea({
   areaKey: 'singapore',
   geometrySource:
-    'LTA-derived Singapore GTFS route shapes; newer segments retain straight fallback geometry',
+    'OpenStreetMap MRT/LRT route relations and LTA-derived Singapore GTFS route shapes',
   feeds: [
     {
       zipPath: SINGAPORE_SHAPES_GTFS_PATH,
       routePrefix: 'singapore-rail/',
     },
   ],
+  osmRouteRelations: OSM_ROUTE_RELATIONS.singapore,
 });
 await buildArea({
   areaKey: 'atlanta',
@@ -295,6 +423,7 @@ await buildArea({
 await buildArea({
   areaKey: 'athens',
   geometrySource:
-    'OASA / STASY platform coordinates; straight fallback where no published GTFS shapes exist',
+    'OpenStreetMap Athens Metro route relations matched to OASA / STASY platform coordinates',
   feeds: [],
+  osmRouteRelations: OSM_ROUTE_RELATIONS.athens,
 });

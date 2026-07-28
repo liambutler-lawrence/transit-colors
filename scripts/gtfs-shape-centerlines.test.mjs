@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import {
   averageShapeSections,
   buildGtfsShapeCenterlines,
+  extractClosedShapeSection,
   extractShapeSection,
   resampleLine,
 } from './gtfs-shape-centerlines.mjs';
@@ -37,6 +38,20 @@ const section = extractShapeSection(
 assert.ok(section.length > 2);
 assert.deepEqual(section[0], [0, 0]);
 assert.deepEqual(section.at(-1), [0.01, 0]);
+
+const seamSection = extractClosedShapeSection(
+  [
+    [0, 0],
+    [0.01, 0],
+    [0.01, 0.01],
+    [0, 0.01],
+    [0, 0],
+  ],
+  [0, 0.009],
+  [0.001, 0],
+);
+assert.ok(seamSection.length >= 3);
+assert.ok(seamSection.every(([longitude]) => longitude < 0.002));
 
 const built = buildGtfsShapeCenterlines({
   shapes: [
