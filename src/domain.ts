@@ -182,6 +182,9 @@ export const landmassDataSchema = z
     areas: z.object({
       cdmx: landmassAreaSchema,
       nyc: landmassAreaSchema,
+      singapore: landmassAreaSchema,
+      atlanta: landmassAreaSchema,
+      athens: landmassAreaSchema,
     }),
   })
   .loose();

@@ -67,6 +67,9 @@ assert.equal(lineColor('cdmx', 'L12'), '#BFA042');
 assert.equal(lineColor('nyc', 'A'), '#0062CF');
 assert.equal(lineColor('nyc', '6X'), '#009952');
 assert.equal(lineColor('nyc', 'SIR'), '#008EB7');
+assert.equal(lineColor('singapore', 'CC'), '#FA9E0D');
+assert.equal(lineColor('atlanta', 'RED'), '#CE242B');
+assert.equal(lineColor('athens', 'M3'), '#0057A8');
 
 const closedServiceDays = Array.from({ length: 7 }, () => []);
 const overnightServiceDays = Array.from({ length: 7 }, () => []);

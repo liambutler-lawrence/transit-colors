@@ -54,12 +54,58 @@ export const AREAS: Record<AreaKey, AreaConfig> = {
     supportsDestination: true,
     buildCommand: 'npm run build:data:nyc',
   },
+  singapore: {
+    label: 'Singapore',
+    center: [103.8198, 1.3521],
+    zoom: 10,
+    circumference: 'data/singapore-circumference.json?v=20260728a',
+    liveRoads: true,
+    stations: 'data/singapore-stations.geojson?v=20260728a',
+    metadata: 'data/singapore-metadata.json?v=20260728a',
+    schedules: 'data/singapore-schedules.json?v=20260728a',
+    timezone: 'Asia/Singapore',
+    supportsDestination: true,
+    buildCommand: 'npm run build:data:singapore',
+  },
+  atlanta: {
+    label: 'Atlanta',
+    center: [-84.388, 33.75],
+    zoom: 10,
+    circumference: 'data/atlanta-circumference.json?v=20260728a',
+    liveRoads: true,
+    stations: 'data/atlanta-stations.geojson?v=20260728a',
+    metadata: 'data/atlanta-metadata.json?v=20260728a',
+    schedules: 'data/atlanta-schedules.json?v=20260728a',
+    timezone: 'America/New_York',
+    supportsDestination: true,
+    buildCommand: 'npm run build:data:atlanta',
+  },
+  athens: {
+    label: 'Athens',
+    center: [23.7275, 37.9838],
+    zoom: 10.5,
+    circumference: 'data/athens-circumference.json?v=20260728a',
+    liveRoads: true,
+    stations: 'data/athens-stations.geojson?v=20260728a',
+    metadata: 'data/athens-metadata.json?v=20260728a',
+    schedules: 'data/athens-schedules.json?v=20260728a',
+    timezone: 'Europe/Athens',
+    supportsDestination: true,
+    buildCommand: 'npm run build:data:athens',
+  },
 };
 
-export const AREA_KEYS: readonly AreaKey[] = ['cdmx', 'nyc'];
+export const AREA_KEYS: readonly AreaKey[] = [
+  'cdmx',
+  'nyc',
+  'singapore',
+  'atlanta',
+  'athens',
+];
+const AREA_KEY_SET: ReadonlySet<string> = new Set(AREA_KEYS);
 
 export function isAreaKey(value: unknown): value is AreaKey {
-  return value === 'cdmx' || value === 'nyc';
+  return typeof value === 'string' && AREA_KEY_SET.has(value);
 }
 
 export function isMode(value: unknown): value is Mode {
@@ -381,6 +427,9 @@ export const runtime: AppRuntime = {
   circumferenceSchedules: {
     cdmx: null,
     nyc: null,
+    singapore: null,
+    atlanta: null,
+    athens: null,
   },
   futureStreetAccessStationIds: [],
   initialLoadComplete: false,
@@ -414,6 +463,9 @@ function createCircumferenceCanvas(areaKey: AreaKey): HTMLCanvasElement {
 export const circumferenceCanvases: Record<AreaKey, HTMLCanvasElement> = {
   cdmx: createCircumferenceCanvas('cdmx'),
   nyc: createCircumferenceCanvas('nyc'),
+  singapore: createCircumferenceCanvas('singapore'),
+  atlanta: createCircumferenceCanvas('atlanta'),
+  athens: createCircumferenceCanvas('athens'),
 };
 
 function createCircumferenceState(): CircumferenceState {
@@ -440,6 +492,9 @@ function createCircumferenceState(): CircumferenceState {
 export const circumferenceStates: Record<AreaKey, CircumferenceState> = {
   cdmx: createCircumferenceState(),
   nyc: createCircumferenceState(),
+  singapore: createCircumferenceState(),
+  atlanta: createCircumferenceState(),
+  athens: createCircumferenceState(),
 };
 
 export let circumferenceState = circumferenceStates[initialAreaKey];

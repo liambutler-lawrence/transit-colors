@@ -439,11 +439,16 @@ export function installMapData(stations: StationCollection): void {
 
   for (const areaKey of AREA_KEYS) {
     const sourceId = `circumference-gradient-${areaKey}`;
+    const fallbackGradientBounds: Record<AreaKey, [number, number, number, number]> = {
+      cdmx: [-99.42, 19.18, -98.84, 19.66],
+      nyc: [-74.08, 40.54, -73.7, 40.9],
+      singapore: [103.55, 1.15, 104.1, 1.5],
+      atlanta: [-84.6, 33.55, -84.15, 34.05],
+      athens: [23.55, 37.78, 24.05, 38.2],
+    };
     const gradientBounds =
       runtime.circumferenceLandmasses?.areas[areaKey].gradient_bounds ??
-      (areaKey === 'cdmx'
-        ? [-99.42, 19.18, -98.84, 19.66]
-        : [-74.08, 40.54, -73.7, 40.9]);
+      fallbackGradientBounds[areaKey];
     map.addSource(
       sourceId,
       createCircumferenceGradientSource(

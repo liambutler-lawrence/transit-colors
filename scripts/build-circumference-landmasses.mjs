@@ -190,6 +190,7 @@ function landPolygonForPoint(polygons, point) {
 
 const records = readPolygonRecords(await readFile(shapefilePath));
 const americanMainland = ringRecordForPoint(records, [-99.1332, 19.4326]);
+const afroEurasianMainland = ringRecordForPoint(records, [23.7275, 37.9838]);
 const nycLandmassDefinitions = [
   {
     id: 'american-mainland',
@@ -238,6 +239,28 @@ const nycLandmasses = nycLandmassDefinitions.flatMap((definition) => {
     },
   ];
 });
+const singaporeGradientBounds = [103.55, 1.15, 104.1, 1.5];
+const detailedSingaporeLandPolygons = await detailedLandPolygonsForBounds(
+  singaporeGradientBounds,
+);
+const singaporeMainIsland = landPolygonForPoint(
+  detailedSingaporeLandPolygons,
+  [103.8198, 1.3521],
+);
+const singaporeMainIslandMask = [singaporeMainIsland.map(roundedRing)];
+const singaporeMainIslandArea = Math.round(
+  polygonAreaSquareMeters(singaporeMainIsland[0]),
+);
+const athensGradientBounds = [23.55, 37.78, 24.05, 38.2];
+const detailedAthensLandPolygons =
+  await detailedLandPolygonsForBounds(athensGradientBounds);
+const athensMainlandMask = [
+  landPolygonForPoint(detailedAthensLandPolygons, [23.7275, 37.9838]).map(roundedRing),
+];
+const americanMainlandArea = Math.round(polygonAreaSquareMeters(americanMainland.ring));
+const afroEurasianMainlandArea = Math.round(
+  polygonAreaSquareMeters(afroEurasianMainland.ring),
+);
 const data = {
   source: 'Natural Earth 1:10m land-area totals',
   source_url:
@@ -253,14 +276,14 @@ const data = {
   areas: {
     cdmx: {
       label: 'American mainland',
-      area_m2: Math.round(polygonAreaSquareMeters(americanMainland.ring)),
+      area_m2: americanMainlandArea,
       gradient_bounds: [-99.42, 19.18, -98.84, 19.66],
       mask: null,
       landmasses: [
         {
           id: 'american-mainland',
           label: 'American mainland',
-          area_m2: Math.round(polygonAreaSquareMeters(americanMainland.ring)),
+          area_m2: americanMainlandArea,
           mask: null,
         },
       ],
@@ -271,6 +294,48 @@ const data = {
       gradient_bounds: nycGradientBounds,
       mask: detailedNycLandPolygons.map((polygon) => polygon.map(roundedRing)),
       landmasses: nycLandmasses,
+    },
+    singapore: {
+      label: 'Singapore main island',
+      area_m2: singaporeMainIslandArea,
+      gradient_bounds: singaporeGradientBounds,
+      mask: detailedSingaporeLandPolygons.map((polygon) => polygon.map(roundedRing)),
+      landmasses: [
+        {
+          id: 'singapore-main-island',
+          label: 'Singapore main island',
+          area_m2: singaporeMainIslandArea,
+          mask: singaporeMainIslandMask,
+        },
+      ],
+    },
+    atlanta: {
+      label: 'American mainland',
+      area_m2: americanMainlandArea,
+      gradient_bounds: [-84.6, 33.55, -84.15, 34.05],
+      mask: null,
+      landmasses: [
+        {
+          id: 'american-mainland',
+          label: 'American mainland',
+          area_m2: americanMainlandArea,
+          mask: null,
+        },
+      ],
+    },
+    athens: {
+      label: 'Afro-Eurasian mainland',
+      area_m2: afroEurasianMainlandArea,
+      gradient_bounds: athensGradientBounds,
+      mask: detailedAthensLandPolygons.map((polygon) => polygon.map(roundedRing)),
+      landmasses: [
+        {
+          id: 'afro-eurasian-mainland',
+          label: 'Afro-Eurasian mainland',
+          area_m2: afroEurasianMainlandArea,
+          mask: athensMainlandMask,
+        },
+      ],
     },
   },
 };

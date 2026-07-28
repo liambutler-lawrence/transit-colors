@@ -2,7 +2,8 @@
 // CDMX: https://serviciosatlas.sgirpc.cdmx.gob.mx/arcgis/rest/services/AtlasCapasPublicas/Movilidad_Integrada_CDMX/FeatureServer/1
 // NYC: https://www.mta.info/document/168976
 // PATH: published route_color values in the Port Authority GTFS feed
-export type LineColorArea = 'cdmx' | 'nyc';
+// Singapore, Atlanta, and Athens: official system maps / published GTFS palettes
+export type LineColorArea = 'cdmx' | 'nyc' | 'singapore' | 'atlanta' | 'athens';
 
 const LINE_COLORS: Record<LineColorArea, Readonly<Record<string, string>>> = {
   cdmx: {
@@ -55,6 +56,30 @@ const LINE_COLORS: Record<LineColorArea, Readonly<Record<string, string>>> = {
     'PATH · Journal Square - 33rd Street (via Hoboken)': '#FF9900',
     'PATH · Newark - Harrison Shuttle Train': '#8C3C96',
     'PATH · World Trade Center - 33rd Street': '#65C100',
+  },
+  singapore: {
+    NS: '#D42E12',
+    EW: '#009645',
+    CG: '#009645',
+    NE: '#8F4199',
+    CC: '#FA9E0D',
+    CE: '#FA9E0D',
+    DT: '#005EC4',
+    TE: '#9D5B25',
+    BP: '#748477',
+    SK: '#748477',
+    PG: '#748477',
+  },
+  atlanta: {
+    BLUE: '#0075B2',
+    GOLD: '#D4A723',
+    GREEN: '#009D4B',
+    RED: '#CE242B',
+  },
+  athens: {
+    M1: '#009640',
+    M2: '#E30613',
+    M3: '#0057A8',
   },
 };
 

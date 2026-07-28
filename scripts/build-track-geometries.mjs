@@ -23,6 +23,12 @@ const PATH_GTFS_PATH = resolve(
 const CDMX_GTFS_PATH = resolve(
   process.env.CDMX_GTFS_PATH ?? resolve(cacheDir, 'cdmx.zip'),
 );
+const SINGAPORE_SHAPES_GTFS_PATH = resolve(
+  process.env.SINGAPORE_SHAPES_GTFS_PATH ?? resolve(cacheDir, 'singapore-shapes.zip'),
+);
+const ATLANTA_GTFS_PATH = resolve(
+  process.env.ATLANTA_GTFS_PATH ?? resolve(cacheDir, 'atlanta.zip'),
+);
 
 function readZipCsv(zipPath, filename) {
   return parseCsv(
@@ -264,4 +270,31 @@ await buildArea({
       useRouteLongName: true,
     },
   ],
+});
+await buildArea({
+  areaKey: 'singapore',
+  geometrySource:
+    'LTA-derived Singapore GTFS route shapes; newer segments retain straight fallback geometry',
+  feeds: [
+    {
+      zipPath: SINGAPORE_SHAPES_GTFS_PATH,
+      routePrefix: 'singapore-rail/',
+    },
+  ],
+});
+await buildArea({
+  areaKey: 'atlanta',
+  geometrySource: 'Metropolitan Atlanta Rapid Transit Authority static GTFS',
+  feeds: [
+    {
+      zipPath: ATLANTA_GTFS_PATH,
+      routePrefix: 'marta-rail/',
+    },
+  ],
+});
+await buildArea({
+  areaKey: 'athens',
+  geometrySource:
+    'OASA / STASY platform coordinates; straight fallback where no published GTFS shapes exist',
+  feeds: [],
 });

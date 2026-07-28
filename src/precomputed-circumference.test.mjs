@@ -9,10 +9,10 @@ import {
 } from './circumference.ts';
 import { circumferenceGeometryVariantsSchema } from './circumference/schema.ts';
 
-const AREA_KEYS = ['cdmx', 'nyc'];
+const LOOP_AREA_KEYS = ['cdmx', 'nyc', 'singapore', 'athens'];
 
 test('precomputed circumference winners are validated and topology-stable', async () => {
-  for (const areaKey of AREA_KEYS) {
+  for (const areaKey of LOOP_AREA_KEYS) {
     const startedAt = performance.now();
     const routeData = circumferenceGeometryVariantsSchema.parse(
       JSON.parse(
@@ -51,6 +51,58 @@ test('precomputed circumference winners are validated and topology-stable', asyn
       }
     }
   }
+});
+
+test('Atlanta publishes its full branched network without a fake loop', async () => {
+  const [routeData, schedules] = await Promise.all([
+    readFile(
+      new URL('../data/atlanta-circumference.json', import.meta.url),
+      'utf8',
+    ).then((data) => circumferenceGeometryVariantsSchema.parse(JSON.parse(data))),
+    readFile(new URL('../data/atlanta-schedules.json', import.meta.url), 'utf8').then(
+      JSON.parse,
+    ),
+  ]);
+  assert.equal(routeData.track.candidates.length, 0);
+  assert.equal(routeData.straight.candidates.length, 0);
+  assert.ok(routeData.track.network.stations.length >= 50);
+  assert.ok(routeData.track.network.segments.length >= 50);
+  assert.deepEqual(
+    [...activeCircumferenceService(schedules, 1, 6 * 60 + 30).lineNames].sort(),
+    ['BLUE', 'GOLD', 'GREEN', 'RED'],
+  );
+});
+
+test('Singapore includes the completed Circle Line closure', async () => {
+  const routeData = circumferenceGeometryVariantsSchema.parse(
+    JSON.parse(
+      await readFile(
+        new URL('../data/singapore-circumference.json', import.meta.url),
+        'utf8',
+      ),
+    ),
+  );
+  const circleClosure = [
+    ['NE1-CC29', 'CC30'],
+    ['CC30', 'CC31'],
+    ['CC31', 'CC32'],
+    ['CC32', 'NS27-CE2-TE20'],
+  ];
+  const rideEdges = new Set(
+    routeData.track.network.segments
+      .filter((segment) => segment.type === 'ride' && segment.lines.includes('CC'))
+      .map((segment) =>
+        [segment.from.id, segment.to.id]
+          .map((id) => id.split('/').at(-2))
+          .sort()
+          .join('::'),
+      ),
+  );
+
+  for (const stationPair of circleClosure) {
+    assert.ok(rideEdges.has(stationPair.sort().join('::')));
+  }
+  assert.ok(routeData.track.candidates[0].areaSquareMeters > 200_000_000);
 });
 
 test('NYC exact winner uses the 1 from South Ferry through 14 St', async () => {

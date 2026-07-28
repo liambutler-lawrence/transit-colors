@@ -1,7 +1,7 @@
 # Transit Colors
 
-Transit Colors is an interactive map for exploring transit access in Mexico City and the
-New York City region. It includes:
+Transit Colors is an interactive map for exploring transit access in Mexico City, New
+York City, Singapore, Atlanta, and Athens. It includes:
 
 - street-level distance to selected transit modes;
 - schedule-adjusted travel time to a selected station; and
@@ -9,13 +9,13 @@ New York City region. It includes:
   enclose.
 
 Circumference routes follow averaged centerlines from official GTFS track shapes by
-default, with an option to compare straight platform-to-platform geometry. The map also
-shows every eligible metro line and platform in its official agency color. Both metro
-networks and their selected boundaries stay visible together. The shared weekday/time
-setting filters each city's published operating lines and selects the proven
-maximum-area boundary for that service period. NYC line appearances are filtered per
-track segment and route-direction pattern, while CDMX correctly has no visible service
-during its fully closed madrugada hours.
+default where shape data is published, with an option to compare straight
+platform-to-platform geometry. The map also shows every eligible metro line and
+line-specific platform in its official agency color. All five networks and their
+selected boundaries stay visible together. The shared weekday/time setting filters each
+city's operating lines and selects the proven maximum-area boundary for that service
+period. Atlanta correctly reports that its branched rail network has no closed loop,
+rather than manufacturing one from concurrent services.
 
 The sidebar follows the same product → mode → results → selected item hierarchy for both
 experiences. Circumference result cards show each city's route and landmass split and

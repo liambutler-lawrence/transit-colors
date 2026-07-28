@@ -77,7 +77,7 @@ const methodologySchema = z.object({
   trackGeometryMethod: z.string().nullable(),
 });
 const modeResultSchema = z.object({
-  candidates: z.array(candidateSchema).min(1),
+  candidates: z.array(candidateSchema),
   methodology: methodologySchema,
   network: z.object({
     segments: z.array(networkSegmentSchema),

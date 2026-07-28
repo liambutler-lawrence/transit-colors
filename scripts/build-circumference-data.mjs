@@ -12,7 +12,8 @@ import {
 } from './exact-circumference-solver.mjs';
 
 const areaKeys = process.argv.slice(2);
-const selectedAreaKeys = areaKeys.length > 0 ? areaKeys : ['cdmx', 'nyc'];
+const supportedAreaKeys = ['cdmx', 'nyc', 'singapore', 'atlanta', 'athens'];
+const selectedAreaKeys = areaKeys.length > 0 ? areaKeys : supportedAreaKeys;
 
 function networkSegmentIds(network) {
   return new Set(network.segments.map((segment) => segment.id));
@@ -96,7 +97,7 @@ async function exactSchedulePaths(areaKey, network, schedules, fullExact) {
 }
 
 for (const areaKey of selectedAreaKeys) {
-  if (areaKey !== 'cdmx' && areaKey !== 'nyc') {
+  if (!supportedAreaKeys.includes(areaKey)) {
     throw new Error(`Unknown circumference area: ${areaKey}`);
   }
   const [stations, schedules] = await Promise.all([
@@ -107,6 +108,27 @@ for (const areaKey of selectedAreaKeys) {
   console.time(`${areaKey}: network and alternatives`);
   const generated = buildCircumferenceCandidates(stations.features, schedules);
   console.timeEnd(`${areaKey}: network and alternatives`);
+
+  // MARTA Rail is a branched cross: its colored services share long trunks but
+  // do not form a geographically meaningful closed passenger route. Preserve
+  // and display its complete network without manufacturing a zero-area loop
+  // from parallel services on the same tracks.
+  if (areaKey === 'atlanta') {
+    const geometryVariants = Object.fromEntries(
+      Object.entries(generated.geometryVariants).map(([mode, variant]) => [
+        mode,
+        {
+          ...variant,
+          candidates: [],
+          scheduleCandidates: [],
+        },
+      ]),
+    );
+    const outputUrl = new URL(`../data/${areaKey}-circumference.json`, import.meta.url);
+    await writeFile(outputUrl, `${JSON.stringify(geometryVariants)}\n`);
+    console.log(`Wrote ${outputUrl.pathname} (complete network; no closed loop)`);
+    continue;
+  }
 
   console.time(`${areaKey}: exact topology solve`);
   const exact = await solveExactMaximumAreaCycle(
