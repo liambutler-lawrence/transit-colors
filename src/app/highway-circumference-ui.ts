@@ -46,7 +46,7 @@ import {
   updateStatus,
 } from './context.js';
 
-const HIGHWAY_DATA_URL = 'data/north-america-highway-circumference.json?v=20260728b';
+const HIGHWAY_DATA_URL = 'data/north-america-highway-circumference.json?v=20260728d';
 let highwayData: HighwayCircumferenceData | null = null;
 let highwayPromise: Promise<HighwayCircumferenceData> | null = null;
 let highwayGradientApplied = false;
@@ -103,7 +103,7 @@ export function syncCircumferenceCriterionControls(): void {
     ? 'Highway details'
     : 'Line or transfer details';
   circumferenceMethodNoteEl.textContent = highwayMode
-    ? 'Solid lines are separated 2+ lane controlled-access mainlines; dashed lines are direct, ramp-only freeway connectors. Only shared physical nodes form graph junctions—grade-separated crossings do not. The thick route is the exact maximum-area simple boundary.'
+    ? 'Solid lines are separated 2+ lane controlled-access mainlines; dashed lines are direct, ramp-only freeway connectors. Only shared physical nodes form graph junctions—grade-separated crossings do not. The thick route is the largest validated detailed simple boundary.'
     : 'All metro networks stay visible, including metros without a circle. Each result card is the largest circle that does not reuse another result’s rail segments and focuses it on the map; clicking any visible line, platform, transfer, street, or station updates this final section directly.';
 }
 
@@ -146,7 +146,7 @@ function highwayResultCard(data: HighwayCircumferenceData): HTMLElement {
     'en-US',
   )} highway features · ${data.methodology.interchangeConnectorCount.toLocaleString(
     'en-US',
-  )} verified interchange connector · ${data.route.boundaryRoadFeatureCount.toLocaleString(
+  )} verified interchange connectors · ${data.route.boundaryRoadFeatureCount.toLocaleString(
     'en-US',
   )} on boundary`;
   const focusAction = document.createElement('span');
@@ -193,7 +193,7 @@ function highwayResultCard(data: HighwayCircumferenceData): HTMLElement {
   const summary = document.createElement('p');
   summary.className = 'result-summary';
   summary.textContent =
-    'Proven largest embedded simple circle · mainlines plus direct ramp-only connectors · WGS84 ellipsoidal area';
+    'Largest validated continental cycle expanded through detailed OSM topology · mainlines plus direct ramp-only connectors · WGS84 ellipsoidal area';
   result.append(summary);
   return result;
 }
@@ -260,7 +260,7 @@ function renderHighwayCircumference({
   circumferenceSelectionTypeEl.textContent = 'Selected highway circle';
   circumferenceNameEl.textContent = 'North America controlled-access maximum';
   circumferenceSummaryEl.textContent =
-    'Largest-area simple loop in separated controlled-access mainlines connected only by valid ramp paths.';
+    'Largest validated simple loop in separated controlled-access mainlines connected only by valid ramp paths.';
   replaceMetadata([
     {
       label: 'Contained land',
@@ -290,7 +290,7 @@ function renderHighwayCircumference({
     },
   ]);
   routeChoiceSummaryEl.textContent =
-    'Automatic exact winner; source seams and route segments remain manually overridable in the data build.';
+    'Automatic continental winner, refined onto exact-identity OSM carriageways and ramps; route segments remain manually overridable in the data build.';
   routeChoiceSelect.disabled = true;
   routeAutoButton.disabled = true;
   routeRequireSegmentButton.disabled = true;
@@ -380,7 +380,11 @@ export async function prepareHighwayCircumference({
 }
 
 export function installHighwayHover(): void {
-  let hoveredId: string | number | null = null;
+  let hovered: {
+    readonly id: string | number;
+    readonly source: 'highway-circumference' | 'highway-network';
+    readonly sourceLayer?: 'highways';
+  } | null = null;
   for (const layerId of [
     'highway-circumference-route-connector-line',
     'highway-circumference-route-line',
@@ -390,32 +394,55 @@ export function installHighwayHover(): void {
     map.on('mousemove', layerId, (event) => {
       const feature = event.features?.[0];
       if (!feature || feature.id === undefined) return;
+      const networkFeature = layerId.includes('-network-');
+      const source: 'highway-circumference' | 'highway-network' = networkFeature
+        ? 'highway-network'
+        : 'highway-circumference';
+      const sourceLayer: 'highways' | undefined = networkFeature
+        ? 'highways'
+        : undefined;
       const properties = highwayMapFeaturePropertiesSchema.safeParse(
         feature.properties,
       );
       if (!properties.success) return;
-      if (hoveredId !== null) {
+      if (hovered !== null) {
         map.setFeatureState(
-          { source: 'highway-circumference', id: hoveredId },
+          {
+            source: hovered.source,
+            ...(hovered.sourceLayer ? { sourceLayer: hovered.sourceLayer } : {}),
+            id: hovered.id,
+          },
           { hover: false },
         );
       }
-      hoveredId = feature.id;
+      hovered = {
+        id: feature.id,
+        source,
+        ...(sourceLayer ? { sourceLayer } : {}),
+      };
       map.setFeatureState(
-        { source: 'highway-circumference', id: feature.id },
+        {
+          source,
+          ...(sourceLayer ? { sourceLayer } : {}),
+          id: feature.id,
+        },
         { hover: true },
       );
       showHighwayFeature(properties.data);
       map.getCanvas().style.cursor = 'pointer';
     });
     map.on('mouseleave', layerId, () => {
-      if (hoveredId !== null) {
+      if (hovered !== null) {
         map.setFeatureState(
-          { source: 'highway-circumference', id: hoveredId },
+          {
+            source: hovered.source,
+            ...(hovered.sourceLayer ? { sourceLayer: hovered.sourceLayer } : {}),
+            id: hovered.id,
+          },
           { hover: false },
         );
       }
-      hoveredId = null;
+      hovered = null;
       map.getCanvas().style.cursor = '';
     });
     map.on('click', layerId, (event) => {

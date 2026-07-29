@@ -44,6 +44,30 @@ export function geodesicDistanceMeters(
   return result.s12;
 }
 
+export function geodesicMidpoint([longitudeA, latitudeA], [longitudeB, latitudeB]) {
+  const inverse = WGS84.Inverse(
+    latitudeA,
+    longitudeA,
+    latitudeB,
+    longitudeB,
+    Geodesic.DISTANCE | Geodesic.AZIMUTH,
+  );
+  if (!Number.isFinite(inverse.s12) || !Number.isFinite(inverse.azi1)) {
+    throw new Error('GeographicLib did not return a WGS84 midpoint inverse.');
+  }
+  const direct = WGS84.Direct(
+    latitudeA,
+    longitudeA,
+    inverse.azi1,
+    inverse.s12 / 2,
+    Geodesic.LATITUDE | Geodesic.LONGITUDE,
+  );
+  if (!Number.isFinite(direct.lat2) || !Number.isFinite(direct.lon2)) {
+    throw new Error('GeographicLib did not return a WGS84 midpoint.');
+  }
+  return [direct.lon2, direct.lat2];
+}
+
 export function signedAreaContributionSquareMeters(
   coordinates,
   referenceLatitudeRadians = 0,

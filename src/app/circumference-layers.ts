@@ -29,8 +29,9 @@ export function installCircumferenceLayers(): void {
   map.addLayer({
     id: 'highway-circumference-network-casing',
     type: 'line',
-    source: 'highway-circumference',
-    filter: ['==', ['get', 'kind'], 'highway-network-mainline'],
+    source: 'highway-network',
+    'source-layer': 'highways',
+    filter: ['==', ['get', 'role'], 'mainline'],
     layout: {
       visibility: 'none',
       'line-cap': 'round',
@@ -46,8 +47,9 @@ export function installCircumferenceLayers(): void {
   map.addLayer({
     id: 'highway-circumference-network-line',
     type: 'line',
-    source: 'highway-circumference',
-    filter: ['==', ['get', 'kind'], 'highway-network-mainline'],
+    source: 'highway-network',
+    'source-layer': 'highways',
+    filter: ['==', ['get', 'role'], 'mainline'],
     layout: {
       visibility: 'none',
       'line-cap': 'round',
@@ -68,8 +70,9 @@ export function installCircumferenceLayers(): void {
   map.addLayer({
     id: 'highway-circumference-network-connector-casing',
     type: 'line',
-    source: 'highway-circumference',
-    filter: ['==', ['get', 'kind'], 'highway-network-connector'],
+    source: 'highway-network',
+    'source-layer': 'highways',
+    filter: ['==', ['get', 'role'], 'connector'],
     layout: {
       visibility: 'none',
       'line-cap': 'round',
@@ -85,8 +88,9 @@ export function installCircumferenceLayers(): void {
   map.addLayer({
     id: 'highway-circumference-network-connector-line',
     type: 'line',
-    source: 'highway-circumference',
-    filter: ['==', ['get', 'kind'], 'highway-network-connector'],
+    source: 'highway-network',
+    'source-layer': 'highways',
+    filter: ['==', ['get', 'role'], 'connector'],
     layout: {
       visibility: 'none',
       'line-cap': 'round',

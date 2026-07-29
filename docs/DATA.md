@@ -110,38 +110,42 @@ explicit no-loop result.
 
 ## North American controlled-access highways
 
-Download and extract Natural Earth 5.1.1's North America roads supplement and 1:10m land
-shapefile. The committed OSM precision override can be regenerated from an ignored
-Overpass response before rebuilding the continental result:
+Install `osmium-tool` and `tippecanoe`, then download the current Geofabrik motorway
+extracts for Canada, Mexico, and every United States region:
 
 ```sh
-npm run build:data:highway-interchanges
+scripts/download-osm-highways.sh
 ```
 
-Then run:
+The script merges and filters those extracts into the ignored
+`data/.osm-highway-cache/north-america-motorways.osm.pbf`. Download and extract Natural
+Earth 5.1.1's 1:10m land shapefile, then build the continental result:
 
 ```sh
 npm run build:data:highways -- \
-  /path/to/ne_10m_roads_north_america.shp \
+  data/.osm-highway-cache/north-america-motorways.osm.pbf \
   data/north-america-highway-circumference.json \
-  /path/to/ne_10m_land.shp \
-  data/highway-interchanges/norwalk-i95-us7.json
+  data/north-america-highways.pmtiles \
+  /path/to/ne_10m_land.shp
 ```
 
-The build retains divided `Freeway` and `Tollway` centerlines. At a precision
-interchange it requires OSM `motorway`, `oneway=yes`, and at least two lanes for each
-mainline carriageway, averages the paired sides every 25 meters, and admits only
-signal-free `motorway_link` paths that join two eligible mainlines. Ramp connectors and
-mainlines stay distinct. Only identical explicit node IDs create a junction, so a bridge
-or other grade-separated geometric crossing cannot become an intersection. The builder
-also repairs short dangling source seams and nine sub-3 km international file-boundary
-seams, then keeps the largest contiguous North American component.
+This is a network-wide detailed build, not a local precision override. It requires OSM
+`motorway`, a separated one-way carriageway, and at least two lanes where an explicit
+lane count exists for each mainline. Opposing carriageways are paired locally and their
+geodesic midpoint is sampled every 50 meters. One-lane motorway branches and
+`motorway_link` ways remain separate connector edges; ordinary traffic signals
+invalidate a connector while ramp meters do not.
 
-It removes terminal branches, compresses degree-two corridors, decomposes the graph into
-vertex-biconnected blocks, and proves the maximum-area embedded outer boundary. The
-committed file contains the complete thin display network, segmented thick winning
-route, source attributes, and WGS84 land-contained and coastward areas. The browser
-lazy-loads this larger snapshot only after the highway criterion is selected.
+The route graph preserves every original OSM node identity. Mainline sides are mapped
+onto the sampled centerline, but a ramp may attach only at the exact OSM node shared
+with that mainline. A bridge, tunnel, or other grade-separated geometric crossing
+therefore cannot become an intersection. The builder contracts only internally connected
+geographic cells for the continental solve, expands the winning cycle through real
+detailed paths, and rejects a self-intersecting or materially undersized result.
+
+The committed JSON contains the segmented thick winning route, source attributes, and
+WGS84 land-contained and coastward areas. The complete thin network is stored separately
+as PMTiles so the browser can stream only the visible zoom tiles.
 
 ## Landmasses
 

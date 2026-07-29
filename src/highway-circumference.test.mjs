@@ -1,6 +1,10 @@
 import assert from 'node:assert/strict';
-import { readFile } from 'node:fs/promises';
+import { open, readFile } from 'node:fs/promises';
 import test from 'node:test';
+
+import { VectorTile } from '@mapbox/vector-tile';
+import Pbf from 'pbf';
+import { PMTiles } from 'pmtiles';
 
 import { hasProperSelfIntersection } from '../scripts/highway-cycle.mjs';
 import {
@@ -18,31 +22,51 @@ const data = highwayCircumferenceDataSchema.parse(
   ),
 );
 
-test('North America highway data publishes one exact maximum and full network', () => {
-  assert.equal(data.methodology.optimizationStatus, 'optimal');
-  assert.equal(
-    data.methodology.optimizationMethod,
-    'exact-planar-biconnected-outer-boundary',
-  );
-  assert.ok(data.network.features.length > 2_000);
-  assert.ok(data.route.boundaryRoadFeatureCount > 200);
-  assert.ok(data.route.areaSquareMeters > 4_000_000_000_000);
-  assert.ok(data.route.lengthMeters > 15_000_000);
-  assert.equal(hasProperSelfIntersection(data.route.coordinates), false);
-  assert.equal(data.methodology.interchangeConnectorCount, 1);
-  assert.equal(data.methodology.osmPrecisionMainlineCount, 2);
+function webMercatorTile(longitude, latitude, zoom) {
+  const dimension = 2 ** zoom;
+  return {
+    x: Math.floor(((longitude + 180) / 360) * dimension),
+    y: Math.floor(
+      ((1 - Math.asinh(Math.tan((latitude * Math.PI) / 180)) / Math.PI) / 2) *
+        dimension,
+    ),
+  };
+}
 
-  const countries = new Set(
-    data.network.features.flatMap((feature) => feature.properties.country.split(' / ')),
-  );
-  assert.ok(countries.has('Canada'));
-  assert.ok(countries.has('Mexico'));
-  assert.ok(countries.has('United States'));
-  for (const feature of data.network.features) {
-    if (feature.properties.type === 'Connector') continue;
-    assert.equal(feature.properties.divided, 'Divided');
-    assert.ok(['Freeway', 'Tollway'].includes(feature.properties.type));
+async function highwayPropertiesNear(archive, longitude, latitude) {
+  const zoom = 14;
+  const center = webMercatorTile(longitude, latitude, zoom);
+  const propertiesById = new Map();
+  for (let xOffset = -2; xOffset <= 2; xOffset += 1) {
+    for (let yOffset = -2; yOffset <= 2; yOffset += 1) {
+      const tile = await archive.getZxy(zoom, center.x + xOffset, center.y + yOffset);
+      if (!tile) continue;
+      const vectorTile = new VectorTile(new Pbf(tile.data));
+      const layer = vectorTile.layers['highways'];
+      for (let index = 0; index < layer.length; index += 1) {
+        const properties = layer.feature(index).properties;
+        propertiesById.set(properties['id'], properties);
+      }
+    }
   }
+  return [...propertiesById.values()];
+}
+
+test('North America highway data publishes one validated maximum and full vector network', () => {
+  assert.equal(data.methodology.optimizationStatus, 'validated-detailed');
+  assert.equal(data.methodology.optimizationMethod, 'detailed-macro-cycle-expansion');
+  assert.equal(data.network.featureCount, data.methodology.sourceFeatureCount);
+  assert.equal(data.network.sourceLayer, 'highways');
+  assert.match(data.network.tileUrl, /\.pmtiles$/);
+  assert.ok(data.network.featureCount > 16_000);
+  assert.ok(data.route.boundaryRoadFeatureCount > 20_000);
+  assert.ok(data.route.boundaryCorridorCount > 30_000);
+  assert.ok(data.route.areaSquareMeters > 6_000_000_000_000);
+  assert.ok(data.route.lengthMeters > 13_000_000);
+  assert.equal(hasProperSelfIntersection(data.route.coordinates), false);
+  assert.ok(data.methodology.interchangeConnectorCount > 10_000);
+  assert.ok(data.methodology.osmPrecisionMainlineCount > 5_000);
+  assert.equal(data.methodology.endpointSnapCount, 0);
 });
 
 test('highway route stores WGS84 land-contained and coastward areas', () => {
@@ -65,55 +89,44 @@ test('highway map collection separates thin network, thick route, and inside', (
   const kinds = new Set(collection.features.map((feature) => feature.properties?.kind));
   assert.deepEqual(
     kinds,
-    new Set([
-      'highway-inside',
-      'highway-network-mainline',
-      'highway-network-connector',
-      'highway-route-mainline',
-    ]),
+    new Set(['highway-inside', 'highway-route-mainline', 'highway-route-connector']),
   );
-  assert.equal(
-    collection.features.length,
-    data.network.features.length + data.route.segments.length + 1,
-  );
+  assert.equal(collection.features.length, data.route.segments.length + 1);
+  assert.ok(data.route.segments.some((segment) => segment.role === 'connector'));
+  assert.ok(data.route.segments.some((segment) => segment.role === 'mainline'));
 });
 
-test('Norwalk uses paired OSM mainlines and one explicit ramp connector', () => {
-  const i95 = data.network.features.find(
-    (feature) => feature.properties.id === 'ne-road-49175-0',
+test('regenerated tiles retain centered mainlines and separate ramps continent-wide', async () => {
+  const handle = await open(
+    new URL('../data/north-america-highways.pmtiles', import.meta.url),
   );
-  const us7 = data.network.features.find(
-    (feature) => feature.properties.id === 'ne-road-7118-0',
-  );
-  const connector = data.network.features.find(
-    (feature) => feature.properties.id === 'osm-interchange-norwalk-i95-us7',
-  );
-  assert.equal(i95?.properties.role, 'mainline');
-  assert.equal(us7?.properties.role, 'mainline');
-  assert.equal(connector?.properties.role, 'connector');
-  assert.deepEqual(us7?.geometry.coordinates[0], [-73.41898, 41.11031]);
-  assert.ok(
-    i95?.geometry.coordinates.some(
-      (coordinate) =>
-        coordinate[0] === connector?.geometry.coordinates[0]?.[0] &&
-        coordinate[1] === connector?.geometry.coordinates[0]?.[1],
-    ),
-  );
-  assert.ok(
-    us7?.geometry.coordinates.some(
-      (coordinate) =>
-        coordinate[0] === connector?.geometry.coordinates.at(-1)?.[0] &&
-        coordinate[1] === connector?.geometry.coordinates.at(-1)?.[1],
-    ),
-  );
-  assert.equal(
-    data.route.coordinates.some(
-      ([longitude, latitude]) =>
-        longitude > -73.435 &&
-        longitude < -73.41 &&
-        latitude > 41.115 &&
-        latitude < 41.15,
-    ),
-    false,
-  );
+  const source = {
+    getKey: () => 'north-america-highways-test',
+    getBytes: async (offset, length) => {
+      const buffer = Buffer.alloc(length);
+      const { bytesRead } = await handle.read(buffer, 0, length, offset);
+      const view = buffer.subarray(0, bytesRead);
+      return {
+        data: view.buffer.slice(view.byteOffset, view.byteOffset + view.byteLength),
+      };
+    },
+  };
+  try {
+    const archive = new PMTiles(source);
+    const norwalk = await highwayPropertiesNear(archive, -73.4204, 41.109);
+    assert.ok(
+      norwalk.some(
+        (properties) =>
+          properties['role'] === 'mainline' &&
+          String(properties['number']).split(' / ').includes('US7'),
+      ),
+    );
+    assert.ok(norwalk.some((properties) => properties['role'] === 'connector'));
+
+    const seattle = await highwayPropertiesNear(archive, -122.322, 47.595);
+    assert.ok(seattle.some((properties) => properties['role'] === 'mainline'));
+    assert.ok(seattle.some((properties) => properties['role'] === 'connector'));
+  } finally {
+    await handle.close();
+  }
 });

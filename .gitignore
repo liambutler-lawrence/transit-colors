@@ -8,5 +8,6 @@ coverage/
 .env.*
 npm-debug.log*
 data/.overpass-cache/
+data/.osm-highway-cache/
 data/.cdmx-streets.ndjson
 data/.gtfs-cache/

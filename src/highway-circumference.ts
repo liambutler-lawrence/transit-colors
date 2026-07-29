@@ -10,7 +10,7 @@ import { z } from 'zod';
 
 import { coordinateSchema, type Coordinate, type LandmassArea } from './domain.js';
 
-const highwayFeaturePropertiesSchema = z.object({
+export const highwayFeaturePropertiesSchema = z.object({
   class: z.string(),
   country: z.string(),
   divided: z.string(),
@@ -20,14 +20,6 @@ const highwayFeaturePropertiesSchema = z.object({
   role: z.enum(['mainline', 'connector', 'source-seam']),
   state: z.string(),
   type: z.string(),
-});
-const highwayFeatureSchema = z.object({
-  type: z.literal('Feature'),
-  geometry: z.object({
-    type: z.literal('LineString'),
-    coordinates: z.array(coordinateSchema).min(2),
-  }),
-  properties: highwayFeaturePropertiesSchema,
 });
 const highwayLandmassSchema = z.object({
   area_m2: z.number().positive(),
@@ -54,13 +46,22 @@ export const highwayCircumferenceDataSchema = z.object({
     giantNetworkNodeCount: z.number().int().positive(),
     interchangeConnectorCount: z.number().int().nonnegative(),
     osmPrecisionMainlineCount: z.number().int().nonnegative(),
-    optimizationMethod: z.literal('exact-planar-biconnected-outer-boundary'),
-    optimizationStatus: z.literal('optimal'),
+    optimizationMethod: z.enum([
+      'exact-planar-biconnected-outer-boundary',
+      'coarse-exact-detailed-map-match',
+      'detailed-macro-cycle-expansion',
+    ]),
+    optimizationStatus: z.enum([
+      'optimal',
+      'optimal-guide-refined',
+      'validated-detailed',
+    ]),
     sourceFeatureCount: z.number().int().positive(),
   }),
   network: z.object({
-    type: z.literal('FeatureCollection'),
-    features: z.array(highwayFeatureSchema).min(1),
+    featureCount: z.number().int().positive(),
+    sourceLayer: z.literal('highways'),
+    tileUrl: z.string().min(1),
   }),
   route: z.object({
     areaSquareMeters: z.number().positive(),
@@ -94,12 +95,14 @@ export type HighwayCircumferenceData = z.infer<typeof highwayCircumferenceDataSc
 export type HighwayFeatureProperties = z.infer<typeof highwayFeaturePropertiesSchema>;
 
 export const highwayMapFeaturePropertiesSchema = highwayFeaturePropertiesSchema.extend({
-  kind: z.enum([
-    'highway-network-mainline',
-    'highway-network-connector',
-    'highway-route-mainline',
-    'highway-route-connector',
-  ]),
+  kind: z
+    .enum([
+      'highway-network-mainline',
+      'highway-network-connector',
+      'highway-route-mainline',
+      'highway-route-connector',
+    ])
+    .optional(),
 });
 
 export function highwayLandmassArea(data: HighwayCircumferenceData): LandmassArea {
@@ -154,22 +157,7 @@ export function highwayFeatureCollection(
   );
   return {
     type: 'FeatureCollection',
-    features: [
-      inside,
-      ...data.network.features.map(
-        (feature): Feature<LineString, GeoJsonProperties> => ({
-          ...feature,
-          properties: {
-            ...feature.properties,
-            kind:
-              feature.properties.role === 'mainline'
-                ? 'highway-network-mainline'
-                : 'highway-network-connector',
-          },
-        }),
-      ),
-      ...route,
-    ],
+    features: [inside, ...route],
   };
 }
 

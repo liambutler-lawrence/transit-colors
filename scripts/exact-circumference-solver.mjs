@@ -1,3 +1,5 @@
+/* eslint-disable max-lines -- Exact model construction and validation share one private model representation. */
+
 import { createRequire } from 'node:module';
 import {
   hasSelfIntersection,
@@ -54,6 +56,50 @@ class UnionFind {
   }
 }
 
+class MinimumWeightHeap {
+  constructor() {
+    this.values = [];
+  }
+
+  get size() {
+    return this.values.length;
+  }
+
+  push(value) {
+    this.values.push(value);
+    let index = this.values.length - 1;
+    while (index > 0) {
+      const parentIndex = Math.floor((index - 1) / 2);
+      if (this.values[parentIndex].weight <= value.weight) break;
+      this.values[index] = this.values[parentIndex];
+      index = parentIndex;
+    }
+    this.values[index] = value;
+  }
+
+  pop() {
+    const result = this.values[0];
+    const last = this.values.pop();
+    if (this.values.length === 0) return result;
+    let index = 0;
+    while (true) {
+      const leftIndex = index * 2 + 1;
+      const rightIndex = leftIndex + 1;
+      if (leftIndex >= this.values.length) break;
+      const childIndex =
+        rightIndex < this.values.length &&
+        this.values[rightIndex].weight < this.values[leftIndex].weight
+          ? rightIndex
+          : leftIndex;
+      if (this.values[childIndex].weight >= last.weight) break;
+      this.values[index] = this.values[childIndex];
+      index = childIndex;
+    }
+    this.values[index] = last;
+    return result;
+  }
+}
+
 function transferPathFinder(network) {
   const adjacency = new Map(network.stations.map((station) => [station.id, []]));
   for (const [segmentIndex, segment] of network.segments.entries()) {
@@ -85,19 +131,14 @@ function transferPathFinder(network) {
 
     const distances = new Map([[fromId, 0]]);
     const previous = new Map();
-    const pending = new Set([fromId]);
-    while (pending.size > 0 && !distances.has(toId)) {
-      let currentId = null;
-      let currentDistance = Infinity;
-      for (const candidateId of pending) {
-        const candidateDistance = distances.get(candidateId) ?? Infinity;
-        if (candidateDistance < currentDistance) {
-          currentId = candidateId;
-          currentDistance = candidateDistance;
-        }
-      }
-      if (currentId === null) break;
-      pending.delete(currentId);
+    const pending = new MinimumWeightHeap();
+    pending.push({ nodeId: fromId, weight: 0 });
+    while (pending.size > 0) {
+      const current = pending.pop();
+      const currentId = current.nodeId;
+      const currentDistance = current.weight;
+      if (currentDistance !== distances.get(currentId)) continue;
+      if (currentId === toId) break;
       for (const step of adjacency.get(currentId) ?? []) {
         const nextDistance = currentDistance + step.weight;
         if (nextDistance >= (distances.get(step.toId) ?? Infinity)) continue;
@@ -106,7 +147,7 @@ function transferPathFinder(network) {
           fromId: currentId,
           segmentIndex: step.segmentIndex,
         });
-        pending.add(step.toId);
+        pending.push({ nodeId: step.toId, weight: nextDistance });
       }
     }
     if (!distances.has(toId)) {
@@ -140,6 +181,10 @@ function transferPathFinder(network) {
       nodeIds: [fromId, ...steps.map((step) => step.toId)],
     };
     cache.set(key, result);
+    cache.set(`${toId}${EDGE_SEPARATOR}${fromId}`, {
+      coordinates: [...coordinates].reverse(),
+      nodeIds: [...result.nodeIds].reverse(),
+    });
     return result;
   };
 }
@@ -984,4 +1029,54 @@ export async function solveExactMaximumAreaCycle(
     solveMilliseconds: performance.now() - startedAt,
     status: best.status,
   };
+}
+
+export async function solveExactMaximumAreaCycleSingleModel(
+  network,
+  { onIteration = () => {} } = {},
+) {
+  const require = createRequire(import.meta.url);
+  const loadHighs = require('highs');
+  const highs = await loadHighs();
+  const startedAt = performance.now();
+  const noGoodCycles = [];
+  let optimizationIterations = 0;
+  while (true) {
+    optimizationIterations += 1;
+    const model = buildExactCircumferenceModel(network, noGoodCycles, null, true);
+    const solution = highs.solve(model.lp, {
+      mip_abs_gap: 0.000001,
+      mip_rel_gap: 0,
+      presolve: 'on',
+      time_limit: 300,
+    });
+    if (solution.Status !== 'Optimal') {
+      throw new Error(
+        `Single-model circumference solve did not prove optimality: ${solution.Status}`,
+      );
+    }
+    const orderedArcs = orderedSelectedArcs(model, solution);
+    const nodeIds = platformPathForArcs(model, orderedArcs);
+    const coordinates = coordinatesForPath(network, nodeIds);
+    onIteration({
+      crossingCutCount: model.crossingCutCount,
+      iteration: optimizationIterations,
+      objectiveSquareKilometers: solution.ObjectiveValue,
+    });
+    if (!isValidSimpleCircumferenceCycle(network, nodeIds)) {
+      noGoodCycles.push(orderedArcs.map((arc) => arc.arcIndex));
+      continue;
+    }
+    return {
+      areaSquareMeters: Math.abs(signedAreaContributionSquareMeters(coordinates)),
+      coordinates,
+      edgeIndices: orderedArcs
+        .map((arc) => model.rideEdges[arc.edgeIndex].originalSegmentIndices)
+        .flat(),
+      nodeIds,
+      optimizationIterations,
+      solveMilliseconds: performance.now() - startedAt,
+      status: solution.Status,
+    };
+  }
 }
