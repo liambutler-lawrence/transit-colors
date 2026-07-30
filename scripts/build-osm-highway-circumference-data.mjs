@@ -126,7 +126,7 @@ const [guide, landmassBuffer] = await Promise.all([
 let derived;
 try {
   derived = deserialize(await readFile(derivedCachePath));
-  if (derived.displayTopologyVersion !== 6) {
+  if (derived.displayTopologyVersion !== 7) {
     throw new Error('The cached display topology predates ramp classification.');
   }
   console.log(`Reused ${derivedCachePath}.`);
@@ -149,7 +149,7 @@ try {
   console.log(detailed.statistics);
   derived = {
     detailed,
-    displayTopologyVersion: 6,
+    displayTopologyVersion: 7,
   };
   await writeFile(derivedCachePath, serialize(derived));
 
@@ -178,7 +178,7 @@ try {
   derived = {
     compressed,
     detailed,
-    displayTopologyVersion: 6,
+    displayTopologyVersion: 7,
     graphStatistics,
     sourceCompressed: compressed,
     sourceGraphParts: exactGraph.parts.map(({ id, role, tokens }) => ({
@@ -187,13 +187,13 @@ try {
       tokens,
     })),
     sourceGraphStatistics: graphStatistics,
-    sourceTopologyVersion: 9,
+    sourceTopologyVersion: 10,
   };
   await writeFile(derivedCachePath, serialize(derived));
 }
 globalThis.gc?.();
 const { detailed } = derived;
-if (derived.sourceTopologyVersion !== 9) {
+if (derived.sourceTopologyVersion !== 10) {
   console.time('Read OSM mainline continuity topology');
   const osm = await readOsmMotorwayPbf(sourcePath);
   console.timeEnd('Read OSM mainline continuity topology');
@@ -222,7 +222,7 @@ if (derived.sourceTopologyVersion !== 9) {
     exactEdges: sourceGraph.edges.length,
     exactNodes: sourceGraph.coordinateByNodeId.size,
   };
-  derived.sourceTopologyVersion = 9;
+  derived.sourceTopologyVersion = 10;
   console.timeEnd('Build explicit paired-centerline route graph');
   console.log(derived.sourceGraphStatistics);
   await writeFile(derivedCachePath, serialize(derived));

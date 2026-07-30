@@ -10,6 +10,8 @@ const PAIR_SEARCH_METERS = 160;
 const GRID_SIZE_DEGREES = 0.002;
 const MAX_DIRECT_CONNECTOR_METERS = 25_000;
 const MAX_RECIPROCAL_ENDPOINT_GAP_METERS = 2_500;
+const MAX_RAMP_CORRESPONDENCE_SAMPLES = 240;
+const RAMP_CORRESPONDENCE_SPACING_METERS = 25;
 
 function decodeOplString(value) {
   return value.replace(/%([0-9a-fA-F]{2})/g, (_, hexadecimal) =>
@@ -327,48 +329,6 @@ function resampleCoordinates(coordinates, spacingMeters = SAMPLE_SPACING_METERS)
     });
   }
   return samples;
-}
-
-function resampleCoordinatesToCount(coordinates, sampleCount) {
-  const sampled = resampleCoordinates(
-    coordinates,
-    Math.max(1, lineLengthMeters(coordinates) / Math.max(1, sampleCount - 1)),
-  );
-  if (sampled.length === sampleCount) {
-    return sampled.map((sample) => sample.coordinate);
-  }
-  // Floating-point length/spacing division can land one sample either side of
-  // the requested count, so fall back to exact normalized-distance sampling.
-  const cumulative = [0];
-  for (let index = 1; index < coordinates.length; index += 1) {
-    cumulative.push(
-      cumulative.at(-1) +
-        geodesicDistanceMeters(coordinates[index - 1], coordinates[index]),
-    );
-  }
-  const result = [];
-  let segmentIndex = 1;
-  for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += 1) {
-    const distance = (cumulative.at(-1) * sampleIndex) / Math.max(1, sampleCount - 1);
-    while (
-      segmentIndex < cumulative.length - 1 &&
-      cumulative[segmentIndex] < distance
-    ) {
-      segmentIndex += 1;
-    }
-    const segmentLength = cumulative[segmentIndex] - cumulative[segmentIndex - 1];
-    const fraction =
-      segmentLength === 0
-        ? 0
-        : (distance - cumulative[segmentIndex - 1]) / segmentLength;
-    const start = coordinates[segmentIndex - 1];
-    const end = coordinates[segmentIndex];
-    result.push([
-      start[0] + (end[0] - start[0]) * fraction,
-      start[1] + (end[1] - start[1]) * fraction,
-    ]);
-  }
-  return result;
 }
 
 function gridCell([longitude, latitude]) {
@@ -995,30 +955,182 @@ function attachmentAtPartDistance(part, partIndex, distanceAlongPartMeters) {
   throw new Error(`Highway part ${part.id} has no segment for a ramp attachment.`);
 }
 
-function averageReciprocalPathCoordinates(
+function rampCurveSamples(coordinates) {
+  const lengthMeters = lineLengthMeters(coordinates);
+  const sampleCount = Math.max(
+    3,
+    Math.min(
+      MAX_RAMP_CORRESPONDENCE_SAMPLES,
+      Math.ceil(lengthMeters / RAMP_CORRESPONDENCE_SPACING_METERS) + 1,
+    ),
+  );
+  return resampleCoordinates(
+    coordinates,
+    Math.max(1, lengthMeters / Math.max(1, sampleCount - 1)),
+  );
+}
+
+function localMeters(coordinate, origin) {
+  const latitudeRadians = (origin[1] * Math.PI) / 180;
+  return [
+    (coordinate[0] - origin[0]) * 111_320 * Math.cos(latitudeRadians),
+    (coordinate[1] - origin[1]) * 110_574,
+  ];
+}
+
+function alignedRampSamples(samples, commonStart, commonEnd, origin) {
+  const originalStart = localMeters(samples[0].coordinate, origin);
+  const originalEnd = localMeters(samples.at(-1).coordinate, origin);
+  const targetStart = localMeters(commonStart, origin);
+  const targetEnd = localMeters(commonEnd, origin);
+  const totalDistanceMeters = samples.at(-1).distanceMeters;
+  return samples.map((sample) => {
+    const progress =
+      totalDistanceMeters === 0 ? 0 : sample.distanceMeters / totalDistanceMeters;
+    const coordinate = localMeters(sample.coordinate, origin);
+    return {
+      ...sample,
+      // Align endpoints only for the correspondence search. The final
+      // centerline still uses geodesic midpoints of the unmodified paths.
+      aligned: [
+        coordinate[0] +
+          (targetStart[0] - originalStart[0]) * (1 - progress) +
+          (targetEnd[0] - originalEnd[0]) * progress,
+        coordinate[1] +
+          (targetStart[1] - originalStart[1]) * (1 - progress) +
+          (targetEnd[1] - originalEnd[1]) * progress,
+      ],
+      progress,
+    };
+  });
+}
+
+function correspondenceCost(first, second, chordLengthSquared) {
+  const distanceSquared =
+    (first.aligned[0] - second.aligned[0]) ** 2 +
+    (first.aligned[1] - second.aligned[1]) ** 2;
+  const progressPenalty =
+    (first.progress - second.progress) ** 2 *
+    Math.min(250_000, chordLengthSquared * 0.02);
+  const tangentPenalty = (1 - dot(first.direction, second.direction)) * 225;
+  return distanceSquared + progressPenalty + tangentPenalty;
+}
+
+function monotoneCurveCorrespondence(firstSamples, secondSamples) {
+  const firstCount = firstSamples.length;
+  const secondCount = secondSamples.length;
+  const previous = new Float64Array(secondCount).fill(Infinity);
+  const current = new Float64Array(secondCount).fill(Infinity);
+  const predecessors = new Uint8Array(firstCount * secondCount);
+  const chordLengthSquared =
+    (firstSamples.at(-1).aligned[0] - firstSamples[0].aligned[0]) ** 2 +
+    (firstSamples.at(-1).aligned[1] - firstSamples[0].aligned[1]) ** 2;
+  // Dynamic time warping gives every point an order-preserving partner. A
+  // loop can therefore consume more samples than a direct ramp without being
+  // forced to match the same normalized-distance position.
+  for (let firstIndex = 0; firstIndex < firstCount; firstIndex += 1) {
+    current.fill(Infinity);
+    for (let secondIndex = 0; secondIndex < secondCount; secondIndex += 1) {
+      const cost = correspondenceCost(
+        firstSamples[firstIndex],
+        secondSamples[secondIndex],
+        chordLengthSquared,
+      );
+      if (firstIndex === 0 && secondIndex === 0) {
+        current[secondIndex] = cost;
+        continue;
+      }
+      const diagonal =
+        firstIndex > 0 && secondIndex > 0 ? previous[secondIndex - 1] : Infinity;
+      const advanceFirst =
+        firstIndex > 0
+          ? previous[secondIndex] + RAMP_CORRESPONDENCE_SPACING_METERS ** 2
+          : Infinity;
+      const advanceSecond =
+        secondIndex > 0
+          ? current[secondIndex - 1] + RAMP_CORRESPONDENCE_SPACING_METERS ** 2
+          : Infinity;
+      const best = Math.min(diagonal, advanceFirst, advanceSecond);
+      current[secondIndex] = best + cost;
+      predecessors[firstIndex * secondCount + secondIndex] =
+        best === diagonal ? 1 : best === advanceFirst ? 2 : 3;
+    }
+    previous.set(current);
+  }
+
+  const correspondence = [];
+  let firstIndex = firstCount - 1;
+  let secondIndex = secondCount - 1;
+  while (firstIndex > 0 || secondIndex > 0) {
+    correspondence.push([firstIndex, secondIndex]);
+    const predecessor = predecessors[firstIndex * secondCount + secondIndex];
+    if (predecessor === 1) {
+      firstIndex -= 1;
+      secondIndex -= 1;
+    } else if (predecessor === 2) {
+      firstIndex -= 1;
+    } else {
+      secondIndex -= 1;
+    }
+  }
+  correspondence.push([0, 0]);
+  return correspondence.reverse();
+}
+
+export function averageReciprocalPathCoordinates(
   firstCoordinates,
   secondCoordinates,
   startCoordinate,
   endCoordinate,
 ) {
-  const maximumLength = Math.max(
-    lineLengthMeters(firstCoordinates),
-    lineLengthMeters(secondCoordinates),
+  const firstRawSamples = rampCurveSamples(firstCoordinates);
+  const secondRawSamples = rampCurveSamples(secondCoordinates);
+  const origin = midpoint(startCoordinate, endCoordinate);
+  const firstSamples = alignedRampSamples(
+    firstRawSamples,
+    startCoordinate,
+    endCoordinate,
+    origin,
   );
-  const sampleCount = Math.max(
-    3,
-    Math.min(800, Math.ceil(maximumLength / SAMPLE_SPACING_METERS) + 1),
+  const secondSamples = alignedRampSamples(
+    secondRawSamples,
+    startCoordinate,
+    endCoordinate,
+    origin,
   );
-  const firstSamples = resampleCoordinatesToCount(firstCoordinates, sampleCount);
-  const secondSamples = resampleCoordinatesToCount(secondCoordinates, sampleCount);
-  const coordinates = firstSamples.map((coordinate, index) =>
-    midpoint(coordinate, secondSamples[index]),
+  const coordinates = monotoneCurveCorrespondence(firstSamples, secondSamples).map(
+    ([firstIndex, secondIndex]) =>
+      midpoint(
+        firstRawSamples[firstIndex].coordinate,
+        secondRawSamples[secondIndex].coordinate,
+      ),
   );
   coordinates[0] = startCoordinate;
   coordinates[coordinates.length - 1] = endCoordinate;
   return coordinates.filter(
     (coordinate, index) =>
       index === 0 || geodesicDistanceMeters(coordinates[index - 1], coordinate) > 0.25,
+  );
+}
+
+function travelDirectionAtNode(coordinates, nodeIndex) {
+  if (nodeIndex === 0) return vector(coordinates[0], coordinates[1]);
+  if (nodeIndex === coordinates.length - 1) {
+    return vector(coordinates.at(-2), coordinates.at(-1));
+  }
+  return vector(coordinates[nodeIndex - 1], coordinates[nodeIndex + 1]);
+}
+
+function reciprocalDirectionPenalty(first, second) {
+  const firstDirections = first.travelDirections ?? [];
+  const secondDirections = second.travelDirections ?? [];
+  if (firstDirections.length === 0 || secondDirections.length === 0) return 0;
+  return Math.min(
+    ...firstDirections.flatMap((firstDirection) =>
+      secondDirections.map(
+        (secondDirection) => (1 + dot(firstDirection, secondDirection)) * 0.5,
+      ),
+    ),
   );
 }
 
@@ -1101,11 +1213,25 @@ function reciprocalPathPairs(paths, groupByPartIndex) {
         ) {
           continue;
         }
+        const firstDirectionPenalty = reciprocalDirectionPenalty(
+          first.path.firstAttachment,
+          second.path.secondAttachment,
+        );
+        const secondDirectionPenalty = reciprocalDirectionPenalty(
+          first.path.secondAttachment,
+          second.path.firstAttachment,
+        );
         candidates.push({
           first,
           score:
             firstEndpointGapMeters +
             secondEndpointGapMeters +
+            // Physical merge points can sit on opposite sides of a large
+            // interchange. Opposing mainline travel directions identify the
+            // same external legs more reliably than endpoint proximity alone.
+            (firstDirectionPenalty + secondDirectionPenalty) *
+              MAX_RECIPROCAL_ENDPOINT_GAP_METERS *
+              8 +
             (first.path.firstAttachment.partIndex ===
               second.path.secondAttachment.partIndex &&
             first.path.secondAttachment.partIndex ===
@@ -1692,18 +1818,27 @@ export function connectMainlinePartsAtSourceNodes(osm, mainlineWays, parts) {
 export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
   const partSegmentGrid = buildPartSegmentGrid(parts);
   const sourceWayIdToPartIndices = indexPartsBySourceWay(parts);
+  const graph = connectorSegmentGraph(connectorWays);
   const mainlinePartIndicesByNode = new Map();
+  const mainlineDirectionsByNodeAndPart = new Map();
   for (const way of mainlineWays) {
     const partIndices = sourceWayIdToPartIndices.get(way.id) ?? [];
     if (partIndices.length === 0) continue;
-    for (const nodeId of way.nodeIds) {
+    const wayCoordinates =
+      way.coordinates ?? way.nodeIds.map((nodeId) => osm.nodes.get(nodeId).coordinate);
+    for (const [nodeIndex, nodeId] of way.nodeIds.entries()) {
+      if (!graph.incident.has(nodeId)) continue;
       const indices = mainlinePartIndicesByNode.get(nodeId) ?? new Set();
-      for (const partIndex of partIndices) indices.add(partIndex);
+      for (const partIndex of partIndices) {
+        indices.add(partIndex);
+        const key = `${nodeId}:${partIndex}`;
+        const directions = mainlineDirectionsByNodeAndPart.get(key) ?? [];
+        directions.push(travelDirectionAtNode(wayCoordinates, nodeIndex));
+        mainlineDirectionsByNodeAndPart.set(key, directions);
+      }
       mainlinePartIndicesByNode.set(nodeId, indices);
     }
   }
-
-  const graph = connectorSegmentGraph(connectorWays);
   const components = traceLinkComponents(graph);
   const connectors = [];
   const insertionsByPart = new Map();
@@ -1717,7 +1852,18 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
         mainlinePartIndices: partIndices,
         nodeCoordinate: osm.nodes.get(nodeId).coordinate,
       });
-      return attachment ? [{ ...attachment, nodeId }] : [];
+      return attachment
+        ? [
+            {
+              ...attachment,
+              nodeId,
+              travelDirections:
+                mainlineDirectionsByNodeAndPart.get(
+                  `${nodeId}:${attachment.partIndex}`,
+                ) ?? [],
+            },
+          ]
+        : [];
     });
     if (attachments.length < 2) continue;
     const directedPaths = directedConnectorPaths(

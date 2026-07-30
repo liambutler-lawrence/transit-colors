@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  averageReciprocalPathCoordinates,
   buildOsmHighwayCenterlines,
   buildPairedOsmSourceTopologyGraph,
   buildRampConnectors,
@@ -10,6 +11,18 @@ import {
   prepareWays,
   traceMotorwayChains,
 } from './osm-highway-network.mjs';
+
+function coordinateBounds(coordinates) {
+  return coordinates.reduce(
+    (bounds, [longitude, latitude]) => [
+      Math.min(bounds[0], longitude),
+      Math.min(bounds[1], latitude),
+      Math.max(bounds[2], longitude),
+      Math.max(bounds[3], latitude),
+    ],
+    [Infinity, Infinity, -Infinity, -Infinity],
+  );
+}
 
 test('OPL parser preserves explicit node identities and motorway tags', () => {
   const node = parseOplLine('n42 v1 dV c0 t x-73.4 y41.1');
@@ -160,6 +173,125 @@ test('classic T interchange produces two paired centerlines and a triangle', () 
   );
   assert.ok(result.connectors.some((connector) => connector.coordinates.at(-1)[0] < 0));
   assert.ok(result.connectors.some((connector) => connector.coordinates.at(-1)[0] > 0));
+});
+
+test('reciprocal matcher uses directional legs instead of nearest ramp endpoints', () => {
+  const nodeCoordinates = {
+    aAfter: [0.012, -0.0001],
+    aBefore: [-0.002, -0.0001],
+    aCorrect: [0.008, 0.0001],
+    aSource: [0, -0.0001],
+    aWestEnd: [-0.002, 0.0001],
+    aWrong: [0.0001, -0.0001],
+    bAfter: [0.012, 0.0099],
+    bBefore: [-0.002, 0.0099],
+    bCorrect: [0.008, 0.0101],
+    bTarget: [0, 0.0099],
+    bWestEnd: [-0.002, 0.0101],
+    bWrong: [0.0001, 0.0099],
+    correctMiddle: [0.004, 0.0051],
+    forwardMiddle: [0.002, 0.005],
+    wrongMiddle: [0.0002, 0.005],
+  };
+  const nodes = new Map(
+    Object.entries(nodeCoordinates).map(([id, coordinate]) => [
+      id,
+      { coordinate, tags: {} },
+    ]),
+  );
+  const mainlineWays = [
+    {
+      id: 'a-east',
+      nodeIds: ['aBefore', 'aSource', 'aWrong', 'aAfter'],
+    },
+    {
+      id: 'a-west',
+      nodeIds: ['aAfter', 'aCorrect', 'aWestEnd'],
+    },
+    {
+      id: 'b-east',
+      nodeIds: ['bBefore', 'bTarget', 'bWrong', 'bAfter'],
+    },
+    {
+      id: 'b-west',
+      nodeIds: ['bAfter', 'bCorrect', 'bWestEnd'],
+    },
+  ];
+  const parts = [
+    {
+      coordinates: [
+        [-0.02, 0],
+        [0.02, 0],
+      ],
+      id: 'a',
+      role: 'mainline',
+      sourceWayIds: ['a-east', 'a-west'],
+      tokens: ['A'],
+    },
+    {
+      coordinates: [
+        [-0.02, 0.01],
+        [0.02, 0.01],
+      ],
+      id: 'b',
+      role: 'mainline',
+      sourceWayIds: ['b-east', 'b-west'],
+      tokens: ['B'],
+    },
+  ];
+  const connectorWays = [
+    {
+      id: 'forward',
+      nodeIds: ['aSource', 'forwardMiddle', 'bTarget'],
+    },
+    {
+      id: 'correct-reciprocal',
+      nodeIds: ['bCorrect', 'correctMiddle', 'aCorrect'],
+    },
+    {
+      id: 'wrong-same-direction',
+      nodeIds: ['bWrong', 'wrongMiddle', 'aWrong'],
+    },
+  ];
+  const result = buildRampConnectors({ nodes }, mainlineWays, parts, connectorWays);
+  assert.equal(result.connectors.length, 1);
+  assert.deepEqual(
+    new Set(result.connectors[0].sourceWayIds),
+    new Set(['forward', 'correct-reciprocal']),
+  );
+  assert.equal(result.statistics.unpairedConnectorPathCount, 1);
+});
+
+test('shape-aware ramp average retains a smaller loop between unlike paths', () => {
+  const directPath = [
+    [0, -0.012],
+    [0.002, -0.008],
+    [0.007, -0.003],
+    [0.012, 0],
+  ];
+  const loopPath = [
+    [0, 0.012],
+    [-0.006, 0.011],
+    [-0.01, 0.006],
+    [-0.009, 0],
+    [-0.006, -0.005],
+    [0, -0.007],
+    [0.006, -0.005],
+    [0.01, -0.001],
+    [0.012, 0.001],
+  ];
+  const averaged = averageReciprocalPathCoordinates(
+    directPath,
+    loopPath,
+    [0, 0],
+    [0.012, 0.0005],
+  );
+  const bounds = coordinateBounds(averaged);
+  assert.deepEqual(averaged[0], [0, 0]);
+  assert.deepEqual(averaged.at(-1), [0.012, 0.0005]);
+  assert.ok(bounds[0] < -0.004 && bounds[0] > -0.006);
+  assert.ok(bounds[1] < -0.009 && bounds[1] > -0.01);
+  assert.ok(averaged.length > 100);
 });
 
 test('unpaired one-way ramps are excluded from display and topology', () => {
