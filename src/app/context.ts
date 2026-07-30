@@ -503,6 +503,7 @@ function createCircumferenceState(): CircumferenceState {
       segments: [],
       stations: [],
     },
+    resultCandidates: [],
     selected: null,
     overrideId: '',
     methodology: null,

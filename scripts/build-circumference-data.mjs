@@ -5,6 +5,7 @@ import {
   buildCircumferenceCandidates,
   candidateFromNetworkPath,
   filterCircumferenceNetwork,
+  selectIndependentCircumferenceCandidates,
 } from '../src/circumference.ts';
 import {
   isValidSimpleCircumferenceCycle,
@@ -221,6 +222,7 @@ for (const areaKey of selectedAreaKeys) {
         {
           ...variant,
           candidates: [],
+          routeCandidates: [],
           scheduleCandidates: [],
         },
       ]),
@@ -294,7 +296,7 @@ for (const areaKey of selectedAreaKeys) {
   const unsortedCandidatePaths = [
     ...fullExactPaths,
     ...singleLinePaths,
-    ...generated.geometryVariants.straight.candidates
+    ...generated.geometryVariants.straight.routeCandidates
       .filter(
         (candidate) =>
           candidate.id !== exactStraightCandidate.id &&
@@ -351,25 +353,51 @@ for (const areaKey of selectedAreaKeys) {
       );
     },
   );
+  const routeCandidatesByMode = {};
+  for (const mode of ['track', 'straight']) {
+    const baseVariant = generated.geometryVariants[mode];
+    routeCandidatesByMode[mode] = candidatePaths.map((nodeIds) =>
+      candidateFromNetworkPath(baseVariant.network, nodeIds, {
+        independentCircleKind: nativeCircularCandidateIds.has(
+          candidateFromNetworkPath(
+            generated.geometryVariants.straight.network,
+            nodeIds,
+            { useTrackGeometry: false },
+          ).id,
+        )
+          ? 'native-line'
+          : undefined,
+        useTrackGeometry: mode === 'track',
+      }),
+    );
+  }
+  const trackCandidateById = new Map(
+    routeCandidatesByMode.track.map((candidate) => [candidate.id, candidate]),
+  );
+  const selectedCandidateIds = selectIndependentCircumferenceCandidates(
+    routeCandidatesByMode.straight,
+    { spatialCandidatesById: trackCandidateById },
+  ).map((candidate) => candidate.id);
   const geometryVariants = {};
   for (const mode of ['track', 'straight']) {
     const baseVariant = generated.geometryVariants[mode];
+    const routeCandidates = routeCandidatesByMode[mode];
+    const candidateById = new Map(
+      routeCandidates.map((candidate) => [candidate.id, candidate]),
+    );
+    const candidates = selectedCandidateIds.map((candidateId) => {
+      const candidate = candidateById.get(candidateId);
+      if (!candidate) {
+        throw new Error(
+          `${areaKey} ${mode} geometry is missing candidate ${candidateId}`,
+        );
+      }
+      return candidate;
+    });
     geometryVariants[mode] = {
       ...baseVariant,
-      candidates: candidatePaths.map((nodeIds) =>
-        candidateFromNetworkPath(baseVariant.network, nodeIds, {
-          independentCircleKind: nativeCircularCandidateIds.has(
-            candidateFromNetworkPath(
-              generated.geometryVariants.straight.network,
-              nodeIds,
-              { useTrackGeometry: false },
-            ).id,
-          )
-            ? 'native-line'
-            : undefined,
-          useTrackGeometry: mode === 'track',
-        }),
-      ),
+      candidates,
+      routeCandidates,
       scheduleCandidates: uniqueScheduleExactPaths.map((nodeIds) =>
         candidateFromNetworkPath(baseVariant.network, nodeIds, {
           independentCircleKind: nativeCircularCandidateIds.has(

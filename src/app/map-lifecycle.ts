@@ -1047,6 +1047,7 @@ routeTrackGeometryToggle.addEventListener('change', () => {
   );
   for (const areaKey of AREA_KEYS) {
     circumferenceStates[areaKey].candidates = [];
+    circumferenceStates[areaKey].resultCandidates = [];
   }
   requestAnimationFrame(() => {
     prepareCircumferenceRoute();

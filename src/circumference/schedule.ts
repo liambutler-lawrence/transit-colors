@@ -1,5 +1,6 @@
 import type { Schedule } from '../domain.js';
 import { routeIdForService } from './graph.js';
+import { selectIndependentCircumferenceCandidates } from './independent.js';
 import { candidateFromNetworkPath } from './precomputed.js';
 import type {
   CircumferenceCandidate,
@@ -261,33 +262,90 @@ export function scheduleCircumferenceMode(
   result: CircumferenceModeResult,
   activeService: ActiveCircumferenceService | null,
   geometryMode: CircumferenceGeometryMode,
+  referenceResults: {
+    readonly ranking?: CircumferenceModeResult;
+    readonly spatial?: CircumferenceModeResult;
+  } = {},
 ): CircumferenceModeResult {
-  const network = filterCircumferenceNetwork(result.network, activeService);
-  const rebuildCandidates = (
-    candidates: readonly CircumferenceCandidate[],
-  ): CircumferenceCandidate[] =>
-    candidates
-      .filter((candidate) => networkPathExists(network, candidate.nodeIds))
-      .map((candidate) =>
-        candidateFromNetworkPath(network, candidate.nodeIds, {
-          independentCircleKind: candidate.independentCircleKind,
-          useTrackGeometry: geometryMode === 'track',
-        }),
-      );
-  const validCandidates = rebuildCandidates(result.candidates);
-  const validScheduleCandidates = rebuildCandidates(
-    result.scheduleCandidates?.length ? result.scheduleCandidates : result.candidates,
+  const buildScheduledPool = (
+    sourceResult: CircumferenceModeResult,
+    sourceGeometryMode: CircumferenceGeometryMode,
+  ): {
+    readonly network: CircumferenceNetwork;
+    readonly routeCandidates: CircumferenceCandidate[];
+    readonly scheduleCandidates: CircumferenceCandidate[];
+  } => {
+    const network = filterCircumferenceNetwork(sourceResult.network, activeService);
+    const rebuildCandidates = (
+      candidates: readonly CircumferenceCandidate[],
+    ): CircumferenceCandidate[] =>
+      candidates
+        .filter((candidate) => networkPathExists(network, candidate.nodeIds))
+        .map((candidate) =>
+          candidateFromNetworkPath(network, candidate.nodeIds, {
+            independentCircleKind: candidate.independentCircleKind,
+            useTrackGeometry: sourceGeometryMode === 'track',
+          }),
+        );
+    const validRouteCandidates = rebuildCandidates(sourceResult.routeCandidates);
+    const validScheduleCandidates = rebuildCandidates(
+      sourceResult.scheduleCandidates?.length
+        ? sourceResult.scheduleCandidates
+        : sourceResult.routeCandidates,
+    );
+    const winner = validScheduleCandidates[0] ?? validRouteCandidates[0];
+    const alternatives = [...validRouteCandidates, ...validScheduleCandidates]
+      .filter((candidate) => candidate.id !== winner?.id)
+      .filter(
+        (candidate, index, candidates) =>
+          candidates.findIndex(({ id }) => id === candidate.id) === index,
+      )
+      .sort((first, second) => second.areaSquareMeters - first.areaSquareMeters);
+    return {
+      network,
+      routeCandidates: winner === undefined ? [] : [winner, ...alternatives],
+      scheduleCandidates: validScheduleCandidates,
+    };
+  };
+
+  const currentPool = buildScheduledPool(result, geometryMode);
+  const rankingPool =
+    referenceResults.ranking === undefined
+      ? currentPool
+      : buildScheduledPool(referenceResults.ranking, 'straight');
+  const spatialPool =
+    referenceResults.spatial === undefined
+      ? currentPool
+      : buildScheduledPool(referenceResults.spatial, 'track');
+  const spatialCandidateById = new Map(
+    spatialPool.routeCandidates.map((candidate) => [candidate.id, candidate]),
   );
-  const winner = validScheduleCandidates[0] ?? validCandidates[0];
-  const alternatives = validCandidates
-    .filter((candidate) => candidate.id !== winner?.id)
-    .sort((first, second) => second.areaSquareMeters - first.areaSquareMeters);
-  const candidates = winner === undefined ? [] : [winner, ...alternatives];
+  const selectedCandidateIds = selectIndependentCircumferenceCandidates(
+    rankingPool.routeCandidates,
+    { spatialCandidatesById: spatialCandidateById },
+  ).map((candidate) => candidate.id);
+  const currentCandidateById = new Map(
+    currentPool.routeCandidates.map((candidate) => [candidate.id, candidate]),
+  );
+  const candidates = selectedCandidateIds.flatMap((candidateId) => {
+    const candidate = currentCandidateById.get(candidateId);
+    return candidate ? [candidate] : [];
+  });
+  const rankingOrder = new Map(
+    rankingPool.routeCandidates.map((candidate, index) => [candidate.id, index]),
+  );
+  const routeCandidates = [...currentPool.routeCandidates].sort(
+    (first, second) =>
+      (rankingOrder.get(first.id) ?? Number.MAX_SAFE_INTEGER) -
+        (rankingOrder.get(second.id) ?? Number.MAX_SAFE_INTEGER) ||
+      first.id.localeCompare(second.id),
+  );
 
   return {
     candidates,
     methodology: result.methodology,
-    network,
-    scheduleCandidates: validScheduleCandidates,
+    network: currentPool.network,
+    routeCandidates,
+    scheduleCandidates: currentPool.scheduleCandidates,
   };
 }

@@ -207,7 +207,7 @@ test('circle result cards focus an always-visible global network', async () => {
   assert.match(circumferenceUi, /dataset\['focusCandidate'\] = candidate\.id/);
   assert.match(
     circumferenceUi,
-    /AREA_KEYS\.flatMap\(\(areaKey\) => \{[\s\S]*selectIndependentCircumferenceCandidates/,
+    /AREA_KEYS\.flatMap\(\(areaKey\) => \{[\s\S]*circumferenceStates\[areaKey\]\.resultCandidates/,
   );
   assert.match(
     circumferenceUi,

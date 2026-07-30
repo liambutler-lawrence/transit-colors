@@ -5,6 +5,8 @@ import test from 'node:test';
 import { isValidSimpleCircumferenceCycle } from '../scripts/exact-circumference-solver.mjs';
 import {
   activeCircumferenceService,
+  CIRCUMFERENCE_INTERIOR_OVERLAP_TOLERANCE_SQUARE_METERS,
+  circumferenceInteriorOverlapSquareMeters,
   distanceMeters,
   junctionContinuationLineLanes,
   junctionContinuationSections,
@@ -42,9 +44,36 @@ test('precomputed circumference winners are validated and topology-stable', asyn
       routeData.track.scheduleCandidates.map((candidate) => candidate.nodeIds),
       routeData.straight.scheduleCandidates.map((candidate) => candidate.nodeIds),
     );
+    const trackRouteCandidateById = new Map(
+      routeData.track.routeCandidates.map((candidate) => [candidate.id, candidate]),
+    );
+    const expectedCandidateIds = selectIndependentCircumferenceCandidates(
+      routeData.straight.routeCandidates,
+      { spatialCandidatesById: trackRouteCandidateById },
+    ).map((candidate) => candidate.id);
+    assert.deepEqual(
+      routeData.track.candidates.map((candidate) => candidate.id),
+      expectedCandidateIds,
+    );
+    assert.deepEqual(
+      routeData.straight.candidates.map((candidate) => candidate.id),
+      expectedCandidateIds,
+    );
     assert.equal(
       selectIndependentCircumferenceCandidates(routeData.track.candidates).length,
-      ['athens', 'singapore'].includes(areaKey) ? 3 : 1,
+      routeData.track.candidates.length,
+    );
+    for (const [index, candidate] of routeData.track.candidates.entries()) {
+      for (const otherCandidate of routeData.track.candidates.slice(index + 1)) {
+        assert.ok(
+          circumferenceInteriorOverlapSquareMeters(candidate, otherCandidate) <=
+            CIRCUMFERENCE_INTERIOR_OVERLAP_TOLERANCE_SQUARE_METERS,
+          `${areaKey} publishes overlapping result circles ${candidate.id} and ${otherCandidate.id}`,
+        );
+      }
+    }
+    assert.ok(
+      routeData.track.routeCandidates.length >= routeData.track.candidates.length,
     );
     assert.ok(routeData.straight.scheduleCandidates.length >= 1);
     for (const [index, candidate] of routeData.straight.candidates.entries()) {
@@ -337,7 +366,7 @@ test('Singapore includes the completed Circle Line closure', async () => {
   assert.ok(routeData.track.candidates[0].areaSquareMeters > 200_000_000);
 });
 
-test('Singapore reports its three major independent MRT circles', async () => {
+test('Singapore publishes only its largest spatially independent MRT circle', async () => {
   const [routeData, schedules] = await Promise.all([
     readFile(
       new URL('../data/singapore-circumference.json', import.meta.url),
@@ -347,15 +376,40 @@ test('Singapore reports its three major independent MRT circles', async () => {
       JSON.parse,
     ),
   ]);
-  const independent = selectIndependentCircumferenceCandidates(
-    routeData.track.candidates,
-  );
+  const independent = routeData.track.candidates;
 
-  assert.equal(independent.length, 3);
+  assert.equal(independent.length, 1);
   assert.deepEqual(
     independent.map((candidate) => candidate.lines),
-    [['CC', 'CG', 'DT', 'EW', 'NS'], ['CC'], ['CC', 'DT', 'NE', 'NS', 'TE']],
+    [['CC', 'CG', 'DT', 'EW', 'NS']],
   );
+  assert.ok(routeData.track.routeCandidates.length > independent.length);
+  assert.equal(
+    selectIndependentCircumferenceCandidates(routeData.track.routeCandidates).length,
+    1,
+  );
+  const middayService = activeCircumferenceService(schedules, 1, 12 * 60);
+  const scheduleOptions = {
+    ranking: routeData.straight,
+    spatial: routeData.track,
+  };
+  const scheduledTrack = scheduleCircumferenceMode(
+    routeData.track,
+    middayService,
+    'track',
+    scheduleOptions,
+  );
+  const scheduledStraight = scheduleCircumferenceMode(
+    routeData.straight,
+    middayService,
+    'straight',
+    scheduleOptions,
+  );
+  assert.deepEqual(
+    scheduledTrack.candidates.map((candidate) => candidate.id),
+    scheduledStraight.candidates.map((candidate) => candidate.id),
+  );
+  assert.equal(scheduledTrack.candidates.length, 1);
   assert.equal(schedules.routes['singapore-rail/BP'].mode, 'light_rail');
   assert.equal(schedules.routes['singapore-rail/SK'].mode, 'light_rail');
   assert.equal(schedules.routes['singapore-rail/PG'].mode, 'light_rail');

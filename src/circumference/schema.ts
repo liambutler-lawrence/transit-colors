@@ -84,6 +84,7 @@ const modeResultSchema = z.object({
     segments: z.array(networkSegmentSchema),
     stations: z.array(circumferenceNodeSchema),
   }),
+  routeCandidates: z.array(candidateSchema),
   scheduleCandidates: z.array(candidateSchema).default([]),
 });
 

@@ -54,6 +54,7 @@ export interface CircumferenceState {
   network: CircumferenceNetwork;
   overrideId: string;
   requiredSegmentIds: Set<string>;
+  resultCandidates: CircumferenceCandidate[];
   scheduleKey: string;
   selected: CircumferenceCandidate | null;
 }

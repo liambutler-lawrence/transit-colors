@@ -44,6 +44,7 @@ import {
   lineServiceEdges,
   serviceEdgeToken,
 } from './service-edges.js';
+import { selectIndependentCircumferenceCandidates } from './independent.js';
 import type {
   Adjacency,
   BuildCircumferenceOptions,
@@ -1009,8 +1010,9 @@ export function buildCircumferenceCandidates(
       transfersByEdge,
     });
     return {
-      candidates: variant.candidates,
+      candidates: selectIndependentCircumferenceCandidates(variant.candidates),
       network: variant.network,
+      routeCandidates: variant.candidates,
       methodology: {
         eligibleStationCount: eligibleStations.length,
         platformNodeCount: nodes.size,

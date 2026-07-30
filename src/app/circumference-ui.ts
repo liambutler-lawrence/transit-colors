@@ -15,7 +15,6 @@ import {
   scheduleCircumferenceMode,
   scheduleLineStateKey,
   selectCircumferenceCandidate,
-  selectIndependentCircumferenceCandidates,
   type JunctionContinuationLane,
 } from '../circumference.js';
 import {
@@ -204,6 +203,7 @@ export function resetCircumferenceRoute(): void {
     routeState.activeLineNames = [];
     routeState.areaKey = null;
     routeState.candidates = [];
+    routeState.resultCandidates = [];
     routeState.network = {
       segments: [],
       stations: [],
@@ -654,9 +654,7 @@ function compareCircleArea(
  */
 export function circumferenceCircleResults(): CircumferenceCircleResult[] {
   return AREA_KEYS.flatMap((areaKey) => {
-    const candidates = selectIndependentCircumferenceCandidates(
-      circumferenceStates[areaKey].candidates,
-    );
+    const candidates = circumferenceStates[areaKey].resultCandidates;
     return candidates.map((candidate, index) => ({
       areaKey,
       areaRank: index + 1,
@@ -875,7 +873,7 @@ export function renderCircumferenceOptions(): void {
   automaticOption.value = '';
   automaticOption.textContent = 'Automatic · proven largest straight-edge area';
   const rankingCandidates =
-    circumferenceState.geometryVariants?.straight.candidates ??
+    circumferenceState.geometryVariants?.straight.routeCandidates ??
     circumferenceState.candidates;
   const candidateOptions = circumferenceState.candidates.map((candidate, index) => {
     const option = document.createElement('option');
@@ -927,11 +925,16 @@ function prepareCircumferenceArea(
     baseResult,
     activeService,
     geometryMode,
+    {
+      ranking: routeState.geometryVariants.straight,
+      spatial: routeState.geometryVariants.track,
+    },
   );
   routeState.areaKey = areaKey;
   routeState.geometryMode = geometryMode;
   routeState.scheduleKey = scheduleKey;
-  routeState.candidates = result.candidates;
+  routeState.candidates = result.routeCandidates;
+  routeState.resultCandidates = result.candidates;
   routeState.network = result.network;
   routeState.methodology = result.methodology;
   routeState.activeLineNames = [
@@ -943,7 +946,7 @@ function prepareCircumferenceArea(
   ].sort(sortLineNames);
 
   const storedOverride = storedCircumferenceOverride(areaKey);
-  routeState.overrideId = result.candidates.some(
+  routeState.overrideId = result.routeCandidates.some(
     (candidate) => candidate.id === storedOverride,
   )
     ? storedOverride
@@ -951,7 +954,7 @@ function prepareCircumferenceArea(
   if (
     !routeState.overrideId &&
     storedOverride &&
-    !baseResult.candidates.some((candidate) => candidate.id === storedOverride)
+    !baseResult.routeCandidates.some((candidate) => candidate.id === storedOverride)
   ) {
     storeCircumferenceOverride(areaKey, '');
   }

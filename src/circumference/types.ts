@@ -108,9 +108,18 @@ export interface CircumferenceMethodology {
 }
 
 export interface CircumferenceModeResult {
+  /**
+   * Publishable result circles. Their interiors and ride segments are pairwise
+   * disjoint by construction.
+   */
   readonly candidates: CircumferenceCandidate[];
   readonly methodology: CircumferenceMethodology;
   readonly network: CircumferenceNetwork;
+  /**
+   * Ranked candidate pool retained for manual route overrides. These are not
+   * result circles and may overlap one another.
+   */
+  readonly routeCandidates: CircumferenceCandidate[];
   readonly scheduleCandidates?: CircumferenceCandidate[] | undefined;
 }
 

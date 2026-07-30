@@ -12,7 +12,6 @@ import {
   scheduleCircumferenceMode,
   serviceDaysActiveAt,
   selectCircumferenceCandidate,
-  selectIndependentCircumferenceCandidates,
   tracksShareFromNode,
 } from './circumference.js';
 import { calculateLandmassCoverage } from './circumference-landmass.js';
@@ -71,41 +70,6 @@ assert.equal(lineColor('nyc', 'SIR'), '#008EB7');
 assert.equal(lineColor('singapore', 'CC'), '#FA9E0D');
 assert.equal(lineColor('atlanta', 'RED'), '#CE242B');
 assert.equal(lineColor('athens', 'M3'), '#0057A8');
-
-const independentCandidate = (id, areaSquareMeters, rideSegmentIds) => ({
-  id,
-  areaSquareMeters,
-  lines: ['A', 'B'],
-  segments: rideSegmentIds.map((segmentId) => ({
-    id: segmentId,
-    type: 'ride',
-  })),
-});
-assert.deepEqual(
-  selectIndependentCircumferenceCandidates([
-    independentCandidate('overlapping-alternative', 90, ['trunk', 'west']),
-    independentCandidate('eastern-circle', 70, ['east-a', 'east-b']),
-    {
-      ...independentCandidate('native-circle', 80, ['trunk', 'native']),
-      independentCircleKind: 'native-line',
-      lines: ['Circle'],
-    },
-    {
-      ...independentCandidate('native-circle-alternative', 75, [
-        'trunk',
-        'native-other',
-      ]),
-      independentCircleKind: 'native-line',
-      lines: ['Circle'],
-    },
-    {
-      ...independentCandidate('largest-circle', 100, ['trunk', 'north']),
-      lines: ['A', 'B'],
-    },
-    independentCandidate('southern-circle', 60, ['south-a', 'south-b']),
-  ]).map(({ id }) => id),
-  ['largest-circle', 'native-circle', 'eastern-circle', 'southern-circle'],
-);
 
 const closedServiceDays = Array.from({ length: 7 }, () => []);
 const overnightServiceDays = Array.from({ length: 7 }, () => []);
@@ -570,7 +534,7 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
   assert.equal(new Set(winner.nodeIds).size, winner.nodeIds.length);
   assert.ok(winner.coordinates.length > winner.nodeIds.length + 1);
   assert.ok(winner.lines.length > 1);
-  assert.ok(result.candidates.length > 2);
+  assert.ok(result.geometryVariants.track.routeCandidates.length > 2);
   assert.equal(result.methodology.trackGeometryEnabled, true);
   assert.ok(result.methodology.trackGeometryEdgeCount > 100);
   const straightWinner = result.geometryVariants.straight.candidates[0];
