@@ -220,3 +220,36 @@ test('circle result cards focus an always-visible global network', async () => {
     /AREA_KEYS\.flatMap\(\(areaKey\) =>[\s\S]*routeFeatureCollection/,
   );
 });
+
+test('metro and highway circumference networks are mutually exclusive', async () => {
+  const circumferenceUi = await readFile(
+    new URL('./app/circumference-ui.ts', import.meta.url),
+    'utf8',
+  );
+  const prepareStart = circumferenceUi.indexOf(
+    'export function prepareCircumferenceRoute',
+  );
+  const prepareEnd = circumferenceUi.indexOf(
+    'export function refreshCircumferenceSchedule',
+    prepareStart,
+  );
+  const prepareRoute = circumferenceUi.slice(
+    prepareStart,
+    prepareEnd >= 0 ? prepareEnd : undefined,
+  );
+
+  assert.ok(prepareStart >= 0);
+  assert.match(
+    circumferenceUi,
+    /const networkVisible =[\s\S]*runtime\.activeProduct === 'circumference' &&[\s\S]*!highwayMode/,
+  );
+  assert.match(
+    circumferenceUi,
+    /const routeVisible =[\s\S]*runtime\.activeProduct === 'circumference' &&[\s\S]*!highwayMode/,
+  );
+  assert.ok(
+    prepareRoute.indexOf('syncCircumferenceVisibility();') <
+      prepareRoute.indexOf('if (highwayCriterionActive())'),
+    'the outgoing criterion layers are hidden before the incoming network is prepared',
+  );
+});

@@ -1009,10 +1009,13 @@ export function focusCircumferenceArea(
 export function prepareCircumferenceRoute(
   sequence: number = runtime.loadSequence,
 ): void {
-  if (sequence !== runtime.loadSequence || !runtime.circumferenceLandmasses) {
-    return;
-  }
+  if (sequence !== runtime.loadSequence) return;
   syncCircumferenceCriterionControls();
+  // The criteria are distinct products on the shared map. Synchronize all
+  // route layers before preparing the newly selected dataset so a previously
+  // rendered metro or highway network cannot remain visible during the switch.
+  syncCircumferenceVisibility();
+  if (!runtime.circumferenceLandmasses) return;
   if (highwayCriterionActive()) {
     void prepareHighwayCircumference();
     return;
