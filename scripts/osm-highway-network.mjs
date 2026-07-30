@@ -8,6 +8,8 @@ import { geodesicDistanceMeters, geodesicMidpoint } from './wgs84-geodesy.mjs';
 const SAMPLE_SPACING_METERS = 50;
 const PAIR_SEARCH_METERS = 160;
 const GRID_SIZE_DEGREES = 0.002;
+const MAX_DIRECT_CONNECTOR_METERS = 25_000;
+const MAX_RECIPROCAL_ENDPOINT_GAP_METERS = 2_500;
 
 function decodeOplString(value) {
   return value.replace(/%([0-9a-fA-F]{2})/g, (_, hexadecimal) =>
@@ -274,15 +276,28 @@ function lineLengthMeters(coordinates) {
 }
 
 function resampleChain(chain) {
+  const samples = resampleCoordinates(chain.coordinates);
+  return {
+    ...chain,
+    lengthMeters: samples.at(-1)?.distanceMeters ?? 0,
+    samples: samples.map((sample, sampleIndex) => ({
+      ...sample,
+      chainId: chain.id,
+      sampleIndex,
+    })),
+  };
+}
+
+function resampleCoordinates(coordinates, spacingMeters = SAMPLE_SPACING_METERS) {
   const cumulative = [0];
-  for (let index = 1; index < chain.coordinates.length; index += 1) {
+  for (let index = 1; index < coordinates.length; index += 1) {
     cumulative.push(
       cumulative.at(-1) +
-        geodesicDistanceMeters(chain.coordinates[index - 1], chain.coordinates[index]),
+        geodesicDistanceMeters(coordinates[index - 1], coordinates[index]),
     );
   }
   const lengthMeters = cumulative.at(-1);
-  const sampleCount = Math.max(2, Math.ceil(lengthMeters / SAMPLE_SPACING_METERS) + 1);
+  const sampleCount = Math.max(2, Math.ceil(lengthMeters / spacingMeters) + 1);
   const samples = [];
   let segmentIndex = 1;
   for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += 1) {
@@ -299,21 +314,61 @@ function resampleChain(chain) {
       endDistance === startDistance
         ? 0
         : (distance - startDistance) / (endDistance - startDistance);
-    const start = chain.coordinates[segmentIndex - 1];
-    const end = chain.coordinates[segmentIndex];
+    const start = coordinates[segmentIndex - 1];
+    const end = coordinates[segmentIndex];
     samples.push({
-      chainId: chain.id,
       coordinate: [
         start[0] + (end[0] - start[0]) * fraction,
         start[1] + (end[1] - start[1]) * fraction,
       ],
       direction: vector(start, end),
       distanceMeters: distance,
-      sampleIndex,
       sourceSegmentIndex: segmentIndex - 1,
     });
   }
-  return { ...chain, lengthMeters, samples };
+  return samples;
+}
+
+function resampleCoordinatesToCount(coordinates, sampleCount) {
+  const sampled = resampleCoordinates(
+    coordinates,
+    Math.max(1, lineLengthMeters(coordinates) / Math.max(1, sampleCount - 1)),
+  );
+  if (sampled.length === sampleCount) {
+    return sampled.map((sample) => sample.coordinate);
+  }
+  // Floating-point length/spacing division can land one sample either side of
+  // the requested count, so fall back to exact normalized-distance sampling.
+  const cumulative = [0];
+  for (let index = 1; index < coordinates.length; index += 1) {
+    cumulative.push(
+      cumulative.at(-1) +
+        geodesicDistanceMeters(coordinates[index - 1], coordinates[index]),
+    );
+  }
+  const result = [];
+  let segmentIndex = 1;
+  for (let sampleIndex = 0; sampleIndex < sampleCount; sampleIndex += 1) {
+    const distance = (cumulative.at(-1) * sampleIndex) / Math.max(1, sampleCount - 1);
+    while (
+      segmentIndex < cumulative.length - 1 &&
+      cumulative[segmentIndex] < distance
+    ) {
+      segmentIndex += 1;
+    }
+    const segmentLength = cumulative[segmentIndex] - cumulative[segmentIndex - 1];
+    const fraction =
+      segmentLength === 0
+        ? 0
+        : (distance - cumulative[segmentIndex - 1]) / segmentLength;
+    const start = coordinates[segmentIndex - 1];
+    const end = coordinates[segmentIndex];
+    result.push([
+      start[0] + (end[0] - start[0]) * fraction,
+      start[1] + (end[1] - start[1]) * fraction,
+    ]);
+  }
+  return result;
 }
 
 function gridCell([longitude, latitude]) {
@@ -602,6 +657,7 @@ export function buildAveragedMainlines(chains) {
 function connectorSegmentGraph(connectorWays) {
   const edges = [];
   const incident = new Map();
+  const outgoing = new Map();
   for (const way of connectorWays) {
     for (let index = 1; index < way.nodeIds.length; index += 1) {
       const edgeIndex = edges.length;
@@ -611,6 +667,9 @@ function connectorSegmentGraph(connectorWays) {
         wayId: way.id,
       };
       edges.push(edge);
+      const outgoingEntries = outgoing.get(edge.fromId) ?? [];
+      outgoingEntries.push(edgeIndex);
+      outgoing.set(edge.fromId, outgoingEntries);
       for (const nodeId of [edge.fromId, edge.toId]) {
         const entries = incident.get(nodeId) ?? [];
         entries.push(edgeIndex);
@@ -618,7 +677,7 @@ function connectorSegmentGraph(connectorWays) {
       }
     }
   }
-  return { edges, incident };
+  return { edges, incident, outgoing };
 }
 
 function traceLinkComponents(graph) {
@@ -666,6 +725,9 @@ function attachmentForNode({ grid, mainlinePartIndices, nodeCoordinate }) {
           best = {
             coordinate,
             distanceAlongMeters: geodesicDistanceMeters(segment.start, coordinate),
+            distanceAlongPartMeters:
+              segment.startDistanceMeters +
+              geodesicDistanceMeters(segment.start, coordinate),
             distanceMeters,
             partIndex: segment.partIndex,
             segmentIndex: segment.segmentIndex,
@@ -698,6 +760,9 @@ function attachmentsForNodeByPart({ grid, mainlinePartIndices, nodeCoordinate })
           bestByPart.set(segment.partIndex, {
             coordinate,
             distanceAlongMeters: geodesicDistanceMeters(segment.start, coordinate),
+            distanceAlongPartMeters:
+              segment.startDistanceMeters +
+              geodesicDistanceMeters(segment.start, coordinate),
             distanceMeters,
             partIndex: segment.partIndex,
             segmentIndex: segment.segmentIndex,
@@ -712,6 +777,7 @@ function attachmentsForNodeByPart({ grid, mainlinePartIndices, nodeCoordinate })
 function buildPartSegmentGrid(parts) {
   const grid = new Map();
   for (const [partIndex, part] of parts.entries()) {
+    let startDistanceMeters = 0;
     for (
       let segmentIndex = 0;
       segmentIndex < part.coordinates.length - 1;
@@ -733,23 +799,36 @@ function buildPartSegmentGrid(parts) {
         ) {
           const key = `${cellX},${cellY}`;
           const segments = grid.get(key) ?? [];
-          segments.push({ end, partIndex, segmentIndex, start });
+          segments.push({
+            end,
+            partIndex,
+            segmentIndex,
+            start,
+            startDistanceMeters,
+          });
           grid.set(key, segments);
         }
       }
+      startDistanceMeters += geodesicDistanceMeters(start, end);
     }
   }
   return grid;
 }
 
-function pathFromOwner(nodeId, previousByNode) {
+function directedPath(nodeId, previousByNode) {
   const nodeIds = [nodeId];
+  const edgeIndices = [];
   let currentId = nodeId;
   while (previousByNode.has(currentId)) {
-    currentId = previousByNode.get(currentId);
+    const previous = previousByNode.get(currentId);
+    edgeIndices.push(previous.edgeIndex);
+    currentId = previous.nodeId;
     nodeIds.push(currentId);
   }
-  return nodeIds;
+  return {
+    edgeIndices: edgeIndices.reverse(),
+    nodeIds: nodeIds.reverse(),
+  };
 }
 
 function blockingTrafficSignal(node) {
@@ -811,76 +890,304 @@ class MinimumDistanceHeap {
   }
 }
 
-function directConnectorPaths(component, graph, attachments, osm) {
+function directedConnectorPaths(component, graph, attachments, osm) {
   const activeEdges = new Set(component.edgeIndices);
-  const queue = new MinimumDistanceHeap();
-  const distanceByNode = new Map();
-  const ownerByNode = new Map();
-  const previousByNode = new Map();
-  for (const [ownerIndex, attachment] of attachments.entries()) {
-    if (blockingTrafficSignal(osm.nodes.get(attachment.nodeId))) {
-      continue;
-    }
-    if ((distanceByNode.get(attachment.nodeId) ?? Infinity) <= 0) continue;
-    distanceByNode.set(attachment.nodeId, 0);
-    ownerByNode.set(attachment.nodeId, ownerIndex);
-    queue.push({ distanceMeters: 0, nodeId: attachment.nodeId });
+  const attachmentIndicesByNodeId = new Map();
+  for (const [attachmentIndex, attachment] of attachments.entries()) {
+    const indices = attachmentIndicesByNodeId.get(attachment.nodeId) ?? [];
+    indices.push(attachmentIndex);
+    attachmentIndicesByNodeId.set(attachment.nodeId, indices);
   }
-  const candidateByOwnerPair = new Map();
-  while (queue.size > 0) {
-    const current = queue.pop();
-    if (current.distanceMeters !== distanceByNode.get(current.nodeId)) continue;
-    for (const edgeIndex of graph.incident.get(current.nodeId) ?? []) {
-      if (!activeEdges.has(edgeIndex)) continue;
-      const edge = graph.edges[edgeIndex];
-      const nextId = edge.fromId === current.nodeId ? edge.toId : edge.fromId;
-      if (blockingTrafficSignal(osm.nodes.get(nextId))) continue;
-      const edgeLength = geodesicDistanceMeters(
-        osm.nodes.get(current.nodeId).coordinate,
-        osm.nodes.get(nextId).coordinate,
-      );
-      const nextDistance = current.distanceMeters + edgeLength;
-      const currentOwner = ownerByNode.get(current.nodeId);
-      const nextOwner = ownerByNode.get(nextId);
-      if (nextOwner !== undefined && nextOwner !== currentOwner) {
-        const firstOwner = Math.min(currentOwner, nextOwner);
-        const secondOwner = Math.max(currentOwner, nextOwner);
-        const key = `${firstOwner}:${secondOwner}`;
-        const totalDistance =
-          current.distanceMeters + edgeLength + distanceByNode.get(nextId);
-        const existing = candidateByOwnerPair.get(key);
-        if (!existing || totalDistance < existing.distanceMeters) {
-          const currentPath = pathFromOwner(current.nodeId, previousByNode);
-          const nextPath = pathFromOwner(nextId, previousByNode);
-          const currentToNext =
-            currentOwner === firstOwner
-              ? [...currentPath].reverse().concat(nextPath)
-              : [...nextPath].reverse().concat(currentPath);
-          candidateByOwnerPair.set(key, {
-            distanceMeters: totalDistance,
-            firstOwner,
-            nodeIds: currentToNext,
-            secondOwner,
+
+  const paths = [];
+  for (const sourceAttachment of attachments) {
+    if (blockingTrafficSignal(osm.nodes.get(sourceAttachment.nodeId))) continue;
+    const queue = new MinimumDistanceHeap();
+    const distanceByNode = new Map([[sourceAttachment.nodeId, 0]]);
+    const previousByNode = new Map();
+    const bestByTarget = new Map();
+    queue.push({ distanceMeters: 0, nodeId: sourceAttachment.nodeId });
+    while (queue.size > 0) {
+      const current = queue.pop();
+      if (current.distanceMeters !== distanceByNode.get(current.nodeId)) continue;
+      if (current.distanceMeters > MAX_DIRECT_CONNECTOR_METERS) continue;
+
+      const targetIndices = attachmentIndicesByNodeId.get(current.nodeId) ?? [];
+      if (current.nodeId !== sourceAttachment.nodeId && targetIndices.length > 0) {
+        for (const targetIndex of targetIndices) {
+          const targetAttachment = attachments[targetIndex];
+          if (targetAttachment.partIndex === sourceAttachment.partIndex) continue;
+          const existing = bestByTarget.get(targetIndex);
+          if (existing && existing.distanceMeters <= current.distanceMeters) continue;
+          bestByTarget.set(targetIndex, {
+            ...directedPath(current.nodeId, previousByNode),
+            distanceMeters: current.distanceMeters,
+            firstAttachment: sourceAttachment,
+            secondAttachment: targetAttachment,
           });
         }
+        // A direct freeway connector ends at the first mainline it reaches.
+        // Continuing through that mainline would manufacture a multi-interchange link.
+        continue;
       }
-      if (nextDistance >= (distanceByNode.get(nextId) ?? Infinity)) continue;
-      distanceByNode.set(nextId, nextDistance);
-      ownerByNode.set(nextId, currentOwner);
-      previousByNode.set(nextId, current.nodeId);
-      queue.push({ distanceMeters: nextDistance, nodeId: nextId });
+
+      for (const edgeIndex of graph.outgoing.get(current.nodeId) ?? []) {
+        if (!activeEdges.has(edgeIndex)) continue;
+        const edge = graph.edges[edgeIndex];
+        const nextId = edge.toId;
+        if (blockingTrafficSignal(osm.nodes.get(nextId))) continue;
+        const edgeLength = geodesicDistanceMeters(
+          osm.nodes.get(current.nodeId).coordinate,
+          osm.nodes.get(nextId).coordinate,
+        );
+        const nextDistance = current.distanceMeters + edgeLength;
+        if (
+          nextDistance > MAX_DIRECT_CONNECTOR_METERS ||
+          nextDistance >= (distanceByNode.get(nextId) ?? Infinity)
+        ) {
+          continue;
+        }
+        distanceByNode.set(nextId, nextDistance);
+        previousByNode.set(nextId, { edgeIndex, nodeId: current.nodeId });
+        queue.push({ distanceMeters: nextDistance, nodeId: nextId });
+      }
+    }
+    paths.push(...bestByTarget.values());
+  }
+  return paths;
+}
+
+function attachmentAtPartDistance(part, partIndex, distanceAlongPartMeters) {
+  const targetDistance = Math.max(
+    0,
+    Math.min(lineLengthMeters(part.coordinates), distanceAlongPartMeters),
+  );
+  let traversedMeters = 0;
+  for (
+    let segmentIndex = 0;
+    segmentIndex < part.coordinates.length - 1;
+    segmentIndex += 1
+  ) {
+    const start = part.coordinates[segmentIndex];
+    const end = part.coordinates[segmentIndex + 1];
+    const segmentLengthMeters = geodesicDistanceMeters(start, end);
+    if (
+      traversedMeters + segmentLengthMeters >= targetDistance ||
+      segmentIndex === part.coordinates.length - 2
+    ) {
+      const distanceAlongMeters = targetDistance - traversedMeters;
+      const fraction =
+        segmentLengthMeters === 0 ? 0 : distanceAlongMeters / segmentLengthMeters;
+      return {
+        coordinate: [
+          Number((start[0] + (end[0] - start[0]) * fraction).toFixed(7)),
+          Number((start[1] + (end[1] - start[1]) * fraction).toFixed(7)),
+        ],
+        distanceAlongMeters,
+        distanceAlongPartMeters: targetDistance,
+        distanceMeters: 0,
+        partIndex,
+        segmentIndex,
+      };
+    }
+    traversedMeters += segmentLengthMeters;
+  }
+  throw new Error(`Highway part ${part.id} has no segment for a ramp attachment.`);
+}
+
+function averageReciprocalPathCoordinates(
+  firstCoordinates,
+  secondCoordinates,
+  startCoordinate,
+  endCoordinate,
+) {
+  const maximumLength = Math.max(
+    lineLengthMeters(firstCoordinates),
+    lineLengthMeters(secondCoordinates),
+  );
+  const sampleCount = Math.max(
+    3,
+    Math.min(800, Math.ceil(maximumLength / SAMPLE_SPACING_METERS) + 1),
+  );
+  const firstSamples = resampleCoordinatesToCount(firstCoordinates, sampleCount);
+  const secondSamples = resampleCoordinatesToCount(secondCoordinates, sampleCount);
+  const coordinates = firstSamples.map((coordinate, index) =>
+    midpoint(coordinate, secondSamples[index]),
+  );
+  coordinates[0] = startCoordinate;
+  coordinates[coordinates.length - 1] = endCoordinate;
+  return coordinates.filter(
+    (coordinate, index) =>
+      index === 0 || geodesicDistanceMeters(coordinates[index - 1], coordinate) > 0.25,
+  );
+}
+
+function mainlineGroupByPartIndex(parts) {
+  const parent = new Map(
+    parts
+      .map((part, partIndex) => ({ part, partIndex }))
+      .filter(({ part }) => part.role === 'mainline')
+      .map(({ partIndex }) => [partIndex, partIndex]),
+  );
+  const find = (partIndex) => {
+    const current = parent.get(partIndex);
+    if (current === partIndex) return partIndex;
+    const root = find(current);
+    parent.set(partIndex, root);
+    return root;
+  };
+  const union = (firstPartIndex, secondPartIndex) => {
+    const firstRoot = find(firstPartIndex);
+    const secondRoot = find(secondPartIndex);
+    if (firstRoot === secondRoot) return;
+    parent.set(Math.max(firstRoot, secondRoot), Math.min(firstRoot, secondRoot));
+  };
+  const firstPartIndexBySourceWayId = new Map();
+  for (const [partIndex, part] of parts.entries()) {
+    if (part.role !== 'mainline') continue;
+    for (const sourceWayId of part.sourceWayIds) {
+      const firstPartIndex = firstPartIndexBySourceWayId.get(sourceWayId);
+      if (firstPartIndex === undefined) {
+        firstPartIndexBySourceWayId.set(sourceWayId, partIndex);
+      } else {
+        union(firstPartIndex, partIndex);
+      }
     }
   }
-  return [...candidateByOwnerPair.values()]
-    .filter(
-      ({ firstOwner, secondOwner }) =>
-        attachments[firstOwner].partIndex !== attachments[secondOwner].partIndex,
+  return new Map([...parent.keys()].map((partIndex) => [partIndex, find(partIndex)]));
+}
+
+function reciprocalPathPairs(paths, groupByPartIndex) {
+  const groups = new Map();
+  for (const [pathIndex, path] of paths.entries()) {
+    const firstPartIndex = path.firstAttachment.partIndex;
+    const secondPartIndex = path.secondAttachment.partIndex;
+    const firstGroup = groupByPartIndex.get(firstPartIndex) ?? firstPartIndex;
+    const secondGroup = groupByPartIndex.get(secondPartIndex) ?? secondPartIndex;
+    const sameGroup = firstGroup === secondGroup;
+    const lowGroup = sameGroup
+      ? Math.min(firstPartIndex, secondPartIndex)
+      : Math.min(firstGroup, secondGroup);
+    const highGroup = sameGroup
+      ? Math.max(firstPartIndex, secondPartIndex)
+      : Math.max(firstGroup, secondGroup);
+    const key = `${lowGroup}:${highGroup}`;
+    const group = groups.get(key) ?? { forward: [], reverse: [] };
+    const forward = sameGroup ? firstPartIndex === lowGroup : firstGroup === lowGroup;
+    (forward ? group.forward : group.reverse).push({
+      path,
+      pathIndex,
+    });
+    groups.set(key, group);
+  }
+
+  const used = new Set();
+  const pairs = [];
+  for (const group of groups.values()) {
+    const candidates = [];
+    for (const first of group.forward) {
+      for (const second of group.reverse) {
+        const firstEndpointGapMeters = geodesicDistanceMeters(
+          first.path.firstAttachment.coordinate,
+          second.path.secondAttachment.coordinate,
+        );
+        const secondEndpointGapMeters = geodesicDistanceMeters(
+          first.path.secondAttachment.coordinate,
+          second.path.firstAttachment.coordinate,
+        );
+        if (
+          firstEndpointGapMeters > MAX_RECIPROCAL_ENDPOINT_GAP_METERS ||
+          secondEndpointGapMeters > MAX_RECIPROCAL_ENDPOINT_GAP_METERS
+        ) {
+          continue;
+        }
+        candidates.push({
+          first,
+          score:
+            firstEndpointGapMeters +
+            secondEndpointGapMeters +
+            (first.path.firstAttachment.partIndex ===
+              second.path.secondAttachment.partIndex &&
+            first.path.secondAttachment.partIndex ===
+              second.path.firstAttachment.partIndex
+              ? 0
+              : MAX_RECIPROCAL_ENDPOINT_GAP_METERS * 4),
+          second,
+        });
+      }
+    }
+    candidates.sort(
+      (first, second) =>
+        first.score - second.score ||
+        first.first.pathIndex - second.first.pathIndex ||
+        first.second.pathIndex - second.second.pathIndex,
+    );
+    for (const candidate of candidates) {
+      if (used.has(candidate.first.pathIndex) || used.has(candidate.second.pathIndex)) {
+        continue;
+      }
+      used.add(candidate.first.pathIndex);
+      used.add(candidate.second.pathIndex);
+      pairs.push([candidate.first.path, candidate.second.path]);
+    }
+  }
+  return { pairs, unpairedPathCount: paths.length - used.size };
+}
+
+function attachmentForCoordinateOnPart(part, partIndex, coordinate) {
+  let best = null;
+  let startDistanceMeters = 0;
+  for (
+    let segmentIndex = 0;
+    segmentIndex < part.coordinates.length - 1;
+    segmentIndex += 1
+  ) {
+    const start = part.coordinates[segmentIndex];
+    const end = part.coordinates[segmentIndex + 1];
+    const projected = projectCoordinateOntoSegment(coordinate, start, end).map(
+      (value) => Number(value.toFixed(7)),
+    );
+    const distanceMeters = geodesicDistanceMeters(coordinate, projected);
+    const distanceAlongMeters = geodesicDistanceMeters(start, projected);
+    if (!best || distanceMeters < best.distanceMeters) {
+      best = {
+        coordinate: projected,
+        distanceAlongMeters,
+        distanceAlongPartMeters: startDistanceMeters + distanceAlongMeters,
+        distanceMeters,
+        partIndex,
+        segmentIndex,
+      };
+    }
+    startDistanceMeters += geodesicDistanceMeters(start, end);
+  }
+  return best;
+}
+
+function averageReciprocalAttachment(first, second, parts) {
+  if (first.partIndex === second.partIndex) {
+    return attachmentAtPartDistance(
+      parts[first.partIndex],
+      first.partIndex,
+      (first.distanceAlongPartMeters + second.distanceAlongPartMeters) / 2,
+    );
+  }
+  const averageCoordinate = midpoint(first.coordinate, second.coordinate);
+  return [first.partIndex, second.partIndex]
+    .map((partIndex) =>
+      attachmentForCoordinateOnPart(parts[partIndex], partIndex, averageCoordinate),
     )
-    .map((path) => ({
-      ...path,
-      firstAttachment: attachments[path.firstOwner],
-      secondAttachment: attachments[path.secondOwner],
-    }));
+    .sort(
+      (firstCandidate, secondCandidate) =>
+        firstCandidate.distanceMeters - secondCandidate.distanceMeters ||
+        firstCandidate.partIndex - secondCandidate.partIndex,
+    )[0];
+}
+
+function topologyCoordinate(part, coordinate, key) {
+  const entries = part.topologyCoordinates ?? [];
+  entries.push({ coordinate, key });
+  part.topologyCoordinates = entries;
 }
 
 function insertPartProjections(parts, insertionsByPart) {
@@ -927,57 +1234,230 @@ function exactEdgeKey(firstId, secondId) {
 }
 
 export function buildOsmSourceTopologyGraph(osm, averagedParts) {
+  const parentByNodeId = new Map();
+  const coordinateByLocalNodeId = new Map();
+  const localNodeIdsByPart = [];
+  const localNodeIdsByTopologyKey = new Map();
+
+  const find = (nodeId) => {
+    const parent = parentByNodeId.get(nodeId);
+    if (parent === nodeId) return nodeId;
+    const root = find(parent);
+    parentByNodeId.set(nodeId, root);
+    return root;
+  };
+  const union = (firstId, secondId) => {
+    const firstRoot = find(firstId);
+    const secondRoot = find(secondId);
+    if (firstRoot === secondRoot) return;
+    parentByNodeId.set(
+      firstRoot < secondRoot ? secondRoot : firstRoot,
+      firstRoot < secondRoot ? firstRoot : secondRoot,
+    );
+  };
+  const registerTopologyKey = (topologyKey, localNodeId) => {
+    const existing = localNodeIdsByTopologyKey.get(topologyKey);
+    if (existing) union(existing, localNodeId);
+    else localNodeIdsByTopologyKey.set(topologyKey, localNodeId);
+  };
+
+  for (const [partIndex, part] of averagedParts.entries()) {
+    const localNodeIds = part.coordinates.map((coordinate, coordinateIndex) => {
+      const nodeId = `part:${partIndex}:vertex:${coordinateIndex}`;
+      parentByNodeId.set(nodeId, nodeId);
+      coordinateByLocalNodeId.set(nodeId, coordinate);
+      return nodeId;
+    });
+    localNodeIdsByPart.push(localNodeIds);
+    for (const key of part.startTopologyKeys ?? []) {
+      registerTopologyKey(key, localNodeIds[0]);
+    }
+    for (const key of part.endTopologyKeys ?? []) {
+      registerTopologyKey(key, localNodeIds.at(-1));
+    }
+    for (const topology of part.topologyCoordinates ?? []) {
+      let nearestIndex = 0;
+      let nearestDistanceMeters = Infinity;
+      for (const [coordinateIndex, coordinate] of part.coordinates.entries()) {
+        const distanceMeters = geodesicDistanceMeters(topology.coordinate, coordinate);
+        if (distanceMeters < nearestDistanceMeters) {
+          nearestDistanceMeters = distanceMeters;
+          nearestIndex = coordinateIndex;
+        }
+      }
+      if (nearestDistanceMeters > 1) {
+        throw new Error(
+          `Topology key ${topology.key} is ${nearestDistanceMeters.toFixed(
+            2,
+          )} m from highway part ${part.id}.`,
+        );
+      }
+      registerTopologyKey(topology.key, localNodeIds[nearestIndex]);
+    }
+  }
+
+  const coordinateByNodeId = new Map();
+  for (const [localNodeId, coordinate] of coordinateByLocalNodeId) {
+    const root = find(localNodeId);
+    if (!coordinateByNodeId.has(root)) coordinateByNodeId.set(root, coordinate);
+  }
+  const graphParts = averagedParts.map((part) => ({
+    id: part.id,
+    role: part.role,
+    sourceWayIds: part.sourceWayIds,
+    tokens: part.tokens,
+  }));
+  const edges = [];
+  const edgeIndexByKey = new Map();
+  const addEdge = (fromId, toId, partIndex) => {
+    if (fromId === toId) return;
+    const key = exactEdgeKey(fromId, toId);
+    const existingIndex = edgeIndexByKey.get(key);
+    if (existingIndex !== undefined) {
+      edges[existingIndex].partIndices.add(partIndex);
+      return;
+    }
+    edgeIndexByKey.set(key, edges.length);
+    edges.push({
+      fromId,
+      partIndices: new Set([partIndex]),
+      toId,
+    });
+  };
+  for (const [partIndex, localNodeIds] of localNodeIdsByPart.entries()) {
+    for (let index = 1; index < localNodeIds.length; index += 1) {
+      const fromId = find(localNodeIds[index - 1]);
+      const toId = find(localNodeIds[index]);
+      addEdge(fromId, toId, partIndex);
+    }
+  }
+
+  // The averaged display geometry intentionally omits short stretches where
+  // the two carriageways cannot be paired confidently. Preserve continuous
+  // mainline topology across those gaps by mapping the original mainline
+  // vertices onto their averaged centerline vertices wherever available.
+  // Ramp edges are never restored here: only the reciprocal averaged ramp
+  // parts above are eligible for the route graph.
+  if (osm) {
+    const prepared = prepareWays(osm);
+    const sourceWayIdToPartIndices = indexPartsBySourceWay(averagedParts);
+    const partSegmentGrid = buildPartSegmentGrid(averagedParts);
+    const mappedMainlineNodeByOsmNodeId = new Map();
+    for (const way of prepared.mainlines) {
+      const eligiblePartIndices = new Set(sourceWayIdToPartIndices.get(way.id) ?? []);
+      const graphNodes = way.nodeIds.map((nodeId) => {
+        const cached = mappedMainlineNodeByOsmNodeId.get(nodeId);
+        if (cached) return cached;
+        const sourceCoordinate = osm.nodes.get(nodeId).coordinate;
+        const attachment =
+          eligiblePartIndices.size > 0
+            ? attachmentForNode({
+                grid: partSegmentGrid,
+                mainlinePartIndices: eligiblePartIndices,
+                nodeCoordinate: sourceCoordinate,
+              })
+            : null;
+        const node = attachment
+          ? (() => {
+              const part = averagedParts[attachment.partIndex];
+              const segmentStart = part.coordinates[attachment.segmentIndex];
+              const segmentEnd = part.coordinates[attachment.segmentIndex + 1];
+              const vertexIndex =
+                geodesicDistanceMeters(attachment.coordinate, segmentStart) <=
+                geodesicDistanceMeters(attachment.coordinate, segmentEnd)
+                  ? attachment.segmentIndex
+                  : attachment.segmentIndex + 1;
+              const id = find(localNodeIdsByPart[attachment.partIndex][vertexIndex]);
+              return { coordinate: coordinateByNodeId.get(id), id };
+            })()
+          : {
+              coordinate: sourceCoordinate,
+              id: `osm-mainline:${nodeId}`,
+            };
+        mappedMainlineNodeByOsmNodeId.set(nodeId, node);
+        coordinateByNodeId.set(node.id, node.coordinate);
+        return node;
+      });
+      const partIndex = graphParts.length;
+      graphParts.push({
+        id: `osm-mainline-continuity-${way.id}`,
+        role: 'mainline',
+        sourceWayIds: [way.id],
+        tokens: [...way.tokens],
+      });
+      for (let index = 1; index < graphNodes.length; index += 1) {
+        addEdge(graphNodes[index - 1].id, graphNodes[index].id, partIndex);
+      }
+    }
+  }
+  return {
+    coordinateByNodeId,
+    edges,
+    parts: graphParts,
+    statistics: {
+      explicitTopologyKeyCount: localNodeIdsByTopologyKey.size,
+      signalRejectedConnectorCount: 0,
+      sourceConnectorPartCount: averagedParts.filter(
+        (part) => part.role === 'connector',
+      ).length,
+      sourceMainlinePartCount: graphParts.filter((part) => part.role === 'mainline')
+        .length,
+    },
+  };
+}
+
+export function buildPairedOsmSourceTopologyGraph(osm, averagedParts) {
+  if (!osm) throw new Error('OSM mainline topology is required.');
   const prepared = prepareWays(osm);
   const sourceWayIdToPartIndices = indexPartsBySourceWay(averagedParts);
   const partSegmentGrid = buildPartSegmentGrid(averagedParts);
-  const mappedNodeByNodeId = new Map();
-  const graphParts = [];
   const coordinateByNodeId = new Map();
+  const graphParts = [];
   const edges = [];
   const edgeIndexByKey = new Map();
-
-  const addPart = (way, role, graphNodes) => {
-    const partIndex = graphParts.length;
-    graphParts.push({
-      id: `osm-source-${role}-${way.id}`,
-      role,
-      sourceWayIds: [way.id],
-      tokens: [...way.tokens],
-    });
-    for (let index = 1; index < way.nodeIds.length; index += 1) {
-      const fromNode = graphNodes[index - 1];
-      const toNode = graphNodes[index];
-      const fromId = fromNode.id;
-      const toId = toNode.id;
-      if (fromId === toId) continue;
-      coordinateByNodeId.set(fromId, fromNode.coordinate);
-      coordinateByNodeId.set(toId, toNode.coordinate);
-      const key = exactEdgeKey(fromId, toId);
-      const existingIndex = edgeIndexByKey.get(key);
-      if (existingIndex !== undefined) {
-        edges[existingIndex].partIndices.add(partIndex);
-        continue;
-      }
-      edgeIndexByKey.set(key, edges.length);
-      edges.push({
-        fromId,
-        partIndices: new Set([partIndex]),
-        toId,
-      });
+  const addEdge = (fromId, toId, partIndex) => {
+    if (fromId === toId) return;
+    const key = exactEdgeKey(fromId, toId);
+    const existingIndex = edgeIndexByKey.get(key);
+    if (existingIndex !== undefined) {
+      edges[existingIndex].partIndices.add(partIndex);
+      return;
     }
+    edgeIndexByKey.set(key, edges.length);
+    edges.push({
+      fromId,
+      partIndices: new Set([partIndex]),
+      toId,
+    });
   };
 
+  const mappedMainlineNodeByOsmNodeId = new Map();
+  const mappedCenterNodesByPartIndex = new Map();
+  const mappedCenterNode = (partIndex, vertexIndex) => {
+    const id = `center:${partIndex}:${vertexIndex}`;
+    const entries = mappedCenterNodesByPartIndex.get(partIndex) ?? new Map();
+    entries.set(vertexIndex, id);
+    mappedCenterNodesByPartIndex.set(partIndex, entries);
+    const node = {
+      coordinate: averagedParts[partIndex].coordinates[vertexIndex],
+      id,
+      partIndex,
+      vertexIndex,
+    };
+    coordinateByNodeId.set(node.id, node.coordinate);
+    return node;
+  };
   for (const way of prepared.mainlines) {
-    const mainlinePartIndices = new Set(sourceWayIdToPartIndices.get(way.id) ?? []);
+    const eligiblePartIndices = new Set(sourceWayIdToPartIndices.get(way.id) ?? []);
     const graphNodes = way.nodeIds.map((nodeId) => {
-      const cached = mappedNodeByNodeId.get(nodeId);
+      const cached = mappedMainlineNodeByOsmNodeId.get(nodeId);
       if (cached) return cached;
       const sourceCoordinate = osm.nodes.get(nodeId).coordinate;
       const attachment =
-        mainlinePartIndices.size > 0
+        eligiblePartIndices.size > 0
           ? attachmentForNode({
               grid: partSegmentGrid,
-              mainlinePartIndices,
+              mainlinePartIndices: eligiblePartIndices,
               nodeCoordinate: sourceCoordinate,
             })
           : null;
@@ -991,48 +1471,163 @@ export function buildOsmSourceTopologyGraph(osm, averagedParts) {
               geodesicDistanceMeters(attachment.coordinate, segmentEnd)
                 ? attachment.segmentIndex
                 : attachment.segmentIndex + 1;
-            return {
-              coordinate: part.coordinates[vertexIndex],
-              id: `center:${attachment.partIndex}:${vertexIndex}`,
-            };
+            return mappedCenterNode(attachment.partIndex, vertexIndex);
           })()
         : {
             coordinate: sourceCoordinate,
-            id: `osm:${nodeId}`,
+            id: `osm-mainline:${nodeId}`,
           };
-      mappedNodeByNodeId.set(nodeId, node);
+      mappedMainlineNodeByOsmNodeId.set(nodeId, node);
+      coordinateByNodeId.set(node.id, node.coordinate);
       return node;
     });
-    addPart(way, 'mainline', graphNodes);
+    const partIndex = graphParts.length;
+    graphParts.push({
+      id: `osm-source-mainline-${way.id}`,
+      role: 'mainline',
+      sourceWayIds: [way.id],
+      tokens: [...way.tokens],
+    });
+    for (let index = 1; index < graphNodes.length; index += 1) {
+      const fromNode = graphNodes[index - 1];
+      const toNode = graphNodes[index];
+      if (fromNode.partIndex !== undefined && fromNode.partIndex === toNode.partIndex) {
+        const direction = Math.sign(toNode.vertexIndex - fromNode.vertexIndex);
+        let currentNode = fromNode;
+        for (
+          let vertexIndex = fromNode.vertexIndex + direction;
+          direction !== 0 &&
+          (direction > 0
+            ? vertexIndex <= toNode.vertexIndex
+            : vertexIndex >= toNode.vertexIndex);
+          vertexIndex += direction
+        ) {
+          const nextNode = mappedCenterNode(fromNode.partIndex, vertexIndex);
+          addEdge(currentNode.id, nextNode.id, partIndex);
+          currentNode = nextNode;
+        }
+      } else {
+        addEdge(fromNode.id, toNode.id, partIndex);
+      }
+    }
   }
 
-  let signalRejectedConnectorCount = 0;
-  for (const way of prepared.connectors) {
-    if (way.nodeIds.some((nodeId) => blockingTrafficSignal(osm.nodes.get(nodeId)))) {
-      signalRejectedConnectorCount += 1;
-      continue;
-    }
-    const graphNodes = way.nodeIds.map((nodeId) => {
-      const mapped = mappedNodeByNodeId.get(nodeId);
-      return (
-        mapped ?? {
-          coordinate: osm.nodes.get(nodeId).coordinate,
-          id: `osm:${nodeId}`,
-        }
-      );
+  const attachmentPartIndexByMainlinePartIndex = new Map();
+  const attachmentPartIndex = (mainlinePartIndex) => {
+    const existing = attachmentPartIndexByMainlinePartIndex.get(mainlinePartIndex);
+    if (existing !== undefined) return existing;
+    const partIndex = graphParts.length;
+    const mainlinePart = averagedParts[mainlinePartIndex];
+    graphParts.push({
+      id: `osm-centerline-attachment-${mainlinePartIndex}`,
+      role: 'mainline',
+      sourceWayIds: mainlinePart.sourceWayIds,
+      tokens: mainlinePart.tokens,
     });
-    addPart(way, 'connector', graphNodes);
+    attachmentPartIndexByMainlinePartIndex.set(mainlinePartIndex, partIndex);
+    return partIndex;
+  };
+  const exactMappedMainlineNode = (mainlinePartIndex, coordinate) => {
+    const candidates = mappedCenterNodesByPartIndex.get(mainlinePartIndex);
+    if (!candidates || candidates.size === 0) {
+      throw new Error(
+        `Paired ramp has no mapped mainline nodes on part ${mainlinePartIndex}.`,
+      );
+    }
+    let best = null;
+    for (const [vertexIndex, nodeId] of candidates) {
+      const candidateCoordinate =
+        averagedParts[mainlinePartIndex].coordinates[vertexIndex];
+      const distanceMeters = geodesicDistanceMeters(coordinate, candidateCoordinate);
+      if (!best || distanceMeters < best.distanceMeters) {
+        best = { coordinate: candidateCoordinate, distanceMeters, nodeId, vertexIndex };
+      }
+    }
+    const mainlinePart = averagedParts[mainlinePartIndex];
+    let targetVertexIndex = 0;
+    let targetDistanceMeters = Infinity;
+    for (const [
+      vertexIndex,
+      candidateCoordinate,
+    ] of mainlinePart.coordinates.entries()) {
+      const distanceMeters = geodesicDistanceMeters(coordinate, candidateCoordinate);
+      if (distanceMeters < targetDistanceMeters) {
+        targetDistanceMeters = distanceMeters;
+        targetVertexIndex = vertexIndex;
+      }
+    }
+    if (targetDistanceMeters > 1) {
+      throw new Error(
+        `Paired ramp endpoint is not a vertex of mainline part ${mainlinePartIndex}.`,
+      );
+    }
+    const direction = Math.sign(targetVertexIndex - best.vertexIndex);
+    let currentNode = best;
+    const partIndex = attachmentPartIndex(mainlinePartIndex);
+    for (
+      let vertexIndex = best.vertexIndex + direction;
+      direction !== 0 &&
+      (direction > 0
+        ? vertexIndex <= targetVertexIndex
+        : vertexIndex >= targetVertexIndex);
+      vertexIndex += direction
+    ) {
+      const nextNode = mappedCenterNode(mainlinePartIndex, vertexIndex);
+      addEdge(currentNode.nodeId, nextNode.id, partIndex);
+      currentNode = { ...nextNode, nodeId: nextNode.id };
+    }
+    return direction === 0
+      ? {
+          coordinate: best.coordinate,
+          id: best.nodeId,
+        }
+      : {
+          coordinate: currentNode.coordinate,
+          id: currentNode.nodeId,
+        };
+  };
+
+  const pairedConnectors = averagedParts.filter((part) => part.role === 'connector');
+  for (const [connectorIndex, connector] of pairedConnectors.entries()) {
+    const startNode = exactMappedMainlineNode(
+      connector.startMainlinePartIndex,
+      connector.coordinates[0],
+    );
+    const endNode = exactMappedMainlineNode(
+      connector.endMainlinePartIndex,
+      connector.coordinates.at(-1),
+    );
+    const graphNodes = connector.coordinates.map((coordinate, coordinateIndex) => {
+      if (coordinateIndex === 0) return startNode;
+      if (coordinateIndex === connector.coordinates.length - 1) return endNode;
+      const node = {
+        coordinate,
+        id: `paired-ramp:${connectorIndex}:vertex:${coordinateIndex}`,
+      };
+      coordinateByNodeId.set(node.id, node.coordinate);
+      return node;
+    });
+    const partIndex = graphParts.length;
+    graphParts.push({
+      id: connector.id,
+      role: 'connector',
+      sourceWayIds: connector.sourceWayIds,
+      tokens: connector.tokens,
+    });
+    for (let index = 1; index < graphNodes.length; index += 1) {
+      addEdge(graphNodes[index - 1].id, graphNodes[index].id, partIndex);
+    }
   }
+
   return {
     coordinateByNodeId,
     edges,
     parts: graphParts,
     statistics: {
-      signalRejectedConnectorCount,
-      sourceConnectorPartCount: graphParts.filter((part) => part.role === 'connector')
-        .length,
-      sourceMainlinePartCount: graphParts.filter((part) => part.role === 'mainline')
-        .length,
+      explicitTopologyKeyCount: pairedConnectors.length * 2,
+      signalRejectedConnectorCount: 0,
+      sourceConnectorPartCount: pairedConnectors.length,
+      sourceMainlinePartCount: prepared.mainlines.length,
     },
   };
 }
@@ -1081,10 +1676,12 @@ export function connectMainlinePartsAtSourceNodes(osm, mainlineWays, parts) {
         ).toFixed(7),
       ),
     ];
+    const topologyKey = `osm-mainline-junction:${nodeId}`;
     for (const attachment of attachments) {
       const entries = insertionsByPart.get(attachment.partIndex) ?? [];
       entries.push({ ...attachment, coordinate: commonCoordinate });
       insertionsByPart.set(attachment.partIndex, entries);
+      topologyCoordinate(parts[attachment.partIndex], commonCoordinate, topologyKey);
     }
     junctionCount += 1;
   }
@@ -1110,6 +1707,7 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
   const components = traceLinkComponents(graph);
   const connectors = [];
   const insertionsByPart = new Map();
+  const allDirectedPaths = [];
   for (const component of components) {
     const attachments = [...component.nodeIds].flatMap((nodeId) => {
       const partIndices = mainlinePartIndicesByNode.get(nodeId);
@@ -1122,44 +1720,85 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
       return attachment ? [{ ...attachment, nodeId }] : [];
     });
     if (attachments.length < 2) continue;
-    for (const path of directConnectorPaths(component, graph, attachments, osm)) {
+    const directedPaths = directedConnectorPaths(
+      component,
+      graph,
+      attachments,
+      osm,
+    ).flatMap((path) => {
       const coordinates = path.nodeIds.map(
         (nodeId) => osm.nodes.get(nodeId).coordinate,
       );
       coordinates[0] = path.firstAttachment.coordinate;
       coordinates[coordinates.length - 1] = path.secondAttachment.coordinate;
-      if (lineLengthMeters(coordinates) < 5) continue;
-      const connector = {
-        coordinates,
-        id: `osm-connector-${connectors.length + 1}`,
-        role: 'connector',
-        sourceNodeIds: path.nodeIds,
-        sourceWayIds: [
-          ...new Set(
-            path.nodeIds.slice(1).flatMap((nodeId, index) => {
-              const firstId = path.nodeIds[index];
-              return (graph.incident.get(firstId) ?? []).flatMap((edgeIndex) => {
-                const edge = graph.edges[edgeIndex];
-                return edge.fromId === nodeId || edge.toId === nodeId
-                  ? [edge.wayId]
-                  : [];
-              });
-            }),
-          ),
-        ],
-        tokens: [
-          ...new Set([
-            ...parts[path.firstAttachment.partIndex].tokens,
-            ...parts[path.secondAttachment.partIndex].tokens,
-          ]),
-        ],
-      };
-      connectors.push(connector);
-      for (const attachment of [path.firstAttachment, path.secondAttachment]) {
-        const entries = insertionsByPart.get(attachment.partIndex) ?? [];
-        entries.push(attachment);
-        insertionsByPart.set(attachment.partIndex, entries);
-      }
+      return lineLengthMeters(coordinates) < 5
+        ? []
+        : [
+            {
+              ...path,
+              coordinates,
+              sourceWayIds: [
+                ...new Set(
+                  path.edgeIndices.map((edgeIndex) => graph.edges[edgeIndex].wayId),
+                ),
+              ],
+            },
+          ];
+    });
+    allDirectedPaths.push(...directedPaths);
+  }
+  const paired = reciprocalPathPairs(allDirectedPaths, mainlineGroupByPartIndex(parts));
+  for (const [forward, reverse] of paired.pairs) {
+    const startAttachment = averageReciprocalAttachment(
+      forward.firstAttachment,
+      reverse.secondAttachment,
+      parts,
+    );
+    const endAttachment = averageReciprocalAttachment(
+      forward.secondAttachment,
+      reverse.firstAttachment,
+      parts,
+    );
+    const startPartIndex = startAttachment.partIndex;
+    const endPartIndex = endAttachment.partIndex;
+    const coordinates = averageReciprocalPathCoordinates(
+      forward.coordinates,
+      [...reverse.coordinates].reverse(),
+      startAttachment.coordinate,
+      endAttachment.coordinate,
+    );
+    if (lineLengthMeters(coordinates) < 5) continue;
+    const connectorIndex = connectors.length + 1;
+    const startTopologyKey = `osm-ramp-pair:${connectorIndex}:start`;
+    const endTopologyKey = `osm-ramp-pair:${connectorIndex}:end`;
+    const connector = {
+      coordinates,
+      endMainlinePartIndex: endPartIndex,
+      endTopologyKeys: [endTopologyKey],
+      id: `osm-connector-${connectorIndex}`,
+      pairedDirectionCount: 2,
+      role: 'connector',
+      sourceNodeIds: [...new Set([...forward.nodeIds, ...reverse.nodeIds])],
+      sourceWayIds: [...new Set([...forward.sourceWayIds, ...reverse.sourceWayIds])],
+      startMainlinePartIndex: startPartIndex,
+      startTopologyKeys: [startTopologyKey],
+      tokens: [
+        ...new Set([...parts[startPartIndex].tokens, ...parts[endPartIndex].tokens]),
+      ],
+    };
+    connectors.push(connector);
+    for (const [attachment, topologyKey] of [
+      [startAttachment, startTopologyKey],
+      [endAttachment, endTopologyKey],
+    ]) {
+      const entries = insertionsByPart.get(attachment.partIndex) ?? [];
+      entries.push(attachment);
+      insertionsByPart.set(attachment.partIndex, entries);
+      topologyCoordinate(
+        parts[attachment.partIndex],
+        attachment.coordinate,
+        topologyKey,
+      );
     }
   }
   insertPartProjections(parts, insertionsByPart);
@@ -1167,7 +1806,9 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
     connectors,
     statistics: {
       connectorComponentCount: components.length,
+      directedConnectorPathCount: allDirectedPaths.length,
       directConnectorCount: connectors.length,
+      unpairedConnectorPathCount: paired.unpairedPathCount,
     },
   };
 }

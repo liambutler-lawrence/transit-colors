@@ -1033,7 +1033,7 @@ export async function solveExactMaximumAreaCycle(
 
 export async function solveExactMaximumAreaCycleSingleModel(
   network,
-  { onIteration = () => {} } = {},
+  { onIteration = () => {}, validateResult = () => true } = {},
 ) {
   const require = createRequire(import.meta.url);
   const loadHighs = require('highs');
@@ -1067,7 +1067,7 @@ export async function solveExactMaximumAreaCycleSingleModel(
       noGoodCycles.push(orderedArcs.map((arc) => arc.arcIndex));
       continue;
     }
-    return {
+    const result = {
       areaSquareMeters: Math.abs(signedAreaContributionSquareMeters(coordinates)),
       coordinates,
       edgeIndices: orderedArcs
@@ -1078,5 +1078,13 @@ export async function solveExactMaximumAreaCycleSingleModel(
       solveMilliseconds: performance.now() - startedAt,
       status: solution.Status,
     };
+    const validation = validateResult(result, { model, orderedArcs });
+    if (validation !== true) {
+      noGoodCycles.push(
+        Array.isArray(validation) ? validation : orderedArcs.map((arc) => arc.arcIndex),
+      );
+      continue;
+    }
+    return result;
   }
 }

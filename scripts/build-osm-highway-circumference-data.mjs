@@ -8,14 +8,10 @@ import polygonClipping from 'polygon-clipping';
 
 import { calculateLandmassCoverage } from '../src/circumference-landmass.ts';
 import { geodesicLineLengthMeters } from '../src/geodesy.ts';
-import {
-  buildExactHighwayGraph,
-  compressHighwayCore,
-  highwayTwoCore,
-} from './highway-graph.mjs';
+import { compressHighwayCore, highwayTwoCore } from './highway-graph.mjs';
 import {
   buildOsmHighwayCenterlines,
-  buildOsmSourceTopologyGraph,
+  buildPairedOsmSourceTopologyGraph,
   readOsmMotorwayPbf,
 } from './osm-highway-network.mjs';
 import { solveDetailedMacroHighwayCycle } from './highway-macro-cycle.mjs';
@@ -61,10 +57,10 @@ function tileProperties(part) {
   return {
     class:
       part.role === 'connector'
-        ? 'Direct freeway interchange'
+        ? 'Paired reciprocal freeway connector'
         : 'Separated controlled-access mainline',
     country: '',
-    divided: part.role === 'connector' ? 'Separated ramp' : 'Divided',
+    divided: part.role === 'connector' ? 'Averaged directional pair' : 'Divided',
     id: part.id,
     name: routeTokens.join(' / '),
     number: routeTokens.join(' / '),
@@ -110,7 +106,7 @@ async function buildTiles(parts) {
       '--simplify-only-low-zooms',
       '--no-tile-stats',
       '--name=North America controlled-access highways',
-      '--description=Averaged divided motorway mainlines and direct motorway-link connectors',
+      '--description=Averaged divided motorway mainlines and paired reciprocal motorway-link connectors',
       '--attribution=© OpenStreetMap contributors',
       tileInputPath,
     ],
@@ -130,7 +126,7 @@ const [guide, landmassBuffer] = await Promise.all([
 let derived;
 try {
   derived = deserialize(await readFile(derivedCachePath));
-  if (derived.displayTopologyVersion !== 3) {
+  if (derived.displayTopologyVersion !== 6) {
     throw new Error('The cached display topology predates ramp classification.');
   }
   console.log(`Reused ${derivedCachePath}.`);
@@ -151,9 +147,14 @@ try {
   };
   console.timeEnd('Average carriageways and build explicit ramp connections');
   console.log(detailed.statistics);
+  derived = {
+    detailed,
+    displayTopologyVersion: 6,
+  };
+  await writeFile(derivedCachePath, serialize(derived));
 
   console.time('Build exact-identity highway graph');
-  let exactGraph = buildExactHighwayGraph(detailed.parts);
+  let exactGraph = buildPairedOsmSourceTopologyGraph(osm, detailed.parts);
   let core = highwayTwoCore(
     new Set(exactGraph.coordinateByNodeId.keys()),
     exactGraph.edges,
@@ -164,6 +165,7 @@ try {
     core,
   );
   const graphStatistics = {
+    ...exactGraph.statistics,
     compressedEdges: compressed.edges.length,
     compressedNodes: compressed.nodes.length,
     coreEdges: core.activeEdges.size,
@@ -176,19 +178,27 @@ try {
   derived = {
     compressed,
     detailed,
-    displayTopologyVersion: 3,
+    displayTopologyVersion: 6,
     graphStatistics,
+    sourceCompressed: compressed,
+    sourceGraphParts: exactGraph.parts.map(({ id, role, tokens }) => ({
+      id,
+      role,
+      tokens,
+    })),
+    sourceGraphStatistics: graphStatistics,
+    sourceTopologyVersion: 9,
   };
   await writeFile(derivedCachePath, serialize(derived));
 }
 globalThis.gc?.();
 const { detailed } = derived;
-if (derived.sourceTopologyVersion !== 4) {
-  console.time('Read OSM source topology for route graph');
+if (derived.sourceTopologyVersion !== 9) {
+  console.time('Read OSM mainline continuity topology');
   const osm = await readOsmMotorwayPbf(sourcePath);
-  console.timeEnd('Read OSM source topology for route graph');
-  console.time('Build exact source-node route graph');
-  const sourceGraph = buildOsmSourceTopologyGraph(osm, detailed.parts);
+  console.timeEnd('Read OSM mainline continuity topology');
+  console.time('Build explicit paired-centerline route graph');
+  const sourceGraph = buildPairedOsmSourceTopologyGraph(osm, detailed.parts);
   const sourceCore = highwayTwoCore(
     new Set(sourceGraph.coordinateByNodeId.keys()),
     sourceGraph.edges,
@@ -212,8 +222,8 @@ if (derived.sourceTopologyVersion !== 4) {
     exactEdges: sourceGraph.edges.length,
     exactNodes: sourceGraph.coordinateByNodeId.size,
   };
-  derived.sourceTopologyVersion = 4;
-  console.timeEnd('Build exact source-node route graph');
+  derived.sourceTopologyVersion = 9;
+  console.timeEnd('Build explicit paired-centerline route graph');
   console.log(derived.sourceGraphStatistics);
   await writeFile(derivedCachePath, serialize(derived));
 }
@@ -301,9 +311,9 @@ console.timeEnd('Build detailed motorway vector tiles');
 
 const output = {
   centerline_method:
-    'Network-wide geodesic midpoint of locally paired opposing OSM motorway carriageways; ramps retain their surveyed paths',
+    'Network-wide geodesic midpoint of paired opposing OSM motorway carriageways and reciprocal directional ramp paths',
   criterion:
-    'Separated controlled-access mainlines (2+ lanes per direction where lane counts are explicit) with direct motorway-link connectors',
+    'Separated controlled-access mainlines (2+ lanes per direction where lane counts are explicit) with paired reciprocal motorway-link connectors',
   landmass: {
     area_m2: northAmericanMainlandAreaSquareMeters,
     id: 'north-american-mainland',
@@ -324,10 +334,12 @@ const output = {
     giantNetworkEdgeCount: sourceGraphStatistics.exactEdges,
     giantNetworkNodeCount: sourceGraphStatistics.exactNodes,
     interchangeConnectorCount: detailed.statistics.directConnectorCount,
+    directionalRampPathCount: detailed.statistics.directedConnectorPathCount,
     osmPrecisionMainlineCount: detailed.statistics.averagedPartCount,
     optimizationMethod: 'detailed-macro-cycle-expansion',
     optimizationStatus: 'validated-detailed',
     sourceFeatureCount: detailed.parts.length,
+    unpairedRampPathCount: detailed.statistics.unpairedConnectorPathCount,
   },
   network: {
     featureCount: detailed.parts.length,
@@ -349,9 +361,9 @@ const output = {
     outsideLandAreaSquareMeters: landmassCoverage.outsideAreaSquareMeters,
     segments: routeSegments,
   },
-  source: 'OpenStreetMap detailed motorway topology',
+  source: 'OpenStreetMap paired-direction motorway topology',
   source_url: 'https://download.geofabrik.de/north-america.html',
-  source_version: '2026-07-28',
+  source_version: '2026-07-30',
 };
 await writeFile(outputPath, `${JSON.stringify(output)}\n`);
 console.log({

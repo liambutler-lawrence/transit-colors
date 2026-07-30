@@ -46,7 +46,7 @@ import {
   updateStatus,
 } from './context.js';
 
-const HIGHWAY_DATA_URL = 'data/north-america-highway-circumference.json?v=20260728d';
+const HIGHWAY_DATA_URL = 'data/north-america-highway-circumference.json?v=20260730a';
 let highwayData: HighwayCircumferenceData | null = null;
 let highwayPromise: Promise<HighwayCircumferenceData> | null = null;
 let highwayGradientApplied = false;
@@ -103,7 +103,7 @@ export function syncCircumferenceCriterionControls(): void {
     ? 'Highway details'
     : 'Line or transfer details';
   circumferenceMethodNoteEl.textContent = highwayMode
-    ? 'Solid lines are separated 2+ lane controlled-access mainlines; dashed lines are direct, ramp-only freeway connectors. Only shared physical nodes form graph junctions—grade-separated crossings do not. The thick route is the largest validated detailed simple boundary.'
+    ? 'Solid lines are separated 2+ lane controlled-access mainlines; dashed lines are centerlines averaged from reciprocal directional ramp paths. One-way-only ramps are excluded. Only explicit paired endpoints form graph junctions—grade-separated crossings do not. The thick route is the largest validated detailed simple boundary.'
     : 'All metro networks stay visible, including metros without a circle. Each result card is the largest circle that does not reuse another result’s rail segments and focuses it on the map; clicking any visible line, platform, transfer, street, or station updates this final section directly.';
 }
 
@@ -146,7 +146,7 @@ function highwayResultCard(data: HighwayCircumferenceData): HTMLElement {
     'en-US',
   )} highway features · ${data.methodology.interchangeConnectorCount.toLocaleString(
     'en-US',
-  )} verified interchange connectors · ${data.route.boundaryRoadFeatureCount.toLocaleString(
+  )} paired interchange connectors · ${data.route.boundaryRoadFeatureCount.toLocaleString(
     'en-US',
   )} on boundary`;
   const focusAction = document.createElement('span');
@@ -193,7 +193,7 @@ function highwayResultCard(data: HighwayCircumferenceData): HTMLElement {
   const summary = document.createElement('p');
   summary.className = 'result-summary';
   summary.textContent =
-    'Largest validated continental cycle expanded through detailed OSM topology · mainlines plus direct ramp-only connectors · WGS84 ellipsoidal area';
+    'Largest validated continental cycle expanded through explicit paired-centerline topology · mainlines plus reciprocal ramp pairs · WGS84 ellipsoidal area';
   result.append(summary);
   return result;
 }
@@ -260,7 +260,7 @@ function renderHighwayCircumference({
   circumferenceSelectionTypeEl.textContent = 'Selected highway circle';
   circumferenceNameEl.textContent = 'North America controlled-access maximum';
   circumferenceSummaryEl.textContent =
-    'Largest validated simple loop in separated controlled-access mainlines connected only by valid ramp paths.';
+    'Largest validated simple loop in separated controlled-access mainlines connected only by paired reciprocal ramp paths.';
   replaceMetadata([
     {
       label: 'Contained land',
@@ -283,6 +283,16 @@ function renderHighwayCircumference({
         'en-US',
       )} corridors`,
     },
+    {
+      label: 'Ramp pairing',
+      value: `${data.methodology.interchangeConnectorCount.toLocaleString(
+        'en-US',
+      )} pairs from ${data.methodology.directionalRampPathCount.toLocaleString(
+        'en-US',
+      )} directed paths · ${data.methodology.unpairedRampPathCount.toLocaleString(
+        'en-US',
+      )} unmatched omitted`,
+    },
     { label: 'Source', value: `${data.source} v${data.source_version}` },
     {
       label: 'Precision geometry',
@@ -290,7 +300,7 @@ function renderHighwayCircumference({
     },
   ]);
   routeChoiceSummaryEl.textContent =
-    'Automatic continental winner, refined onto exact-identity OSM carriageways and ramps; route segments remain manually overridable in the data build.';
+    'Automatic continental winner, refined onto explicit OSM-derived centerlines for paired carriageways and paired reciprocal ramps; route segments remain manually overridable in the data build.';
   routeChoiceSelect.disabled = true;
   routeAutoButton.disabled = true;
   routeRequireSegmentButton.disabled = true;
@@ -323,7 +333,7 @@ export function showHighwayFeature(properties: HighwayFeatureProperties): void {
     ? 'Highlighted maximum-area controlled-access highway circle'
     : [
         connector
-          ? 'Direct ramp-only highway interchange'
+          ? 'Centerline averaged from two reciprocal directional ramp paths'
           : seam
             ? 'International source seam repair'
             : properties.type,

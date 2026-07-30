@@ -40,6 +40,7 @@ export const highwayCircumferenceDataSchema = z.object({
     compressedEdgeCount: z.number().int().positive(),
     compressedNodeCount: z.number().int().positive(),
     crossBorderSeamConnectorCount: z.number().int().nonnegative(),
+    directionalRampPathCount: z.number().int().nonnegative(),
     endpointSnapCount: z.number().int().nonnegative(),
     faceCount: z.number().int().positive(),
     giantNetworkEdgeCount: z.number().int().positive(),
@@ -57,6 +58,7 @@ export const highwayCircumferenceDataSchema = z.object({
       'validated-detailed',
     ]),
     sourceFeatureCount: z.number().int().positive(),
+    unpairedRampPathCount: z.number().int().nonnegative(),
   }),
   network: z.object({
     featureCount: z.number().int().positive(),
@@ -141,10 +143,10 @@ export function highwayFeatureCollection(
       properties: {
         class:
           segment.role === 'connector'
-            ? 'Boundary interchange connector'
+            ? 'Boundary paired interchange connector'
             : 'Controlled-access boundary',
         country: data.route.countries.join(', '),
-        divided: segment.role === 'connector' ? 'Separated ramps' : 'Divided',
+        divided: segment.role === 'connector' ? 'Averaged directional pair' : 'Divided',
         id: data.route.id,
         kind: `highway-route-${segment.role}`,
         name: 'Maximum-area highway circle',

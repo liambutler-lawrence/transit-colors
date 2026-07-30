@@ -58,13 +58,19 @@ test('North America highway data publishes one validated maximum and full vector
   assert.equal(data.network.featureCount, data.methodology.sourceFeatureCount);
   assert.equal(data.network.sourceLayer, 'highways');
   assert.match(data.network.tileUrl, /\.pmtiles$/);
-  assert.ok(data.network.featureCount > 16_000);
+  assert.ok(data.network.featureCount > 10_000);
   assert.ok(data.route.boundaryRoadFeatureCount > 20_000);
-  assert.ok(data.route.boundaryCorridorCount > 30_000);
-  assert.ok(data.route.areaSquareMeters > 6_000_000_000_000);
-  assert.ok(data.route.lengthMeters > 13_000_000);
+  assert.ok(data.route.boundaryCorridorCount > 700);
+  assert.ok(data.route.areaSquareMeters > 5_200_000_000_000);
+  assert.ok(data.route.lengthMeters > 11_000_000);
   assert.equal(hasProperSelfIntersection(data.route.coordinates), false);
-  assert.ok(data.methodology.interchangeConnectorCount > 10_000);
+  assert.ok(data.methodology.interchangeConnectorCount > 4_000);
+  assert.ok(data.methodology.directionalRampPathCount > 10_000);
+  assert.equal(
+    data.methodology.directionalRampPathCount -
+      data.methodology.interchangeConnectorCount * 2,
+    data.methodology.unpairedRampPathCount,
+  );
   assert.ok(data.methodology.osmPrecisionMainlineCount > 5_000);
   assert.equal(data.methodology.endpointSnapCount, 0);
 });
@@ -121,11 +127,23 @@ test('regenerated tiles retain centered mainlines and separate ramps continent-w
           String(properties['number']).split(' / ').includes('US7'),
       ),
     );
-    assert.ok(norwalk.some((properties) => properties['role'] === 'connector'));
+    assert.ok(
+      norwalk.some(
+        (properties) =>
+          properties['role'] === 'connector' &&
+          properties['divided'] === 'Averaged directional pair',
+      ),
+    );
 
     const seattle = await highwayPropertiesNear(archive, -122.322, 47.595);
     assert.ok(seattle.some((properties) => properties['role'] === 'mainline'));
-    assert.ok(seattle.some((properties) => properties['role'] === 'connector'));
+    assert.ok(
+      seattle.some(
+        (properties) =>
+          properties['role'] === 'connector' &&
+          properties['divided'] === 'Averaged directional pair',
+      ),
+    );
   } finally {
     await handle.close();
   }

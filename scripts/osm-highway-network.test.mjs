@@ -3,6 +3,7 @@ import test from 'node:test';
 
 import {
   buildOsmHighwayCenterlines,
+  buildPairedOsmSourceTopologyGraph,
   buildRampConnectors,
   classifyOsmMotorwayWay,
   parseOplLine,
@@ -28,11 +29,12 @@ test('OPL parser preserves explicit node identities and motorway tags', () => {
 test('ramp connectors use explicit OSM nodes and ignore coordinate-only crossings', () => {
   const nodes = new Map([
     ['1', { coordinate: [0, 0], tags: {} }],
-    ['2', { coordinate: [1, 0], tags: {} }],
-    ['3', { coordinate: [0, 1], tags: {} }],
-    ['4', { coordinate: [1, 1], tags: {} }],
-    ['5', { coordinate: [0, 0.5], tags: {} }],
-    ['6', { coordinate: [0, 0.5], tags: {} }],
+    ['2', { coordinate: [0.01, 0], tags: {} }],
+    ['3', { coordinate: [0, 0.01], tags: {} }],
+    ['4', { coordinate: [0.01, 0.01], tags: {} }],
+    ['5', { coordinate: [0, 0.005], tags: {} }],
+    ['6', { coordinate: [0, 0.005], tags: {} }],
+    ['7', { coordinate: [0.0001, 0.005], tags: {} }],
   ]);
   const mainlineWays = [
     { id: '10', nodeIds: ['1', '2'] },
@@ -42,15 +44,15 @@ test('ramp connectors use explicit OSM nodes and ignore coordinate-only crossing
     {
       coordinates: [
         [0, 0],
-        [1, 0],
+        [0.01, 0],
       ],
       sourceWayIds: ['10'],
       tokens: ['A'],
     },
     {
       coordinates: [
-        [0, 1],
-        [1, 1],
+        [0, 0.01],
+        [0.01, 0.01],
       ],
       sourceWayIds: ['11'],
       tokens: ['B'],
@@ -58,13 +60,204 @@ test('ramp connectors use explicit OSM nodes and ignore coordinate-only crossing
   ];
   const connectorWays = [
     { id: '20', nodeIds: ['1', '5', '3'] },
+    { id: '22', nodeIds: ['3', '7', '1'] },
     // This node shares coordinates with node 5 but not its identity, so it
     // cannot jump onto the A-to-B connector.
     { id: '21', nodeIds: ['2', '6'] },
   ];
   const result = buildRampConnectors({ nodes }, mainlineWays, parts, connectorWays);
   assert.equal(result.connectors.length, 1);
-  assert.deepEqual(result.connectors[0].sourceNodeIds, ['1', '5', '3']);
+  assert.equal(result.connectors[0].pairedDirectionCount, 2);
+  assert.deepEqual(new Set(result.connectors[0].sourceWayIds), new Set(['20', '22']));
+  assert.ok(!result.connectors[0].sourceNodeIds.includes('6'));
+});
+
+test('classic T interchange produces two paired centerlines and a triangle', () => {
+  const nodes = new Map(
+    Object.entries({
+      stemWestOut: [-0.0003, -0.006],
+      stemWestIn: [0.0003, -0.0055],
+      stemEastOut: [0.0003, -0.006],
+      stemEastIn: [-0.0003, -0.0055],
+      westIn: [-0.006, 0.0003],
+      westOut: [-0.006, -0.0003],
+      eastIn: [0.006, -0.0003],
+      eastOut: [0.006, 0.0003],
+      westForward: [-0.003, -0.003],
+      westReverse: [-0.003, -0.0025],
+      eastForward: [0.003, -0.003],
+      eastReverse: [0.003, -0.0025],
+    }).map(([id, coordinate]) => [id, { coordinate, tags: {} }]),
+  );
+  const mainlineWays = [
+    {
+      id: 'stem-a',
+      nodeIds: ['stemWestOut', 'stemEastOut'],
+    },
+    {
+      id: 'stem-b',
+      nodeIds: ['stemEastIn', 'stemWestIn'],
+    },
+    {
+      id: 'through-a',
+      nodeIds: ['westOut', 'eastIn'],
+    },
+    {
+      id: 'through-b',
+      nodeIds: ['eastOut', 'westIn'],
+    },
+  ];
+  const parts = [
+    {
+      coordinates: [
+        [0, -0.02],
+        [0, -0.004],
+      ],
+      id: 'stem',
+      role: 'mainline',
+      sourceWayIds: ['stem-a', 'stem-b'],
+      tokens: ['MA3'],
+    },
+    {
+      coordinates: [
+        [-0.02, 0],
+        [0.02, 0],
+      ],
+      id: 'through',
+      role: 'mainline',
+      sourceWayIds: ['through-a', 'through-b'],
+      tokens: ['I95'],
+    },
+  ];
+  const connectorWays = [
+    {
+      id: 'stem-to-west',
+      nodeIds: ['stemWestOut', 'westForward', 'westIn'],
+    },
+    {
+      id: 'west-to-stem',
+      nodeIds: ['westOut', 'westReverse', 'stemWestIn'],
+    },
+    {
+      id: 'stem-to-east',
+      nodeIds: ['stemEastOut', 'eastForward', 'eastIn'],
+    },
+    {
+      id: 'east-to-stem',
+      nodeIds: ['eastOut', 'eastReverse', 'stemEastIn'],
+    },
+  ];
+  const result = buildRampConnectors({ nodes }, mainlineWays, parts, connectorWays);
+  assert.equal(result.connectors.length, 2);
+  assert.equal(result.statistics.directedConnectorPathCount, 4);
+  assert.equal(result.statistics.unpairedConnectorPathCount, 0);
+  assert.ok(
+    result.connectors.every(
+      (connector) =>
+        connector.coordinates[0][1] < -0.004 &&
+        Math.abs(connector.coordinates.at(-1)[1]) < 1e-9,
+    ),
+  );
+  assert.ok(result.connectors.some((connector) => connector.coordinates.at(-1)[0] < 0));
+  assert.ok(result.connectors.some((connector) => connector.coordinates.at(-1)[0] > 0));
+});
+
+test('unpaired one-way ramps are excluded from display and topology', () => {
+  const nodes = new Map([
+    ['1', { coordinate: [0, 0], tags: {} }],
+    ['2', { coordinate: [0.01, 0], tags: {} }],
+    ['3', { coordinate: [0, 0.01], tags: {} }],
+    ['4', { coordinate: [0.01, 0.01], tags: {} }],
+    ['5', { coordinate: [0.005, 0.005], tags: {} }],
+  ]);
+  const parts = [
+    {
+      coordinates: [
+        [0, 0],
+        [0.01, 0],
+      ],
+      id: 'a',
+      role: 'mainline',
+      sourceWayIds: ['10'],
+      tokens: ['A'],
+    },
+    {
+      coordinates: [
+        [0, 0.01],
+        [0.01, 0.01],
+      ],
+      id: 'b',
+      role: 'mainline',
+      sourceWayIds: ['11'],
+      tokens: ['B'],
+    },
+  ];
+  const result = buildRampConnectors(
+    { nodes },
+    [
+      { id: '10', nodeIds: ['1', '2'] },
+      { id: '11', nodeIds: ['3', '4'] },
+    ],
+    parts,
+    [{ id: '20', nodeIds: ['1', '5', '3'] }],
+  );
+  assert.equal(result.connectors.length, 0);
+  assert.equal(result.statistics.directedConnectorPathCount, 1);
+  assert.equal(result.statistics.unpairedConnectorPathCount, 1);
+});
+
+test('explicit topology does not connect coordinate-only centerline crossings', () => {
+  const parts = [
+    {
+      coordinates: [
+        [-0.01, 0],
+        [0, 0],
+        [0.01, 0],
+      ],
+      id: 'horizontal',
+      role: 'mainline',
+      sourceWayIds: ['1'],
+      tokens: ['A'],
+    },
+    {
+      coordinates: [
+        [0, -0.01],
+        [0, 0],
+        [0, 0.01],
+      ],
+      id: 'vertical',
+      role: 'mainline',
+      sourceWayIds: ['2'],
+      tokens: ['B'],
+    },
+  ];
+  const graph = buildPairedOsmSourceTopologyGraph(
+    {
+      nodes: new Map([
+        ['h1', { coordinate: [-0.01, 0], tags: {} }],
+        ['hx', { coordinate: [0, 0], tags: {} }],
+        ['h2', { coordinate: [0.01, 0], tags: {} }],
+        ['v1', { coordinate: [0, -0.01], tags: {} }],
+        ['vx', { coordinate: [0, 0], tags: {} }],
+        ['v2', { coordinate: [0, 0.01], tags: {} }],
+      ]),
+      ways: [
+        {
+          id: '1',
+          nodeIds: ['h1', 'hx', 'h2'],
+          tags: { highway: 'motorway', lanes: '2', oneway: 'yes' },
+        },
+        {
+          id: '2',
+          nodeIds: ['v1', 'vx', 'v2'],
+          tags: { highway: 'motorway', lanes: '2', oneway: 'yes' },
+        },
+      ],
+    },
+    parts,
+  );
+  assert.equal(graph.coordinateByNodeId.size, 6);
+  assert.equal(graph.edges.length, 4);
 });
 
 test('explicit one-lane motorway branches and links remain connectors', () => {

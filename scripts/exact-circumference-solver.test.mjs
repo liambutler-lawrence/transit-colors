@@ -6,6 +6,7 @@ import {
   feedbackVertexRoots,
   signedAreaContributionSquareMeters,
   solveExactMaximumAreaCycle,
+  solveExactMaximumAreaCycleSingleModel,
 } from './exact-circumference-solver.mjs';
 
 function station(id, coordinate) {
@@ -96,4 +97,29 @@ test('exact circumference solver proves the largest cycle beyond local faces', a
   assert.equal(result.status, 'Optimal');
   assert.deepEqual(new Set(result.nodeIds), new Set(['a', 'b', 'c', 'd']));
   assert.ok(result.areaSquareMeters > 14_000_000);
+});
+
+test('single-model validation can cut a rejected optimal cycle', async () => {
+  const stations = [
+    station('a', [0, 0]),
+    station('b', [0.04, 0]),
+    station('c', [0.04, 0.03]),
+    station('d', [0, 0.03]),
+    station('e', [0.02, 0.012]),
+  ];
+  const [a, b, c, d, e] = stations;
+  const network = {
+    stations,
+    segments: [ride(a, b), ride(b, c), ride(c, d), ride(d, a), ride(a, e), ride(e, c)],
+  };
+  let validationCount = 0;
+  const result = await solveExactMaximumAreaCycleSingleModel(network, {
+    validateResult: () => {
+      validationCount += 1;
+      return validationCount > 1;
+    },
+  });
+  assert.equal(result.status, 'Optimal');
+  assert.equal(validationCount, 2);
+  assert.ok(result.optimizationIterations >= 2);
 });

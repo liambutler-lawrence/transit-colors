@@ -4,6 +4,7 @@ import {
 } from '../src/geodesy.ts';
 import {
   hasProperSelfIntersection,
+  properSelfIntersectionSegments,
   solveLargestPlanarHighwayCycle,
 } from './highway-cycle.mjs';
 import { solveExactMaximumAreaCycleSingleModel } from './exact-circumference-solver.mjs';
@@ -76,9 +77,24 @@ class MinimumDistanceHeap {
   }
 }
 
-function cellKey([longitude, latitude], cellSizeDegrees) {
-  return `${Math.floor(longitude / cellSizeDegrees)},${Math.floor(
-    latitude / cellSizeDegrees,
+class MacroTransitionCrossingError extends Error {
+  constructor(owner, cause) {
+    super(
+      `Macro transition ${owner.incomingSourceEdgeIndex} → ${owner.outgoingSourceEdgeIndex} cannot be expanded without a geometric crossing.`,
+      { cause },
+    );
+    this.incomingSourceEdgeIndex = owner.incomingSourceEdgeIndex;
+    this.outgoingSourceEdgeIndex = owner.outgoingSourceEdgeIndex;
+  }
+}
+
+function cellKey(
+  [longitude, latitude],
+  cellSizeDegrees,
+  [longitudeOffset, latitudeOffset] = [0, 0],
+) {
+  return `${Math.floor((longitude - longitudeOffset) / cellSizeDegrees)},${Math.floor(
+    (latitude - latitudeOffset) / cellSizeDegrees,
   )}`;
 }
 
@@ -96,14 +112,23 @@ function orientEdge(edge, fromId) {
       };
 }
 
-function contractedHighwayGraph(nodes, edges, cellSizeDegrees) {
+function contractedHighwayGraph(
+  nodes,
+  edges,
+  cellSizeDegrees,
+  cellOffsetDegrees = [0, 0],
+) {
   const coordinateByNodeId = new Map(nodes.map((node) => [node.id, node.coordinate]));
   const union = new UnionFind(nodes.map((node) => node.id));
   const internalEdgeIndices = new Set();
   for (const [edgeIndex, edge] of edges.entries()) {
     if (
-      cellKey(coordinateByNodeId.get(edge.fromId), cellSizeDegrees) ===
-      cellKey(coordinateByNodeId.get(edge.toId), cellSizeDegrees)
+      cellKey(
+        coordinateByNodeId.get(edge.fromId),
+        cellSizeDegrees,
+        cellOffsetDegrees,
+      ) ===
+      cellKey(coordinateByNodeId.get(edge.toId), cellSizeDegrees, cellOffsetDegrees)
     ) {
       union.union(edge.fromId, edge.toId);
       internalEdgeIndices.add(edgeIndex);
@@ -182,7 +207,13 @@ function internalAdjacency(context) {
   return adjacency;
 }
 
-function shortestInternalPath(fromId, toId, context, adjacency) {
+function shortestInternalPath(
+  fromId,
+  toId,
+  context,
+  adjacency,
+  forbiddenEdgeIndices = new Set(),
+) {
   if (fromId === toId) return [];
   const distances = new Map([[fromId, 0]]);
   const previous = new Map();
@@ -193,6 +224,7 @@ function shortestInternalPath(fromId, toId, context, adjacency) {
     if (current.distanceMeters !== distances.get(current.nodeId)) continue;
     if (current.nodeId === toId) break;
     for (const edgeIndex of adjacency.get(current.nodeId) ?? []) {
+      if (forbiddenEdgeIndices.has(edgeIndex)) continue;
       const edge = context.edges[edgeIndex];
       const nextId = edge.fromId === current.nodeId ? edge.toId : edge.fromId;
       const nextDistance =
@@ -220,7 +252,7 @@ function shortestInternalPath(fromId, toId, context, adjacency) {
   return steps;
 }
 
-function expandedMacroCycle(exact, context) {
+function expandedMacroCycle(exact, context, forbiddenInternalEdgeIndices = new Set()) {
   const externalSteps = exact.edgeIndices.map((edgeIndex, index) => {
     const edge = context.externalEdges[edgeIndex];
     const oriented =
@@ -257,36 +289,85 @@ function expandedMacroCycle(exact, context) {
       current.actualFromId,
       context,
       adjacency,
+      forbiddenInternalEdgeIndices,
     );
     for (const step of internalSteps) {
       const sourceEdge = context.edges[step.edgeIndex];
       const oriented = orientEdge(sourceEdge, step.fromId);
       segments.push({
         coordinates: oriented.coordinates,
+        edgeIndex: step.edgeIndex,
+        incomingSourceEdgeIndex: previous.sourceEdgeIndex,
+        kind: 'internal',
+        outgoingSourceEdgeIndex: current.sourceEdgeIndex,
         partIndices: sourceEdge.partIndices,
       });
     }
     const externalSourceEdge = context.edges[current.sourceEdgeIndex];
     segments.push({
       coordinates: current.coordinates,
+      edgeIndex: current.sourceEdgeIndex,
+      kind: 'external',
       partIndices: externalSourceEdge.partIndices,
     });
   }
   const coordinates = [];
+  const coordinateEdgeOwners = [];
   for (const segment of segments) {
-    coordinates.push(
-      ...(coordinates.length === 0
-        ? segment.coordinates
-        : segment.coordinates.slice(1)),
-    );
+    if (coordinates.length === 0) coordinates.push(segment.coordinates[0]);
+    for (const coordinate of segment.coordinates.slice(1)) {
+      coordinates.push(coordinate);
+      coordinateEdgeOwners.push(segment);
+    }
   }
   if (
     coordinates[0][0] !== coordinates.at(-1)[0] ||
     coordinates[0][1] !== coordinates.at(-1)[1]
   ) {
     coordinates.push(coordinates[0]);
+    coordinateEdgeOwners.push(segments.at(-1));
   }
-  return { coordinates, segments };
+  return { coordinateEdgeOwners, coordinates, segments };
+}
+
+function nonIntersectingExpandedMacroCycle(exact, context) {
+  const forbiddenInternalEdgeIndices = new Set();
+  let lastForbiddenOwner = null;
+  for (let attempt = 0; attempt < 200; attempt += 1) {
+    let expanded;
+    try {
+      expanded = expandedMacroCycle(exact, context, forbiddenInternalEdgeIndices);
+    } catch (error) {
+      if (lastForbiddenOwner) {
+        throw new MacroTransitionCrossingError(lastForbiddenOwner, error);
+      }
+      throw error;
+    }
+    const intersection = properSelfIntersectionSegments(expanded.coordinates);
+    if (!intersection) return expanded;
+    const candidates = intersection
+      .map((coordinateEdgeIndex) => expanded.coordinateEdgeOwners[coordinateEdgeIndex])
+      .filter(
+        (owner) =>
+          owner?.kind === 'internal' &&
+          !forbiddenInternalEdgeIndices.has(owner.edgeIndex),
+      )
+      .sort((first, second) => first.edgeIndex - second.edgeIndex);
+    const candidate = candidates[0];
+    if (!candidate) {
+      throw new Error(
+        `Macro cycle has an external-only geometric crossing at ${intersection.join(
+          ' and ',
+        )}.`,
+      );
+    }
+    lastForbiddenOwner = candidate;
+    forbiddenInternalEdgeIndices.add(candidate.edgeIndex);
+  }
+  throw new MacroTransitionCrossingError(
+    lastForbiddenOwner,
+    new Error('Could not reroute macro-cell paths without crossings.'),
+  );
 }
 
 function exactMacroNetwork(context) {
@@ -330,17 +411,21 @@ function exactMacroNetwork(context) {
   return { segments, stations };
 }
 
-async function solveExactContractedCycle(context) {
-  const network = exactMacroNetwork(context);
-  const result = await solveExactMaximumAreaCycleSingleModel(network);
+function contractedCycleFromExactResult(result, context) {
   const groupIds = new Set(context.groupNodes.map((node) => node.id));
   const edgeIndices = [];
   const nodeIds = [];
-  for (const [routeIndex, segmentIndex] of result.edgeIndices.entries()) {
-    const fromId = result.nodeIds[routeIndex];
+  for (const [routeIndex, fromId] of result.nodeIds.entries()) {
     if (!groupIds.has(fromId)) continue;
+    const dummyId = result.nodeIds[(routeIndex + 1) % result.nodeIds.length];
+    const sourceExternalIndex = Number(dummyId?.match(/^macro-edge:(\d+)$/)?.[1]);
+    if (!Number.isInteger(sourceExternalIndex)) {
+      throw new Error(
+        `Exact macro route does not alternate group ${fromId} with an edge node.`,
+      );
+    }
     nodeIds.push(fromId);
-    edgeIndices.push(network.segments[segmentIndex].sourceExternalIndex);
+    edgeIndices.push(sourceExternalIndex);
   }
   if (edgeIndices.length < 3 || edgeIndices.length !== nodeIds.length) {
     throw new Error('Exact macro route did not alternate groups and corridors.');
@@ -353,61 +438,156 @@ async function solveExactContractedCycle(context) {
   };
 }
 
+async function solveExactContractedCycle(context) {
+  const network = exactMacroNetwork(context);
+  const result = await solveExactMaximumAreaCycleSingleModel(network, {
+    validateResult: (candidate, { model, orderedArcs }) => {
+      try {
+        const cycle = contractedCycleFromExactResult(candidate, context);
+        return !hasProperSelfIntersection(
+          nonIntersectingExpandedMacroCycle(cycle, context).coordinates,
+        );
+      } catch (error) {
+        if (error instanceof MacroTransitionCrossingError) {
+          const forbiddenSourceEdgeIndices = new Set([
+            error.incomingSourceEdgeIndex,
+            error.outgoingSourceEdgeIndex,
+          ]);
+          const forbiddenArcIndexes = orderedArcs
+            .filter((arc) =>
+              model.rideEdges[arc.edgeIndex].originalSegmentIndices.some(
+                (segmentIndex) =>
+                  forbiddenSourceEdgeIndices.has(
+                    network.segments[segmentIndex].sourceExternalIndex,
+                  ),
+              ),
+            )
+            .map((arc) => arc.arcIndex);
+          if (forbiddenArcIndexes.length >= 2) return forbiddenArcIndexes;
+        }
+        return false;
+      }
+    },
+  });
+  return contractedCycleFromExactResult(result, context);
+}
+
 export async function solveDetailedMacroHighwayCycle(
   nodes,
   edges,
-  { cellSizesDegrees = [3, 4, 5, 6] } = {},
+  {
+    cellOffsetFractions = [
+      [0, 0],
+      [0.5, 0],
+      [0, 0.5],
+      [0.5, 0.5],
+      [0.25, 0.25],
+      [0.75, 0.75],
+    ],
+    cellSizesDegrees = [3, 4, 5, 6, 8, 10],
+    runExact = true,
+  } = {},
 ) {
   let best = null;
   const attempts = [];
   for (const cellSizeDegrees of cellSizesDegrees) {
-    const context = contractedHighwayGraph(nodes, edges, cellSizeDegrees);
-    let exact;
-    try {
-      exact = solveLargestPlanarHighwayCycle(context.groupNodes, context.externalEdges);
-    } catch (error) {
+    for (const cellOffsetFraction of cellOffsetFractions) {
+      const cellOffsetDegrees = cellOffsetFraction.map(
+        (fraction) => fraction * cellSizeDegrees,
+      );
+      const context = contractedHighwayGraph(
+        nodes,
+        edges,
+        cellSizeDegrees,
+        cellOffsetDegrees,
+      );
+      let exact;
+      try {
+        exact = solveLargestPlanarHighwayCycle(
+          context.groupNodes,
+          context.externalEdges,
+        );
+      } catch (error) {
+        attempts.push({
+          cellOffsetFraction,
+          cellSizeDegrees,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
+      let expanded;
+      try {
+        expanded = nonIntersectingExpandedMacroCycle(exact, context);
+      } catch (error) {
+        attempts.push({
+          cellOffsetFraction,
+          cellSizeDegrees,
+          error: error instanceof Error ? error.message : String(error),
+        });
+        continue;
+      }
+      const areaSquareMeters = geodesicPolygonAreaSquareMeters(expanded.coordinates);
+      const selfIntersects = hasProperSelfIntersection(expanded.coordinates);
       attempts.push({
+        areaSquareKilometers: areaSquareMeters / 1_000_000,
+        cellOffsetFraction,
         cellSizeDegrees,
-        error: error instanceof Error ? error.message : String(error),
+        externalEdgeCount: context.externalEdges.length,
+        externalNodeCount: context.groupNodes.length,
+        selfIntersects,
       });
-      continue;
-    }
-    const expanded = expandedMacroCycle(exact, context);
-    const areaSquareMeters = geodesicPolygonAreaSquareMeters(expanded.coordinates);
-    const selfIntersects = hasProperSelfIntersection(expanded.coordinates);
-    attempts.push({
-      areaSquareKilometers: areaSquareMeters / 1_000_000,
-      cellSizeDegrees,
-      externalEdgeCount: context.externalEdges.length,
-      externalNodeCount: context.groupNodes.length,
-      selfIntersects,
-    });
-    if (!selfIntersects && (!best || areaSquareMeters > best.areaSquareMeters)) {
-      best = {
-        ...expanded,
-        areaSquareMeters,
-        cellSizeDegrees,
-        exact,
-        lengthMeters: geodesicLineLengthMeters(expanded.coordinates),
-      };
+      if (!selfIntersects && (!best || areaSquareMeters > best.areaSquareMeters)) {
+        best = {
+          ...expanded,
+          areaSquareMeters,
+          cellOffsetFraction,
+          cellSizeDegrees,
+          exact,
+          lengthMeters: geodesicLineLengthMeters(expanded.coordinates),
+        };
+      }
     }
   }
+  if (!runExact) {
+    if (!best) {
+      throw new Error(
+        `No non-self-intersecting detailed macro highway cycle: ${JSON.stringify(
+          attempts,
+        )}`,
+      );
+    }
+    return { ...best, attempts };
+  }
   const exactCellSizeDegrees = Math.max(...cellSizesDegrees);
-  const exactContext = contractedHighwayGraph(nodes, edges, exactCellSizeDegrees);
+  const exactCellOffsetFraction =
+    best?.cellSizeDegrees === exactCellSizeDegrees ? best.cellOffsetFraction : [0, 0];
+  const exactCellOffsetDegrees = exactCellOffsetFraction.map(
+    (fraction) => fraction * exactCellSizeDegrees,
+  );
+  const exactContext = contractedHighwayGraph(
+    nodes,
+    edges,
+    exactCellSizeDegrees,
+    exactCellOffsetDegrees,
+  );
   try {
     const exact = await solveExactContractedCycle(exactContext);
-    const expanded = expandedMacroCycle(exact, exactContext);
+    const expanded = nonIntersectingExpandedMacroCycle(exact, exactContext);
     const areaSquareMeters = geodesicPolygonAreaSquareMeters(expanded.coordinates);
     const selfIntersects = hasProperSelfIntersection(expanded.coordinates);
     attempts.push({
       areaSquareKilometers: areaSquareMeters / 1_000_000,
+      cellOffsetFraction: exactCellOffsetFraction,
       cellSizeDegrees: exactCellSizeDegrees,
       exactMilp: true,
       externalEdgeCount: exactContext.externalEdges.length,
       externalNodeCount: exactContext.groupNodes.length,
       selfIntersects,
     });
-    if (!selfIntersects && (!best || areaSquareMeters > best.areaSquareMeters)) {
+    if (
+      !selfIntersects &&
+      (!best || areaSquareMeters >= best.areaSquareMeters * (1 - Number.EPSILON * 8))
+    ) {
       best = {
         ...expanded,
         areaSquareMeters,
@@ -419,6 +599,7 @@ export async function solveDetailedMacroHighwayCycle(
     }
   } catch (error) {
     attempts.push({
+      cellOffsetFraction: exactCellOffsetFraction,
       cellSizeDegrees: exactCellSizeDegrees,
       error: error instanceof Error ? error.message : String(error),
       exactMilp: true,
