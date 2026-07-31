@@ -9,6 +9,7 @@ import {
   classifyOsmMotorwayWay,
   parseOplLine,
   prepareWays,
+  removeRampTerminalHooks,
   traceMotorwayChains,
 } from './osm-highway-network.mjs';
 
@@ -292,6 +293,62 @@ test('shape-aware ramp average retains a smaller loop between unlike paths', () 
   assert.ok(bounds[0] < -0.004 && bounds[0] > -0.006);
   assert.ok(bounds[1] < -0.009 && bounds[1] > -0.01);
   assert.ok(averaged.length > 100);
+});
+
+test('terminal correspondence hooks are removed from Chattanooga ramp averages', () => {
+  const eastConnector = [
+    [-85.4537644, 34.9652314],
+    [-85.4536329, 34.9654011],
+    [-85.4535015, 34.9655709],
+    [-85.45337, 34.9657406],
+    [-85.4531764, 34.9658891],
+    [-85.4529741, 34.9660346],
+    [-85.4527772, 34.9661854],
+    [-85.4526008, 34.9663566],
+    [-85.4524239, 34.9665273],
+    [-85.4522485, 34.9666992],
+    [-85.4457247, 34.9712172],
+    [-85.4454567, 34.9712576],
+    [-85.4451879, 34.9712928],
+    [-85.4449174, 34.9713163],
+    [-85.4446481, 34.971342],
+    [-85.4443871, 34.9713982],
+    [-85.4441256, 34.971449],
+    [-85.4438784, 34.9714714],
+    [-85.4436682, 34.9714276],
+    [-85.4435813, 34.9713509],
+  ];
+  const northConnector = [
+    [-85.4537644, 34.9652314],
+    [-85.4537913, 34.9653383],
+    [-85.4537075, 34.9655095],
+    [-85.4535817, 34.965673],
+    [-85.4533934, 34.9658258],
+    [-85.4532085, 34.9659804],
+    [-85.4530255, 34.9661362],
+    [-85.4528639, 34.9663082],
+    [-85.4527268, 34.9664974],
+    [-85.4525981, 34.9666907],
+    [-85.4547389, 34.9749091],
+    [-85.4548749, 34.9750992],
+    [-85.4550077, 34.9752909],
+    [-85.4550533, 34.9753916],
+    [-85.4551406, 34.9755966],
+    [-85.4552265, 34.9758024],
+    [-85.4553137, 34.9760076],
+    [-85.4554044, 34.9762075],
+    [-85.4555594, 34.9762972],
+    [-85.4557131, 34.9763876],
+  ];
+  const eastSmoothed = removeRampTerminalHooks(eastConnector);
+  const northSmoothed = removeRampTerminalHooks(northConnector);
+
+  assert.deepEqual(eastSmoothed[0], eastConnector[0]);
+  assert.deepEqual(eastSmoothed.at(-1), eastConnector.at(-1));
+  assert.deepEqual(northSmoothed[0], northConnector[0]);
+  assert.deepEqual(northSmoothed.at(-1), northConnector.at(-1));
+  assert.equal(eastConnector.length - eastSmoothed.length, 2);
+  assert.equal(northConnector.length - northSmoothed.length, 2);
 });
 
 test('unpaired one-way ramps are excluded from display and topology', () => {

@@ -12,6 +12,9 @@ const MAX_DIRECT_CONNECTOR_METERS = 25_000;
 const MAX_RECIPROCAL_ENDPOINT_GAP_METERS = 2_500;
 const MAX_RAMP_CORRESPONDENCE_SAMPLES = 240;
 const RAMP_CORRESPONDENCE_SPACING_METERS = 25;
+const RAMP_TERMINAL_HOOK_WINDOW_METERS = 75;
+const MAX_RAMP_TERMINAL_TURN_DEGREES = 32;
+const MAX_RAMP_TERMINAL_HOOK_VERTICES_PER_END = 2;
 
 function decodeOplString(value) {
   return value.replace(/%([0-9a-fA-F]{2})/g, (_, hexadecimal) =>
@@ -1077,6 +1080,56 @@ function monotoneCurveCorrespondence(firstSamples, secondSamples) {
   return correspondence.reverse();
 }
 
+function turnDegrees(first, middle, last) {
+  const incoming = vector(first, middle);
+  const outgoing = vector(middle, last);
+  return (
+    (Math.acos(Math.max(-1, Math.min(1, dot(incoming, outgoing)))) * 180) / Math.PI
+  );
+}
+
+/**
+ * Removes only sharp terminal vertices created by a repeated dynamic-time-
+ * warping match. Real reciprocal paths diverge and merge tangentially; a
+ * 32° kink within 75 m of the shared mainline attachment is correspondence
+ * noise, not physical ramp geometry. Endpoints remain exact graph junctions.
+ */
+export function removeRampTerminalHooks(coordinates) {
+  const smoothed = [...coordinates];
+  for (const fromStart of [true, false]) {
+    for (
+      let removal = 0;
+      removal < MAX_RAMP_TERMINAL_HOOK_VERTICES_PER_END;
+      removal += 1
+    ) {
+      let distanceFromEndpointMeters = 0;
+      let sharpest = null;
+      for (let offset = 1; offset < smoothed.length - 1; offset += 1) {
+        const index = fromStart ? offset : smoothed.length - 1 - offset;
+        const endpointNeighborIndex = fromStart ? index - 1 : index + 1;
+        distanceFromEndpointMeters += geodesicDistanceMeters(
+          smoothed[endpointNeighborIndex],
+          smoothed[index],
+        );
+        if (distanceFromEndpointMeters > RAMP_TERMINAL_HOOK_WINDOW_METERS) break;
+        const turn = turnDegrees(
+          smoothed[index - 1],
+          smoothed[index],
+          smoothed[index + 1],
+        );
+        if (!sharpest || turn > sharpest.turn) {
+          sharpest = { index, turn };
+        }
+      }
+      if (!sharpest || sharpest.turn <= MAX_RAMP_TERMINAL_TURN_DEGREES) {
+        break;
+      }
+      smoothed.splice(sharpest.index, 1);
+    }
+  }
+  return smoothed;
+}
+
 export function averageReciprocalPathCoordinates(
   firstCoordinates,
   secondCoordinates,
@@ -1107,10 +1160,13 @@ export function averageReciprocalPathCoordinates(
   );
   coordinates[0] = startCoordinate;
   coordinates[coordinates.length - 1] = endCoordinate;
-  return coordinates.filter(
+  const deduplicated = coordinates.filter(
     (coordinate, index) =>
-      index === 0 || geodesicDistanceMeters(coordinates[index - 1], coordinate) > 0.25,
+      index === 0 ||
+      geodesicDistanceMeters(coordinates[index - 1], coordinate) > 0.25,
   );
+  const smoothed = removeRampTerminalHooks(deduplicated);
+  return lineLengthMeters(smoothed) >= 5 ? smoothed : deduplicated;
 }
 
 function travelDirectionAtNode(coordinates, nodeIndex) {
