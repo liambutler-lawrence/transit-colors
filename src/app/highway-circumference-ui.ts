@@ -46,7 +46,7 @@ import {
   updateStatus,
 } from './context.js';
 
-const HIGHWAY_DATA_URL = 'data/north-america-highway-circumference.json?v=20260730b';
+const HIGHWAY_DATA_URL = 'data/north-america-highway-circumference.json?v=20260730c';
 let highwayData: HighwayCircumferenceData | null = null;
 let highwayPromise: Promise<HighwayCircumferenceData> | null = null;
 let highwayGradientApplied = false;

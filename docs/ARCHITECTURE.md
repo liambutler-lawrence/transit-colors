@@ -90,15 +90,15 @@ OpenStreetMap divided-road graph. It pairs lane-qualified one-way carriageways i
 sampled centerline, classifies direct motorway-link paths as connector edges, and
 inserts their endpoints into the mainline geometry. Geometry crossings never create
 graph nodes; topology comes from explicit shared source nodes. The continental stages
-are endpoint seam repair, largest-component selection, 2-core pruning, degree-two
-compression, coarse exact cycle selection, and detailed outer-envelope expansion.
-Geographic contraction is used only to choose the continental cycle topology: it is not
-treated as a detailed-area proof. The detailed expansion replaces a truncated arc with a
-node-disjoint graph ear through the northeastern and eastern support vertices of the
-largest biconnected block. Every ear uses explicit source junctions; an
-interchange-scale geometric crossing forbids the offending ear corridor and triggers
-another detailed routing attempt. The accepted boundary is a simple cycle in both graph
-topology and rendered geometry.
+are largest-component selection, 2-core pruning, degree-two compression, a detailed
+northeastern perimeter cycle, and independent detailed node-disjoint ears for
+southeastern Massachusetts and the southern/western perimeter. The northeastern cycle is
+explicitly anchored through Highway 407, Ottawa, Québec, and coastal New England. Every
+ear uses explicit source junctions. A small hook where two consecutive averaged edges
+overshoot their shared junction is clipped only between those adjacent tails; any
+nonlocal geometric crossing forbids the responsible corridor and triggers another
+routing attempt. The accepted boundary is a simple cycle in both graph topology and
+rendered geometry.
 
 The circumference map keeps one independent route state and gradient image source per
 metro area. It merges all complete networks and selected boundaries into one GeoJSON

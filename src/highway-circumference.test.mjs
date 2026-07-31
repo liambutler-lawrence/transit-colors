@@ -56,7 +56,7 @@ test('North America highway data publishes one validated maximum and full vector
   assert.equal(data.methodology.optimizationStatus, 'validated-detailed');
   assert.equal(
     data.methodology.optimizationMethod,
-    'detailed-macro-cycle-with-envelope-ears',
+    'detailed-topology-preserving-perimeter-ears',
   );
   assert.equal(data.network.featureCount, data.methodology.sourceFeatureCount);
   assert.equal(data.network.sourceLayer, 'highways');
@@ -64,7 +64,7 @@ test('North America highway data publishes one validated maximum and full vector
   assert.ok(data.network.featureCount > 10_000);
   assert.ok(data.route.boundaryRoadFeatureCount > 20_000);
   assert.ok(data.route.boundaryCorridorCount > 700);
-  assert.ok(data.route.areaSquareMeters > 6_000_000_000_000);
+  assert.ok(data.route.areaSquareMeters > 6_150_000_000_000);
   assert.ok(data.route.lengthMeters > 14_000_000);
   assert.ok(
     data.route.coordinates.some(
@@ -76,9 +76,30 @@ test('North America highway data publishes one validated maximum and full vector
       ([longitude, latitude]) => longitude > -71 && latitude > 42,
     ),
   );
+  assert.ok(
+    data.route.coordinates.some(
+      ([longitude, latitude]) =>
+        longitude > -80 && longitude < -78.5 && latitude > 43.65,
+    ),
+    'route should use Highway 407 north of Toronto',
+  );
+  assert.ok(
+    data.route.coordinates.some(
+      ([longitude, latitude]) =>
+        longitude > -76 && longitude < -75.4 && latitude > 45.25,
+    ),
+    'route should include the Highway 416 / 417 Ottawa leg',
+  );
+  assert.ok(
+    data.route.coordinates.some(
+      ([longitude, latitude]) =>
+        longitude > -71.1 && longitude < -70.85 && latitude > 41.75 && latitude < 42.05,
+    ),
+    'route should include the I-495 southeastern Massachusetts detour',
+  );
   assert.equal(hasProperSelfIntersection(data.route.coordinates), false);
-  assert.ok(data.methodology.interchangeConnectorCount > 4_000);
-  assert.ok(data.methodology.directionalRampPathCount > 10_000);
+  assert.ok(data.methodology.interchangeConnectorCount > 5_000);
+  assert.ok(data.methodology.directionalRampPathCount > 12_000);
   assert.equal(
     data.methodology.directionalRampPathCount -
       data.methodology.interchangeConnectorCount * 2,
@@ -145,6 +166,24 @@ test('regenerated tiles retain centered mainlines and separate ramps continent-w
         (properties) =>
           properties['role'] === 'connector' &&
           properties['divided'] === 'Averaged directional pair',
+      ),
+    );
+
+    const toronto407 = await highwayPropertiesNear(archive, -79.54, 43.79);
+    assert.ok(
+      toronto407.some(
+        (properties) =>
+          properties['role'] === 'mainline' &&
+          String(properties['number']).split(' / ').includes('407'),
+      ),
+    );
+
+    const ottawa = await highwayPropertiesNear(archive, -75.7, 45.42);
+    assert.ok(
+      ottawa.some(
+        (properties) =>
+          properties['role'] === 'mainline' &&
+          String(properties['number']).split(' / ').includes('417'),
       ),
     );
 

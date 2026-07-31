@@ -203,6 +203,64 @@ test('classic T interchange produces two paired centerlines and a triangle', () 
   assert.ok(result.connectors.some((connector) => connector.coordinates.at(-1)[0] > 0));
 });
 
+test('source-mapped ramps remain paired after carriageways diverge early', () => {
+  const nodes = new Map(
+    Object.entries({
+      aForward: [0, -0.006],
+      aReverse: [0.01, -0.006],
+      bForward: [0, 0.026],
+      bReverse: [0.01, 0.026],
+      forwardMiddle: [0.004, 0.01],
+      reverseMiddle: [0.006, 0.01],
+    }).map(([id, coordinate]) => [id, { coordinate, tags: {} }]),
+  );
+  const mainlineWays = [
+    { id: 'a-forward', nodeIds: ['aForward', 'aReverse'] },
+    { id: 'a-reverse', nodeIds: ['aReverse', 'aForward'] },
+    { id: 'b-forward', nodeIds: ['bForward', 'bReverse'] },
+    { id: 'b-reverse', nodeIds: ['bReverse', 'bForward'] },
+  ];
+  const parts = [
+    {
+      coordinates: [
+        [0, 0],
+        [0.01, 0],
+      ],
+      id: 'a',
+      role: 'mainline',
+      sourceWayIds: ['a-forward', 'a-reverse'],
+      tokens: ['A'],
+    },
+    {
+      coordinates: [
+        [0, 0.02],
+        [0.01, 0.02],
+      ],
+      id: 'b',
+      role: 'mainline',
+      sourceWayIds: ['b-forward', 'b-reverse'],
+      tokens: ['B'],
+    },
+  ];
+  const connectorWays = [
+    {
+      id: 'forward',
+      nodeIds: ['aForward', 'forwardMiddle', 'bForward'],
+    },
+    {
+      id: 'reverse',
+      nodeIds: ['bReverse', 'reverseMiddle', 'aReverse'],
+    },
+  ];
+
+  const result = buildRampConnectors({ nodes }, mainlineWays, parts, connectorWays);
+
+  assert.equal(result.connectors.length, 1);
+  assert.equal(result.statistics.unpairedConnectorPathCount, 0);
+  assert.deepEqual(result.connectors[0].coordinates[0], [0.005, 0]);
+  assert.deepEqual(result.connectors[0].coordinates.at(-1), [0.005, 0.02]);
+});
+
 test('reciprocal matcher uses directional legs instead of nearest ramp endpoints', () => {
   const nodeCoordinates = {
     aAfter: [0.012, -0.0001],

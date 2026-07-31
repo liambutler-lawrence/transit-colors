@@ -670,36 +670,51 @@ function traceLinkComponents(graph) {
   return components;
 }
 
-function attachmentForNode({ grid, mainlinePartIndices, nodeCoordinate }) {
+function attachmentForNode({
+  grid,
+  mainlinePartIndices,
+  maximumDistanceMeters = PAIR_SEARCH_METERS,
+  nodeCoordinate,
+}) {
   let best = null;
   const [cellX, cellY] = gridCell(nodeCoordinate);
-  for (let x = cellX - 2; x <= cellX + 2; x += 1) {
-    for (let y = cellY - 2; y <= cellY + 2; y += 1) {
-      for (const segment of grid.get(`${x},${y}`) ?? []) {
-        if (!mainlinePartIndices.has(segment.partIndex)) continue;
-        const coordinate = projectCoordinateOntoSegment(
-          nodeCoordinate,
-          segment.start,
-          segment.end,
-        ).map((value) => Number(value.toFixed(7)));
-        const distanceMeters = geodesicDistanceMeters(nodeCoordinate, coordinate);
-        if (
-          distanceMeters <= PAIR_SEARCH_METERS &&
-          (!best || distanceMeters < best.distanceMeters)
-        ) {
-          best = {
-            coordinate,
-            distanceAlongMeters: geodesicDistanceMeters(segment.start, coordinate),
-            distanceAlongPartMeters:
-              segment.startDistanceMeters +
-              geodesicDistanceMeters(segment.start, coordinate),
-            distanceMeters,
-            partIndex: segment.partIndex,
-            segmentIndex: segment.segmentIndex,
-          };
+  const search = (radiusCells) => {
+    for (let x = cellX - radiusCells; x <= cellX + radiusCells; x += 1) {
+      for (let y = cellY - radiusCells; y <= cellY + radiusCells; y += 1) {
+        for (const segment of grid.get(`${x},${y}`) ?? []) {
+          if (!mainlinePartIndices.has(segment.partIndex)) continue;
+          const coordinate = projectCoordinateOntoSegment(
+            nodeCoordinate,
+            segment.start,
+            segment.end,
+          ).map((value) => Number(value.toFixed(7)));
+          const distanceMeters = geodesicDistanceMeters(nodeCoordinate, coordinate);
+          if (
+            distanceMeters <= maximumDistanceMeters &&
+            (!best || distanceMeters < best.distanceMeters)
+          ) {
+            best = {
+              coordinate,
+              distanceAlongMeters: geodesicDistanceMeters(segment.start, coordinate),
+              distanceAlongPartMeters:
+                segment.startDistanceMeters +
+                geodesicDistanceMeters(segment.start, coordinate),
+              distanceMeters,
+              partIndex: segment.partIndex,
+              segmentIndex: segment.segmentIndex,
+            };
+          }
         }
       }
     }
+  };
+  search(2);
+  if (!best && maximumDistanceMeters > PAIR_SEARCH_METERS) {
+    const longitudeMetersPerCell =
+      GRID_SIZE_DEGREES *
+      111_320 *
+      Math.max(0.25, Math.cos((nodeCoordinate[1] * Math.PI) / 180));
+    search(Math.ceil(maximumDistanceMeters / longitudeMetersPerCell) + 1);
   }
   return best;
 }
@@ -1968,6 +1983,12 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
       const attachment = attachmentForNode({
         grid: partSegmentGrid,
         mainlinePartIndices: partIndices,
+        // At a directional interchange, reciprocal carriageways can peel away
+        // hundreds of metres before their OSM ways become motorway_link. The
+        // source-way mapping already limits this search to the correct averaged
+        // mainline, so the ordinary cross-road proximity threshold is needlessly
+        // destructive here.
+        maximumDistanceMeters: MAX_RECIPROCAL_ENDPOINT_GAP_METERS,
         nodeCoordinate: osm.nodes.get(nodeId).coordinate,
       });
       return attachment

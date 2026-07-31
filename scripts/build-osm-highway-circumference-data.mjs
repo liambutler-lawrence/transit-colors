@@ -10,15 +10,16 @@ import { calculateLandmassCoverage } from '../src/circumference-landmass.ts';
 import { geodesicLineLengthMeters } from '../src/geodesy.ts';
 import { compressHighwayCore, highwayTwoCore } from './highway-graph.mjs';
 import {
+  NORTH_AMERICAN_HIGHWAY_ENVELOPE_COORDINATES,
   northAmericanHighwayEnvelopeSupportNodeIds,
   refineHighwayCycleThroughWaypoints,
+  solveHighwayEnvelopeCycleThroughWaypoints,
 } from './highway-envelope-cycle.mjs';
 import {
   buildOsmHighwayCenterlines,
   buildPairedOsmSourceTopologyGraph,
   readOsmMotorwayPbf,
 } from './osm-highway-network.mjs';
-import { solveDetailedMacroHighwayCycle } from './highway-macro-cycle.mjs';
 import {
   multiPolygonAreaSquareMeters,
   pointInRing,
@@ -124,9 +125,9 @@ const landmassBuffer = await readFile(landmassSourcePath);
 let derived;
 try {
   derived = deserialize(await readFile(derivedCachePath));
-  if (derived.displayTopologyVersion !== 9) {
+  if (derived.displayTopologyVersion !== 10) {
     throw new Error(
-      'The cached display topology predates bounded ramp-centerline smoothing.',
+      'The cached display topology predates source-mapped interchange attachments.',
     );
   }
   console.log(`Reused ${derivedCachePath}.`);
@@ -149,7 +150,7 @@ try {
   console.log(detailed.statistics);
   derived = {
     detailed,
-    displayTopologyVersion: 9,
+    displayTopologyVersion: 10,
   };
   await writeFile(derivedCachePath, serialize(derived));
 
@@ -178,7 +179,7 @@ try {
   derived = {
     compressed,
     detailed,
-    displayTopologyVersion: 9,
+    displayTopologyVersion: 10,
     graphStatistics,
     sourceCompressed: compressed,
     sourceGraphParts: exactGraph.parts.map(({ id, role, tokens }) => ({
@@ -187,13 +188,13 @@ try {
       tokens,
     })),
     sourceGraphStatistics: graphStatistics,
-    sourceTopologyVersion: 10,
+    sourceTopologyVersion: 11,
   };
   await writeFile(derivedCachePath, serialize(derived));
 }
 globalThis.gc?.();
 const { detailed } = derived;
-if (derived.sourceTopologyVersion !== 10) {
+if (derived.sourceTopologyVersion !== 11) {
   console.time('Read OSM mainline continuity topology');
   const osm = await readOsmMotorwayPbf(sourcePath);
   console.timeEnd('Read OSM mainline continuity topology');
@@ -222,93 +223,69 @@ if (derived.sourceTopologyVersion !== 10) {
     exactEdges: sourceGraph.edges.length,
     exactNodes: sourceGraph.coordinateByNodeId.size,
   };
-  derived.sourceTopologyVersion = 10;
+  derived.sourceTopologyVersion = 11;
   console.timeEnd('Build explicit paired-centerline route graph');
   console.log(derived.sourceGraphStatistics);
   await writeFile(derivedCachePath, serialize(derived));
 }
 const { sourceCompressed, sourceGraphParts, sourceGraphStatistics } = derived;
-
-let macroCycle;
-if (derived.macroCycleTopologyVersion === 1 && derived.macroCycle) {
-  macroCycle = derived.macroCycle;
-  console.log('Reused cached detailed continental macro-cycle.');
-} else {
-  console.time('Solve and expand detailed continental macro-cycle');
-  macroCycle = await solveDetailedMacroHighwayCycle(
-    sourceCompressed.nodes,
-    sourceCompressed.edges,
+const routeGraphEdges = sourceCompressed.edges.map((edge) => {
+  const roles = [...edge.partIndices].map(
+    (partIndex) => sourceGraphParts[partIndex].role,
   );
-  console.timeEnd('Solve and expand detailed continental macro-cycle');
-  derived.macroCycle = macroCycle;
-  derived.macroCycleTopologyVersion = 1;
-  await writeFile(derivedCachePath, serialize(derived));
-}
-console.log({
-  areaSquareKilometers: macroCycle.areaSquareMeters / 1_000_000,
-  attempts: macroCycle.attempts,
+  const role = roles.includes('mainline') ? 'mainline' : 'connector';
+  return {
+    ...edge,
+    // Prefer continuous mainlines when two detailed paths enclose the same
+    // area. A connector remains available when it is required to change
+    // highways, but is not used as a gratuitous interchange shortcut.
+    role,
+    routingPenaltyMeters: role === 'connector' ? 2_000 : 0,
+  };
 });
 
-const supportNodeIds = northAmericanHighwayEnvelopeSupportNodeIds(
+const supportNodeIds = (supportCoordinates) =>
+  northAmericanHighwayEnvelopeSupportNodeIds(sourceCompressed.nodes, routeGraphEdges, {
+    supportCoordinates,
+  });
+const envelopeCoordinates = NORTH_AMERICAN_HIGHWAY_ENVELOPE_COORDINATES;
+console.time('Solve detailed northeastern outer-envelope cycle');
+let exact = solveHighwayEnvelopeCycleThroughWaypoints(
   sourceCompressed.nodes,
-  sourceCompressed.edges,
+  routeGraphEdges,
+  supportNodeIds([...envelopeCoordinates.slice(0, 5), envelopeCoordinates[6]]),
+  { tryReverse: false },
 );
-console.time('Expand cycle through detailed outer-envelope supports');
-const envelopeAttempts = [];
-for (const [orderedSupportNodeIds, attachmentCoordinates] of [
-  [
-    supportNodeIds,
-    [
-      [-87.74, 41.96],
-      [-81.24, 32.08],
-    ],
-  ],
-  [
-    [...supportNodeIds].reverse(),
-    [
-      [-81.24, 32.08],
-      [-87.74, 41.96],
-    ],
-  ],
-]) {
-  try {
-    envelopeAttempts.push(
-      refineHighwayCycleThroughWaypoints(
-        sourceCompressed.nodes,
-        sourceCompressed.edges,
-        macroCycle.segments,
-        orderedSupportNodeIds,
-        { attachmentCoordinates },
-      ),
-    );
-  } catch (error) {
-    console.warn(
-      `Envelope order ${orderedSupportNodeIds.join(' → ')} failed: ${
-        error instanceof Error ? error.message : String(error)
-      }`,
-    );
-  }
-}
-const exact = envelopeAttempts.sort(
-  (first, second) =>
-    second.areaSquareMeters - first.areaSquareMeters ||
-    first.lengthMeters - second.lengthMeters,
-)[0];
-console.timeEnd('Expand cycle through detailed outer-envelope supports');
-if (!exact) {
-  throw new Error('No detailed outer-envelope highway cycle could be constructed.');
-}
+console.timeEnd('Solve detailed northeastern outer-envelope cycle');
+console.time('Expand boundary through southeastern Massachusetts');
+exact = refineHighwayCycleThroughWaypoints(
+  sourceCompressed.nodes,
+  routeGraphEdges,
+  exact.segments,
+  supportNodeIds([envelopeCoordinates[5]]),
+  {
+    attachmentCoordinates: [envelopeCoordinates[4], envelopeCoordinates[6]],
+  },
+);
+console.timeEnd('Expand boundary through southeastern Massachusetts');
+console.time('Expand boundary through southern and western perimeter');
+exact = refineHighwayCycleThroughWaypoints(
+  sourceCompressed.nodes,
+  routeGraphEdges,
+  exact.segments,
+  supportNodeIds(envelopeCoordinates.slice(7)),
+  {
+    attachmentCoordinates: [envelopeCoordinates[6], envelopeCoordinates[0]],
+    maximumRerouteAttempts: 500,
+  },
+);
+console.timeEnd('Expand boundary through southern and western perimeter');
 console.log({
   areaSquareKilometers: exact.areaSquareMeters / 1_000_000,
   supportNodeIds: exact.supportNodeIds,
 });
-if (
-  exact.areaSquareMeters < 6_000_000_000_000 ||
-  exact.areaSquareMeters < macroCycle.areaSquareMeters * 1.05
-) {
-  throw new Error(
-    'Outer-envelope refinement did not materially expand the contracted macro cycle.',
-  );
+if (exact.areaSquareMeters < 6_000_000_000_000) {
+  throw new Error('Detailed outer-envelope cycle is below the continental area floor.');
 }
 
 const routeCoordinates = exact.coordinates.map((coordinate) =>
@@ -321,6 +298,25 @@ if (
   throw new Error(
     'Detailed highway boundary does not reach both Québec and eastern New England.',
   );
+}
+for (const [region, includesRegion] of [
+  [
+    'Highway 407 north of Toronto',
+    ([longitude, latitude]) => longitude > -80 && longitude < -78.5 && latitude > 43.65,
+  ],
+  [
+    'the Ottawa 416 / 417 corridor',
+    ([longitude, latitude]) => longitude > -76 && longitude < -75.4 && latitude > 45.25,
+  ],
+  [
+    'southeastern Massachusetts',
+    ([longitude, latitude]) =>
+      longitude > -71.3 && longitude < -70.4 && latitude > 41.4 && latitude < 42,
+  ],
+]) {
+  if (!routeCoordinates.some(includesRegion)) {
+    throw new Error(`Detailed highway boundary omits ${region}.`);
+  }
 }
 const americanMainlandRing = readPolygonRings(landmassBuffer).find((ring) =>
   pointInRing([-99.1332, 19.4326], ring),
@@ -413,7 +409,7 @@ const output = {
     interchangeConnectorCount: detailed.statistics.directConnectorCount,
     directionalRampPathCount: detailed.statistics.directedConnectorPathCount,
     osmPrecisionMainlineCount: detailed.statistics.averagedPartCount,
-    optimizationMethod: 'detailed-macro-cycle-with-envelope-ears',
+    optimizationMethod: 'detailed-topology-preserving-perimeter-ears',
     optimizationStatus: 'validated-detailed',
     sourceFeatureCount: detailed.parts.length,
     unpairedRampPathCount: detailed.statistics.unpairedConnectorPathCount,
