@@ -85,19 +85,20 @@ renders these files; it never runs the combinatorial search during page load or 
 schedule change.
 
 The highway criterion uses a separate compact runtime schema in
-`src/highway-circumference.ts`. Its offline builder operates on the Natural Earth
-divided-road centerline graph with local OSM precision overrides. Each override pairs
-lane-qualified one-way carriageways into a sampled centerline, classifies direct
-motorway-link paths as connector edges, and inserts their endpoints into the mainline
-geometry. Geometry crossings never create graph nodes; topology comes from explicit
-shared source nodes. The continental stages are endpoint seam repair, largest-component
-selection, 2-core pruning, degree-two compression, iterative Tarjan vertex-biconnected
-decomposition, and geographic rotation-system face traversal. Every simple cycle lies
-inside one biconnected block; for each embedded planar block the outer face contains all
-bounded faces and is therefore its exact maximum-area cycle. The selected boundary is
-also checked for proper geometric self-crossings. This reduces roughly 367,000 source
-edges to about 2,300 proof corridors and solves in seconds rather than placing a
-continental graph in the browser or metro MILP.
+`src/highway-circumference.ts`. Its offline builder operates on a network-wide
+OpenStreetMap divided-road graph. It pairs lane-qualified one-way carriageways into a
+sampled centerline, classifies direct motorway-link paths as connector edges, and
+inserts their endpoints into the mainline geometry. Geometry crossings never create
+graph nodes; topology comes from explicit shared source nodes. The continental stages
+are endpoint seam repair, largest-component selection, 2-core pruning, degree-two
+compression, coarse exact cycle selection, and detailed outer-envelope expansion.
+Geographic contraction is used only to choose the continental cycle topology: it is not
+treated as a detailed-area proof. The detailed expansion replaces a truncated arc with a
+node-disjoint graph ear through the northeastern and eastern support vertices of the
+largest biconnected block. Every ear uses explicit source junctions; an
+interchange-scale geometric crossing forbids the offending ear corridor and triggers
+another detailed routing attempt. The accepted boundary is a simple cycle in both graph
+topology and rendered geometry.
 
 The circumference map keeps one independent route state and gradient image source per
 metro area. It merges all complete networks and selected boundaries into one GeoJSON

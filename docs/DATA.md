@@ -140,8 +140,13 @@ The route graph preserves every original OSM node identity. Mainline sides are m
 onto the sampled centerline, but a ramp may attach only at the exact OSM node shared
 with that mainline. A bridge, tunnel, or other grade-separated geometric crossing
 therefore cannot become an intersection. The builder contracts only internally connected
-geographic cells for the continental solve, expands the winning cycle through real
-detailed paths, and rejects a self-intersecting or materially undersized result.
+geographic cells for the initial continental solve. It then expands the cycle through
+real detailed paths and routes a node-disjoint outer-envelope ear through the Québec and
+eastern New England support vertices that contraction would otherwise hide inside one
+large cell. A proper crossing forbids the responsible ear corridor and retries the
+detailed route. Independent absolute-area and geographic-coverage thresholds reject both
+self-intersecting and silently truncated output; the previous output file is not used as
+its own regression guide.
 
 The committed JSON contains the segmented thick winning route, source attributes, and
 WGS84 land-contained and coastward areas. The complete thin network is stored separately

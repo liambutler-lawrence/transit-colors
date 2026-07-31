@@ -51,6 +51,7 @@ export const highwayCircumferenceDataSchema = z.object({
       'exact-planar-biconnected-outer-boundary',
       'coarse-exact-detailed-map-match',
       'detailed-macro-cycle-expansion',
+      'detailed-macro-cycle-with-envelope-ears',
     ]),
     optimizationStatus: z.enum([
       'optimal',

@@ -10,6 +10,10 @@ import { calculateLandmassCoverage } from '../src/circumference-landmass.ts';
 import { geodesicLineLengthMeters } from '../src/geodesy.ts';
 import { compressHighwayCore, highwayTwoCore } from './highway-graph.mjs';
 import {
+  northAmericanHighwayEnvelopeSupportNodeIds,
+  refineHighwayCycleThroughWaypoints,
+} from './highway-envelope-cycle.mjs';
+import {
   buildOsmHighwayCenterlines,
   buildPairedOsmSourceTopologyGraph,
   readOsmMotorwayPbf,
@@ -30,9 +34,6 @@ const outputPath = resolve(
 );
 const tilesPath = resolve(process.argv[4] ?? 'data/north-america-highways.pmtiles');
 const landmassSourcePath = resolve(process.argv[5] ?? '/tmp/ne-land/ne_10m_land.shp');
-const guidePath = resolve(
-  process.argv[6] ?? 'data/north-america-highway-circumference.json',
-);
 const tileInputPath = resolve('data/.osm-highway-cache/north-america-highways.ndjson');
 const derivedCachePath = resolve(
   'data/.osm-highway-cache/north-america-derived-network.bin',
@@ -118,10 +119,7 @@ async function buildTiles(parts) {
   }
 }
 
-const [guide, landmassBuffer] = await Promise.all([
-  readFile(guidePath, 'utf8').then(JSON.parse),
-  readFile(landmassSourcePath),
-]);
+const landmassBuffer = await readFile(landmassSourcePath);
 
 let derived;
 try {
@@ -180,7 +178,7 @@ try {
   derived = {
     compressed,
     detailed,
-    displayTopologyVersion: 8,
+    displayTopologyVersion: 9,
     graphStatistics,
     sourceCompressed: compressed,
     sourceGraphParts: exactGraph.parts.map(({ id, role, tokens }) => ({
@@ -231,26 +229,99 @@ if (derived.sourceTopologyVersion !== 10) {
 }
 const { sourceCompressed, sourceGraphParts, sourceGraphStatistics } = derived;
 
-console.time('Solve and expand detailed continental macro-cycle');
-const exact = await solveDetailedMacroHighwayCycle(
+let macroCycle;
+if (derived.macroCycleTopologyVersion === 1 && derived.macroCycle) {
+  macroCycle = derived.macroCycle;
+  console.log('Reused cached detailed continental macro-cycle.');
+} else {
+  console.time('Solve and expand detailed continental macro-cycle');
+  macroCycle = await solveDetailedMacroHighwayCycle(
+    sourceCompressed.nodes,
+    sourceCompressed.edges,
+  );
+  console.timeEnd('Solve and expand detailed continental macro-cycle');
+  derived.macroCycle = macroCycle;
+  derived.macroCycleTopologyVersion = 1;
+  await writeFile(derivedCachePath, serialize(derived));
+}
+console.log({
+  areaSquareKilometers: macroCycle.areaSquareMeters / 1_000_000,
+  attempts: macroCycle.attempts,
+});
+
+const supportNodeIds = northAmericanHighwayEnvelopeSupportNodeIds(
   sourceCompressed.nodes,
   sourceCompressed.edges,
 );
-console.timeEnd('Solve and expand detailed continental macro-cycle');
+console.time('Expand cycle through detailed outer-envelope supports');
+const envelopeAttempts = [];
+for (const [orderedSupportNodeIds, attachmentCoordinates] of [
+  [
+    supportNodeIds,
+    [
+      [-87.74, 41.96],
+      [-81.24, 32.08],
+    ],
+  ],
+  [
+    [...supportNodeIds].reverse(),
+    [
+      [-81.24, 32.08],
+      [-87.74, 41.96],
+    ],
+  ],
+]) {
+  try {
+    envelopeAttempts.push(
+      refineHighwayCycleThroughWaypoints(
+        sourceCompressed.nodes,
+        sourceCompressed.edges,
+        macroCycle.segments,
+        orderedSupportNodeIds,
+        { attachmentCoordinates },
+      ),
+    );
+  } catch (error) {
+    console.warn(
+      `Envelope order ${orderedSupportNodeIds.join(' → ')} failed: ${
+        error instanceof Error ? error.message : String(error)
+      }`,
+    );
+  }
+}
+const exact = envelopeAttempts.sort(
+  (first, second) =>
+    second.areaSquareMeters - first.areaSquareMeters ||
+    first.lengthMeters - second.lengthMeters,
+)[0];
+console.timeEnd('Expand cycle through detailed outer-envelope supports');
+if (!exact) {
+  throw new Error('No detailed outer-envelope highway cycle could be constructed.');
+}
 console.log({
   areaSquareKilometers: exact.areaSquareMeters / 1_000_000,
-  guideAreaSquareKilometers: guide.route.areaSquareMeters / 1_000_000,
-  attempts: exact.attempts,
+  supportNodeIds: exact.supportNodeIds,
 });
-if (exact.areaSquareMeters < guide.route.areaSquareMeters * 0.72) {
+if (
+  exact.areaSquareMeters < 6_000_000_000_000 ||
+  exact.areaSquareMeters < macroCycle.areaSquareMeters * 1.05
+) {
   throw new Error(
-    'Detailed route match lost too much of the proven continental boundary.',
+    'Outer-envelope refinement did not materially expand the contracted macro cycle.',
   );
 }
 
 const routeCoordinates = exact.coordinates.map((coordinate) =>
   roundCoordinate(coordinate),
 );
+if (
+  !routeCoordinates.some(([longitude, latitude]) => longitude > -74 && latitude > 45) ||
+  !routeCoordinates.some(([longitude, latitude]) => longitude > -71 && latitude > 42)
+) {
+  throw new Error(
+    'Detailed highway boundary does not reach both Québec and eastern New England.',
+  );
+}
 const americanMainlandRing = readPolygonRings(landmassBuffer).find((ring) =>
   pointInRing([-99.1332, 19.4326], ring),
 );
@@ -307,9 +378,13 @@ const boundaryPartIndices = new Set(
   exact.segments.flatMap((segment) => [...segment.partIndices]),
 );
 
-console.time('Build detailed motorway vector tiles');
-await buildTiles(detailed.parts);
-console.timeEnd('Build detailed motorway vector tiles');
+if (process.env['HIGHWAY_REUSE_EXISTING_TILES'] === '1') {
+  console.log(`Reused existing ${tilesPath}.`);
+} else {
+  console.time('Build detailed motorway vector tiles');
+  await buildTiles(detailed.parts);
+  console.timeEnd('Build detailed motorway vector tiles');
+}
 
 const output = {
   centerline_method:
@@ -338,7 +413,7 @@ const output = {
     interchangeConnectorCount: detailed.statistics.directConnectorCount,
     directionalRampPathCount: detailed.statistics.directedConnectorPathCount,
     osmPrecisionMainlineCount: detailed.statistics.averagedPartCount,
-    optimizationMethod: 'detailed-macro-cycle-expansion',
+    optimizationMethod: 'detailed-macro-cycle-with-envelope-ears',
     optimizationStatus: 'validated-detailed',
     sourceFeatureCount: detailed.parts.length,
     unpairedRampPathCount: detailed.statistics.unpairedConnectorPathCount,
@@ -357,7 +432,7 @@ const output = {
     boundaryRoadFeatureCount: boundaryPartIndices.size,
     containedLandAreaSquareMeters: landmassCoverage.insideAreaSquareMeters,
     coordinates: routeCoordinates,
-    countries: guide.route.countries,
+    countries: ['Canada', 'United States'],
     id: 'north-america-controlled-access-maximum',
     lengthMeters: geodesicLineLengthMeters(routeCoordinates),
     outsideLandAreaSquareMeters: landmassCoverage.outsideAreaSquareMeters,

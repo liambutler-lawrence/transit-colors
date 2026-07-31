@@ -54,15 +54,28 @@ async function highwayPropertiesNear(archive, longitude, latitude) {
 
 test('North America highway data publishes one validated maximum and full vector network', () => {
   assert.equal(data.methodology.optimizationStatus, 'validated-detailed');
-  assert.equal(data.methodology.optimizationMethod, 'detailed-macro-cycle-expansion');
+  assert.equal(
+    data.methodology.optimizationMethod,
+    'detailed-macro-cycle-with-envelope-ears',
+  );
   assert.equal(data.network.featureCount, data.methodology.sourceFeatureCount);
   assert.equal(data.network.sourceLayer, 'highways');
   assert.match(data.network.tileUrl, /\.pmtiles$/);
   assert.ok(data.network.featureCount > 10_000);
   assert.ok(data.route.boundaryRoadFeatureCount > 20_000);
   assert.ok(data.route.boundaryCorridorCount > 700);
-  assert.ok(data.route.areaSquareMeters > 5_200_000_000_000);
-  assert.ok(data.route.lengthMeters > 11_000_000);
+  assert.ok(data.route.areaSquareMeters > 6_000_000_000_000);
+  assert.ok(data.route.lengthMeters > 14_000_000);
+  assert.ok(
+    data.route.coordinates.some(
+      ([longitude, latitude]) => longitude > -74 && latitude > 45,
+    ),
+  );
+  assert.ok(
+    data.route.coordinates.some(
+      ([longitude, latitude]) => longitude > -71 && latitude > 42,
+    ),
+  );
   assert.equal(hasProperSelfIntersection(data.route.coordinates), false);
   assert.ok(data.methodology.interchangeConnectorCount > 4_000);
   assert.ok(data.methodology.directionalRampPathCount > 10_000);
