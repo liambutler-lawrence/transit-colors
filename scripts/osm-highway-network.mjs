@@ -15,6 +15,8 @@ const RAMP_CORRESPONDENCE_SPACING_METERS = 25;
 const RAMP_TERMINAL_HOOK_WINDOW_METERS = 75;
 const MAX_RAMP_TERMINAL_TURN_DEGREES = 32;
 const MAX_RAMP_TERMINAL_HOOK_VERTICES_PER_END = 2;
+const RAMP_CENTERLINE_SMOOTHING_PASSES = 5;
+const MAX_RAMP_CENTERLINE_SMOOTHING_OFFSET_METERS = 8;
 
 function decodeOplString(value) {
   return value.replace(/%([0-9a-fA-F]{2})/g, (_, hexadecimal) =>
@@ -981,6 +983,16 @@ function localMeters(coordinate, origin) {
   ];
 }
 
+function coordinateFromLocalMeters(coordinate, origin) {
+  const latitudeRadians = (origin[1] * Math.PI) / 180;
+  return [
+    Number(
+      (origin[0] + coordinate[0] / (111_320 * Math.cos(latitudeRadians))).toFixed(7),
+    ),
+    Number((origin[1] + coordinate[1] / 110_574).toFixed(7)),
+  ];
+}
+
 function alignedRampSamples(samples, commonStart, commonEnd, origin) {
   const originalStart = localMeters(samples[0].coordinate, origin);
   const originalEnd = localMeters(samples.at(-1).coordinate, origin);
@@ -1130,6 +1142,53 @@ export function removeRampTerminalHooks(coordinates) {
   return smoothed;
 }
 
+/**
+ * Suppresses the alternating midpoint jitter left by many-to-one dynamic-time-
+ * warping matches. Repeated [1, 2, 1] filtering is a compact Gaussian
+ * low-pass: it rounds only high-frequency movement while preserving the
+ * averaged curve's overall form. Every vertex remains within eight meters of
+ * its unsmoothed position, and the exact graph-junction endpoints are fixed.
+ */
+export function smoothRampCenterline(coordinates) {
+  if (coordinates.length < 4) return coordinates;
+  const origin = midpoint(coordinates[0], coordinates.at(-1));
+  const original = coordinates.map((coordinate) => localMeters(coordinate, origin));
+  let smoothed = original.map((coordinate) => [...coordinate]);
+  for (let pass = 0; pass < RAMP_CENTERLINE_SMOOTHING_PASSES; pass += 1) {
+    smoothed = smoothed.map((coordinate, index) => {
+      if (index === 0 || index === smoothed.length - 1) {
+        return [...original[index]];
+      }
+      return [
+        (smoothed[index - 1][0] + 2 * coordinate[0] + smoothed[index + 1][0]) / 4,
+        (smoothed[index - 1][1] + 2 * coordinate[1] + smoothed[index + 1][1]) / 4,
+      ];
+    });
+  }
+  const bounded = smoothed.map((coordinate, index) => {
+    if (index === 0 || index === smoothed.length - 1) {
+      return [...original[index]];
+    }
+    const longitudeOffset = coordinate[0] - original[index][0];
+    const latitudeOffset = coordinate[1] - original[index][1];
+    const offsetMeters = Math.hypot(longitudeOffset, latitudeOffset);
+    const scale =
+      offsetMeters > MAX_RAMP_CENTERLINE_SMOOTHING_OFFSET_METERS
+        ? MAX_RAMP_CENTERLINE_SMOOTHING_OFFSET_METERS / offsetMeters
+        : 1;
+    return [
+      original[index][0] + longitudeOffset * scale,
+      original[index][1] + latitudeOffset * scale,
+    ];
+  });
+  const result = bounded.map((coordinate) =>
+    coordinateFromLocalMeters(coordinate, origin),
+  );
+  result[0] = coordinates[0];
+  result[result.length - 1] = coordinates.at(-1);
+  return result;
+}
+
 export function averageReciprocalPathCoordinates(
   firstCoordinates,
   secondCoordinates,
@@ -1164,8 +1223,12 @@ export function averageReciprocalPathCoordinates(
     (coordinate, index) =>
       index === 0 || geodesicDistanceMeters(coordinates[index - 1], coordinate) > 0.25,
   );
-  const smoothed = removeRampTerminalHooks(deduplicated);
-  return lineLengthMeters(smoothed) >= 5 ? smoothed : deduplicated;
+  const withoutTerminalHooks = removeRampTerminalHooks(deduplicated);
+  const smoothed = smoothRampCenterline(withoutTerminalHooks);
+  if (lineLengthMeters(smoothed) >= 5) return smoothed;
+  return lineLengthMeters(withoutTerminalHooks) >= 5
+    ? withoutTerminalHooks
+    : deduplicated;
 }
 
 function travelDirectionAtNode(coordinates, nodeIndex) {

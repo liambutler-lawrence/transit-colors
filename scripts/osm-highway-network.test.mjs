@@ -10,6 +10,7 @@ import {
   parseOplLine,
   prepareWays,
   removeRampTerminalHooks,
+  smoothRampCenterline,
   traceMotorwayChains,
 } from './osm-highway-network.mjs';
 
@@ -23,6 +24,32 @@ function coordinateBounds(coordinates) {
     ],
     [Infinity, Infinity, -Infinity, -Infinity],
   );
+}
+
+function maximumTurnDegrees(coordinates) {
+  let maximum = 0;
+  for (let index = 1; index < coordinates.length - 1; index += 1) {
+    const vector = (first, second) => {
+      const latitudeScale = Math.cos((((first[1] + second[1]) / 2) * Math.PI) / 180);
+      const longitude = (second[0] - first[0]) * latitudeScale;
+      const latitude = second[1] - first[1];
+      const length = Math.hypot(longitude, latitude);
+      return [longitude / length, latitude / length];
+    };
+    const incoming = vector(coordinates[index - 1], coordinates[index]);
+    const outgoing = vector(coordinates[index], coordinates[index + 1]);
+    const turn =
+      (Math.acos(
+        Math.max(
+          -1,
+          Math.min(1, incoming[0] * outgoing[0] + incoming[1] * outgoing[1]),
+        ),
+      ) *
+        180) /
+      Math.PI;
+    maximum = Math.max(maximum, turn);
+  }
+  return maximum;
 }
 
 test('OPL parser preserves explicit node identities and motorway tags', () => {
@@ -349,6 +376,31 @@ test('terminal correspondence hooks are removed from Chattanooga ramp averages',
   assert.deepEqual(northSmoothed.at(-1), northConnector.at(-1));
   assert.equal(eastConnector.length - eastSmoothed.length, 2);
   assert.equal(northConnector.length - northSmoothed.length, 2);
+});
+
+test('paired ramp centerlines suppress correspondence jitter without moving endpoints', () => {
+  const longitudeScale = 111_320 * Math.cos((35.3 * Math.PI) / 180);
+  const latitudeScale = 110_574;
+  const jitteryCurve = Array.from({ length: 41 }, (_, index) => {
+    const progress = index / 40;
+    const angle = Math.PI + (Math.PI / 2) * progress;
+    const radius = 280 + (index % 2 === 0 ? -5 : 5);
+    return [
+      -85.15 + (Math.cos(angle) * radius) / longitudeScale,
+      35.3 + (Math.sin(angle) * radius) / latitudeScale,
+    ];
+  });
+  const smoothed = smoothRampCenterline(jitteryCurve);
+
+  assert.deepEqual(smoothed[0], jitteryCurve[0]);
+  assert.deepEqual(smoothed.at(-1), jitteryCurve.at(-1));
+  assert.equal(smoothed.length, jitteryCurve.length);
+  assert.ok(maximumTurnDegrees(smoothed) < maximumTurnDegrees(jitteryCurve) * 0.45);
+  for (const [index, coordinate] of smoothed.entries()) {
+    const longitudeOffset = (coordinate[0] - jitteryCurve[index][0]) * longitudeScale;
+    const latitudeOffset = (coordinate[1] - jitteryCurve[index][1]) * latitudeScale;
+    assert.ok(Math.hypot(longitudeOffset, latitudeOffset) <= 8.1);
+  }
 });
 
 test('unpaired one-way ramps are excluded from display and topology', () => {

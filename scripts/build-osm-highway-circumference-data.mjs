@@ -126,9 +126,9 @@ const [guide, landmassBuffer] = await Promise.all([
 let derived;
 try {
   derived = deserialize(await readFile(derivedCachePath));
-  if (derived.displayTopologyVersion !== 8) {
+  if (derived.displayTopologyVersion !== 9) {
     throw new Error(
-      'The cached display topology predates terminal ramp-hook smoothing.',
+      'The cached display topology predates bounded ramp-centerline smoothing.',
     );
   }
   console.log(`Reused ${derivedCachePath}.`);
@@ -151,7 +151,7 @@ try {
   console.log(detailed.statistics);
   derived = {
     detailed,
-    displayTopologyVersion: 8,
+    displayTopologyVersion: 9,
   };
   await writeFile(derivedCachePath, serialize(derived));
 
