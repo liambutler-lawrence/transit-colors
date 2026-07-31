@@ -1162,8 +1162,7 @@ export function averageReciprocalPathCoordinates(
   coordinates[coordinates.length - 1] = endCoordinate;
   const deduplicated = coordinates.filter(
     (coordinate, index) =>
-      index === 0 ||
-      geodesicDistanceMeters(coordinates[index - 1], coordinate) > 0.25,
+      index === 0 || geodesicDistanceMeters(coordinates[index - 1], coordinate) > 0.25,
   );
   const smoothed = removeRampTerminalHooks(deduplicated);
   return lineLengthMeters(smoothed) >= 5 ? smoothed : deduplicated;
