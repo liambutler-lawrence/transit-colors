@@ -447,6 +447,24 @@
                   standard-offset change.
                 </p>
               </fieldset>
+              <fieldset class="timezone-period-control timezone-simulator-control">
+                <legend>What if?</legend>
+                <label for="timezone-country">Country or territory</label>
+                <select id="timezone-country" disabled>
+                  <option value="">Loading country boundaries…</option>
+                </select>
+                <label for="timezone-country-zone">New timekeeping region</label>
+                <select id="timezone-country-zone" disabled>
+                  <option value="">Choose a country first</option>
+                </select>
+                <button id="timezone-country-reset" type="button" disabled>
+                  Reset country
+                </button>
+                <p id="timezone-country-summary">
+                  Choose a country and give all of it another time zone to compare its
+                  clock with the Sun.
+                </p>
+              </fieldset>
             </section>
 
             <section class="sidebar-section results-section">

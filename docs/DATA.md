@@ -174,6 +174,7 @@ uses a local equal-area transform rather than Web Mercator.
 
 ```sh
 npm run build:data:timezone-skew
+npm run build:data:timezone-countries
 ```
 
 The builder downloads timezone-boundary-builder's version-pinned `timezones-1970`
@@ -190,13 +191,23 @@ node scripts/build-timezone-skew-data.mjs \
 
 The boundary snapshot is derived from OpenStreetMap and remains subject to ODbL; both
 upstream releases, source URLs, checksums, and the boundary license are recorded in the
-generated file. The committed IANA 2026c rule table covers 1970 through 2050, so runtime
+generated file. The committed IANA 2026c rule table covers 1970 through 2037, so runtime
 results do not depend on the browser's bundled timezone release. The current-year
 selector groups every recurring or one-off UTC-offset transition into ranges with a
 unique global pattern. The historical selector groups one-off standard-offset changes
 into eras, while paired recurring daylight-saving reversals are excluded. Solar noon is
 then derived directly from longitude for the selected range:
 `12:00 + UTC offset − longitude × 4 minutes per degree`.
+
+The country-timezone simulator uses a separately generated Natural Earth 1:50m Admin 0
+snapshot. Its builder pins the upstream commit and checksum, keeps only country names,
+codes, and simplified polygons, and records Natural Earth's public-domain status in
+`data/timezone-skew-countries.geojson`. To rebuild from a downloaded source:
+
+```sh
+node scripts/build-timezone-country-data.mjs \
+  data/timezone-skew-countries.geojson /path/to/ne_50m_admin_0_countries.geojson
+```
 
 ## Validation
 

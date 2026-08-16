@@ -5,7 +5,6 @@ import { circumferenceGeometryVariantsSchema } from '../circumference/schema.js'
 import type { CircumferenceGeometryVariants } from '../circumference/types.js';
 import { createCircumferenceGradientSource } from '../circumference-gradient-source.js';
 import { createStreetAccessScorer, splitStreetFeatures } from '../routing.js';
-import { timezoneSkewCollectionSchema } from '../timezone-skew.js';
 import {
   landmassDataSchema,
   mapFeaturePropertiesSchema,
@@ -62,6 +61,7 @@ import {
 } from './highway-circumference-ui.js';
 import { firstSymbolLayerId } from './map-ui-utils.js';
 import { installTimezoneSkew } from './timezone-skew-ui.js';
+import { fetchTimezoneMapData } from './timezone-data.js';
 import {
   applyInspectedSegmentOverride,
   applyTimeScale,
@@ -758,17 +758,14 @@ export async function loadArea(
 
 export async function initialize(): Promise<void> {
   try {
-    const [basemapStyle, landmasses, timezoneSkewData, circumferenceEntries] =
+    const [basemapStyle, landmasses, timezoneMapData, circumferenceEntries] =
       await Promise.all([
         fetchParsed('vendor/openfreemap-liberty.json', styleSpecificationSchema),
         fetchParsed(
           'data/circumference-landmasses.json?v=20260727d',
           landmassDataSchema,
         ),
-        fetchParsed(
-          'data/timezone-skew-zones.geojson?v=20260816c',
-          timezoneSkewCollectionSchema,
-        ),
+        fetchTimezoneMapData(),
         Promise.all(
           AREA_KEYS.map(async (areaKey) => ({
             areaKey,
@@ -784,7 +781,7 @@ export async function initialize(): Promise<void> {
       ]);
     runtime.pendingBasemapStyle = basemapStyle;
     runtime.circumferenceLandmasses = landmasses;
-    installTimezoneSkew(timezoneSkewData);
+    installTimezoneSkew(timezoneMapData.zones, timezoneMapData.countries);
     for (const { areaKey, geometryVariants, schedules } of circumferenceEntries) {
       circumferenceStates[areaKey].geometryVariants = geometryVariants;
       runtime.circumferenceSchedules[areaKey] = schedules;
