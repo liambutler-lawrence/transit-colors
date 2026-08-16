@@ -118,8 +118,11 @@ export const requestedAreaKey = initialSearchParams.get('area');
 export const initialAreaKey: AreaKey = isAreaKey(requestedAreaKey)
   ? requestedAreaKey
   : 'cdmx';
+const requestedProduct = initialSearchParams.get('product');
 export const initialProduct: Product =
-  initialSearchParams.get('product') === 'circumference' ? 'circumference' : 'access';
+  requestedProduct === 'circumference' || requestedProduct === 'timezone'
+    ? requestedProduct
+    : 'access';
 export const initialCircumferenceCriterion: CircumferenceCriterion =
   initialSearchParams.get('criterion') === 'motorway' ? 'motorway' : 'metro';
 
@@ -339,11 +342,31 @@ export const circumferenceProductButton = requiredElement(
   '#product-circumference',
   HTMLButtonElement,
 );
+export const timezoneProductButton = requiredElement(
+  '#product-timezone',
+  HTMLButtonElement,
+);
 export const accessProductEl = requiredElement('#access-product', HTMLElement);
 export const circumferenceProductEl = requiredElement(
   '#circumference-product',
   HTMLElement,
 );
+export const timezoneProductEl = requiredElement('#timezone-product', HTMLElement);
+export const timezoneColorsToggle = requiredElement(
+  '#toggle-timezone-colors',
+  HTMLInputElement,
+);
+export const timezoneBoundariesToggle = requiredElement(
+  '#toggle-timezone-boundaries',
+  HTMLInputElement,
+);
+export const timezoneSelectionTypeEl = requiredElement(
+  '#timezone-selection-type',
+  HTMLElement,
+);
+export const timezoneNameEl = requiredElement('#timezone-name', HTMLElement);
+export const timezoneSummaryEl = requiredElement('#timezone-summary', HTMLElement);
+export const timezoneMetadataEl = requiredElement('#timezone-metadata', HTMLElement);
 export const circumferenceResultsEl = requiredElement(
   '#circumference-results',
   HTMLElement,

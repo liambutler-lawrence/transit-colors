@@ -34,6 +34,11 @@ import {
 } from './highway-circumference-ui.js';
 import { activeAccessTransitTimes, setLayerVisibility } from './map-ui-utils.js';
 import {
+  focusTimezoneWorld,
+  positionTimezoneSkewLayers,
+  syncTimezoneSkewVisibility,
+} from './timezone-skew-ui.js';
+import {
   AREAS,
   COLORS,
   FUTURE_MODE_ACCESS_PROPERTIES,
@@ -90,6 +95,10 @@ import {
   streetToggle,
   timeScaleControlEl,
   timeStreetColor,
+  timezoneBoundariesToggle,
+  timezoneColorsToggle,
+  timezoneProductButton,
+  timezoneProductEl,
   updateStatus,
 } from './context.js';
 
@@ -104,22 +113,36 @@ export function setActiveProduct(
     updateUrl = true,
   }: { readonly fit?: boolean; readonly updateUrl?: boolean } = {},
 ): void {
-  runtime.activeProduct = product === 'circumference' ? 'circumference' : 'access';
+  runtime.activeProduct = product;
+  const accessActive = runtime.activeProduct === 'access';
   const circumferenceActive = runtime.activeProduct === 'circumference';
+  const timezoneActive = runtime.activeProduct === 'timezone';
   appShellEl.classList.toggle('circumference-active', circumferenceActive);
-  accessProductButton.setAttribute('aria-selected', String(!circumferenceActive));
+  appShellEl.classList.toggle('timezone-active', timezoneActive);
+  accessProductButton.setAttribute('aria-selected', String(accessActive));
   circumferenceProductButton.setAttribute('aria-selected', String(circumferenceActive));
-  accessProductButton.tabIndex = circumferenceActive ? -1 : 0;
+  timezoneProductButton.setAttribute('aria-selected', String(timezoneActive));
+  accessProductButton.tabIndex = accessActive ? 0 : -1;
   circumferenceProductButton.tabIndex = circumferenceActive ? 0 : -1;
-  accessProductEl.hidden = circumferenceActive;
+  timezoneProductButton.tabIndex = timezoneActive ? 0 : -1;
+  accessProductEl.hidden = !accessActive;
   circumferenceProductEl.hidden = !circumferenceActive;
+  timezoneProductEl.hidden = !timezoneActive;
+
+  if (map.isStyleLoaded()) {
+    map.setProjection({ type: timezoneActive ? 'mercator' : 'globe' });
+  }
 
   syncStreetVisibility();
   syncStationVisibility();
   syncCircumferenceVisibility();
+  syncTimezoneSkewVisibility();
   if (updateUrl) updateAreaChrome(runtime.activeAreaKey);
 
-  if (circumferenceActive) {
+  if (timezoneActive) {
+    if (fit) focusTimezoneWorld();
+    updateStatus('Clock skew ready');
+  } else if (circumferenceActive) {
     prepareCircumferenceRoute();
     if (fit && highwayCriterionActive()) {
       fitHighwayCircumference();
@@ -129,12 +152,25 @@ export function setActiveProduct(
     updateStatus(circumferenceState.selected ? 'Route ready' : 'Loading routes', {
       isLoading: !circumferenceState.selected,
     });
-  } else {
+  } else if (accessActive) {
     if (fit && state.metadata) applyMapBounds(state.metadata);
     if (AREAS[runtime.activeAreaKey].liveRoads) requestLiveStreetRefresh();
     updateStatus(state.destination ? 'Destination set' : 'Ready');
     updateViewportStatistics();
   }
+}
+
+accessProductButton.addEventListener('click', () => {
+  setActiveProduct('access');
+});
+circumferenceProductButton.addEventListener('click', () => {
+  setActiveProduct('circumference');
+});
+timezoneProductButton.addEventListener('click', () => {
+  setActiveProduct('timezone');
+});
+for (const toggle of [timezoneColorsToggle, timezoneBoundariesToggle]) {
+  toggle.addEventListener('change', syncTimezoneSkewVisibility);
 }
 
 export function syncStationVisibility(): void {
@@ -482,7 +518,7 @@ export function finishLoading(): void {
 
   runtime.loadingOperation = null;
   runtime.loadingCanFinish = false;
-  updateStatus('Ready');
+  updateStatus(runtime.activeProduct === 'timezone' ? 'Clock skew ready' : 'Ready');
   mapLoadingEl.hidden = true;
   mapEl.setAttribute('aria-busy', 'false');
   window.dispatchEvent(
@@ -508,6 +544,7 @@ export function installBasemap(): void {
       }
     }
     positionCircumferenceGradient();
+    positionTimezoneSkewLayers();
     if (AREAS[runtime.activeAreaKey].liveRoads) {
       requestLiveStreetRefresh();
       syncStreetVisibility();
@@ -815,16 +852,20 @@ export function updateAreaChrome(areaKey: AreaKey): void {
   areaSelect.value = areaKey;
   accessResultAreaEl.textContent = area.label;
   document.title =
-    runtime.activeProduct === 'circumference'
-      ? `Circumference Lab — ${area.label}`
-      : `Transit Colors — ${area.label}`;
+    runtime.activeProduct === 'timezone'
+      ? 'Clock Skew Map — Transit Colors'
+      : runtime.activeProduct === 'circumference'
+        ? `Circumference Lab — ${area.label}`
+        : `Transit Colors — ${area.label}`;
   mapEl.setAttribute(
     'aria-label',
-    runtime.activeProduct === 'circumference'
-      ? `All maximum-area circumferential routes map, focused on ${area.label}`
-      : area.supportsDestination
-        ? `${area.label} transit access and travel time map`
-        : `${area.label} transit proximity map`,
+    runtime.activeProduct === 'timezone'
+      ? 'Interactive world map of clock time compared with mean solar time'
+      : runtime.activeProduct === 'circumference'
+        ? `All maximum-area circumferential routes map, focused on ${area.label}`
+        : area.supportsDestination
+          ? `${area.label} transit access and travel time map`
+          : `${area.label} transit proximity map`,
   );
   destinationControlEl.hidden = !area.supportsDestination;
   departureControlEl.hidden = !area.supportsDestination;
@@ -836,7 +877,10 @@ export function updateAreaChrome(areaKey: AreaKey): void {
   } else {
     url.searchParams.set('area', areaKey);
   }
-  if (runtime.activeProduct === 'circumference') {
+  if (runtime.activeProduct === 'timezone') {
+    url.searchParams.set('product', 'timezone');
+    url.searchParams.delete('criterion');
+  } else if (runtime.activeProduct === 'circumference') {
     url.searchParams.set('product', 'circumference');
     if (routeCriterionSelect.value === 'motorway') {
       url.searchParams.set('criterion', 'motorway');

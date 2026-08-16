@@ -5,6 +5,7 @@ import { circumferenceGeometryVariantsSchema } from '../circumference/schema.js'
 import type { CircumferenceGeometryVariants } from '../circumference/types.js';
 import { createCircumferenceGradientSource } from '../circumference-gradient-source.js';
 import { createStreetAccessScorer, splitStreetFeatures } from '../routing.js';
+import { timezoneSkewCollectionSchema } from '../timezone-skew.js';
 import {
   landmassDataSchema,
   mapFeaturePropertiesSchema,
@@ -60,6 +61,7 @@ import {
   installHighwayHover,
 } from './highway-circumference-ui.js';
 import { firstSymbolLayerId } from './map-ui-utils.js';
+import { installTimezoneSkew } from './timezone-skew-ui.js';
 import {
   applyInspectedSegmentOverride,
   applyTimeScale,
@@ -77,11 +79,9 @@ import {
   COLORS,
   LIVE_ROAD_CLASSES,
   MODE_LABELS,
-  accessProductButton,
   activeStationModes,
   areaSelect,
   circumferenceCanvases,
-  circumferenceProductButton,
   circumferenceResultsEl,
   circumferenceScheduleDaySelect,
   circumferenceScheduleTimeInput,
@@ -734,12 +734,12 @@ export async function loadArea(
     syncStationVisibility();
     syncCircumferenceVisibility();
     updateViewportStatistics();
-    prepareCircumferenceRoute(sequence);
+    if (runtime.activeProduct !== 'timezone') prepareCircumferenceRoute(sequence);
     window.__transitPerformance.dataFetchedMs =
       performance.now() - window.__transitPerformance.startedAt;
     scheduleDestinationSetup(areaKey, area, stations, sequence);
 
-    if (area.liveRoads || runtime.activeProduct === 'circumference') {
+    if (area.liveRoads || runtime.activeProduct !== 'access') {
       scheduleLiveStreetRefresh();
       runtime.loadingCanFinish = true;
       requestAnimationFrame(() => requestAnimationFrame(finishLoading));
@@ -758,29 +758,42 @@ export async function loadArea(
 
 export async function initialize(): Promise<void> {
   try {
-    const [basemapStyle, landmasses, circumferenceEntries] = await Promise.all([
-      fetchParsed('vendor/openfreemap-liberty.json', styleSpecificationSchema),
-      fetchParsed('data/circumference-landmasses.json?v=20260727d', landmassDataSchema),
-      Promise.all(
-        AREA_KEYS.map(async (areaKey) => ({
-          areaKey,
-          geometryVariants: await fetchCircumferenceGeometryVariants(
-            AREAS[areaKey].circumference,
-          ),
-          schedules: await fetchParsed(AREAS[areaKey].schedules, scheduleSchema).catch(
-            () => null,
-          ),
-        })),
-      ),
-    ]);
+    const [basemapStyle, landmasses, timezoneSkewData, circumferenceEntries] =
+      await Promise.all([
+        fetchParsed('vendor/openfreemap-liberty.json', styleSpecificationSchema),
+        fetchParsed(
+          'data/circumference-landmasses.json?v=20260727d',
+          landmassDataSchema,
+        ),
+        fetchParsed(
+          'data/timezone-skew-zones.geojson?v=20260816a',
+          timezoneSkewCollectionSchema,
+        ),
+        Promise.all(
+          AREA_KEYS.map(async (areaKey) => ({
+            areaKey,
+            geometryVariants: await fetchCircumferenceGeometryVariants(
+              AREAS[areaKey].circumference,
+            ),
+            schedules: await fetchParsed(
+              AREAS[areaKey].schedules,
+              scheduleSchema,
+            ).catch(() => null),
+          })),
+        ),
+      ]);
     runtime.pendingBasemapStyle = basemapStyle;
     runtime.circumferenceLandmasses = landmasses;
+    installTimezoneSkew(timezoneSkewData);
     for (const { areaKey, geometryVariants, schedules } of circumferenceEntries) {
       circumferenceStates[areaKey].geometryVariants = geometryVariants;
       runtime.circumferenceSchedules[areaKey] = schedules;
     }
     setActiveCircumferenceState(initialAreaKey);
-    await loadArea(initialAreaKey, { initial: true });
+    await loadArea(initialAreaKey, {
+      initial: true,
+      fit: runtime.activeProduct !== 'timezone',
+    });
   } catch (error) {
     console.error(error);
     runtime.loadingOperation = null;
@@ -933,7 +946,7 @@ map.on('idle', () => {
     runtime.loadingOperation?.type !== 'filter' &&
     (renderedStreets.length > 0 ||
       !streetToggle.checked ||
-      runtime.activeProduct === 'circumference')
+      runtime.activeProduct !== 'access')
   ) {
     runtime.loadingCanFinish = true;
     finishLoading();
@@ -982,14 +995,6 @@ circumferenceResultsEl.addEventListener('click', (event) => {
   }
   routeChoiceSelect.value = candidateId;
   routeChoiceSelect.dispatchEvent(new Event('change'));
-});
-
-accessProductButton.addEventListener('click', () => {
-  setActiveProduct('access');
-});
-
-circumferenceProductButton.addEventListener('click', () => {
-  setActiveProduct('circumference');
 });
 
 routeCriterionSelect.addEventListener('change', () => {
@@ -1087,5 +1092,7 @@ setActiveProduct(initialProduct, { fit: false, updateUrl: false });
 void map.once('style.load', () => {
   window.__transitPerformance.styleLoadedMs =
     performance.now() - window.__transitPerformance.startedAt;
+  map.setProjection({ type: initialProduct === 'timezone' ? 'mercator' : 'globe' });
+  setActiveProduct(runtime.activeProduct, { updateUrl: false });
   void initialize();
 });

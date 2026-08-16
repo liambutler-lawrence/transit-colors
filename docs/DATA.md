@@ -14,6 +14,7 @@ Rebuild data only when intentionally refreshing a source snapshot.
 - Official AIFA and Servicio de Transportes Eléctricos station references
 - Natural Earth 1:10m land polygons
 - Natural Earth 1:10m North America roads supplement
+- Natural Earth 1:10m time zones and 1:50m land polygons
 
 Review each source's terms before redistributing a new snapshot. Preserve the in-app
 attribution whenever adding a source.
@@ -168,6 +169,18 @@ npm run build:data:landmasses -- /path/to/ne_10m_land.shp
 The result includes the masks and measured areas used by Circumference Lab. Landmass
 totals and clipped route coverage use WGS84 ellipsoidal area; the clipping workspace
 uses a local equal-area transform rather than Web Mercator.
+
+## Clock skew
+
+```sh
+npm run build:data:timezone-skew
+```
+
+The builder clips Natural Earth 5.1.2's UTC-offset zones to its 1:50m land polygons and
+writes `data/timezone-skew-zones.geojson`. Source URLs are version-pinned so rebuilding
+the snapshot is deterministic. The browser derives solar noon directly from longitude:
+`12:00 + UTC offset − longitude × 4 minutes per degree`. The source zones describe
+standard UTC offsets; seasonal daylight-saving changes are intentionally excluded.
 
 ## Validation
 

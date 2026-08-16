@@ -38,6 +38,15 @@
               >
                 Circumference routes
               </button>
+              <button
+                id="product-timezone"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="timezone-product"
+              >
+                Clock skew
+              </button>
             </div>
           </div>
           <div class="panel-actions">
@@ -371,6 +380,107 @@
                 rail segments and focuses it on the map; clicking any visible line,
                 platform, transfer, street, or station updates this final section
                 directly.
+              </p>
+            </section>
+          </div>
+
+          <div
+            id="timezone-product"
+            class="product-panel timezone-product"
+            role="tabpanel"
+            hidden
+          >
+            <section class="sidebar-section display-section">
+              <div class="section-heading compact-heading">
+                <div>
+                  <span class="section-eyebrow">Map display</span>
+                  <h2>Visible layers</h2>
+                </div>
+              </div>
+              <div class="toggles timezone-toggles" aria-label="Clock skew layers">
+                <label>
+                  <input id="toggle-timezone-colors" type="checkbox" checked />
+                  <span>Color wash</span>
+                </label>
+                <label>
+                  <input id="toggle-timezone-boundaries" type="checkbox" checked />
+                  <span>Zone borders</span>
+                </label>
+              </div>
+            </section>
+
+            <section class="sidebar-section mode-section">
+              <div class="section-heading">
+                <span class="section-index">2</span>
+                <div>
+                  <span class="section-eyebrow">Mode</span>
+                  <h2>Clock time vs solar time</h2>
+                </div>
+              </div>
+              <div class="timezone-explainer">
+                <strong>Where does noon really happen?</strong>
+                <p>
+                  Standard time gives a whole region one clock. Longitude determines
+                  mean solar time. Their difference shifts the Sun's highest point away
+                  from 12:00.
+                </p>
+              </div>
+            </section>
+
+            <section class="sidebar-section results-section">
+              <div class="section-heading">
+                <span class="section-index">3</span>
+                <div>
+                  <span class="section-eyebrow">Results</span>
+                  <h2>Solar noon displacement</h2>
+                </div>
+              </div>
+
+              <div
+                class="legend timezone-legend"
+                aria-label="Solar noon displacement from two hours later in red through noon in white to two hours earlier in blue"
+              >
+                <div class="legend-bar"></div>
+                <div class="legend-labels">
+                  <span>+2 hr later</span>
+                  <span>12:00</span>
+                  <span>−2 hr earlier</span>
+                </div>
+              </div>
+              <p class="timezone-result-note">
+                Color is calculated continuously from each timezone's UTC offset and
+                every point's longitude.
+              </p>
+            </section>
+
+            <section class="sidebar-section selected-section">
+              <div class="section-heading">
+                <span class="section-index">4</span>
+                <div>
+                  <span class="section-eyebrow">Selected item</span>
+                  <h2>Local clock reading</h2>
+                </div>
+              </div>
+              <div class="selection timezone-selection" aria-live="polite">
+                <span id="timezone-selection-type" class="metric-label"
+                  >Nothing selected</span
+                >
+                <strong id="timezone-name">Move over a timezone</strong>
+                <span id="timezone-summary">
+                  Hover or click any colored land area to compare clock noon with mean
+                  solar noon.
+                </span>
+                <dl id="timezone-metadata" class="feature-metadata"></dl>
+              </div>
+              <p class="method-note timezone-method-note">
+                Inspired by
+                <a
+                  href="https://blog.poormansmath.net/the-time-it-takes-to-change-the-time/"
+                  target="_blank"
+                  rel="noreferrer"
+                  >Stefano Maggiolo's map</a
+                >. Boundaries use public-domain Natural Earth data and represent
+                standard offsets rather than seasonal daylight-saving changes.
               </p>
             </section>
           </div>
