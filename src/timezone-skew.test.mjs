@@ -24,6 +24,21 @@ test('the committed clock-skew zones satisfy the runtime boundary', async () => 
   assert.ok(data.features.some(({ properties }) => properties.offset_hours === 12.75));
 });
 
+test('the clock-skew color wash follows the shared globe projection', async () => {
+  const [accessControls, mapLifecycle, timezoneUi] = await Promise.all([
+    readFile(new URL('./app/access-controls.ts', import.meta.url), 'utf8'),
+    readFile(new URL('./app/map-lifecycle.ts', import.meta.url), 'utf8'),
+    readFile(new URL('./app/timezone-skew-ui.ts', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(accessControls, /map\.setProjection\(\{ type: 'globe' \}\)/);
+  assert.match(mapLifecycle, /map\.setProjection\(\{ type: 'globe' \}\)/);
+  assert.match(timezoneUi, /gl_Position = projectTile\(a_position\)/);
+  assert.match(timezoneUi, /shaderData\.variantName/);
+  assert.doesNotMatch(accessControls, /timezoneActive \? 'mercator'/);
+  assert.doesNotMatch(mapLifecycle, /initialProduct === 'timezone' \? 'mercator'/);
+});
+
 test('solar noon skew compares UTC offset with longitude-derived solar time', () => {
   assert.equal(solarNoonSkewMinutes(0, 0), 0);
   assert.equal(solarNoonSkewMinutes(-75, -5), 0);

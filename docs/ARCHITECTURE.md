@@ -19,7 +19,7 @@ application, deterministic derived datasets, and scripts that refresh those data
 8. `src/app/circumference-layers.ts` owns the complete-line, selected-route, transfer,
    station, and label layer definitions.
 9. `src/app/timezone-skew-ui.ts` triangulates land-clipped time-zone polygons for a
-   longitude-continuous custom WebGL layer and manages map inspection.
+   longitude-continuous, projection-aware custom WebGL layer and manages map inspection.
 
 The application modules form a one-way dependency graph from shared context to features
 to lifecycle orchestration. Cross-feature refresh requests use browser events instead of
@@ -127,10 +127,10 @@ PMTiles so the browser requests only visible ranges. Roads for the other four ar
 derived from visible OpenFreeMap road features at runtime.
 
 The clock-skew dataset is committed as land-clipped MultiPolygons. The browser uses a
-custom WebGL fill rather than precomputed color bands, allowing the red-white-blue value
-to vary continuously with longitude inside each official UTC-offset zone. A transparent
-MapLibre fill layer remains available for hit testing, while a line layer draws the zone
-boundaries.
+projection-aware custom WebGL fill rather than precomputed color bands, allowing the
+red-white-blue value to vary continuously with longitude inside each official UTC-offset
+zone. A transparent MapLibre fill layer remains available for hit testing, while a line
+layer draws the zone boundaries.
 
 Downloaded GTFS and Overpass responses are caches, not source artifacts, and are
 excluded from version control and production builds.
