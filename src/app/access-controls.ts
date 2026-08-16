@@ -130,7 +130,7 @@ export function setActiveProduct(
   timezoneProductEl.hidden = !timezoneActive;
 
   if (map.isStyleLoaded()) {
-    map.setProjection({ type: timezoneActive ? 'mercator' : 'globe' });
+    map.setProjection({ type: 'globe' });
   }
 
   syncStreetVisibility();

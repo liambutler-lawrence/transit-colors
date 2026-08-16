@@ -1092,7 +1092,7 @@ setActiveProduct(initialProduct, { fit: false, updateUrl: false });
 void map.once('style.load', () => {
   window.__transitPerformance.styleLoadedMs =
     performance.now() - window.__transitPerformance.startedAt;
-  map.setProjection({ type: initialProduct === 'timezone' ? 'mercator' : 'globe' });
+  map.setProjection({ type: 'globe' });
   setActiveProduct(runtime.activeProduct, { updateUrl: false });
   void initialize();
 });

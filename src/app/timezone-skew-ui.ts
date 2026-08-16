@@ -70,18 +70,20 @@ function compileShader(
 
 function createProgram(
   gl: WebGLRenderingContext | WebGL2RenderingContext,
-): WebGLProgram {
+  shaderData: CustomRenderMethodInput['shaderData'],
+): TimezoneSkewProgram {
   const vertexShader = compileShader(
     gl,
     gl.VERTEX_SHADER,
     `
       precision highp float;
+      ${shaderData.define}
+      ${shaderData.vertexShaderPrelude}
       attribute vec2 a_position;
       attribute float a_skew;
-      uniform mat4 u_matrix;
       varying float v_skew;
       void main() {
-        gl_Position = u_matrix * vec4(a_position, 0.0, 1.0);
+        gl_Position = projectTile(a_position);
         v_skew = a_skew;
       }
     `,
@@ -115,7 +117,39 @@ function createProgram(
     gl.deleteProgram(program);
     throw new Error(message);
   }
-  return program;
+  return {
+    program,
+    positionLocation: gl.getAttribLocation(program, 'a_position'),
+    skewLocation: gl.getAttribLocation(program, 'a_skew'),
+    projectionMatrixLocation: gl.getUniformLocation(program, 'u_projection_matrix'),
+    tileMercatorCoordsLocation: gl.getUniformLocation(
+      program,
+      'u_projection_tile_mercator_coords',
+    ),
+    clippingPlaneLocation: gl.getUniformLocation(
+      program,
+      'u_projection_clipping_plane',
+    ),
+    projectionTransitionLocation: gl.getUniformLocation(
+      program,
+      'u_projection_transition',
+    ),
+    fallbackMatrixLocation: gl.getUniformLocation(
+      program,
+      'u_projection_fallback_matrix',
+    ),
+  };
+}
+
+interface TimezoneSkewProgram {
+  readonly program: WebGLProgram;
+  readonly positionLocation: number;
+  readonly skewLocation: number;
+  readonly projectionMatrixLocation: WebGLUniformLocation | null;
+  readonly tileMercatorCoordsLocation: WebGLUniformLocation | null;
+  readonly clippingPlaneLocation: WebGLUniformLocation | null;
+  readonly projectionTransitionLocation: WebGLUniformLocation | null;
+  readonly fallbackMatrixLocation: WebGLUniformLocation | null;
 }
 
 function triangulateTimezoneData(data: TimezoneSkewCollection): Float32Array {
@@ -151,10 +185,7 @@ class TimezoneSkewLayer implements CustomLayerInterface {
   readonly renderingMode = '2d' satisfies CustomLayerInterface['renderingMode'];
   private buffer: WebGLBuffer | null = null;
   private map: MapLibreMap | null = null;
-  private positionLocation = -1;
-  private program: WebGLProgram | null = null;
-  private skewLocation = -1;
-  private matrixLocation: WebGLUniformLocation | null = null;
+  private readonly programs = new Map<string, TimezoneSkewProgram>();
   private visible = false;
 
   constructor(private readonly vertices: Float32Array) {}
@@ -169,10 +200,6 @@ class TimezoneSkewLayer implements CustomLayerInterface {
     gl: WebGLRenderingContext | WebGL2RenderingContext,
   ): void {
     this.map = mapInstance;
-    this.program = createProgram(gl);
-    this.positionLocation = gl.getAttribLocation(this.program, 'a_position');
-    this.skewLocation = gl.getAttribLocation(this.program, 'a_skew');
-    this.matrixLocation = gl.getUniformLocation(this.program, 'u_matrix');
     this.buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
     gl.bufferData(gl.ARRAY_BUFFER, this.vertices, gl.STATIC_DRAW);
@@ -182,18 +209,46 @@ class TimezoneSkewLayer implements CustomLayerInterface {
     gl: WebGLRenderingContext | WebGL2RenderingContext,
     options: CustomRenderMethodInput,
   ): void {
-    if (!this.visible || !this.program || !this.buffer || !this.matrixLocation) return;
-    gl.useProgram(this.program);
+    if (!this.visible || !this.buffer) return;
+    let bindings = this.programs.get(options.shaderData.variantName);
+    if (!bindings) {
+      bindings = createProgram(gl, options.shaderData);
+      this.programs.set(options.shaderData.variantName, bindings);
+    }
+    gl.useProgram(bindings.program);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
-    gl.enableVertexAttribArray(this.positionLocation);
-    gl.vertexAttribPointer(this.positionLocation, 2, gl.FLOAT, false, 12, 0);
-    gl.enableVertexAttribArray(this.skewLocation);
-    gl.vertexAttribPointer(this.skewLocation, 1, gl.FLOAT, false, 12, 8);
-    gl.uniformMatrix4fv(
-      this.matrixLocation,
-      false,
-      options.defaultProjectionData.mainMatrix,
-    );
+    gl.enableVertexAttribArray(bindings.positionLocation);
+    gl.vertexAttribPointer(bindings.positionLocation, 2, gl.FLOAT, false, 12, 0);
+    gl.enableVertexAttribArray(bindings.skewLocation);
+    gl.vertexAttribPointer(bindings.skewLocation, 1, gl.FLOAT, false, 12, 8);
+
+    const projection = options.defaultProjectionData;
+    if (bindings.projectionMatrixLocation) {
+      gl.uniformMatrix4fv(
+        bindings.projectionMatrixLocation,
+        false,
+        projection.mainMatrix,
+      );
+    }
+    if (bindings.tileMercatorCoordsLocation) {
+      gl.uniform4fv(bindings.tileMercatorCoordsLocation, projection.tileMercatorCoords);
+    }
+    if (bindings.clippingPlaneLocation) {
+      gl.uniform4fv(bindings.clippingPlaneLocation, projection.clippingPlane);
+    }
+    if (bindings.projectionTransitionLocation) {
+      gl.uniform1f(
+        bindings.projectionTransitionLocation,
+        projection.projectionTransition,
+      );
+    }
+    if (bindings.fallbackMatrixLocation) {
+      gl.uniformMatrix4fv(
+        bindings.fallbackMatrixLocation,
+        false,
+        projection.fallbackMatrix,
+      );
+    }
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
     gl.drawArrays(gl.TRIANGLES, 0, this.vertices.length / 3);
@@ -204,9 +259,11 @@ class TimezoneSkewLayer implements CustomLayerInterface {
     gl: WebGLRenderingContext | WebGL2RenderingContext,
   ): void {
     if (this.buffer) gl.deleteBuffer(this.buffer);
-    if (this.program) gl.deleteProgram(this.program);
+    for (const bindings of this.programs.values()) {
+      gl.deleteProgram(bindings.program);
+    }
+    this.programs.clear();
     this.buffer = null;
-    this.program = null;
     this.map = null;
   }
 }

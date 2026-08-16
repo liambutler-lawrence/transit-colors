@@ -35,10 +35,10 @@ first changing a city mode. At regional and world scale the map renders as an
 interactive globe, transitioning continuously to the familiar flat-map view at street
 scale.
 
-Clock Skew switches to a flat world view and shades land continuously within each
-official UTC-offset zone. Red locations reach solar noon later than 12:00 civil time;
-blue locations reach it earlier. Hovering or clicking reports longitude, UTC offset,
-calculated solar-noon time, and the zone's named places.
+Clock Skew shades land continuously within each official UTC-offset zone on the same
+rotatable globe used by the other map modes. Red locations reach solar noon later than
+12:00 civil time; blue locations reach it earlier. Hovering or clicking reports
+longitude, UTC offset, calculated solar-noon time, and the zone's named places.
 
 The public site is deployed at
 [liambutler-lawrence.github.io/transit-colors](https://liambutler-lawrence.github.io/transit-colors/).
