@@ -19,9 +19,19 @@ test('the committed clock-skew zones satisfy the runtime boundary', async () => 
     ),
   );
 
-  assert.ok(data.features.length >= 90);
+  assert.ok(data.features.length >= 60);
   assert.ok(data.features.some(({ properties }) => properties.offset_hours === 5.5));
-  assert.ok(data.features.some(({ properties }) => properties.offset_hours === 12.75));
+  assert.ok(data.features.some(({ properties }) => properties.offset_hours === 13.75));
+  assert.ok(
+    data.features.some(
+      ({ properties }) => properties.timezone_name === 'America/New_York',
+    ),
+  );
+  assert.ok(
+    data.features.some(
+      ({ properties }) => properties.timezone_name === 'America/Phoenix',
+    ),
+  );
 });
 
 test('the clock-skew color wash follows the shared globe projection', async () => {

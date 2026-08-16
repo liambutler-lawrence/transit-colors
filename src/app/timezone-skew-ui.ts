@@ -17,6 +17,15 @@ import {
   type TimezoneSkewProperties,
 } from '../timezone-skew.js';
 import {
+  buildTimezonePeriods,
+  formatTimezonePeriodDateRange,
+  formatUtcOffset,
+  timezoneOffsetHours,
+  timezoneOffsetsAt,
+  type TimezoneOffsetResolver,
+  type TimezonePeriod,
+} from '../timezone-seasons.js';
+import {
   compactPanelQuery,
   map,
   runtime,
@@ -24,6 +33,8 @@ import {
   timezoneColorsToggle,
   timezoneMetadataEl,
   timezoneNameEl,
+  timezonePeriodSelect,
+  timezonePeriodSummaryEl,
   timezoneSelectionTypeEl,
   timezoneSummaryEl,
 } from './context.js';
@@ -152,10 +163,28 @@ interface TimezoneSkewProgram {
   readonly fallbackMatrixLocation: WebGLUniformLocation | null;
 }
 
-function triangulateTimezoneData(data: TimezoneSkewCollection): Float32Array {
+interface TimezoneSkewMesh {
+  readonly vertices: Float32Array;
+  readonly longitudes: Float32Array;
+  readonly timezoneIndices: Uint16Array;
+  readonly timezones: readonly string[];
+  readonly fallbackOffsets: Float32Array;
+}
+
+function triangulateTimezoneData(
+  data: TimezoneSkewCollection,
+  offsets: ReadonlyMap<string, number>,
+): TimezoneSkewMesh {
   const vertices: number[] = [];
-  for (const feature of data.features) {
-    const offsetHours = feature.properties.offset_hours;
+  const longitudes: number[] = [];
+  const timezoneIndices: number[] = [];
+  const timezones = data.features.map(({ properties }) => properties.timezone_name);
+  const fallbackOffsets = new Float32Array(
+    data.features.map(({ properties }) => properties.offset_hours),
+  );
+  for (const [timezoneIndex, feature] of data.features.entries()) {
+    const offsetHours =
+      offsets.get(feature.properties.timezone_name) ?? feature.properties.offset_hours;
     for (const polygon of feature.geometry.coordinates) {
       const flattened = flatten(polygon);
       const triangleIndices = earcut(
@@ -173,10 +202,18 @@ function triangulateTimezoneData(data: TimezoneSkewCollection): Float32Array {
           mercatorY(latitude),
           solarNoonSkewMinutes(longitude, offsetHours),
         );
+        longitudes.push(longitude);
+        timezoneIndices.push(timezoneIndex);
       }
     }
   }
-  return new Float32Array(vertices);
+  return {
+    vertices: new Float32Array(vertices),
+    longitudes: new Float32Array(longitudes),
+    timezoneIndices: new Uint16Array(timezoneIndices),
+    timezones,
+    fallbackOffsets,
+  };
 }
 
 class TimezoneSkewLayer implements CustomLayerInterface {
@@ -187,8 +224,22 @@ class TimezoneSkewLayer implements CustomLayerInterface {
   private map: MapLibreMap | null = null;
   private readonly programs = new Map<string, TimezoneSkewProgram>();
   private visible = false;
+  private dirty = false;
 
-  constructor(private readonly vertices: Float32Array) {}
+  constructor(private readonly mesh: TimezoneSkewMesh) {}
+
+  setOffsets(offsets: ReadonlyMap<string, number>): void {
+    for (let index = 0; index < this.mesh.timezoneIndices.length; index += 1) {
+      const timezoneIndex = this.mesh.timezoneIndices[index] ?? 0;
+      const timezone = this.mesh.timezones[timezoneIndex] ?? '';
+      const offsetHours =
+        offsets.get(timezone) ?? this.mesh.fallbackOffsets[timezoneIndex] ?? 0;
+      const longitude = this.mesh.longitudes[index] ?? 0;
+      this.mesh.vertices[index * 3 + 2] = solarNoonSkewMinutes(longitude, offsetHours);
+    }
+    this.dirty = true;
+    this.map?.triggerRepaint();
+  }
 
   setVisible(visible: boolean): void {
     this.visible = visible;
@@ -202,7 +253,7 @@ class TimezoneSkewLayer implements CustomLayerInterface {
     this.map = mapInstance;
     this.buffer = gl.createBuffer();
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
-    gl.bufferData(gl.ARRAY_BUFFER, this.vertices, gl.STATIC_DRAW);
+    gl.bufferData(gl.ARRAY_BUFFER, this.mesh.vertices, gl.DYNAMIC_DRAW);
   }
 
   render(
@@ -217,6 +268,10 @@ class TimezoneSkewLayer implements CustomLayerInterface {
     }
     gl.useProgram(bindings.program);
     gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer);
+    if (this.dirty) {
+      gl.bufferSubData(gl.ARRAY_BUFFER, 0, this.mesh.vertices);
+      this.dirty = false;
+    }
     gl.enableVertexAttribArray(bindings.positionLocation);
     gl.vertexAttribPointer(bindings.positionLocation, 2, gl.FLOAT, false, 12, 0);
     gl.enableVertexAttribArray(bindings.skewLocation);
@@ -251,7 +306,7 @@ class TimezoneSkewLayer implements CustomLayerInterface {
     }
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.ONE, gl.ONE_MINUS_SRC_ALPHA);
-    gl.drawArrays(gl.TRIANGLES, 0, this.vertices.length / 3);
+    gl.drawArrays(gl.TRIANGLES, 0, this.mesh.vertices.length / 3);
   }
 
   onRemove(
@@ -270,22 +325,122 @@ class TimezoneSkewLayer implements CustomLayerInterface {
 
 let timezoneLayer: TimezoneSkewLayer | null = null;
 let hoverInstalled = false;
+let periodControlInstalled = false;
+let activeTimezoneOffsets: ReadonlyMap<string, number> = new Map();
+let activeTimezonePeriod: TimezonePeriod | null = null;
+let timezonePeriods: readonly TimezonePeriod[] = [];
+let timezoneNames: readonly string[] = [];
+let timezonePeriodYear = new Date().getUTCFullYear();
+let resolveTimezoneOffset: TimezoneOffsetResolver = timezoneOffsetHours;
+let lastInspectedTimezone: {
+  readonly properties: TimezoneSkewProperties;
+  readonly longitude: number;
+} | null = null;
+
+function updatePeriodSummary(period: TimezonePeriod, index: number): void {
+  const range = formatTimezonePeriodDateRange(period.startMs, period.endMs);
+  const nextCount = period.nextChangedTimezones.length;
+  const nextChange =
+    nextCount === 0
+      ? 'No later offset change occurs this year.'
+      : `${nextCount} timekeeping ${nextCount === 1 ? 'region changes' : 'regions change'} at the next boundary.`;
+  timezonePeriodSummaryEl.textContent = `${timezonePeriodYear} · ${range} · Pattern ${index + 1} of ${timezonePeriods.length}. ${nextChange}`;
+}
+
+function applyTimezonePeriod(index: number): void {
+  const period = timezonePeriods[index];
+  if (!period) return;
+  activeTimezonePeriod = period;
+  activeTimezoneOffsets = timezoneOffsetsAt(
+    timezoneNames,
+    period.representativeMs,
+    resolveTimezoneOffset,
+  );
+  timezonePeriodSelect.value = String(index);
+  updatePeriodSummary(period, index);
+  timezoneLayer?.setOffsets(activeTimezoneOffsets);
+  if (lastInspectedTimezone) {
+    renderTimezoneDetails(
+      lastInspectedTimezone.properties,
+      lastInspectedTimezone.longitude,
+    );
+  }
+}
+
+function installTimezonePeriodControl(data: TimezoneSkewCollection): void {
+  timezoneNames = data.features.map(({ properties }) => properties.timezone_name);
+  const fallbackOffsets = new Map(
+    data.features.map(({ properties }) => [
+      properties.timezone_name,
+      properties.offset_hours,
+    ]),
+  );
+  const supportedTimezones = new Set(
+    timezoneNames.filter((timezone) => {
+      try {
+        timezoneOffsetHours(timezone, Date.now());
+        return true;
+      } catch {
+        return false;
+      }
+    }),
+  );
+  resolveTimezoneOffset = (timezone, epochMs) =>
+    supportedTimezones.has(timezone)
+      ? timezoneOffsetHours(timezone, epochMs)
+      : (fallbackOffsets.get(timezone) ?? 0);
+
+  const now = Date.now();
+  const year = new Date(now).getUTCFullYear();
+  timezonePeriodYear = year;
+  timezonePeriods = buildTimezonePeriods(timezoneNames, year, resolveTimezoneOffset);
+  timezonePeriodSelect.replaceChildren(
+    ...timezonePeriods.map((period, index) => {
+      const option = document.createElement('option');
+      option.value = String(index);
+      option.textContent = period.label;
+      return option;
+    }),
+  );
+  timezonePeriodSelect.disabled = false;
+  const currentIndex = Math.max(
+    0,
+    timezonePeriods.findIndex(({ startMs, endMs }) => now >= startMs && now < endMs),
+  );
+  applyTimezonePeriod(currentIndex);
+
+  if (!periodControlInstalled) {
+    periodControlInstalled = true;
+    timezonePeriodSelect.addEventListener('change', () => {
+      applyTimezonePeriod(Number(timezonePeriodSelect.value));
+    });
+  }
+}
 
 function renderTimezoneDetails(
   properties: TimezoneSkewProperties,
   longitude: number,
 ): void {
-  const skewMinutes = solarNoonSkewMinutes(longitude, properties.offset_hours);
+  const offsetHours =
+    activeTimezoneOffsets.get(properties.timezone_name) ?? properties.offset_hours;
+  const offsetLabel = formatUtcOffset(offsetHours);
+  const periodLabel = activeTimezonePeriod
+    ? `${formatTimezonePeriodDateRange(
+        activeTimezonePeriod.startMs,
+        activeTimezonePeriod.endMs,
+      )}, ${timezonePeriodYear}`
+    : 'Current offset pattern';
   timezoneSelectionTypeEl.textContent = 'Mean solar time';
-  timezoneNameEl.textContent = properties.offset_label;
+  timezoneNameEl.textContent = offsetLabel;
+  const skewMinutes = solarNoonSkewMinutes(longitude, offsetHours);
   timezoneSummaryEl.textContent = `Solar noon here falls near ${formatSolarNoon(skewMinutes)}—${describeSolarNoonSkew(skewMinutes)}.`;
   replaceMetadata(timezoneMetadataEl, [
     { label: 'Longitude', value: formatLongitude(longitude) },
-    { label: 'UTC offset', value: properties.offset_label },
+    { label: 'UTC offset', value: offsetLabel },
     { label: 'Solar noon', value: formatSolarNoon(skewMinutes) },
     { label: 'Clock skew', value: describeSolarNoonSkew(skewMinutes) },
-    { label: 'Places', value: properties.places },
-    { label: 'Example zone', value: properties.timezone_name },
+    { label: 'Time of year', value: periodLabel },
+    { label: 'Timekeeping region', value: properties.timezone_name },
   ]);
 }
 
@@ -295,6 +450,10 @@ function inspectTimezone(event: MapLayerMouseEvent): void {
     event.features?.[0]?.properties,
   );
   if (!properties.success) return;
+  lastInspectedTimezone = {
+    properties: properties.data,
+    longitude: event.lngLat.lng,
+  };
   renderTimezoneDetails(properties.data, event.lngLat.lng);
 }
 
@@ -313,14 +472,18 @@ function installTimezoneHover(): void {
 
 export function installTimezoneSkew(data: TimezoneSkewCollection): void {
   if (map.getSource('timezone-skew-zones')) return;
+  installTimezonePeriodControl(data);
   map.addSource('timezone-skew-zones', {
     type: 'geojson',
     data,
-    attribution: 'Timezone and land boundaries: Natural Earth (public domain)',
+    attribution:
+      'Time zones: <a href="https://github.com/evansiroky/timezone-boundary-builder">timezone-boundary-builder</a> / © OpenStreetMap contributors, ODbL',
     promoteId: 'id',
   });
 
-  timezoneLayer = new TimezoneSkewLayer(triangulateTimezoneData(data));
+  timezoneLayer = new TimezoneSkewLayer(
+    triangulateTimezoneData(data, activeTimezoneOffsets),
+  );
   map.addLayer(timezoneLayer, firstSymbolLayerId());
   map.addLayer(
     {

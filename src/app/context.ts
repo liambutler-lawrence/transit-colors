@@ -360,6 +360,14 @@ export const timezoneBoundariesToggle = requiredElement(
   '#toggle-timezone-boundaries',
   HTMLInputElement,
 );
+export const timezonePeriodSelect = requiredElement(
+  '#timezone-period',
+  HTMLSelectElement,
+);
+export const timezonePeriodSummaryEl = requiredElement(
+  '#timezone-period-summary',
+  HTMLElement,
+);
 export const timezoneSelectionTypeEl = requiredElement(
   '#timezone-selection-type',
   HTMLElement,

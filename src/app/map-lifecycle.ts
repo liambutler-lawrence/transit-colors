@@ -766,7 +766,7 @@ export async function initialize(): Promise<void> {
           landmassDataSchema,
         ),
         fetchParsed(
-          'data/timezone-skew-zones.geojson?v=20260816a',
+          'data/timezone-skew-zones.geojson?v=20260816b',
           timezoneSkewCollectionSchema,
         ),
         Promise.all(
