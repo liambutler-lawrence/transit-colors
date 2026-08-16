@@ -4,9 +4,10 @@ Transit Colors is an interactive map for exploring transit access in Mexico City
 York City, Singapore, Atlanta, and Athens. It includes:
 
 - street-level distance to selected transit modes;
-- schedule-adjusted travel time to a selected station; and
+- schedule-adjusted travel time to a selected station;
 - a Circumference Lab that finds large closed metro or divided-highway loops and
-  measures the land they enclose.
+  measures the land they enclose; and
+- a Clock Skew map comparing official UTC offsets with longitude-based solar time.
 
 Circumference routes follow averaged centerlines from official GTFS track shapes by
 default where shape data is published, with an option to compare straight
@@ -33,6 +34,11 @@ visible street, station, line, platform, or transfer can be inspected directly w
 first changing a city mode. At regional and world scale the map renders as an
 interactive globe, transitioning continuously to the familiar flat-map view at street
 scale.
+
+Clock Skew switches to a flat world view and shades land continuously within each
+official UTC-offset zone. Red locations reach solar noon later than 12:00 civil time;
+blue locations reach it earlier. Hovering or clicking reports longitude, UTC offset,
+calculated solar-noon time, and the zone's named places.
 
 The public site is deployed at
 [liambutler-lawrence.github.io/transit-colors](https://liambutler-lawrence.github.io/transit-colors/).

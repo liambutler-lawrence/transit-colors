@@ -176,8 +176,11 @@ test('the sidebar follows product, mode, results, and selection hierarchy', asyn
   assert.ok(accessResultsIndex < accessSelectionIndex);
   assert.match(shell, />\s*Transit heatmap\s*</);
   assert.match(shell, />\s*Circumference routes\s*</);
+  assert.match(shell, />\s*Clock skew\s*</);
   assert.match(shell, /id="circumference-results"/);
   assert.match(shell, /id="access-result-area"/);
+  assert.match(shell, /id="timezone-product"/);
+  assert.match(shell, /id="timezone-metadata"/);
   assert.doesNotMatch(shell, /<span>Focus on…<\/span>/);
 });
 

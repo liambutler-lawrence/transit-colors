@@ -25,7 +25,7 @@ import type { TransitGraph, TransitTimes, WaitResult } from '../routing/types.js
 
 export type AreaKey = 'cdmx' | 'nyc' | 'singapore' | 'atlanta' | 'athens';
 export type CircumferenceCriterion = 'metro' | 'motorway';
-export type Product = 'access' | 'circumference';
+export type Product = 'access' | 'circumference' | 'timezone';
 
 export interface AreaConfig {
   readonly buildCommand: string;

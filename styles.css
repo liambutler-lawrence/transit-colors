@@ -111,10 +111,7 @@ body {
 }
 
 .panel-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  position: relative;
   padding-bottom: 14px;
   border-bottom: 1px solid var(--line);
 }
@@ -123,6 +120,7 @@ body {
   display: grid;
   gap: 6px;
   min-width: 0;
+  width: 100%;
 }
 
 .hierarchy-label,
@@ -136,14 +134,17 @@ body {
 }
 
 .hierarchy-label {
+  display: flex;
+  min-height: 28px;
+  align-items: center;
   color: #256b62;
+  padding-right: 168px;
 }
 
 .product-tabs {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   width: 100%;
-  max-width: 286px;
   margin: 0;
   padding: 3px;
   border: 1px solid var(--line);
@@ -181,7 +182,14 @@ body {
   color: #713b24;
 }
 
+.timezone-active .product-tabs button[aria-selected='true'] {
+  color: #244f8f;
+}
+
 .panel-actions {
+  position: absolute;
+  top: -2px;
+  right: 0;
   display: flex;
   flex: 0 0 auto;
   align-items: center;
@@ -249,7 +257,13 @@ body {
 }
 
 .app-shell.panel-collapsed .panel-header {
+  display: flex;
+  min-height: 36px;
   justify-content: center;
+}
+
+.app-shell.panel-collapsed .panel-actions {
+  position: static;
 }
 
 .app-shell.panel-collapsed .panel-heading,
@@ -356,6 +370,11 @@ body {
   background: #fce9dc;
 }
 
+.timezone-active .section-index {
+  color: #244f8f;
+  background: #e5edff;
+}
+
 .heading-context {
   display: inline-block;
   margin-left: 4px;
@@ -445,6 +464,50 @@ body {
     rgba(241, 184, 67, 0.4) 46%,
     rgba(23, 145, 135, 0) 100%
   );
+}
+
+.timezone-legend .legend-bar {
+  height: 16px;
+  border: 1px solid rgba(67, 77, 91, 0.18);
+  background: linear-gradient(
+    90deg,
+    #ff2e35 0%,
+    #ff9ca0 28%,
+    #f6f4ef 50%,
+    #aac1fb 72%,
+    #3068ed 100%
+  );
+}
+
+.timezone-legend .legend-labels span:nth-child(2) {
+  text-align: center;
+}
+
+.timezone-result-note {
+  margin: 11px 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.42;
+}
+
+.timezone-explainer {
+  padding: 12px;
+  border: 1px solid #cdd9ef;
+  border-radius: 8px;
+  background: #f6f8fd;
+}
+
+.timezone-explainer strong {
+  display: block;
+  color: #244f8f;
+  font-size: 0.82rem;
+}
+
+.timezone-explainer p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
 }
 
 .circumference-legend .legend-labels span:nth-child(2) {
@@ -698,6 +761,14 @@ body {
 
 .circumference-toggles {
   grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.timezone-toggles {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.timezone-toggles input {
+  accent-color: #3569c8;
 }
 
 .circumference-metrics .metric {
@@ -972,6 +1043,11 @@ body {
   background: #fce9dc;
 }
 
+.timezone-active .status {
+  color: #244f8f;
+  background: #e5edff;
+}
+
 .station-breakdown {
   display: flex;
   flex-wrap: wrap;
@@ -1049,6 +1125,19 @@ body {
   color: var(--muted);
   font-size: 0.84rem;
   line-height: 1.4;
+}
+
+#timezone-summary {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
+.timezone-method-note a {
+  color: #244f8f;
+  font-weight: 800;
 }
 
 .feature-metadata {
