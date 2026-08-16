@@ -14,7 +14,7 @@ Rebuild data only when intentionally refreshing a source snapshot.
 - Official AIFA and Servicio de Transportes Eléctricos station references
 - Natural Earth 1:10m land polygons
 - Natural Earth 1:10m North America roads supplement
-- Natural Earth 1:10m time zones and 1:50m land polygons
+- timezone-boundary-builder `timezones-now` boundaries derived from OpenStreetMap
 
 Review each source's terms before redistributing a new snapshot. Preserve the in-app
 attribution whenever adding a source.
@@ -176,11 +176,22 @@ uses a local equal-area transform rather than Web Mercator.
 npm run build:data:timezone-skew
 ```
 
-The builder clips Natural Earth 5.1.2's UTC-offset zones to its 1:50m land polygons and
-writes `data/timezone-skew-zones.geojson`. Source URLs are version-pinned so rebuilding
-the snapshot is deterministic. The browser derives solar noon directly from longitude:
-`12:00 + UTC offset − longitude × 4 minutes per degree`. The source zones describe
-standard UTC offsets; seasonal daylight-saving changes are intentionally excluded.
+The builder downloads timezone-boundary-builder's version-pinned `timezones-now`
+archive, verifies its SHA-256 checksum, simplifies its current/future timekeeping
+regions for browser rendering, and writes `data/timezone-skew-zones.geojson`. To rebuild
+from an already downloaded archive, pass the output and source paths explicitly:
+
+```sh
+node scripts/build-timezone-skew-data.mjs \
+  data/timezone-skew-zones.geojson /path/to/timezones-now.geojson.zip
+```
+
+The boundary snapshot is derived from OpenStreetMap and remains subject to ODbL; its
+release, source URL, checksum, and license are recorded in the generated file. At
+runtime, the browser's IANA time-zone rules find every UTC-offset transition in the
+current year and group the map into ranges with a unique global offset pattern. Solar
+noon is then derived directly from longitude for the selected range:
+`12:00 + UTC offset − longitude × 4 minutes per degree`.
 
 ## Validation
 

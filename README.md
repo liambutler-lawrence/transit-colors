@@ -50,7 +50,8 @@ The public site is deployed at
 - Vite
 - MapLibre GL JS globe rendering and PMTiles
 - GeographicLib WGS84 ellipsoidal distance and area calculations
-- OpenFreeMap, OpenStreetMap, official GTFS feeds, and Natural Earth data
+- OpenFreeMap, OpenStreetMap, timezone-boundary-builder, official GTFS feeds, and
+  Natural Earth data
 
 The application is entirely static. Runtime data is committed under `data/`; no
 application server or secret is required to view the map.

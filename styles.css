@@ -510,6 +510,54 @@ body {
   line-height: 1.45;
 }
 
+.timezone-period-control {
+  min-width: 0;
+  margin: 12px 0 0;
+  padding: 10px 12px 12px;
+  border: 1px solid #cdd9ef;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.timezone-period-control legend {
+  padding: 0 5px;
+  color: #244f8f;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.timezone-period-control label {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  font-weight: 750;
+}
+
+.timezone-period-control select {
+  width: 100%;
+  min-height: 38px;
+  padding: 7px 30px 7px 9px;
+  border: 1px solid #b9c2ce;
+  border-radius: 6px;
+  color: var(--ink);
+  background: #ffffff;
+  font: inherit;
+  font-size: 0.78rem;
+}
+
+.timezone-period-control select:focus-visible {
+  outline: 3px solid rgba(48, 104, 237, 0.2);
+  outline-offset: 1px;
+}
+
+.timezone-period-control p {
+  margin: 7px 0 0;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.38;
+}
+
 .circumference-legend .legend-labels span:nth-child(2) {
   text-align: center;
 }

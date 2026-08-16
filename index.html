@@ -420,11 +420,22 @@
               <div class="timezone-explainer">
                 <strong>Where does noon really happen?</strong>
                 <p>
-                  Standard time gives a whole region one clock. Longitude determines
-                  mean solar time. Their difference shifts the Sun's highest point away
-                  from 12:00.
+                  Civil time gives a whole region one clock. Longitude determines mean
+                  solar time. Their difference shifts the Sun's highest point away from
+                  12:00.
                 </p>
               </div>
+              <fieldset class="timezone-period-control">
+                <legend>Time of year</legend>
+                <label for="timezone-period">Global UTC-offset pattern</label>
+                <select id="timezone-period" disabled>
+                  <option>Finding worldwide clock changes…</option>
+                </select>
+                <p id="timezone-period-summary">
+                  Grouping the year wherever any timekeeping region changes its UTC
+                  offset.
+                </p>
+              </fieldset>
             </section>
 
             <section class="sidebar-section results-section">
@@ -479,8 +490,14 @@
                   target="_blank"
                   rel="noreferrer"
                   >Stefano Maggiolo's map</a
-                >. Boundaries use public-domain Natural Earth data and represent
-                standard offsets rather than seasonal daylight-saving changes.
+                >. Current/future timekeeping boundaries come from
+                <a
+                  href="https://github.com/evansiroky/timezone-boundary-builder"
+                  target="_blank"
+                  rel="noreferrer"
+                  >timezone-boundary-builder</a
+                >, using OpenStreetMap data under ODbL. Seasonal offsets use this
+                browser's IANA time-zone rules.
               </p>
             </section>
           </div>
