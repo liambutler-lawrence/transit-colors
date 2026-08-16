@@ -13,8 +13,30 @@ export const timezoneSkewPropertiesSchema = z.object({
   timezone_name: z.string(),
 });
 
+const timezoneTransitionSchema = z.tuple([z.number().int(), z.number().int()]);
+
+export const timezoneRuleSchema = z.object({
+  initialOffsetSeconds: z.number().int(),
+  initialStandardOffsetSeconds: z.number().int(),
+  transitions: z.array(timezoneTransitionSchema),
+  standardTransitions: z.array(timezoneTransitionSchema),
+});
+
 export const timezoneSkewCollectionSchema = z.object({
   type: z.literal('FeatureCollection'),
+  metadata: z.object({
+    baseline_instant: z.iso.datetime(),
+    iana_release: z.string(),
+    iana_source: z.url(),
+    iana_source_sha256: z.string(),
+    license: z.string(),
+    rules_end_epoch_seconds: z.number().int(),
+    rules_start_epoch_seconds: z.number().int(),
+    timezone_release: z.string(),
+    timezone_rules: z.record(z.string(), timezoneRuleSchema),
+    timezone_source: z.url(),
+    timezone_source_sha256: z.string(),
+  }),
   features: z.array(
     z.object({
       type: z.literal('Feature'),
@@ -30,6 +52,7 @@ export const timezoneSkewCollectionSchema = z.object({
 
 export type TimezoneSkewCollection = z.infer<typeof timezoneSkewCollectionSchema>;
 export type TimezoneSkewProperties = z.infer<typeof timezoneSkewPropertiesSchema>;
+export type TimezoneRule = z.infer<typeof timezoneRuleSchema>;
 
 export const TIMEZONE_SKEW_LIMIT_MINUTES = 120;
 

@@ -19,7 +19,10 @@ test('the committed clock-skew zones satisfy the runtime boundary', async () => 
     ),
   );
 
-  assert.ok(data.features.length >= 60);
+  assert.ok(data.features.length >= 300);
+  assert.equal(data.metadata.iana_release, '2026c');
+  assert.equal(data.metadata.timezone_release, '2026c');
+  assert.equal(Object.keys(data.metadata.timezone_rules).length, data.features.length);
   assert.ok(data.features.some(({ properties }) => properties.offset_hours === 5.5));
   assert.ok(data.features.some(({ properties }) => properties.offset_hours === 13.75));
   assert.ok(
@@ -31,6 +34,20 @@ test('the committed clock-skew zones satisfy the runtime boundary', async () => 
     data.features.some(
       ({ properties }) => properties.timezone_name === 'America/Phoenix',
     ),
+  );
+  assert.ok(
+    data.features.some(
+      ({ properties }) => properties.timezone_name === 'America/Edmonton',
+    ),
+  );
+  assert.ok(
+    data.features.some(
+      ({ properties }) => properties.timezone_name === 'America/Vancouver',
+    ),
+  );
+  assert.deepEqual(
+    data.metadata.timezone_rules['America/Edmonton']?.standardTransitions.at(-1),
+    [Date.UTC(2026, 10, 1, 8) / 1_000, -6 * 3_600],
   );
 });
 

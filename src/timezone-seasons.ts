@@ -13,6 +13,20 @@ const UTC_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
   day: 'numeric',
 });
 
+const UTC_HISTORY_DATE_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'UTC',
+  month: 'short',
+  day: 'numeric',
+  year: 'numeric',
+});
+
+const UTC_HISTORY_TIME_FORMATTER = new Intl.DateTimeFormat('en-US', {
+  timeZone: 'UTC',
+  hour: '2-digit',
+  minute: '2-digit',
+  hourCycle: 'h23',
+});
+
 const OFFSET_SAMPLE_STEP_MS = 6 * 60 * 60 * 1_000;
 
 export interface TimezonePeriod {
@@ -22,6 +36,17 @@ export interface TimezonePeriod {
   readonly label: string;
   readonly changedTimezones: readonly string[];
   readonly nextChangedTimezones: readonly string[];
+}
+
+export interface HistoricalTimezonePeriod extends TimezonePeriod {
+  readonly isPresent: boolean;
+}
+
+export interface TimezoneRule {
+  readonly initialOffsetSeconds: number;
+  readonly initialStandardOffsetSeconds: number;
+  readonly transitions: readonly (readonly [number, number])[];
+  readonly standardTransitions: readonly (readonly [number, number])[];
 }
 
 export type TimezoneOffsetResolver = (timezone: string, epochMs: number) => number;
@@ -59,10 +84,47 @@ export function timezoneOffsetHours(timezone: string, epochMs: number): number {
 
 export function formatUtcOffset(offsetHours: number): string {
   const sign = offsetHours < 0 ? '-' : '+';
-  const absoluteMinutes = Math.round(Math.abs(offsetHours) * 60);
-  const hours = Math.floor(absoluteMinutes / 60);
-  const minutes = absoluteMinutes % 60;
-  return `UTC${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+  const absoluteSeconds = Math.round(Math.abs(offsetHours) * 3_600);
+  const hours = Math.floor(absoluteSeconds / 3_600);
+  const minutes = Math.floor((absoluteSeconds % 3_600) / 60);
+  const seconds = absoluteSeconds % 60;
+  const secondsText = seconds === 0 ? '' : `:${String(seconds).padStart(2, '0')}`;
+  return `UTC${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}${secondsText}`;
+}
+
+export function timezoneRuleOffsetHours(
+  rule: TimezoneRule,
+  epochMs: number,
+  standard = false,
+): number {
+  const transitions = standard ? rule.standardTransitions : rule.transitions;
+  let lower = 0;
+  let upper = transitions.length;
+  const epochSeconds = Math.floor(epochMs / 1_000);
+  while (lower < upper) {
+    const middle = Math.floor((lower + upper) / 2);
+    const transition = transitions[middle];
+    if (transition && transition[0] <= epochSeconds) lower = middle + 1;
+    else upper = middle;
+  }
+  const transition = transitions[lower - 1];
+  const offsetSeconds =
+    transition?.[1] ??
+    (standard ? rule.initialStandardOffsetSeconds : rule.initialOffsetSeconds);
+  return offsetSeconds / 3_600;
+}
+
+export function timezoneOffsetsFromRulesAt(
+  rules: Readonly<Record<string, TimezoneRule>>,
+  epochMs: number,
+  standard = false,
+): ReadonlyMap<string, number> {
+  return new Map(
+    Object.entries(rules).map(([timezone, rule]) => [
+      timezone,
+      timezoneRuleOffsetHours(rule, epochMs, standard),
+    ]),
+  );
 }
 
 function findTransition(
@@ -174,6 +236,109 @@ export function buildTimezonePeriods(
       nextChangedTimezones: changesByInstant.get(endMs) ?? [],
     };
   });
+}
+
+export function buildTimezonePeriodsFromRules(
+  rules: Readonly<Record<string, TimezoneRule>>,
+  year: number,
+): readonly TimezonePeriod[] {
+  const yearStart = Date.UTC(year, 0, 1);
+  const yearEnd = Date.UTC(year + 1, 0, 1);
+  const changesByInstant = new Map<number, string[]>();
+  for (const [timezone, rule] of Object.entries(rules).sort(([left], [right]) =>
+    left.localeCompare(right),
+  )) {
+    for (const [transitionSeconds] of rule.transitions) {
+      const transitionMs = transitionSeconds * 1_000;
+      if (transitionMs < yearStart || transitionMs >= yearEnd) continue;
+      const changedTimezones = changesByInstant.get(transitionMs) ?? [];
+      changedTimezones.push(timezone);
+      changesByInstant.set(transitionMs, changedTimezones);
+    }
+  }
+  return buildPeriodsFromChanges(changesByInstant, yearStart, yearEnd, (start, end) =>
+    formatTimezonePeriod(start, end, year),
+  );
+}
+
+function formatHistoricalBoundary(epochMs: number): string {
+  const date = new Date(epochMs);
+  const dateText = UTC_HISTORY_DATE_FORMATTER.format(date);
+  const isMidnight =
+    date.getUTCHours() === 0 &&
+    date.getUTCMinutes() === 0 &&
+    date.getUTCSeconds() === 0;
+  return isMidnight
+    ? dateText
+    : `${dateText}, ${UTC_HISTORY_TIME_FORMATTER.format(date)} UTC`;
+}
+
+export function formatHistoricalTimezonePeriod(
+  startMs: number,
+  endMs: number,
+  isPresent: boolean,
+): string {
+  return `${formatHistoricalBoundary(startMs)} → ${isPresent ? 'present' : formatHistoricalBoundary(endMs)}`;
+}
+
+function buildPeriodsFromChanges(
+  changesByInstant: ReadonlyMap<number, string[]>,
+  startMs: number,
+  endMs: number,
+  label: (periodStartMs: number, periodEndMs: number, index: number) => string,
+): readonly TimezonePeriod[] {
+  const boundaries = [
+    startMs,
+    ...[...changesByInstant.keys()].filter(
+      (transitionMs) => transitionMs > startMs && transitionMs < endMs,
+    ),
+    endMs,
+  ].sort((left, right) => left - right);
+  return boundaries.slice(0, -1).map((periodStartMs, index) => {
+    const periodEndMs = boundaries[index + 1] ?? endMs;
+    return {
+      startMs: periodStartMs,
+      endMs: periodEndMs,
+      representativeMs: Math.min(periodStartMs + 1_000, periodEndMs - 1),
+      label: label(periodStartMs, periodEndMs, index),
+      changedTimezones: changesByInstant.get(periodStartMs) ?? [],
+      nextChangedTimezones: changesByInstant.get(periodEndMs) ?? [],
+    };
+  });
+}
+
+export function buildHistoricalTimezonePeriods(
+  rules: Readonly<Record<string, TimezoneRule>>,
+  startMs: number,
+  endMs: number = Date.now(),
+): readonly HistoricalTimezonePeriod[] {
+  const changesByInstant = new Map<number, string[]>();
+  for (const [timezone, rule] of Object.entries(rules).sort(([left], [right]) =>
+    left.localeCompare(right),
+  )) {
+    for (const [transitionSeconds] of rule.standardTransitions) {
+      const transitionMs = transitionSeconds * 1_000;
+      if (transitionMs <= startMs || transitionMs >= endMs) continue;
+      const changedTimezones = changesByInstant.get(transitionMs) ?? [];
+      changedTimezones.push(timezone);
+      changesByInstant.set(transitionMs, changedTimezones);
+    }
+  }
+  const periods = buildPeriodsFromChanges(
+    changesByInstant,
+    startMs,
+    endMs,
+    (periodStartMs, periodEndMs, index) =>
+      formatHistoricalTimezonePeriod(
+        periodStartMs,
+        periodEndMs,
+        index === changesByInstant.size,
+      ),
+  );
+  return periods.map((period, index) => ({
+    ...period,
+    isPresent: index === periods.length - 1,
+  }));
 }
 
 export function timezoneOffsetsAt(
