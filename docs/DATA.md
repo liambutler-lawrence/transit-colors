@@ -176,21 +176,26 @@ uses a local equal-area transform rather than Web Mercator.
 npm run build:data:timezone-skew
 ```
 
-The builder downloads timezone-boundary-builder's version-pinned `timezones-now`
-archive, verifies its SHA-256 checksum, simplifies its current/future timekeeping
-regions for browser rendering, and writes `data/timezone-skew-zones.geojson`. To rebuild
-from an already downloaded archive, pass the output and source paths explicitly:
+The builder downloads timezone-boundary-builder's version-pinned `timezones-1970`
+archive and the matching IANA tzdata release, verifies both SHA-256 checksums,
+simplifies the post-1970 timekeeping regions for browser rendering, compiles the IANA
+source with `zic`, and writes `data/timezone-skew-zones.geojson`. To rebuild from
+already downloaded archives, pass the output and both source paths explicitly:
 
 ```sh
 node scripts/build-timezone-skew-data.mjs \
-  data/timezone-skew-zones.geojson /path/to/timezones-now.geojson.zip
+  data/timezone-skew-zones.geojson \
+  /path/to/timezones-1970.geojson.zip /path/to/tzdata2026c.tar.gz
 ```
 
-The boundary snapshot is derived from OpenStreetMap and remains subject to ODbL; its
-release, source URL, checksum, and license are recorded in the generated file. At
-runtime, the browser's IANA time-zone rules find every UTC-offset transition in the
-current year and group the map into ranges with a unique global offset pattern. Solar
-noon is then derived directly from longitude for the selected range:
+The boundary snapshot is derived from OpenStreetMap and remains subject to ODbL; both
+upstream releases, source URLs, checksums, and the boundary license are recorded in the
+generated file. The committed IANA 2026c rule table covers 1970 through 2050, so runtime
+results do not depend on the browser's bundled timezone release. The current-year
+selector groups every recurring or one-off UTC-offset transition into ranges with a
+unique global pattern. The historical selector groups one-off standard-offset changes
+into eras, while paired recurring daylight-saving reversals are excluded. Solar noon is
+then derived directly from longitude for the selected range:
 `12:00 + UTC offset − longitude × 4 minutes per degree`.
 
 ## Validation

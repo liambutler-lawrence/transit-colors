@@ -368,6 +368,18 @@ export const timezonePeriodSummaryEl = requiredElement(
   '#timezone-period-summary',
   HTMLElement,
 );
+export const timezoneHistoryPeriodSelect = requiredElement(
+  '#timezone-history-period',
+  HTMLSelectElement,
+);
+export const timezoneHistorySummaryEl = requiredElement(
+  '#timezone-history-summary',
+  HTMLElement,
+);
+export const timezoneResultNoteEl = requiredElement(
+  '#timezone-result-note',
+  HTMLElement,
+);
 export const timezoneSelectionTypeEl = requiredElement(
   '#timezone-selection-type',
   HTMLElement,

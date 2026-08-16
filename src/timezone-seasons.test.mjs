@@ -2,11 +2,15 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 
 import {
+  buildHistoricalTimezonePeriods,
   buildTimezonePeriods,
+  buildTimezonePeriodsFromRules,
   formatTimezonePeriod,
   formatUtcOffset,
   parseGmtOffset,
   timezoneOffsetsAt,
+  timezoneOffsetsFromRulesAt,
+  timezoneRuleOffsetHours,
   timezoneTransitionsForYear,
 } from './timezone-seasons.ts';
 
@@ -81,4 +85,68 @@ test('offset snapshots return the complete selected global combination', () => {
     'Region/A': 1,
     'Region/1': 1,
   });
+});
+
+test('pinned timezone rules produce exact seasonal slices without browser data', () => {
+  const rules = {
+    'Region/A': {
+      initialOffsetSeconds: 0,
+      initialStandardOffsetSeconds: 0,
+      transitions: [
+        [MARCH_CHANGE / 1_000, 3_600],
+        [NOVEMBER_CHANGES[0] / 1_000, 0],
+      ],
+      standardTransitions: [],
+    },
+    'Region/B': {
+      initialOffsetSeconds: 7_200,
+      initialStandardOffsetSeconds: 7_200,
+      transitions: [[MARCH_CHANGE / 1_000, 10_800]],
+      standardTransitions: [],
+    },
+  };
+  const periods = buildTimezonePeriodsFromRules(rules, YEAR);
+
+  assert.equal(periods.length, 3);
+  assert.deepEqual(periods[1].changedTimezones, ['Region/A', 'Region/B']);
+  assert.equal(timezoneRuleOffsetHours(rules['Region/A'], MARCH_CHANGE), 1);
+  assert.deepEqual(
+    Object.fromEntries(timezoneOffsetsFromRulesAt(rules, MARCH_CHANGE)),
+    { 'Region/A': 1, 'Region/B': 3 },
+  );
+});
+
+test('historical periods group simultaneous official changes and omit recurring DST', () => {
+  const startMs = Date.UTC(1970, 0, 1);
+  const firstChangeMs = Date.UTC(1990, 0, 1);
+  const secondChangeMs = Date.UTC(2011, 11, 30);
+  const endMs = Date.UTC(2026, 7, 16);
+  const rules = {
+    'Region/A': {
+      initialOffsetSeconds: 0,
+      initialStandardOffsetSeconds: 0,
+      transitions: [
+        [Date.UTC(1989, 2, 1) / 1_000, 3_600],
+        [Date.UTC(1989, 10, 1) / 1_000, 0],
+      ],
+      standardTransitions: [[firstChangeMs / 1_000, 3_600]],
+    },
+    'Region/B': {
+      initialOffsetSeconds: 7_200,
+      initialStandardOffsetSeconds: 7_200,
+      transitions: [],
+      standardTransitions: [
+        [firstChangeMs / 1_000, 10_800],
+        [secondChangeMs / 1_000, 14_400],
+      ],
+    },
+  };
+  const periods = buildHistoricalTimezonePeriods(rules, startMs, endMs);
+
+  assert.equal(periods.length, 3);
+  assert.deepEqual(periods[1].changedTimezones, ['Region/A', 'Region/B']);
+  assert.equal(periods[2].startMs, secondChangeMs);
+  assert.equal(periods[2].isPresent, true);
+  assert.match(periods[2].label, /Dec 30, 2011 → present/);
+  assert.equal(timezoneRuleOffsetHours(rules['Region/B'], secondChangeMs, true), 4);
 });

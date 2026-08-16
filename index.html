@@ -436,6 +436,17 @@
                   offset.
                 </p>
               </fieldset>
+              <fieldset class="timezone-period-control timezone-history-control">
+                <legend>Official timezone history</legend>
+                <label for="timezone-history-period">Standard-offset era</label>
+                <select id="timezone-history-period" disabled>
+                  <option>Finding official timezone changes…</option>
+                </select>
+                <p id="timezone-history-summary">
+                  Grouping history wherever an IANA timekeeping region records a one-off
+                  standard-offset change.
+                </p>
+              </fieldset>
             </section>
 
             <section class="sidebar-section results-section">
@@ -458,7 +469,7 @@
                   <span>−2 hr earlier</span>
                 </div>
               </div>
-              <p class="timezone-result-note">
+              <p id="timezone-result-note" class="timezone-result-note">
                 Color is calculated continuously from each timezone's UTC offset and
                 every point's longitude.
               </p>
@@ -490,14 +501,15 @@
                   target="_blank"
                   rel="noreferrer"
                   >Stefano Maggiolo's map</a
-                >. Current/future timekeeping boundaries come from
+                >. Timekeeping boundaries since 1970 come from
                 <a
                   href="https://github.com/evansiroky/timezone-boundary-builder"
                   target="_blank"
                   rel="noreferrer"
                   >timezone-boundary-builder</a
-                >, using OpenStreetMap data under ODbL. Seasonal offsets use this
-                browser's IANA time-zone rules.
+                >, using OpenStreetMap data under ODbL. Seasonal and historical offsets
+                use pinned IANA 2026c rules; recurring daylight-saving changes are
+                excluded from official-history eras.
               </p>
             </section>
           </div>

@@ -558,6 +558,16 @@ body {
   line-height: 1.38;
 }
 
+.timezone-history-control {
+  background: #fbfcff;
+}
+
+.timezone-period-control select:disabled {
+  color: #77808b;
+  background: #f1f3f6;
+  cursor: not-allowed;
+}
+
 .circumference-legend .legend-labels span:nth-child(2) {
   text-align: center;
 }

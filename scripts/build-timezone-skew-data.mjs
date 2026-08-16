@@ -1,15 +1,37 @@
+import { execFile as execFileCallback } from 'node:child_process';
 import { createHash } from 'node:crypto';
-import { readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
-import { inflateRawSync } from 'node:zlib';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join, resolve } from 'node:path';
+import { promisify } from 'node:util';
+import { gunzipSync, inflateRawSync } from 'node:zlib';
 
+import { buildTimezoneRule, parseTzif } from './tzif.mjs';
+
+const execFile = promisify(execFileCallback);
 const TIMEZONE_RELEASE = '2026c';
-const TIMEZONE_SOURCE = `https://github.com/evansiroky/timezone-boundary-builder/releases/download/${TIMEZONE_RELEASE}/timezones-now.geojson.zip`;
+const TIMEZONE_SOURCE = `https://github.com/evansiroky/timezone-boundary-builder/releases/download/${TIMEZONE_RELEASE}/timezones-1970.geojson.zip`;
 const TIMEZONE_SOURCE_SHA256 =
-  'f7181b3690da41d174d3a943d575dd4665df48abd7119f406f243ba2df54dda8';
-const ZIP_ENTRY = 'combined-now.json';
+  'c1bd0839c15a94ace5107e84694915fca3ab74907dee7b2ed4e3e5e01acc8f16';
+const IANA_SOURCE = `https://data.iana.org/time-zones/releases/tzdata${TIMEZONE_RELEASE}.tar.gz`;
+const IANA_SOURCE_SHA256 =
+  'e4a178a4477f3d0ea77cc31828ff72aa38feff8d61aa13e7e99e142e9d902be4';
+const ZIP_ENTRY = 'combined-1970.json';
+const TZDATA_FILES = [
+  'africa',
+  'antarctica',
+  'asia',
+  'australasia',
+  'europe',
+  'northamerica',
+  'southamerica',
+  'etcetera',
+  'backward',
+];
 const SIMPLIFICATION_TOLERANCE = 0.018;
-const BASELINE_INSTANT = Date.UTC(2026, 0, 1);
+const RULES_START_SECONDS = Date.UTC(1970, 0, 1) / 1_000;
+const RULES_END_SECONDS = Date.UTC(2051, 0, 1) / 1_000;
+const BASELINE_SECONDS = Date.UTC(2026, 7, 16) / 1_000;
 
 function squaredDistance(left, right) {
   const longitude = left[0] - right[0];
@@ -112,27 +134,23 @@ function simplifyMultiPolygon(polygons) {
     .filter((polygon) => polygon.length > 0);
 }
 
-function offsetHours(timezone, epochMs) {
-  const formatter = new Intl.DateTimeFormat('en-US', {
-    timeZone: timezone,
-    timeZoneName: 'longOffset',
-  });
-  const offset = formatter
-    .formatToParts(new Date(epochMs))
-    .find(({ type }) => type === 'timeZoneName')?.value;
-  if (offset === 'GMT') return 0;
-  const match = /^GMT([+-])(\d{1,2})(?::(\d{2}))?$/.exec(offset ?? '');
-  if (!match) throw new Error(`Unsupported UTC offset ${offset} for ${timezone}`);
-  const minutes = Number(match[2]) * 60 + Number(match[3] ?? 0);
-  return (match[1] === '-' ? -minutes : minutes) / 60;
+function offsetAtSeconds(rule, epochSeconds) {
+  let offsetSeconds = rule.initialOffsetSeconds;
+  for (const [transitionSeconds, nextOffsetSeconds] of rule.transitions) {
+    if (transitionSeconds > epochSeconds) break;
+    offsetSeconds = nextOffsetSeconds;
+  }
+  return offsetSeconds;
 }
 
-function offsetLabel(offset) {
-  const sign = offset < 0 ? '-' : '+';
-  const absoluteMinutes = Math.round(Math.abs(offset) * 60);
-  const hours = Math.floor(absoluteMinutes / 60);
-  const minutes = absoluteMinutes % 60;
-  return `UTC${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`;
+function offsetLabel(offsetSeconds) {
+  const sign = offsetSeconds < 0 ? '-' : '+';
+  const absoluteSeconds = Math.abs(offsetSeconds);
+  const hours = Math.floor(absoluteSeconds / 3_600);
+  const minutes = Math.floor((absoluteSeconds % 3_600) / 60);
+  const seconds = absoluteSeconds % 60;
+  const secondText = seconds === 0 ? '' : `:${String(seconds).padStart(2, '0')}`;
+  return `UTC${sign}${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}${secondText}`;
 }
 
 function placeLabel(timezone) {
@@ -179,36 +197,119 @@ function extractZipEntry(zipBuffer, entryName) {
   throw new Error(`ZIP entry not found: ${entryName}`);
 }
 
-async function sourceArchive(sourcePath) {
+function extractTarFiles(archive, requestedNames) {
+  const tarBuffer = gunzipSync(archive);
+  const requested = new Set(requestedNames);
+  const files = new Map();
+  for (let offset = 0; offset + 512 <= tarBuffer.length;) {
+    const name = tarBuffer
+      .subarray(offset, offset + 100)
+      .toString('utf8')
+      .replace(/\0.*$/, '');
+    if (!name) break;
+    const sizeText = tarBuffer
+      .subarray(offset + 124, offset + 136)
+      .toString('ascii')
+      .replace(/\0.*$/, '')
+      .trim();
+    const size = Number.parseInt(sizeText || '0', 8);
+    const dataOffset = offset + 512;
+    if (requested.has(name)) {
+      files.set(name, tarBuffer.subarray(dataOffset, dataOffset + size));
+    }
+    offset = dataOffset + Math.ceil(size / 512) * 512;
+  }
+  for (const requestedName of requested) {
+    if (!files.has(requestedName)) {
+      throw new Error(`Missing ${requestedName} in IANA tzdata archive`);
+    }
+  }
+  return files;
+}
+
+async function fetchArchive(url, sourcePath) {
   if (sourcePath) return readFile(resolve(sourcePath));
-  const response = await fetch(TIMEZONE_SOURCE);
+  const response = await fetch(url);
   if (!response.ok) {
     throw new Error(
-      `Failed to fetch ${TIMEZONE_SOURCE}: ${response.status} ${response.statusText}`,
+      `Failed to fetch ${url}: ${response.status} ${response.statusText}`,
     );
   }
   return Buffer.from(await response.arrayBuffer());
 }
 
+function verifyChecksum(archive, expected, label) {
+  const checksum = createHash('sha256').update(archive).digest('hex');
+  if (checksum !== expected) {
+    throw new Error(`${label} archive checksum mismatch: ${checksum}`);
+  }
+}
+
+async function compileTimezoneRules(tzdataArchive, timezones) {
+  const temporaryRoot = await mkdtemp(join(tmpdir(), 'transit-colors-tzdata-'));
+  const zoneinfoDirectory = join(temporaryRoot, 'zoneinfo');
+  try {
+    const sourceFiles = extractTarFiles(tzdataArchive, TZDATA_FILES);
+    await Promise.all(
+      [...sourceFiles].map(([name, contents]) =>
+        writeFile(join(temporaryRoot, name), contents),
+      ),
+    );
+    await mkdir(zoneinfoDirectory);
+    try {
+      await execFile(
+        process.env.ZIC ?? 'zic',
+        ['-d', zoneinfoDirectory, ...TZDATA_FILES],
+        { cwd: temporaryRoot },
+      );
+    } catch (error) {
+      throw new Error(
+        `Could not compile IANA timezone rules. Install zic or set ZIC. ${error}`,
+      );
+    }
+
+    const entries = await Promise.all(
+      timezones.map(async (timezone) => {
+        const tzif = await readFile(join(zoneinfoDirectory, timezone));
+        return [
+          timezone,
+          buildTimezoneRule(parseTzif(tzif), RULES_START_SECONDS, RULES_END_SECONDS),
+        ];
+      }),
+    );
+    return Object.fromEntries(entries);
+  } finally {
+    await rm(temporaryRoot, { recursive: true, force: true });
+  }
+}
+
 async function main() {
   const outputPath = resolve(process.argv[2] ?? 'data/timezone-skew-zones.geojson');
-  const archive = await sourceArchive(process.argv[3]);
-  const checksum = createHash('sha256').update(archive).digest('hex');
-  if (checksum !== TIMEZONE_SOURCE_SHA256) {
-    throw new Error(`Timezone archive checksum mismatch: ${checksum}`);
-  }
-  const timezoneData = JSON.parse(extractZipEntry(archive, ZIP_ENTRY).toString('utf8'));
+  const [timezoneArchive, tzdataArchive] = await Promise.all([
+    fetchArchive(TIMEZONE_SOURCE, process.argv[3]),
+    fetchArchive(IANA_SOURCE, process.argv[4]),
+  ]);
+  verifyChecksum(timezoneArchive, TIMEZONE_SOURCE_SHA256, 'Timezone boundary');
+  verifyChecksum(tzdataArchive, IANA_SOURCE_SHA256, 'IANA tzdata');
+  const timezoneData = JSON.parse(
+    extractZipEntry(timezoneArchive, ZIP_ENTRY).toString('utf8'),
+  );
+  const timezones = timezoneData.features.map(({ properties }) => properties.tzid);
+  const timezoneRules = await compileTimezoneRules(tzdataArchive, timezones);
 
   const features = timezoneData.features.map((timezoneFeature, index) => {
     const timezone = timezoneFeature.properties.tzid;
-    const baselineOffset = offsetHours(timezone, BASELINE_INSTANT);
+    const baselineOffsetSeconds = offsetAtSeconds(
+      timezoneRules[timezone],
+      BASELINE_SECONDS,
+    );
     return {
       type: 'Feature',
       id: index,
       properties: {
         id: index,
-        offset_hours: baselineOffset,
-        offset_label: offsetLabel(baselineOffset),
+        offset_hours: baselineOffsetSeconds / 3_600,
+        offset_label: offsetLabel(baselineOffsetSeconds),
         places: placeLabel(timezone),
         dst_places: '',
         timezone_name: timezone,
@@ -223,16 +324,24 @@ async function main() {
   const output = {
     type: 'FeatureCollection',
     metadata: {
-      baseline_instant: new Date(BASELINE_INSTANT).toISOString(),
+      baseline_instant: new Date(BASELINE_SECONDS * 1_000).toISOString(),
+      iana_release: TIMEZONE_RELEASE,
+      iana_source: IANA_SOURCE,
+      iana_source_sha256: IANA_SOURCE_SHA256,
       license: 'Open Database License (ODbL); © OpenStreetMap contributors',
-      release: TIMEZONE_RELEASE,
+      rules_end_epoch_seconds: RULES_END_SECONDS,
+      rules_start_epoch_seconds: RULES_START_SECONDS,
+      timezone_release: TIMEZONE_RELEASE,
+      timezone_rules: timezoneRules,
       timezone_source: TIMEZONE_SOURCE,
       timezone_source_sha256: TIMEZONE_SOURCE_SHA256,
     },
     features,
   };
   await writeFile(outputPath, `${JSON.stringify(output)}\n`, 'utf8');
-  console.log(`Wrote ${features.length} timekeeping-zone features to ${outputPath}`);
+  console.log(
+    `Wrote ${features.length} historical timekeeping-zone features to ${outputPath}`,
+  );
 }
 
 await main();
