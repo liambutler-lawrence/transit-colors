@@ -380,6 +380,22 @@ export const timezoneResultNoteEl = requiredElement(
   '#timezone-result-note',
   HTMLElement,
 );
+export const timezoneCountrySelect = requiredElement(
+  '#timezone-country',
+  HTMLSelectElement,
+);
+export const timezoneCountryZoneSelect = requiredElement(
+  '#timezone-country-zone',
+  HTMLSelectElement,
+);
+export const timezoneCountryResetButton = requiredElement(
+  '#timezone-country-reset',
+  HTMLButtonElement,
+);
+export const timezoneCountrySummaryEl = requiredElement(
+  '#timezone-country-summary',
+  HTMLElement,
+);
 export const timezoneSelectionTypeEl = requiredElement(
   '#timezone-selection-type',
   HTMLElement,

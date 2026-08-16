@@ -30,7 +30,9 @@ const TZDATA_FILES = [
 ];
 const SIMPLIFICATION_TOLERANCE = 0.018;
 const RULES_START_SECONDS = Date.UTC(1970, 0, 1) / 1_000;
-const RULES_END_SECONDS = Date.UTC(2051, 0, 1) / 1_000;
+// Fat TZif files retain explicit recurring transitions through the 32-bit
+// compatibility horizon. Keep the advertised rule window inside that range.
+const RULES_END_SECONDS = Date.UTC(2038, 0, 1) / 1_000;
 const BASELINE_SECONDS = Date.UTC(2026, 7, 16) / 1_000;
 
 function squaredDistance(left, right) {
@@ -259,7 +261,7 @@ async function compileTimezoneRules(tzdataArchive, timezones) {
     try {
       await execFile(
         process.env.ZIC ?? 'zic',
-        ['-d', zoneinfoDirectory, ...TZDATA_FILES],
+        ['-b', 'fat', '-d', zoneinfoDirectory, ...TZDATA_FILES],
         { cwd: temporaryRoot },
       );
     } catch (error) {
