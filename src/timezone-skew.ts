@@ -94,8 +94,9 @@ export function formatSkewDuration(skewMinutes: number): string {
 }
 
 export function describeSolarNoonSkew(skewMinutes: number): string {
-  if (Math.abs(skewMinutes) < 5) return 'within about 5 minutes of 12:00';
-  return `${formatSkewDuration(skewMinutes)} ${skewMinutes > 0 ? 'later' : 'earlier'} than 12:00`;
+  const roundedMinutes = Math.round(skewMinutes);
+  if (roundedMinutes === 0) return '0 min from 12:00';
+  return `${formatSkewDuration(roundedMinutes)} ${roundedMinutes > 0 ? 'later' : 'earlier'} than 12:00`;
 }
 
 export function formatLongitude(longitude: number): string {

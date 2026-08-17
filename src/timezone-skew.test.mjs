@@ -191,7 +191,10 @@ test('solar noon formatting uses a readable twelve-hour clock', () => {
 });
 
 test('solar noon descriptions communicate direction without reversing the scale', () => {
-  assert.equal(describeSolarNoonSkew(0), 'within about 5 minutes of 12:00');
+  assert.equal(describeSolarNoonSkew(0), '0 min from 12:00');
+  assert.equal(describeSolarNoonSkew(4.4), '4 min later than 12:00');
+  assert.equal(describeSolarNoonSkew(-3.6), '4 min earlier than 12:00');
+  assert.equal(describeSolarNoonSkew(0.4), '0 min from 12:00');
   assert.equal(describeSolarNoonSkew(90), '1 hr 30 min later than 12:00');
   assert.equal(describeSolarNoonSkew(-35), '35 min earlier than 12:00');
 });
