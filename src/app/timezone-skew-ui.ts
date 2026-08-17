@@ -1,4 +1,3 @@
-import earcut, { flatten } from 'earcut';
 import type {
   CustomLayerInterface,
   CustomRenderMethodInput,
@@ -6,6 +5,7 @@ import type {
   Map as MapLibreMap,
 } from 'maplibre-gl';
 
+import { triangulateGlobePolygons } from '../globe-polygon-mesh.js';
 import {
   timezoneCountryPropertiesSchema,
   type TimezoneCountryCollection,
@@ -63,20 +63,6 @@ const HIT_LAYER_ID = 'timezone-skew-hit';
 const COUNTRY_OVERRIDE_LAYER_ID = 'timezone-country-override';
 const COUNTRY_BOUNDARY_LAYER_ID = 'timezone-country-override-boundary';
 const COUNTRY_HIT_LAYER_ID = 'timezone-country-override-hit';
-const MAX_MERCATOR_LATITUDE = 85.051129;
-
-function mercatorX(longitude: number): number {
-  return (longitude + 180) / 360;
-}
-
-function mercatorY(latitude: number): number {
-  const clampedLatitude = Math.max(
-    -MAX_MERCATOR_LATITUDE,
-    Math.min(MAX_MERCATOR_LATITUDE, latitude),
-  );
-  const radians = (clampedLatitude * Math.PI) / 180;
-  return (1 - Math.log(Math.tan(Math.PI / 4 + radians / 2)) / Math.PI) / 2;
-}
 
 function compileShader(
   gl: WebGLRenderingContext | WebGL2RenderingContext,
@@ -202,26 +188,15 @@ function triangulateTimezoneData(
   for (const [timezoneIndex, feature] of data.features.entries()) {
     const offsetHours =
       offsets.get(feature.properties.timezone_name) ?? feature.properties.offset_hours;
-    for (const polygon of feature.geometry.coordinates) {
-      const flattened = flatten(polygon);
-      const triangleIndices = earcut(
-        flattened.vertices,
-        flattened.holes,
-        flattened.dimensions,
-      );
-      for (const vertexIndex of triangleIndices) {
-        const coordinateIndex = vertexIndex * flattened.dimensions;
-        const longitude = flattened.vertices[coordinateIndex];
-        const latitude = flattened.vertices[coordinateIndex + 1];
-        if (longitude === undefined || latitude === undefined) continue;
-        vertices.push(
-          mercatorX(longitude),
-          mercatorY(latitude),
-          solarNoonSkewMinutes(longitude, offsetHours),
-        );
-        longitudes.push(longitude);
-        timezoneIndices.push(timezoneIndex);
-      }
+    const { coordinates } = triangulateGlobePolygons(feature.geometry.coordinates);
+    for (let index = 0; index < coordinates.length; index += 3) {
+      const x = coordinates[index];
+      const y = coordinates[index + 1];
+      const longitude = coordinates[index + 2];
+      if (x === undefined || y === undefined || longitude === undefined) continue;
+      vertices.push(x, y, solarNoonSkewMinutes(longitude, offsetHours));
+      longitudes.push(longitude);
+      timezoneIndices.push(timezoneIndex);
     }
   }
   return {
@@ -346,24 +321,13 @@ function triangulateCountryFeature(
 ): Float32Array {
   if (!feature) return new Float32Array();
   const vertices: number[] = [];
-  for (const polygon of feature.geometry.coordinates) {
-    const flattened = flatten(polygon);
-    const triangleIndices = earcut(
-      flattened.vertices,
-      flattened.holes,
-      flattened.dimensions,
-    );
-    for (const vertexIndex of triangleIndices) {
-      const coordinateIndex = vertexIndex * flattened.dimensions;
-      const longitude = flattened.vertices[coordinateIndex];
-      const latitude = flattened.vertices[coordinateIndex + 1];
-      if (longitude === undefined || latitude === undefined) continue;
-      vertices.push(
-        mercatorX(longitude),
-        mercatorY(latitude),
-        solarNoonSkewMinutes(longitude, offsetHours),
-      );
-    }
+  const { coordinates } = triangulateGlobePolygons(feature.geometry.coordinates);
+  for (let index = 0; index < coordinates.length; index += 3) {
+    const x = coordinates[index];
+    const y = coordinates[index + 1];
+    const longitude = coordinates[index + 2];
+    if (x === undefined || y === undefined || longitude === undefined) continue;
+    vertices.push(x, y, solarNoonSkewMinutes(longitude, offsetHours));
   }
   return new Float32Array(vertices);
 }
