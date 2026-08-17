@@ -162,6 +162,19 @@ test('clock-skew controls follow the upstream-to-downstream dependency order', a
   assert.match(html, /id="timezone-period-changes"/);
 });
 
+test('the early-solar-noon side uses green instead of ocean blue', async () => {
+  const [html, styles, timezoneUi] = await Promise.all([
+    readFile(new URL('../index.html', import.meta.url), 'utf8'),
+    readFile(new URL('../styles.css', import.meta.url), 'utf8'),
+    readFile(new URL('./app/timezone-skew-ui.ts', import.meta.url), 'utf8'),
+  ]);
+
+  assert.match(html, /two hours earlier in green/);
+  assert.match(styles, /#159957 100%/);
+  assert.match(timezoneUi, /vec3 early = vec3\(0\.08, 0\.60, 0\.34\)/);
+  assert.doesNotMatch(styles, /#3068ed/);
+});
+
 test('solar noon skew compares UTC offset with longitude-derived solar time', () => {
   assert.equal(solarNoonSkewMinutes(0, 0), 0);
   assert.equal(solarNoonSkewMinutes(-75, -5), 0);

@@ -118,7 +118,7 @@ function createProgram(
       void main() {
         vec3 neutral = vec3(0.965, 0.961, 0.949);
         vec3 late = vec3(1.0, 0.18, 0.21);
-        vec3 early = vec3(0.19, 0.41, 0.93);
+        vec3 early = vec3(0.08, 0.60, 0.34);
         float intensity = clamp(abs(v_skew) / ${TIMEZONE_SKEW_LIMIT_MINUTES.toFixed(1)}, 0.0, 1.0);
         vec3 color = mix(neutral, v_skew >= 0.0 ? late : early, intensity);
         float alpha = ${alpha.toFixed(2)};
