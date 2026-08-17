@@ -136,6 +136,12 @@ function simplifyMultiPolygon(polygons) {
     .filter((polygon) => polygon.length > 0);
 }
 
+function simplifyGeometry(geometry) {
+  const polygons =
+    geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
+  return simplifyMultiPolygon(polygons);
+}
+
 function offsetAtSeconds(rule, epochSeconds) {
   let offsetSeconds = rule.initialOffsetSeconds;
   for (const [transitionSeconds, nextOffsetSeconds] of rule.transitions) {
@@ -318,7 +324,7 @@ async function main() {
       },
       geometry: {
         type: 'MultiPolygon',
-        coordinates: simplifyMultiPolygon(timezoneFeature.geometry.coordinates),
+        coordinates: simplifyGeometry(timezoneFeature.geometry),
       },
     };
   });

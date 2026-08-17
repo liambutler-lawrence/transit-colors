@@ -23,6 +23,10 @@ test('the committed clock-skew zones satisfy the runtime boundary', async () => 
   assert.equal(data.metadata.iana_release, '2026c');
   assert.equal(data.metadata.timezone_release, '2026c');
   assert.equal(Object.keys(data.metadata.timezone_rules).length, data.features.length);
+  assert.ok(
+    data.features.every(({ geometry }) => geometry.coordinates.length > 0),
+    'every timekeeping region should retain renderable geometry',
+  );
   assert.ok(data.features.some(({ properties }) => properties.offset_hours === 5.5));
   assert.ok(data.features.some(({ properties }) => properties.offset_hours === 12.75));
   assert.ok(
@@ -82,6 +86,8 @@ test('solar noon skew compares UTC offset with longitude-derived solar time', ()
   assert.equal(solarNoonSkewMinutes(-75, -5), 0);
   assert.equal(solarNoonSkewMinutes(75, 8), 180);
   assert.equal(solarNoonSkewMinutes(15, 0), -60);
+  assert.equal(solarNoonSkewMinutes(-179, 12), -4);
+  assert.equal(solarNoonSkewMinutes(181, 12), -4);
 });
 
 test('solar noon formatting uses a readable twelve-hour clock', () => {

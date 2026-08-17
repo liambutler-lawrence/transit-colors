@@ -64,7 +64,8 @@ export function solarNoonSkewMinutes(
   longitude: number,
   utcOffsetHours: number,
 ): number {
-  return utcOffsetHours * 60 - longitude * 4;
+  const rawSkew = utcOffsetHours * 60 - longitude * 4;
+  return ((((rawSkew + 720) % 1_440) + 1_440) % 1_440) - 720;
 }
 
 export function formatSolarNoon(skewMinutes: number): string {
