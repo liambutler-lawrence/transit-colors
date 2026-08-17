@@ -64,6 +64,10 @@ const COUNTRY_OVERRIDE_LAYER_ID = 'timezone-country-override';
 const COUNTRY_BOUNDARY_LAYER_ID = 'timezone-country-override-boundary';
 const COUNTRY_HIT_LAYER_ID = 'timezone-country-override-hit';
 
+function timezoneVisualBeforeLayerId(): string | undefined {
+  return map.getLayer('water') ? 'water' : firstSymbolLayerId();
+}
+
 function compileShader(
   gl: WebGLRenderingContext | WebGL2RenderingContext,
   type: number,
@@ -814,7 +818,7 @@ export function installTimezoneSkew(
     type: 'geojson',
     data,
     attribution:
-      'Time zones: <a href="https://github.com/evansiroky/timezone-boundary-builder">timezone-boundary-builder</a> / © OpenStreetMap contributors, ODbL',
+      'Time zones: <a href="https://github.com/evansiroky/timezone-boundary-builder">timezone-boundary-builder</a> / © OpenStreetMap contributors, ODbL · land mask: <a href="https://www.naturalearthdata.com/">Natural Earth</a>, public domain',
     promoteId: 'id',
   });
   map.addSource('timezone-countries', {
@@ -828,9 +832,9 @@ export function installTimezoneSkew(
   timezoneLayer = new TimezoneSkewLayer(
     triangulateTimezoneData(data, activeTimezoneOffsets),
   );
-  map.addLayer(timezoneLayer, firstSymbolLayerId());
+  map.addLayer(timezoneLayer, timezoneVisualBeforeLayerId());
   countryOverrideLayer = new CountryTimezoneOverrideLayer();
-  map.addLayer(countryOverrideLayer, firstSymbolLayerId());
+  map.addLayer(countryOverrideLayer, timezoneVisualBeforeLayerId());
   map.addLayer(
     {
       id: BOUNDARY_LAYER_ID,
@@ -843,7 +847,7 @@ export function installTimezoneSkew(
         'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.45, 5, 1.1],
       },
     },
-    firstSymbolLayerId(),
+    timezoneVisualBeforeLayerId(),
   );
   map.addLayer(
     {
@@ -858,7 +862,7 @@ export function installTimezoneSkew(
         'line-width': ['interpolate', ['linear'], ['zoom'], 1, 1.15, 5, 2.2],
       },
     },
-    firstSymbolLayerId(),
+    timezoneVisualBeforeLayerId(),
   );
   map.addLayer(
     {
@@ -887,19 +891,24 @@ export function installTimezoneSkew(
 }
 
 export function positionTimezoneSkewLayers(): void {
-  const beforeLayerId = firstSymbolLayerId();
-  if (map.getLayer(FILL_LAYER_ID)) map.moveLayer(FILL_LAYER_ID, beforeLayerId);
+  const visualBeforeLayerId = timezoneVisualBeforeLayerId();
+  if (map.getLayer(FILL_LAYER_ID)) {
+    map.moveLayer(FILL_LAYER_ID, visualBeforeLayerId);
+  }
   if (map.getLayer(COUNTRY_OVERRIDE_LAYER_ID)) {
-    map.moveLayer(COUNTRY_OVERRIDE_LAYER_ID, beforeLayerId);
+    map.moveLayer(COUNTRY_OVERRIDE_LAYER_ID, visualBeforeLayerId);
   }
-  if (map.getLayer(BOUNDARY_LAYER_ID)) map.moveLayer(BOUNDARY_LAYER_ID, beforeLayerId);
+  if (map.getLayer(BOUNDARY_LAYER_ID)) {
+    map.moveLayer(BOUNDARY_LAYER_ID, visualBeforeLayerId);
+  }
   if (map.getLayer(COUNTRY_BOUNDARY_LAYER_ID)) {
-    map.moveLayer(COUNTRY_BOUNDARY_LAYER_ID, beforeLayerId);
+    map.moveLayer(COUNTRY_BOUNDARY_LAYER_ID, visualBeforeLayerId);
   }
+  const hitBeforeLayerId = firstSymbolLayerId();
   if (map.getLayer(COUNTRY_HIT_LAYER_ID)) {
-    map.moveLayer(COUNTRY_HIT_LAYER_ID, beforeLayerId);
+    map.moveLayer(COUNTRY_HIT_LAYER_ID, hitBeforeLayerId);
   }
-  if (map.getLayer(HIT_LAYER_ID)) map.moveLayer(HIT_LAYER_ID, beforeLayerId);
+  if (map.getLayer(HIT_LAYER_ID)) map.moveLayer(HIT_LAYER_ID, hitBeforeLayerId);
 }
 
 export function syncTimezoneSkewVisibility(): void {

@@ -6,6 +6,8 @@ import { join, resolve } from 'node:path';
 import { promisify } from 'node:util';
 import { gunzipSync, inflateRawSync } from 'node:zlib';
 
+import polygonClipping from 'polygon-clipping';
+
 import { buildTimezoneRule, parseTzif } from './tzif.mjs';
 
 const execFile = promisify(execFileCallback);
@@ -16,6 +18,12 @@ const TIMEZONE_SOURCE_SHA256 =
 const IANA_SOURCE = `https://data.iana.org/time-zones/releases/tzdata${TIMEZONE_RELEASE}.tar.gz`;
 const IANA_SOURCE_SHA256 =
   'e4a178a4477f3d0ea77cc31828ff72aa38feff8d61aa13e7e99e142e9d902be4';
+const LAND_SOURCE_COMMIT = 'ca96624a56bd078437bca8184e78163e5039ad19';
+const LAND_SOURCE =
+  `https://raw.githubusercontent.com/nvkelso/natural-earth-vector/` +
+  `${LAND_SOURCE_COMMIT}/geojson/ne_10m_land.geojson`;
+const LAND_SOURCE_SHA256 =
+  '1ac90796408bc6ad6911d69448485d3c4dbf2190370080368a09976e1c9f7416';
 const ZIP_ENTRY = 'combined-1970.json';
 const TZDATA_FILES = [
   'africa',
@@ -140,6 +148,52 @@ function simplifyGeometry(geometry) {
   const polygons =
     geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
   return simplifyMultiPolygon(polygons);
+}
+
+function polygonBounds(polygon) {
+  const bounds = [Infinity, Infinity, -Infinity, -Infinity];
+  for (const ring of polygon) {
+    for (const [longitude, latitude] of ring) {
+      bounds[0] = Math.min(bounds[0], longitude);
+      bounds[1] = Math.min(bounds[1], latitude);
+      bounds[2] = Math.max(bounds[2], longitude);
+      bounds[3] = Math.max(bounds[3], latitude);
+    }
+  }
+  return bounds;
+}
+
+function boundsIntersect(left, right) {
+  return !(
+    left[2] < right[0] ||
+    left[0] > right[2] ||
+    left[3] < right[1] ||
+    left[1] > right[3]
+  );
+}
+
+function buildLandIndex(landData) {
+  return landData.features.flatMap(({ geometry }) =>
+    simplifyGeometry(geometry).map((polygon) => ({
+      bounds: polygonBounds(polygon),
+      polygon,
+    })),
+  );
+}
+
+function clipGeometryToLand(geometry, landIndex) {
+  const clippedPolygons = [];
+  for (const timezonePolygon of simplifyGeometry(geometry)) {
+    const timezoneBounds = polygonBounds(timezonePolygon);
+    const nearbyLand = landIndex
+      .filter(({ bounds }) => boundsIntersect(timezoneBounds, bounds))
+      .map(({ polygon }) => polygon);
+    if (nearbyLand.length === 0) continue;
+    clippedPolygons.push(
+      ...polygonClipping.intersection([timezonePolygon], nearbyLand),
+    );
+  }
+  return simplifyMultiPolygon(clippedPolygons);
 }
 
 function offsetAtSeconds(rule, epochSeconds) {
@@ -293,15 +347,18 @@ async function compileTimezoneRules(tzdataArchive, timezones) {
 
 async function main() {
   const outputPath = resolve(process.argv[2] ?? 'data/timezone-skew-zones.geojson');
-  const [timezoneArchive, tzdataArchive] = await Promise.all([
+  const [timezoneArchive, tzdataArchive, landSource] = await Promise.all([
     fetchArchive(TIMEZONE_SOURCE, process.argv[3]),
     fetchArchive(IANA_SOURCE, process.argv[4]),
+    fetchArchive(LAND_SOURCE, process.argv[5]),
   ]);
   verifyChecksum(timezoneArchive, TIMEZONE_SOURCE_SHA256, 'Timezone boundary');
   verifyChecksum(tzdataArchive, IANA_SOURCE_SHA256, 'IANA tzdata');
+  verifyChecksum(landSource, LAND_SOURCE_SHA256, 'Natural Earth land');
   const timezoneData = JSON.parse(
     extractZipEntry(timezoneArchive, ZIP_ENTRY).toString('utf8'),
   );
+  const landIndex = buildLandIndex(JSON.parse(landSource.toString('utf8')));
   const timezones = timezoneData.features.map(({ properties }) => properties.tzid);
   const timezoneRules = await compileTimezoneRules(tzdataArchive, timezones);
 
@@ -324,7 +381,7 @@ async function main() {
       },
       geometry: {
         type: 'MultiPolygon',
-        coordinates: simplifyGeometry(timezoneFeature.geometry),
+        coordinates: clipGeometryToLand(timezoneFeature.geometry, landIndex),
       },
     };
   });
@@ -336,6 +393,10 @@ async function main() {
       iana_release: TIMEZONE_RELEASE,
       iana_source: IANA_SOURCE,
       iana_source_sha256: IANA_SOURCE_SHA256,
+      land_source: LAND_SOURCE,
+      land_source_commit: LAND_SOURCE_COMMIT,
+      land_source_license: 'Public domain',
+      land_source_sha256: LAND_SOURCE_SHA256,
       license: 'Open Database License (ODbL); © OpenStreetMap contributors',
       rules_end_epoch_seconds: RULES_END_SECONDS,
       rules_start_epoch_seconds: RULES_START_SECONDS,

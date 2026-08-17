@@ -9,6 +9,35 @@ import {
   timezoneSkewCollectionSchema,
 } from './timezone-skew.ts';
 
+function pointInRing([longitude, latitude], ring) {
+  let inside = false;
+  for (
+    let currentIndex = 0, previousIndex = ring.length - 1;
+    currentIndex < ring.length;
+    previousIndex = currentIndex, currentIndex += 1
+  ) {
+    const current = ring[currentIndex];
+    const previous = ring[previousIndex];
+    if (
+      current[1] > latitude !== previous[1] > latitude &&
+      longitude <
+        ((previous[0] - current[0]) * (latitude - current[1])) /
+          (previous[1] - current[1]) +
+          current[0]
+    ) {
+      inside = !inside;
+    }
+  }
+  return inside;
+}
+
+function geometryContainsPoint(geometry, point) {
+  return geometry.coordinates.some(
+    ([outerRing, ...holes]) =>
+      pointInRing(point, outerRing) && holes.every((hole) => !pointInRing(point, hole)),
+  );
+}
+
 test('the committed clock-skew zones satisfy the runtime boundary', async () => {
   const data = timezoneSkewCollectionSchema.parse(
     JSON.parse(
@@ -22,6 +51,11 @@ test('the committed clock-skew zones satisfy the runtime boundary', async () => 
   assert.ok(data.features.length >= 300);
   assert.equal(data.metadata.iana_release, '2026c');
   assert.equal(data.metadata.timezone_release, '2026c');
+  assert.match(data.metadata.land_source, /ne_10m_land\.geojson$/);
+  assert.equal(
+    data.metadata.land_source_commit,
+    'ca96624a56bd078437bca8184e78163e5039ad19',
+  );
   assert.equal(Object.keys(data.metadata.timezone_rules).length, data.features.length);
   assert.ok(
     data.features.every(({ geometry }) => geometry.coordinates.length > 0),
@@ -66,6 +100,28 @@ test('the committed clock-skew zones satisfy the runtime boundary', async () => 
   );
 });
 
+test('clock-skew zones stop at land instead of including maritime extents', async () => {
+  const data = timezoneSkewCollectionSchema.parse(
+    JSON.parse(
+      await readFile(
+        new URL('../data/timezone-skew-zones.geojson', import.meta.url),
+        'utf8',
+      ),
+    ),
+  );
+  const zonesAt = (point) =>
+    data.features.filter(({ geometry }) => geometryContainsPoint(geometry, point));
+
+  assert.equal(zonesAt([-5.6, 35.95]).length, 0, 'Strait of Gibraltar');
+  assert.equal(zonesAt([-9.7, 39]).length, 0, 'Atlantic west of Portugal');
+  assert.equal(zonesAt([0, 38]).length, 0, 'Mediterranean Sea');
+  assert.equal(zonesAt([-3.7, 40.4])[0]?.properties.timezone_name, 'Europe/Madrid');
+  assert.equal(
+    zonesAt([-6.84, 34.02])[0]?.properties.timezone_name,
+    'Africa/Casablanca',
+  );
+});
+
 test('the clock-skew color wash follows the shared globe projection', async () => {
   const [accessControls, mapLifecycle, timezoneUi] = await Promise.all([
     readFile(new URL('./app/access-controls.ts', import.meta.url), 'utf8'),
@@ -77,6 +133,11 @@ test('the clock-skew color wash follows the shared globe projection', async () =
   assert.match(mapLifecycle, /map\.setProjection\(\{ type: 'globe' \}\)/);
   assert.match(timezoneUi, /gl_Position = projectTile\(a_position\)/);
   assert.match(timezoneUi, /shaderData\.variantName/);
+  assert.match(
+    timezoneUi,
+    /map\.addLayer\(timezoneLayer, timezoneVisualBeforeLayerId\(\)\)/,
+  );
+  assert.match(timezoneUi, /map\.getLayer\('water'\) \? 'water'/);
   assert.doesNotMatch(accessControls, /timezoneActive \? 'mercator'/);
   assert.doesNotMatch(mapLifecycle, /initialProduct === 'timezone' \? 'mercator'/);
 });
