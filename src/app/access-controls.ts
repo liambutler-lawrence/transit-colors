@@ -554,7 +554,13 @@ export function installBasemap(): void {
     for (const layer of runtime.pendingBasemapStyle.layers ?? []) {
       if (layer.type !== 'background' && !map.getLayer(layer.id)) {
         const beforeLayer =
-          layer.type === 'symbol' ? 'station-points-open' : 'street-proximity';
+          layer.type === 'symbol'
+            ? map.getLayer('station-points-open')
+              ? 'station-points-open'
+              : undefined
+            : map.getLayer('street-proximity')
+              ? 'street-proximity'
+              : undefined;
         map.addLayer(layer, beforeLayer);
       }
     }
