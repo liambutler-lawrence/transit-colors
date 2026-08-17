@@ -1,8 +1,6 @@
 import type { FeatureIdentifier } from 'maplibre-gl';
 
 import { selectCircumferenceCandidate } from '../circumference.js';
-import { circumferenceGeometryVariantsSchema } from '../circumference/schema.js';
-import type { CircumferenceGeometryVariants } from '../circumference/types.js';
 import { createCircumferenceGradientSource } from '../circumference-gradient-source.js';
 import { createStreetAccessScorer, splitStreetFeatures } from '../routing.js';
 import {
@@ -46,6 +44,7 @@ import {
   updateViewportStatistics,
   visibleTiledStreets,
 } from './access-controls.js';
+import { fetchCircumferenceGeometryVariants } from './circumference-data.js';
 import {
   focusCircumferenceArea,
   prepareCircumferenceRoute,
@@ -671,18 +670,6 @@ export function scheduleDestinationSetup(
   }
 }
 
-async function fetchCircumferenceGeometryVariants(
-  url: string,
-): Promise<CircumferenceGeometryVariants> {
-  const response = await fetch(url);
-  if (!response.ok) {
-    throw new Error(
-      `Failed to load precomputed circumference data: ${response.status} ${response.statusText}`,
-    );
-  }
-  return circumferenceGeometryVariantsSchema.parse(await response.json());
-}
-
 export async function loadArea(
   areaKey: AreaKey,
   {
@@ -787,9 +774,14 @@ export async function initialize(): Promise<void> {
       runtime.circumferenceSchedules[areaKey] = schedules;
     }
     setActiveCircumferenceState(initialAreaKey);
+    if (runtime.activeProduct === 'timezone') {
+      runtime.loadingCanFinish = true;
+      requestAnimationFrame(() => requestAnimationFrame(finishLoading));
+      return;
+    }
     await loadArea(initialAreaKey, {
       initial: true,
-      fit: runtime.activeProduct !== 'timezone',
+      fit: true,
     });
   } catch (error) {
     console.error(error);
@@ -801,6 +793,12 @@ export async function initialize(): Promise<void> {
 }
 
 window.addEventListener('transit:refresh-live-roads', scheduleLiveStreetRefresh);
+window.addEventListener('transit:load-active-area', () => {
+  if (state.metadata) return;
+  void loadArea(runtime.activeAreaKey, {
+    fit: runtime.activeProduct !== 'circumference',
+  });
+});
 
 stationBreakdownEl.addEventListener('click', (event) => {
   const target = event.target;

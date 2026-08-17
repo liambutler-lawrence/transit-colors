@@ -141,7 +141,22 @@ export function setActiveProduct(
 
   if (timezoneActive) {
     if (fit) focusTimezoneWorld();
-    updateStatus('Clock skew ready');
+    if (runtime.initialLoadComplete) {
+      updateStatus('Clock skew ready');
+    } else {
+      updateStatus(runtime.loadingOperation?.label ?? 'Loading map', {
+        isLoading: true,
+      });
+    }
+  } else if (
+    runtime.initialLoadComplete &&
+    !state.metadata &&
+    !runtime.loadingOperation
+  ) {
+    updateStatus(circumferenceActive ? 'Loading routes' : 'Loading map', {
+      isLoading: true,
+    });
+    window.dispatchEvent(new Event('transit:load-active-area'));
   } else if (circumferenceActive) {
     prepareCircumferenceRoute();
     if (fit && highwayCriterionActive()) {

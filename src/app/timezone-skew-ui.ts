@@ -1,16 +1,16 @@
 import type {
   CustomLayerInterface,
   CustomRenderMethodInput,
-  MapLayerMouseEvent,
+  MapMouseEvent,
   Map as MapLibreMap,
 } from 'maplibre-gl';
 
 import { triangulateGlobePolygons } from '../globe-polygon-mesh.js';
-import {
-  timezoneCountryPropertiesSchema,
-  type TimezoneCountryCollection,
-  type TimezoneCountryFeature,
-  type TimezoneCountryProperties,
+import { PolygonHitIndex } from '../polygon-hit-index.js';
+import type {
+  TimezoneCountryCollection,
+  TimezoneCountryFeature,
+  TimezoneCountryProperties,
 } from '../timezone-countries.js';
 import {
   describeSolarNoonSkew,
@@ -18,7 +18,6 @@ import {
   formatSolarNoon,
   solarNoonSkewMinutes,
   TIMEZONE_SKEW_LIMIT_MINUTES,
-  timezoneSkewPropertiesSchema,
   type TimezoneSkewCollection,
   type TimezoneSkewProperties,
 } from '../timezone-skew.js';
@@ -62,10 +61,10 @@ import {
 
 const FILL_LAYER_ID = 'timezone-skew-fill';
 const BOUNDARY_LAYER_ID = 'timezone-skew-boundaries';
-const HIT_LAYER_ID = 'timezone-skew-hit';
 const COUNTRY_OVERRIDE_LAYER_ID = 'timezone-country-override';
 const COUNTRY_BOUNDARY_LAYER_ID = 'timezone-country-override-boundary';
-const COUNTRY_HIT_LAYER_ID = 'timezone-country-override-hit';
+const TIMEZONE_SOURCE_LAYER = 'timezone_zones';
+const COUNTRY_SOURCE_LAYER = 'timezone_countries';
 
 function timezoneVisualBeforeLayerId(): string | undefined {
   return map.getLayer('water') ? 'water' : firstSymbolLayerId();
@@ -452,6 +451,8 @@ let selectedTimezonePeriodIndex = 0;
 let timezonePeriodPicker: TimezonePeriodPicker | null = null;
 let timezoneData: TimezoneSkewCollection | null = null;
 let timezoneCountryData: TimezoneCountryCollection | null = null;
+let timezoneHitIndex: PolygonHitIndex<TimezoneSkewProperties> | null = null;
+let timezoneCountryHitIndex: PolygonHitIndex<TimezoneCountryProperties> | null = null;
 let activeCountryFeature: TimezoneCountryFeature | null = null;
 let activeCountryTimezone = '';
 let lastInspectedTimezone: {
@@ -515,9 +516,6 @@ function syncCountryOverride(): void {
   const countryId = activeCountryFeature?.properties.id ?? -1;
   if (map.getLayer(COUNTRY_BOUNDARY_LAYER_ID)) {
     map.setFilter(COUNTRY_BOUNDARY_LAYER_ID, ['==', ['id'], countryId]);
-  }
-  if (map.getLayer(COUNTRY_HIT_LAYER_ID)) {
-    map.setFilter(COUNTRY_HIT_LAYER_ID, ['==', ['id'], countryId]);
   }
   timezoneCountryResetButton.disabled =
     !activeCountryFeature && activeCountryTimezone === '';
@@ -771,36 +769,47 @@ function renderTimezoneDetails(
   replaceMetadata(timezoneMetadataEl, metadata);
 }
 
-function inspectTimezone(event: MapLayerMouseEvent): void {
-  if (runtime.activeProduct !== 'timezone') return;
-  const properties = timezoneSkewPropertiesSchema.safeParse(
-    event.features?.[0]?.properties,
-  );
-  if (!properties.success) return;
-  const countryProperties = timezoneCountryPropertiesSchema.safeParse(
-    map.queryRenderedFeatures(event.point, { layers: [COUNTRY_HIT_LAYER_ID] })[0]
-      ?.properties,
-  );
-  const overrideCountry = countryProperties.success ? countryProperties.data : null;
+function inspectTimezone(event: MapMouseEvent): boolean {
+  if (runtime.activeProduct !== 'timezone') return false;
+  const properties = timezoneHitIndex?.find(event.lngLat.lng, event.lngLat.lat);
+  if (!properties) return false;
+  const countryId = activeCountryFeature?.properties.id;
+  const overrideCountry =
+    countryId === undefined
+      ? null
+      : (timezoneCountryHitIndex?.find(
+          event.lngLat.lng,
+          event.lngLat.lat,
+          (country) => country.id === countryId,
+        ) ?? null);
   lastInspectedTimezone = {
-    properties: properties.data,
+    properties,
     longitude: event.lngLat.lng,
     overrideCountry,
   };
-  renderTimezoneDetails(properties.data, event.lngLat.lng, overrideCountry);
+  renderTimezoneDetails(properties, event.lngLat.lng, overrideCountry);
+  return true;
 }
 
 function installTimezoneHover(): void {
   if (hoverInstalled) return;
   hoverInstalled = true;
-  map.on('mousemove', HIT_LAYER_ID, (event) => {
+  let pendingEvent: MapMouseEvent | null = null;
+  let animationFrame: number | null = null;
+  map.on('mousemove', (event) => {
+    if (runtime.activeProduct !== 'timezone') return;
+    pendingEvent = event;
+    if (animationFrame !== null) return;
+    animationFrame = requestAnimationFrame(() => {
+      animationFrame = null;
+      if (!pendingEvent) return;
+      map.getCanvas().style.cursor = inspectTimezone(pendingEvent) ? 'crosshair' : '';
+      pendingEvent = null;
+    });
+  });
+  map.on('click', (event) => {
     inspectTimezone(event);
-    map.getCanvas().style.cursor = 'crosshair';
   });
-  map.on('mouseleave', HIT_LAYER_ID, () => {
-    map.getCanvas().style.cursor = '';
-  });
-  map.on('click', HIT_LAYER_ID, inspectTimezone);
 }
 
 export function installTimezoneSkew(
@@ -808,18 +817,30 @@ export function installTimezoneSkew(
   countries: TimezoneCountryCollection,
 ): void {
   if (map.getSource('timezone-skew-zones')) return;
+  timezoneHitIndex = new PolygonHitIndex(
+    data.features.map(({ geometry, properties }) => ({
+      polygons: geometry.coordinates,
+      value: properties,
+    })),
+  );
+  timezoneCountryHitIndex = new PolygonHitIndex(
+    countries.features.map(({ geometry, properties }) => ({
+      polygons: geometry.coordinates,
+      value: properties,
+    })),
+  );
   installTimezonePeriodControl(data);
   installCountrySimulatorControl(countries);
   map.addSource('timezone-skew-zones', {
-    type: 'geojson',
-    data,
+    type: 'vector',
+    url: 'pmtiles://data/timezone-skew-zones.pmtiles',
     attribution:
       'Time zones: <a href="https://github.com/evansiroky/timezone-boundary-builder">timezone-boundary-builder</a> / © OpenStreetMap contributors, ODbL · land mask: <a href="https://www.naturalearthdata.com/">Natural Earth</a>, public domain',
     promoteId: 'id',
   });
   map.addSource('timezone-countries', {
-    type: 'geojson',
-    data: countries,
+    type: 'vector',
+    url: 'pmtiles://data/timezone-skew-countries.pmtiles',
     attribution:
       'Countries: <a href="https://www.naturalearthdata.com/">Natural Earth</a>, public domain',
     promoteId: 'id',
@@ -836,6 +857,7 @@ export function installTimezoneSkew(
       id: BOUNDARY_LAYER_ID,
       type: 'line',
       source: 'timezone-skew-zones',
+      'source-layer': TIMEZONE_SOURCE_LAYER,
       layout: { visibility: 'none' },
       paint: {
         'line-color': '#8b4b20',
@@ -850,6 +872,7 @@ export function installTimezoneSkew(
       id: COUNTRY_BOUNDARY_LAYER_ID,
       type: 'line',
       source: 'timezone-countries',
+      'source-layer': COUNTRY_SOURCE_LAYER,
       filter: ['==', ['id'], -1],
       layout: { visibility: 'none' },
       paint: {
@@ -859,27 +882,6 @@ export function installTimezoneSkew(
       },
     },
     timezoneVisualBeforeLayerId(),
-  );
-  map.addLayer(
-    {
-      id: COUNTRY_HIT_LAYER_ID,
-      type: 'fill',
-      source: 'timezone-countries',
-      filter: ['==', ['id'], -1],
-      layout: { visibility: 'none' },
-      paint: { 'fill-color': '#000000', 'fill-opacity': 0.001 },
-    },
-    firstSymbolLayerId(),
-  );
-  map.addLayer(
-    {
-      id: HIT_LAYER_ID,
-      type: 'fill',
-      source: 'timezone-skew-zones',
-      layout: { visibility: 'none' },
-      paint: { 'fill-color': '#000000', 'fill-opacity': 0.001 },
-    },
-    firstSymbolLayerId(),
   );
   syncCountryOverride();
   installTimezoneHover();
@@ -900,11 +902,6 @@ export function positionTimezoneSkewLayers(): void {
   if (map.getLayer(COUNTRY_BOUNDARY_LAYER_ID)) {
     map.moveLayer(COUNTRY_BOUNDARY_LAYER_ID, visualBeforeLayerId);
   }
-  const hitBeforeLayerId = firstSymbolLayerId();
-  if (map.getLayer(COUNTRY_HIT_LAYER_ID)) {
-    map.moveLayer(COUNTRY_HIT_LAYER_ID, hitBeforeLayerId);
-  }
-  if (map.getLayer(HIT_LAYER_ID)) map.moveLayer(HIT_LAYER_ID, hitBeforeLayerId);
 }
 
 export function syncTimezoneSkewVisibility(): void {
@@ -916,8 +913,7 @@ export function syncTimezoneSkewVisibility(): void {
   );
   setLayerVisibility(BOUNDARY_LAYER_ID, active && timezoneBoundariesToggle.checked);
   setLayerVisibility(COUNTRY_BOUNDARY_LAYER_ID, active && overrideActive);
-  setLayerVisibility(COUNTRY_HIT_LAYER_ID, active && overrideActive);
-  setLayerVisibility(HIT_LAYER_ID, active);
+  if (!active) map.getCanvas().style.cursor = '';
 }
 
 export function focusTimezoneWorld(): void {
