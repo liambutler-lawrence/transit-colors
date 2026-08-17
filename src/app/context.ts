@@ -360,13 +360,26 @@ export const timezoneBoundariesToggle = requiredElement(
   '#toggle-timezone-boundaries',
   HTMLInputElement,
 );
-export const timezonePeriodSelect = requiredElement(
-  '#timezone-period',
-  HTMLSelectElement,
+export const timezonePeriodTrigger = requiredElement(
+  '#timezone-period-trigger',
+  HTMLButtonElement,
 );
+export const timezonePeriodMenu = requiredElement('#timezone-period-menu', HTMLElement);
 export const timezonePeriodSummaryEl = requiredElement(
   '#timezone-period-summary',
   HTMLElement,
+);
+export const timezonePeriodChangesEl = requiredElement(
+  '#timezone-period-changes',
+  HTMLDetailsElement,
+);
+export const timezonePeriodChangesSummaryEl = requiredElement(
+  '#timezone-period-changes-summary',
+  HTMLElement,
+);
+export const timezonePeriodChangesListEl = requiredElement(
+  '#timezone-period-changes-list',
+  HTMLUListElement,
 );
 export const timezoneHistoryPeriodSelect = requiredElement(
   '#timezone-history-period',

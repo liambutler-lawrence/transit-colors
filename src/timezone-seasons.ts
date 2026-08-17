@@ -42,6 +42,12 @@ export interface HistoricalTimezonePeriod extends TimezonePeriod {
   readonly isPresent: boolean;
 }
 
+export interface TimezoneOffsetChange {
+  readonly timezone: string;
+  readonly fromOffsetHours: number;
+  readonly toOffsetHours: number;
+}
+
 export interface TimezoneRule {
   readonly initialOffsetSeconds: number;
   readonly initialStandardOffsetSeconds: number;
@@ -125,6 +131,23 @@ export function timezoneOffsetsFromRulesAt(
       timezoneRuleOffsetHours(rule, epochMs, standard),
     ]),
   );
+}
+
+export function timezoneOffsetChangesAtBoundary(
+  rules: Readonly<Record<string, TimezoneRule>>,
+  boundaryMs: number,
+  timezones: readonly string[],
+  standard = false,
+): readonly TimezoneOffsetChange[] {
+  return timezones.flatMap((timezone) => {
+    const rule = rules[timezone];
+    if (!rule) return [];
+    const fromOffsetHours = timezoneRuleOffsetHours(rule, boundaryMs - 1_000, standard);
+    const toOffsetHours = timezoneRuleOffsetHours(rule, boundaryMs, standard);
+    return fromOffsetHours === toOffsetHours
+      ? []
+      : [{ timezone, fromOffsetHours, toOffsetHours }];
+  });
 }
 
 function findTransition(

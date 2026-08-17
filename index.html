@@ -425,17 +425,6 @@
                   12:00.
                 </p>
               </div>
-              <fieldset class="timezone-period-control">
-                <legend>Time of year</legend>
-                <label for="timezone-period">Global UTC-offset pattern</label>
-                <select id="timezone-period" disabled>
-                  <option>Finding worldwide clock changes…</option>
-                </select>
-                <p id="timezone-period-summary">
-                  Grouping the year wherever any timekeeping region changes its UTC
-                  offset.
-                </p>
-              </fieldset>
               <fieldset class="timezone-period-control timezone-history-control">
                 <legend>Official timezone history</legend>
                 <label for="timezone-history-period">Standard-offset era</label>
@@ -446,6 +435,46 @@
                   Grouping history wherever an IANA timekeeping region records a one-off
                   standard-offset change.
                 </p>
+              </fieldset>
+              <fieldset class="timezone-period-control">
+                <legend>Time of year</legend>
+                <span id="timezone-period-label" class="timezone-control-label">
+                  Global UTC-offset pattern
+                </span>
+                <div class="timezone-period-picker">
+                  <button
+                    id="timezone-period-trigger"
+                    class="timezone-period-trigger"
+                    type="button"
+                    aria-haspopup="listbox"
+                    aria-expanded="false"
+                    aria-labelledby="timezone-period-label timezone-period-trigger"
+                    disabled
+                  >
+                    <span>Finding worldwide clock changes…</span>
+                  </button>
+                  <div
+                    id="timezone-period-menu"
+                    class="timezone-period-menu"
+                    role="listbox"
+                    aria-labelledby="timezone-period-label"
+                    hidden
+                  ></div>
+                </div>
+                <p id="timezone-period-summary">
+                  Grouping the year wherever any timekeeping region changes its UTC
+                  offset.
+                </p>
+                <details
+                  id="timezone-period-changes"
+                  class="timezone-period-changes"
+                  hidden
+                >
+                  <summary id="timezone-period-changes-summary">
+                    Countries changing at the next boundary
+                  </summary>
+                  <ul id="timezone-period-changes-list"></ul>
+                </details>
               </fieldset>
               <fieldset class="timezone-period-control timezone-simulator-control">
                 <legend>What if?</legend>

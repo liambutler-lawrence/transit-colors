@@ -37,6 +37,7 @@ export const timezoneSkewCollectionSchema = z.object({
     rules_end_epoch_seconds: z.number().int(),
     rules_start_epoch_seconds: z.number().int(),
     timezone_release: z.string(),
+    timezone_countries: z.record(z.string(), z.array(z.string()).min(1)),
     timezone_rules: z.record(z.string(), timezoneRuleSchema),
     timezone_source: z.url(),
     timezone_source_sha256: z.string(),

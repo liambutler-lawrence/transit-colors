@@ -57,6 +57,13 @@ test('the committed clock-skew zones satisfy the runtime boundary', async () => 
     'ca96624a56bd078437bca8184e78163e5039ad19',
   );
   assert.equal(Object.keys(data.metadata.timezone_rules).length, data.features.length);
+  assert.equal(
+    Object.keys(data.metadata.timezone_countries).length,
+    data.features.length,
+  );
+  assert.deepEqual(data.metadata.timezone_countries['America/New_York'], [
+    'United States',
+  ]);
   assert.ok(
     data.features.every(({ geometry }) => geometry.coordinates.length > 0),
     'every timekeeping region should retain renderable geometry',
@@ -140,6 +147,19 @@ test('the clock-skew color wash follows the shared globe projection', async () =
   assert.match(timezoneUi, /map\.getLayer\('water'\) \? 'water'/);
   assert.doesNotMatch(accessControls, /timezoneActive \? 'mercator'/);
   assert.doesNotMatch(mapLifecycle, /initialProduct === 'timezone' \? 'mercator'/);
+});
+
+test('clock-skew controls follow the upstream-to-downstream dependency order', async () => {
+  const html = await readFile(new URL('../index.html', import.meta.url), 'utf8');
+  const historyIndex = html.indexOf('id="timezone-history-period"');
+  const seasonIndex = html.indexOf('id="timezone-period-trigger"');
+  const simulatorIndex = html.indexOf('id="timezone-country"');
+
+  assert.ok(historyIndex > 0);
+  assert.ok(historyIndex < seasonIndex);
+  assert.ok(seasonIndex < simulatorIndex);
+  assert.match(html, /id="timezone-period-menu"[\s\S]*role="listbox"/);
+  assert.match(html, /id="timezone-period-changes"/);
 });
 
 test('solar noon skew compares UTC offset with longitude-derived solar time', () => {

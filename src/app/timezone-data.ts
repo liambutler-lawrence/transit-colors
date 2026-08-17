@@ -14,7 +14,7 @@ export async function fetchTimezoneMapData(): Promise<{
 }> {
   const [zones, countries] = await Promise.all([
     fetchParsed(
-      'data/timezone-skew-zones.geojson?v=20260816f',
+      'data/timezone-skew-zones.geojson?v=20260816g',
       timezoneSkewCollectionSchema,
     ),
     fetchParsed(
