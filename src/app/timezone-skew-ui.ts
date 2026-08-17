@@ -45,7 +45,6 @@ import {
   timezoneHistorySummaryEl,
   timezoneMetadataEl,
   timezoneNameEl,
-  timezonePeriodSelect,
   timezonePeriodSummaryEl,
   timezoneResultNoteEl,
   timezoneSelectionTypeEl,
@@ -56,6 +55,10 @@ import {
   replaceMetadata,
   setLayerVisibility,
 } from './map-ui-utils.js';
+import {
+  createTimezonePeriodPicker,
+  type TimezonePeriodPicker,
+} from './timezone-period-menu.js';
 
 const FILL_LAYER_ID = 'timezone-skew-fill';
 const BOUNDARY_LAYER_ID = 'timezone-skew-boundaries';
@@ -445,6 +448,8 @@ let activeHistoricalPeriod: HistoricalTimezonePeriod | null = null;
 let timezonePeriods: readonly TimezonePeriod[] = [];
 let historicalTimezonePeriods: readonly HistoricalTimezonePeriod[] = [];
 let timezonePeriodYear = new Date().getUTCFullYear();
+let selectedTimezonePeriodIndex = 0;
+let timezonePeriodPicker: TimezonePeriodPicker | null = null;
 let timezoneData: TimezoneSkewCollection | null = null;
 let timezoneCountryData: TimezoneCountryCollection | null = null;
 let activeCountryFeature: TimezoneCountryFeature | null = null;
@@ -580,31 +585,16 @@ function installCountrySimulatorControl(data: TimezoneCountryCollection): void {
   });
 }
 
-function updatePeriodSummary(period: TimezonePeriod, index: number): void {
-  const range = formatTimezonePeriodDateRange(period.startMs, period.endMs);
-  const nextCount = period.nextChangedTimezones.length;
-  const nextChange =
-    nextCount === 0
-      ? 'No later offset change occurs this year.'
-      : `${nextCount} timekeeping ${nextCount === 1 ? 'region changes' : 'regions change'} at the next boundary.`;
-  timezonePeriodSummaryEl.textContent = `${timezonePeriodYear} · ${range} · Pattern ${index + 1} of ${timezonePeriods.length}. ${nextChange}`;
-}
-
 function applyTimezonePeriod(index: number): void {
   const period = timezonePeriods[index];
-  if (!period || !timezoneData) return;
+  if (!period || !timezoneData || timezoneHistoryPeriodSelect.value !== '') return;
+  selectedTimezonePeriodIndex = index;
   activeTimezonePeriod = period;
-  activeHistoricalPeriod = null;
   activeTimezoneOffsets = timezoneOffsetsFromRulesAt(
     timezoneData.metadata.timezone_rules,
     period.representativeMs,
   );
-  timezonePeriodSelect.value = String(index);
-  timezonePeriodSelect.disabled = false;
-  timezoneHistoryPeriodSelect.value = '';
-  updatePeriodSummary(period, index);
-  timezoneHistorySummaryEl.textContent =
-    'Current map follows the selected time of year. Choose an era to compare standard time since 1970.';
+  timezonePeriodPicker?.setSelected(index);
   timezoneLayer?.setOffsets(activeTimezoneOffsets);
   syncCountryOverride();
 }
@@ -631,9 +621,9 @@ function applyHistoricalTimezonePeriod(index: number): void {
     true,
   );
   timezoneHistoryPeriodSelect.value = String(index);
-  timezonePeriodSelect.disabled = true;
+  timezonePeriodPicker?.setDisabled(true);
   timezonePeriodSummaryEl.textContent =
-    'Time-of-year choices are paused while an official-history era is selected.';
+    'Time of year is downstream from official history and is paused for this standard-offset era.';
   const nextCount = period.nextChangedTimezones.length;
   const nextText = period.isPresent
     ? 'This is the latest completed era.'
@@ -641,6 +631,15 @@ function applyHistoricalTimezonePeriod(index: number): void {
   timezoneHistorySummaryEl.textContent = `${describeChangedTimezones(period.changedTimezones)} ${nextText}`;
   timezoneLayer?.setOffsets(activeTimezoneOffsets);
   syncCountryOverride();
+}
+
+function applyCurrentTimezoneHistory(): void {
+  activeHistoricalPeriod = null;
+  timezoneHistoryPeriodSelect.value = '';
+  timezoneHistorySummaryEl.textContent =
+    'Current map follows the selected time of year. Choose an era to compare standard time since 1970.';
+  timezonePeriodPicker?.setDisabled(false);
+  applyTimezonePeriod(selectedTimezonePeriodIndex);
 }
 
 function historicalOptions(
@@ -685,14 +684,6 @@ function installTimezonePeriodControl(data: TimezoneSkewCollection): void {
     data.metadata.rules_start_epoch_seconds * 1_000,
     Math.min(now, data.metadata.rules_end_epoch_seconds * 1_000),
   );
-  timezonePeriodSelect.replaceChildren(
-    ...timezonePeriods.map((period, index) => {
-      const option = document.createElement('option');
-      option.value = String(index);
-      option.textContent = period.label;
-      return option;
-    }),
-  );
   const currentOption = document.createElement('option');
   currentOption.value = '';
   currentOption.textContent = 'Current map · use time of year';
@@ -705,16 +696,21 @@ function installTimezonePeriodControl(data: TimezoneSkewCollection): void {
     0,
     timezonePeriods.findIndex(({ startMs, endMs }) => now >= startMs && now < endMs),
   );
-  applyTimezonePeriod(currentIndex);
+  selectedTimezonePeriodIndex = currentIndex;
+  timezonePeriodPicker ??= createTimezonePeriodPicker({
+    data,
+    onSelect: applyTimezonePeriod,
+    periods: timezonePeriods,
+    selectedIndex: currentIndex,
+    year,
+  });
+  applyCurrentTimezoneHistory();
 
   if (!periodControlInstalled) {
     periodControlInstalled = true;
-    timezonePeriodSelect.addEventListener('change', () => {
-      applyTimezonePeriod(Number(timezonePeriodSelect.value));
-    });
     timezoneHistoryPeriodSelect.addEventListener('change', () => {
       if (timezoneHistoryPeriodSelect.value === '') {
-        applyTimezonePeriod(Number(timezonePeriodSelect.value));
+        applyCurrentTimezoneHistory();
         return;
       }
       applyHistoricalTimezonePeriod(Number(timezoneHistoryPeriodSelect.value));

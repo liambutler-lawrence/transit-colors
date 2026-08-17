@@ -10,6 +10,7 @@ import {
   parseGmtOffset,
   timezoneOffsetsAt,
   timezoneOffsetsFromRulesAt,
+  timezoneOffsetChangesAtBoundary,
   timezoneRuleOffsetHours,
   timezoneTransitionsForYear,
 } from './timezone-seasons.ts';
@@ -113,6 +114,17 @@ test('pinned timezone rules produce exact seasonal slices without browser data',
   assert.deepEqual(
     Object.fromEntries(timezoneOffsetsFromRulesAt(rules, MARCH_CHANGE)),
     { 'Region/A': 1, 'Region/B': 3 },
+  );
+  assert.deepEqual(
+    timezoneOffsetChangesAtBoundary(
+      rules,
+      MARCH_CHANGE,
+      periods[0].nextChangedTimezones,
+    ),
+    [
+      { timezone: 'Region/A', fromOffsetHours: 0, toOffsetHours: 1 },
+      { timezone: 'Region/B', fromOffsetHours: 2, toOffsetHours: 3 },
+    ],
   );
 });
 

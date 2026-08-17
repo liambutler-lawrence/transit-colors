@@ -36,6 +36,7 @@ const TZDATA_FILES = [
   'etcetera',
   'backward',
 ];
+const TZDATA_METADATA_FILES = ['iso3166.tab', 'zone1970.tab'];
 const SIMPLIFICATION_TOLERANCE = 0.018;
 const RULES_START_SECONDS = Date.UTC(1970, 0, 1) / 1_000;
 // Fat TZif files retain explicit recurring transitions through the 32-bit
@@ -307,14 +308,46 @@ function verifyChecksum(archive, expected, label) {
   }
 }
 
-async function compileTimezoneRules(tzdataArchive, timezones) {
+function tabularRows(source) {
+  return source
+    .toString('utf8')
+    .split('\n')
+    .filter((line) => line && !line.startsWith('#'))
+    .map((line) => line.split('\t'));
+}
+
+function timezoneCountriesFromFiles(sourceFiles, timezones) {
+  const countryNames = new Map(
+    tabularRows(sourceFiles.get('iso3166.tab')).map(([code, name]) => [code, name]),
+  );
+  const countriesByTimezone = new Map(
+    tabularRows(sourceFiles.get('zone1970.tab')).map(([codes, , timezone]) => [
+      timezone,
+      codes.split(',').map((code) => countryNames.get(code) ?? code),
+    ]),
+  );
+  return Object.fromEntries(
+    timezones.map((timezone) => {
+      const countries = countriesByTimezone.get(timezone);
+      if (!countries) {
+        throw new Error(`Missing country metadata for ${timezone}`);
+      }
+      return [timezone, countries];
+    }),
+  );
+}
+
+async function compileTimezoneData(tzdataArchive, timezones) {
   const temporaryRoot = await mkdtemp(join(tmpdir(), 'transit-colors-tzdata-'));
   const zoneinfoDirectory = join(temporaryRoot, 'zoneinfo');
   try {
-    const sourceFiles = extractTarFiles(tzdataArchive, TZDATA_FILES);
+    const sourceFiles = extractTarFiles(tzdataArchive, [
+      ...TZDATA_FILES,
+      ...TZDATA_METADATA_FILES,
+    ]);
     await Promise.all(
-      [...sourceFiles].map(([name, contents]) =>
-        writeFile(join(temporaryRoot, name), contents),
+      TZDATA_FILES.map((name) =>
+        writeFile(join(temporaryRoot, name), sourceFiles.get(name)),
       ),
     );
     await mkdir(zoneinfoDirectory);
@@ -339,7 +372,10 @@ async function compileTimezoneRules(tzdataArchive, timezones) {
         ];
       }),
     );
-    return Object.fromEntries(entries);
+    return {
+      timezoneCountries: timezoneCountriesFromFiles(sourceFiles, timezones),
+      timezoneRules: Object.fromEntries(entries),
+    };
   } finally {
     await rm(temporaryRoot, { recursive: true, force: true });
   }
@@ -360,7 +396,10 @@ async function main() {
   );
   const landIndex = buildLandIndex(JSON.parse(landSource.toString('utf8')));
   const timezones = timezoneData.features.map(({ properties }) => properties.tzid);
-  const timezoneRules = await compileTimezoneRules(tzdataArchive, timezones);
+  const { timezoneCountries, timezoneRules } = await compileTimezoneData(
+    tzdataArchive,
+    timezones,
+  );
 
   const features = timezoneData.features.map((timezoneFeature, index) => {
     const timezone = timezoneFeature.properties.tzid;
@@ -401,6 +440,7 @@ async function main() {
       rules_end_epoch_seconds: RULES_END_SECONDS,
       rules_start_epoch_seconds: RULES_START_SECONDS,
       timezone_release: TIMEZONE_RELEASE,
+      timezone_countries: timezoneCountries,
       timezone_rules: timezoneRules,
       timezone_source: TIMEZONE_SOURCE,
       timezone_source_sha256: TIMEZONE_SOURCE_SHA256,
