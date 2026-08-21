@@ -5,6 +5,12 @@ All notable changes to this project will be documented here. The format follows
 
 ## Unreleased
 
+### Added
+
+- Added a Jersey City Land Use mode that distinguishes vacant industrial land, active
+  industry, auto-oriented retail, modern and historic mixed use, non-retail towers,
+  housing, civic land, and other parcels, with zoning and historic overlays.
+
 ### Fixed
 
 - Refresh the Circumference distance-gradient image from its rendered canvas so the

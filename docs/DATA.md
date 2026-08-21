@@ -15,6 +15,8 @@ Rebuild data only when intentionally refreshing a source snapshot.
 - Natural Earth 1:10m land polygons
 - Natural Earth 1:10m North America roads supplement
 - timezone-boundary-builder `timezones-now` boundaries derived from OpenStreetMap
+- Jersey City Division of City Planning parcel, zoning, redevelopment-plan, and
+  historic-district feature services
 
 Review each source's terms before redistributing a new snapshot. Preserve the in-app
 attribution whenever adding a source.
@@ -85,8 +87,30 @@ station-to-station observations, resamples them to a common interval, and averag
 distinct directions or track sides. Centerlines retain exact platform coordinates as
 their endpoints and fall back to a straight edge when no reliable shape section exists.
 
-`npm run build:data` refreshes all five metro areas, schedules, and track geometry in
-the required order.
+`npm run build:data` refreshes all five metro areas, schedules, track geometry, clock
+skew, circumference results, and Jersey City land use in the required order.
+
+## Jersey City land use
+
+Install Tippecanoe, then run:
+
+```sh
+npm run build:data:land-use
+```
+
+The builder downloads the current official Jersey City parcel, zoning, and historic
+district feature layers, spatially joins their public attributes, assigns each parcel a
+deterministic visualization category, and writes `data/jersey-city-land-use.pmtiles`. It
+also writes `data/jersey-city-land-use-summary.json` with source timestamps and category
+totals. Owner names and other personal fields are not included.
+
+Categories combine tax class, building description, zoning or redevelopment-plan
+context, construction year, stories, and historic-district membership. “Vacant” means
+the parcel is recorded in the vacant-land tax class; it does not establish abandonment,
+contamination, code status, or redevelopment eligibility. Auto-oriented retail and tower
+categories are heuristic descriptions intended for exploration. Consult the
+[official Jersey City zoning map](https://experience.arcgis.com/experience/63717e4171904651a65fe9827fcb5571/)
+and source records for legal or site-specific decisions.
 
 ## Circumference routes
 

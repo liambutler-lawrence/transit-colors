@@ -1,0 +1,29 @@
+{
+  "generated_at": "2026-08-21T23:08:35.751Z",
+  "parcel_count": 58311,
+  "source_record_count": 58311,
+  "zoning_polygon_count": 328,
+  "historic_district_count": 5,
+  "category_counts": {
+    "vacant_industrial": 324,
+    "vacant_other": 7619,
+    "industrial_active": 483,
+    "retail_auto": 468,
+    "commercial_active": 1833,
+    "mixed_use_modern": 2567,
+    "mixed_use_historic": 945,
+    "tower_no_retail": 2939,
+    "housing": 38168,
+    "civic_open_space": 2868,
+    "other": 97
+  },
+  "source_dates": {
+    "parcels": "2024-09-20T19:27:29.056Z",
+    "zoning": "2025-11-18T16:19:32.153Z"
+  },
+  "sources": {
+    "parcels": "https://services2.arcgis.com/UXbywc7dSkfgdPp4/arcgis/rest/services/Parcel_2024/FeatureServer/0",
+    "zoning": "https://services2.arcgis.com/UXbywc7dSkfgdPp4/arcgis/rest/services/Zoning_Districts/FeatureServer/0",
+    "historic_districts": "https://services2.arcgis.com/UXbywc7dSkfgdPp4/arcgis/rest/services/Historic_Districts/FeatureServer/1"
+  }
+}

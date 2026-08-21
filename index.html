@@ -47,6 +47,15 @@
               >
                 Clock skew
               </button>
+              <button
+                id="product-land-use"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="land-use-product"
+              >
+                Land use
+              </button>
             </div>
           </div>
           <div class="panel-actions">
@@ -557,6 +566,126 @@
                 >, using OpenStreetMap data under ODbL. Seasonal and historical offsets
                 use pinned IANA 2026c rules; recurring daylight-saving changes are
                 excluded from official-history eras.
+              </p>
+            </section>
+          </div>
+
+          <div
+            id="land-use-product"
+            class="product-panel land-use-product"
+            role="tabpanel"
+            hidden
+          >
+            <section class="sidebar-section display-section">
+              <div class="section-heading compact-heading">
+                <div>
+                  <span class="section-eyebrow">Map display</span>
+                  <h2>Visible layers</h2>
+                </div>
+              </div>
+              <div class="toggles land-use-toggles" aria-label="Land-use layers">
+                <label>
+                  <input id="toggle-land-use-colors" type="checkbox" checked />
+                  <span>Parcel colors</span>
+                </label>
+                <label>
+                  <input id="toggle-land-use-zoning" type="checkbox" checked />
+                  <span>Zoning borders</span>
+                </label>
+                <label>
+                  <input id="toggle-land-use-historic" type="checkbox" checked />
+                  <span>Historic districts</span>
+                </label>
+              </div>
+            </section>
+
+            <section class="sidebar-section mode-section">
+              <div class="section-heading">
+                <span class="section-index">2</span>
+                <div>
+                  <span class="section-eyebrow">Mode</span>
+                  <h2>Zoning + current status</h2>
+                </div>
+              </div>
+              <div class="land-use-explainer">
+                <strong>Jersey City pilot</strong>
+                <p>
+                  Each lot combines its tax class and building record with current
+                  zoning and historic-district boundaries.
+                </p>
+              </div>
+              <div class="control-group land-use-filter-group">
+                <div class="land-use-filter-heading">
+                  <span class="control-label">Lot types in view</span>
+                  <button id="land-use-reset-filter" type="button" disabled>
+                    Show all
+                  </button>
+                </div>
+                <div
+                  id="land-use-categories"
+                  class="land-use-categories"
+                  aria-label="Land-use category filters"
+                ></div>
+              </div>
+            </section>
+
+            <section class="sidebar-section results-section">
+              <div class="section-heading">
+                <span class="section-index">3</span>
+                <div>
+                  <span class="section-eyebrow">Results</span>
+                  <h2>Lots in view</h2>
+                </div>
+              </div>
+              <div class="metric-grid land-use-metrics">
+                <div class="metric">
+                  <span class="metric-label">Visible parcels</span>
+                  <strong id="land-use-parcel-count">—</strong>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">Vacant</span>
+                  <strong id="land-use-vacant-count">—</strong>
+                </div>
+                <div class="metric">
+                  <span class="metric-label">In redevelopment plan</span>
+                  <strong id="land-use-redevelopment-count">—</strong>
+                </div>
+              </div>
+              <div class="land-use-line-key" aria-label="Boundary legend">
+                <span><i class="zoning-line"></i>Zoning / plan</span>
+                <span><i class="historic-line"></i>Historic district</span>
+              </div>
+            </section>
+
+            <section class="sidebar-section selected-section">
+              <div class="section-heading">
+                <span class="section-index">4</span>
+                <div>
+                  <span class="section-eyebrow">Selected item</span>
+                  <h2>Parcel details</h2>
+                </div>
+              </div>
+              <div class="selection land-use-selection" aria-live="polite">
+                <span id="land-use-selection-type" class="metric-label"
+                  >Nothing selected</span
+                >
+                <strong id="land-use-name">Move over a parcel</strong>
+                <span id="land-use-summary">
+                  Hover or click any colored lot to see its classification evidence.
+                </span>
+                <dl id="land-use-metadata" class="feature-metadata"></dl>
+              </div>
+              <p class="method-note land-use-method-note">
+                This is an exploratory classification, not a legal zoning determination.
+                Parcel records are from Jersey City's 2024 tax-map service; zoning and
+                historic overlays are from the city's
+                <a
+                  href="https://experience.arcgis.com/experience/63717e4171904651a65fe9827fcb5571/"
+                  target="_blank"
+                  rel="noreferrer"
+                  >interactive zoning map</a
+                >. “Historic” means a mapped historic district or a recorded build year
+                before 1946.
               </p>
             </section>
           </div>
