@@ -20,6 +20,8 @@ application, deterministic derived datasets, and scripts that refresh those data
    station, and label layer definitions.
 9. `src/app/timezone-skew-ui.ts` triangulates land-clipped time-zone polygons for a
    longitude-continuous, projection-aware custom WebGL layer and manages map inspection.
+10. `src/app/land-use-ui.ts` streams Jersey City parcel, zoning, redevelopment-plan, and
+    historic-district vector tiles and manages category filtering and inspection.
 
 The application modules form a one-way dependency graph from shared context to features
 to lifecycle orchestration. Cross-feature refresh requests use browser events instead of
@@ -131,6 +133,12 @@ projection-aware custom WebGL fill rather than precomputed color bands, allowing
 red-white-blue value to vary continuously with longitude inside each official UTC-offset
 zone. A transparent MapLibre fill layer remains available for hit testing, while a line
 layer draws the zone boundaries.
+
+The Jersey City land-use archive is a single PMTiles source with parcel, zoning, and
+historic-district layers. `src/land-use.ts` owns the runtime schema, category palette,
+and deterministic parcel classifier shared by the builder, tests, and browser. The
+browser only filters and summarizes visible tiles; source joins and classification run
+offline.
 
 Downloaded GTFS and Overpass responses are caches, not source artifacts, and are
 excluded from version control and production builds.

@@ -32,6 +32,11 @@ import {
   fitHighwayCircumference,
   highwayCriterionActive,
 } from './highway-circumference-ui.js';
+import {
+  focusJerseyCityLandUse,
+  positionJerseyCityLandUseLayers,
+  syncLandUseVisibility,
+} from './land-use-ui.js';
 import { activeAccessTransitTimes, setLayerVisibility } from './map-ui-utils.js';
 import {
   focusTimezoneWorld,
@@ -74,6 +79,8 @@ import {
   isMode,
   legendEl,
   legendLabelsEl,
+  landUseProductButton,
+  landUseProductEl,
   map,
   mapEl,
   mapLoadingEl,
@@ -117,26 +124,33 @@ export function setActiveProduct(
   const accessActive = runtime.activeProduct === 'access';
   const circumferenceActive = runtime.activeProduct === 'circumference';
   const timezoneActive = runtime.activeProduct === 'timezone';
+  const landUseActive = runtime.activeProduct === 'landuse';
   appShellEl.classList.toggle('circumference-active', circumferenceActive);
   appShellEl.classList.toggle('timezone-active', timezoneActive);
+  appShellEl.classList.toggle('land-use-active', landUseActive);
   accessProductButton.setAttribute('aria-selected', String(accessActive));
   circumferenceProductButton.setAttribute('aria-selected', String(circumferenceActive));
   timezoneProductButton.setAttribute('aria-selected', String(timezoneActive));
+  landUseProductButton.setAttribute('aria-selected', String(landUseActive));
   accessProductButton.tabIndex = accessActive ? 0 : -1;
   circumferenceProductButton.tabIndex = circumferenceActive ? 0 : -1;
   timezoneProductButton.tabIndex = timezoneActive ? 0 : -1;
+  landUseProductButton.tabIndex = landUseActive ? 0 : -1;
   accessProductEl.hidden = !accessActive;
   circumferenceProductEl.hidden = !circumferenceActive;
   timezoneProductEl.hidden = !timezoneActive;
+  landUseProductEl.hidden = !landUseActive;
 
   if (map.isStyleLoaded()) {
-    map.setProjection({ type: 'globe' });
+    if (landUseActive) map.setProjection({ type: 'mercator' });
+    else map.setProjection({ type: 'globe' });
   }
 
   syncStreetVisibility();
   syncStationVisibility();
   syncCircumferenceVisibility();
   syncTimezoneSkewVisibility();
+  syncLandUseVisibility();
   if (updateUrl) updateAreaChrome(runtime.activeAreaKey);
 
   if (timezoneActive) {
@@ -148,6 +162,14 @@ export function setActiveProduct(
         isLoading: true,
       });
     }
+  } else if (landUseActive) {
+    if (fit) focusJerseyCityLandUse();
+    updateStatus(
+      runtime.initialLoadComplete
+        ? 'Land use ready'
+        : (runtime.loadingOperation?.label ?? 'Loading map'),
+      { isLoading: !runtime.initialLoadComplete },
+    );
   } else if (
     runtime.initialLoadComplete &&
     !state.metadata &&
@@ -183,6 +205,9 @@ circumferenceProductButton.addEventListener('click', () => {
 });
 timezoneProductButton.addEventListener('click', () => {
   setActiveProduct('timezone');
+});
+landUseProductButton.addEventListener('click', () => {
+  setActiveProduct('landuse');
 });
 for (const toggle of [timezoneColorsToggle, timezoneBoundariesToggle]) {
   toggle.addEventListener('change', syncTimezoneSkewVisibility);
@@ -533,7 +558,13 @@ export function finishLoading(): void {
 
   runtime.loadingOperation = null;
   runtime.loadingCanFinish = false;
-  updateStatus(runtime.activeProduct === 'timezone' ? 'Clock skew ready' : 'Ready');
+  updateStatus(
+    runtime.activeProduct === 'timezone'
+      ? 'Clock skew ready'
+      : runtime.activeProduct === 'landuse'
+        ? 'Land use ready'
+        : 'Ready',
+  );
   mapLoadingEl.hidden = true;
   mapEl.setAttribute('aria-busy', 'false');
   window.dispatchEvent(
@@ -566,6 +597,7 @@ export function installBasemap(): void {
     }
     positionCircumferenceGradient();
     positionTimezoneSkewLayers();
+    positionJerseyCityLandUseLayers();
     if (AREAS[runtime.activeAreaKey].liveRoads) {
       requestLiveStreetRefresh();
       syncStreetVisibility();
@@ -875,18 +907,22 @@ export function updateAreaChrome(areaKey: AreaKey): void {
   document.title =
     runtime.activeProduct === 'timezone'
       ? 'Clock Skew Map — Transit Colors'
-      : runtime.activeProduct === 'circumference'
-        ? `Circumference Lab — ${area.label}`
-        : `Transit Colors — ${area.label}`;
+      : runtime.activeProduct === 'landuse'
+        ? 'Jersey City Land Use — Transit Colors'
+        : runtime.activeProduct === 'circumference'
+          ? `Circumference Lab — ${area.label}`
+          : `Transit Colors — ${area.label}`;
   mapEl.setAttribute(
     'aria-label',
     runtime.activeProduct === 'timezone'
       ? 'Interactive world map of clock time compared with mean solar time'
-      : runtime.activeProduct === 'circumference'
-        ? `All maximum-area circumferential routes map, focused on ${area.label}`
-        : area.supportsDestination
-          ? `${area.label} transit access and travel time map`
-          : `${area.label} transit proximity map`,
+      : runtime.activeProduct === 'landuse'
+        ? 'Interactive Jersey City parcel map of land use, status, zoning, and historic districts'
+        : runtime.activeProduct === 'circumference'
+          ? `All maximum-area circumferential routes map, focused on ${area.label}`
+          : area.supportsDestination
+            ? `${area.label} transit access and travel time map`
+            : `${area.label} transit proximity map`,
   );
   destinationControlEl.hidden = !area.supportsDestination;
   departureControlEl.hidden = !area.supportsDestination;
@@ -900,6 +936,10 @@ export function updateAreaChrome(areaKey: AreaKey): void {
   }
   if (runtime.activeProduct === 'timezone') {
     url.searchParams.set('product', 'timezone');
+    url.searchParams.delete('criterion');
+  } else if (runtime.activeProduct === 'landuse') {
+    url.searchParams.set('product', 'landuse');
+    url.searchParams.delete('area');
     url.searchParams.delete('criterion');
   } else if (runtime.activeProduct === 'circumference') {
     url.searchParams.set('product', 'circumference');

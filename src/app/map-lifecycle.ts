@@ -58,6 +58,7 @@ import {
   fitHighwayCircumference,
   installHighwayHover,
 } from './highway-circumference-ui.js';
+import { installJerseyCityLandUse } from './land-use-ui.js';
 import { firstSymbolLayerId } from './map-ui-utils.js';
 import { installTimezoneSkew } from './timezone-skew-ui.js';
 import { fetchTimezoneMapData } from './timezone-data.js';
@@ -721,7 +722,9 @@ export async function loadArea(
     syncStationVisibility();
     syncCircumferenceVisibility();
     updateViewportStatistics();
-    if (runtime.activeProduct !== 'timezone') prepareCircumferenceRoute(sequence);
+    if (runtime.activeProduct !== 'timezone' && runtime.activeProduct !== 'landuse') {
+      prepareCircumferenceRoute(sequence);
+    }
     window.__transitPerformance.dataFetchedMs =
       performance.now() - window.__transitPerformance.startedAt;
     scheduleDestinationSetup(areaKey, area, stations, sequence);
@@ -769,12 +772,13 @@ export async function initialize(): Promise<void> {
     runtime.pendingBasemapStyle = basemapStyle;
     runtime.circumferenceLandmasses = landmasses;
     installTimezoneSkew(timezoneMapData.zones, timezoneMapData.countries);
+    installJerseyCityLandUse();
     for (const { areaKey, geometryVariants, schedules } of circumferenceEntries) {
       circumferenceStates[areaKey].geometryVariants = geometryVariants;
       runtime.circumferenceSchedules[areaKey] = schedules;
     }
     setActiveCircumferenceState(initialAreaKey);
-    if (runtime.activeProduct === 'timezone') {
+    if (runtime.activeProduct === 'timezone' || runtime.activeProduct === 'landuse') {
       runtime.loadingCanFinish = true;
       requestAnimationFrame(() => requestAnimationFrame(finishLoading));
       return;

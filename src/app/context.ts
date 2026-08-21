@@ -120,7 +120,9 @@ export const initialAreaKey: AreaKey = isAreaKey(requestedAreaKey)
   : 'cdmx';
 const requestedProduct = initialSearchParams.get('product');
 export const initialProduct: Product =
-  requestedProduct === 'circumference' || requestedProduct === 'timezone'
+  requestedProduct === 'circumference' ||
+  requestedProduct === 'timezone' ||
+  requestedProduct === 'landuse'
     ? requestedProduct
     : 'access';
 export const initialCircumferenceCriterion: CircumferenceCriterion =
@@ -346,12 +348,53 @@ export const timezoneProductButton = requiredElement(
   '#product-timezone',
   HTMLButtonElement,
 );
+export const landUseProductButton = requiredElement(
+  '#product-land-use',
+  HTMLButtonElement,
+);
 export const accessProductEl = requiredElement('#access-product', HTMLElement);
 export const circumferenceProductEl = requiredElement(
   '#circumference-product',
   HTMLElement,
 );
 export const timezoneProductEl = requiredElement('#timezone-product', HTMLElement);
+export const landUseProductEl = requiredElement('#land-use-product', HTMLElement);
+export const landUseColorsToggle = requiredElement(
+  '#toggle-land-use-colors',
+  HTMLInputElement,
+);
+export const landUseZoningToggle = requiredElement(
+  '#toggle-land-use-zoning',
+  HTMLInputElement,
+);
+export const landUseHistoricToggle = requiredElement(
+  '#toggle-land-use-historic',
+  HTMLInputElement,
+);
+export const landUseCategoriesEl = requiredElement('#land-use-categories', HTMLElement);
+export const landUseResetFilterButton = requiredElement(
+  '#land-use-reset-filter',
+  HTMLButtonElement,
+);
+export const landUseParcelCountEl = requiredElement(
+  '#land-use-parcel-count',
+  HTMLElement,
+);
+export const landUseVacantCountEl = requiredElement(
+  '#land-use-vacant-count',
+  HTMLElement,
+);
+export const landUseRedevelopmentCountEl = requiredElement(
+  '#land-use-redevelopment-count',
+  HTMLElement,
+);
+export const landUseSelectionTypeEl = requiredElement(
+  '#land-use-selection-type',
+  HTMLElement,
+);
+export const landUseNameEl = requiredElement('#land-use-name', HTMLElement);
+export const landUseSummaryEl = requiredElement('#land-use-summary', HTMLElement);
+export const landUseMetadataEl = requiredElement('#land-use-metadata', HTMLElement);
 export const timezoneColorsToggle = requiredElement(
   '#toggle-timezone-colors',
   HTMLInputElement,

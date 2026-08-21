@@ -143,7 +143,7 @@ body {
 
 .product-tabs {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   width: 100%;
   margin: 0;
   padding: 3px;
@@ -184,6 +184,10 @@ body {
 
 .timezone-active .product-tabs button[aria-selected='true'] {
   color: #244f8f;
+}
+
+.land-use-active .product-tabs button[aria-selected='true'] {
+  color: #5d397f;
 }
 
 .panel-actions {
@@ -375,6 +379,11 @@ body {
   background: #e5edff;
 }
 
+.land-use-active .section-index {
+  color: #5d397f;
+  background: #eee5f6;
+}
+
 .heading-context {
   display: inline-block;
   margin-left: 4px;
@@ -495,6 +504,149 @@ body {
   border: 1px solid #cdd9ef;
   border-radius: 8px;
   background: #f6f8fd;
+}
+
+.land-use-explainer {
+  padding: 12px;
+  border: 1px solid #d8c9e7;
+  border-radius: 8px;
+  background: #faf7fc;
+}
+
+.land-use-explainer strong {
+  display: block;
+  color: #5d397f;
+  font-size: 0.82rem;
+}
+
+.land-use-explainer p {
+  margin: 6px 0 0;
+  color: var(--muted);
+  font-size: 0.75rem;
+  line-height: 1.45;
+}
+
+.land-use-filter-group {
+  margin: 14px 0 0;
+}
+
+.land-use-filter-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 7px;
+}
+
+.land-use-filter-heading .control-label {
+  margin: 0;
+}
+
+.land-use-filter-heading button {
+  padding: 3px 0;
+  border: 0;
+  color: #5d397f;
+  background: transparent;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.7rem;
+  font-weight: 850;
+}
+
+.land-use-filter-heading button:disabled {
+  color: #9aa1a8;
+  cursor: default;
+}
+
+.land-use-categories {
+  display: grid;
+  gap: 5px;
+}
+
+.land-use-category {
+  appearance: none;
+  display: grid;
+  min-width: 0;
+  min-height: 31px;
+  padding: 6px 8px;
+  grid-template-columns: 11px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  color: var(--ink);
+  background: #ffffff;
+  cursor: pointer;
+  font: inherit;
+  font-size: 0.72rem;
+  text-align: left;
+}
+
+.land-use-category:hover {
+  border-color: #b7a1cb;
+  background: #fcfafd;
+}
+
+.land-use-category:focus-visible,
+.land-use-filter-heading button:focus-visible {
+  outline: 3px solid rgba(118, 81, 168, 0.22);
+  outline-offset: 1px;
+}
+
+.land-use-category[aria-pressed='false'] {
+  color: var(--muted);
+  background: #f3f4f5;
+  opacity: 0.58;
+}
+
+.land-use-swatch {
+  width: 11px;
+  height: 11px;
+  border: 1px solid rgba(24, 34, 44, 0.22);
+  border-radius: 3px;
+  background: var(--land-use-color);
+}
+
+.land-use-category[aria-pressed='false'] .land-use-swatch {
+  filter: grayscale(1);
+}
+
+.land-use-category-label {
+  min-width: 0;
+  font-weight: 760;
+}
+
+.land-use-category-count {
+  color: var(--muted);
+  font-variant-numeric: tabular-nums;
+  font-weight: 800;
+}
+
+.land-use-line-key {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  color: var(--muted);
+  font-size: 0.7rem;
+  font-weight: 750;
+}
+
+.land-use-line-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.land-use-line-key i {
+  display: inline-block;
+  width: 24px;
+  height: 0;
+  border-top: 2px dashed #172f4d;
+}
+
+.land-use-line-key .historic-line {
+  border-top-style: solid;
+  border-top-color: #7651a8;
 }
 
 .timezone-explainer strong {
@@ -1084,6 +1236,10 @@ body {
   accent-color: #3569c8;
 }
 
+.land-use-toggles input {
+  accent-color: #7651a8;
+}
+
 .circumference-metrics .metric {
   border-color: #e4d5ca;
   background: #fffaf5;
@@ -1361,6 +1517,11 @@ body {
   background: #e5edff;
 }
 
+.land-use-active .status {
+  color: #5d397f;
+  background: #eee5f6;
+}
+
 .station-breakdown {
   display: flex;
   flex-wrap: wrap;
@@ -1448,8 +1609,21 @@ body {
   line-height: 1.4;
 }
 
+#land-use-summary {
+  display: block;
+  margin-top: 5px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.4;
+}
+
 .timezone-method-note a {
   color: #244f8f;
+  font-weight: 800;
+}
+
+.land-use-method-note a {
+  color: #5d397f;
   font-weight: 800;
 }
 

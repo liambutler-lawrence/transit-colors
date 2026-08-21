@@ -7,7 +7,9 @@ York City, Singapore, Atlanta, and Athens. It includes:
 - schedule-adjusted travel time to a selected station;
 - a Circumference Lab that finds large closed metro or divided-highway loops and
   measures the land they enclose; and
-- a Clock Skew map comparing official UTC offsets with longitude-based solar time.
+- a Clock Skew map comparing official UTC offsets with longitude-based solar time; and
+- a Jersey City Land Use map combining parcel status, assessed use, zoning,
+  redevelopment plans, building age, and historic districts.
 
 Circumference routes follow averaged centerlines from official GTFS track shapes by
 default where shape data is published, with an option to compare straight
@@ -40,6 +42,12 @@ rotatable globe used by the other map modes. Red locations reach solar noon late
 12:00 civil time; blue locations reach it earlier. Hovering or clicking reports
 longitude, UTC offset, calculated solar-noon time, and the zone's named places.
 
+Land Use colors each Jersey City tax parcel by its present assessment record and mapped
+context—for example vacant land in an industrial zone, active industrial property,
+auto-oriented retail, modern or historic mixed use, and towers without retail. Zoning,
+redevelopment-plan, and historic-district boundaries can be compared independently.
+These categories are transparent visualization heuristics, not legal land-use findings.
+
 The public site is deployed at
 [liambutler-lawrence.github.io/transit-colors](https://liambutler-lawrence.github.io/transit-colors/).
 
@@ -50,8 +58,8 @@ The public site is deployed at
 - Vite
 - MapLibre GL JS globe rendering and PMTiles
 - GeographicLib WGS84 ellipsoidal distance and area calculations
-- OpenFreeMap, OpenStreetMap, timezone-boundary-builder, official GTFS feeds, and
-  Natural Earth data
+- OpenFreeMap, OpenStreetMap, timezone-boundary-builder, Jersey City GIS, official GTFS
+  feeds, and Natural Earth data
 
 The application is entirely static. Runtime data is committed under `data/`; no
 application server or secret is required to view the map.
