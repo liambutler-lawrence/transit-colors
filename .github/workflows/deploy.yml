@@ -39,7 +39,7 @@ jobs:
         run: npm run check
 
       - name: Save checked production build
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: production-build
           path: dist
@@ -61,7 +61,7 @@ jobs:
           node-version-file: .nvmrc
 
       - name: Download checked production build
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: production-build
           path: dist
