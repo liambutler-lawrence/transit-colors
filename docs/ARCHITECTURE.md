@@ -142,3 +142,17 @@ offline.
 
 Downloaded GTFS and Overpass responses are caches, not source artifacts, and are
 excluded from version control and production builds.
+
+## Build and deployment boundary
+
+`vite.config.ts` exports an explicit runtime-data allowlist. The production build copies
+only those browser-facing datasets and the two reviewed basemap styles; source GeoJSON,
+derived analysis tables, and download caches stay outside the artifact. A post-build
+check verifies the allowlist and rejects any individual static file above the hosting
+limit.
+
+GitHub Actions builds and validates the artifact once. The deploy job downloads that
+exact artifact, hashes and uploads each file to Vercel's content-addressed file API, and
+creates a prebuilt Build Output v3 deployment. The deployment entry point rejects local
+runs, pull requests, non-`main` refs, other repositories, missing secrets, and
+credentials that do not match the configured project and team.

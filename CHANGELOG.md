@@ -20,6 +20,10 @@ All notable changes to this project will be documented here. The format follows
 
 ### Changed
 
+- Moved production delivery to a checked, GitHub-Actions-only Vercel deployment for
+  `maps.liambutlerlawrence.com`, with digest-based uploads for large map archives.
+- Restricted production artifacts to reviewed runtime data instead of copying raw data
+  sources and download caches.
 - Migrated browser and algorithm code to strict TypeScript.
 - Added Zod validation at network and renderer boundaries.
 - Added strict, type-aware ESLint and Prettier configuration.

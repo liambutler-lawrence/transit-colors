@@ -1,33 +1,49 @@
 # Deployment
 
-GitHub Pages is the production host. Every push to `main` runs
-`.github/workflows/deploy-pages.yml`, validates the repository, builds `dist/`, uploads
-the Pages artifact, and creates a protected `github-pages` deployment.
+Vercel is the production host for
+[`maps.liambutlerlawrence.com`](https://maps.liambutlerlawrence.com). GitHub Actions is
+the sole deployment path. Pull requests run the same checks and create the same static
+artifact, but only a push to `main` or an intentional manual run from `main` can deploy.
+Automatic Vercel Git deployments remain disabled.
+
+## Artifact boundary
+
+`npm run check` performs formatting, lint, strict type, test, build, and artifact
+checks. The Vite build copies only the reviewed browser-facing files in
+`RUNTIME_DATA_FILES`. Raw CDMX GeoJSON, derived scoring tables, GTFS downloads, Overpass
+responses, and OSM highway caches never enter `dist/`.
+
+The map archive is too large for the reference landing page's inline deployment payload.
+`scripts/deploy.mjs` therefore hashes each checked artifact file, uploads it through
+Vercel's file API, and creates a prebuilt Build Output v3 deployment using those exact
+digests. The script never rebuilds inside the deploy job.
 
 ## Repository configuration
 
-In GitHub:
+The repository requires three project-specific encrypted Actions secrets:
 
-1. Open **Settings → Pages**.
-2. Set **Source** to **GitHub Actions**.
-3. Keep the `github-pages` environment protection rules enabled if approvals are
-   required.
+- `VERCEL_TOKEN`: a time-limited Vercel token restricted to the Transit Colors project;
+- `VERCEL_ORG_ID`: the ID of the Vercel account or team that owns the project; and
+- `VERCEL_PROJECT_ID`: the Transit Colors project ID.
 
-No deployment secret is required. The workflow receives short-lived Pages and OIDC
-permissions only in the deployment job.
+Do not reuse a token from another site. The deployment script verifies its repository,
+branch, event, project, and team before uploading anything. It refuses local execution,
+pull-request deployment, and deployment from another repository or branch.
+
+The Vercel project must have `maps.liambutlerlawrence.com` assigned as a production
+domain. At the external DNS provider, `maps` must be a CNAME to the exact
+project-specific target Vercel reports after domain assignment. Do not substitute a
+generic target when Vercel provides a tailored one.
 
 ## Release procedure
 
 1. Merge a reviewed pull request into `main`.
-2. Confirm the **CI** workflow succeeds.
-3. Confirm the **Deploy GitHub Pages** workflow succeeds.
-4. Open the deployment URL and test both products. Confirm the sidebar reads in product,
-   mode, results, and selected-item order; each circumference result card focuses its
-   city without hiding any network; map clicks work in every city; and moving the
-   heatmap to a supported metro activates its local results without recentering.
+2. Confirm the **Deploy to Vercel / check** job succeeds.
+3. Confirm the deploy job uploads the checked artifact and reaches `READY`.
+4. Open the custom domain and verify HTTPS, PMTiles range requests, and all deep links:
+   Transit access, travel time, Circumference Lab, Clock Skew, and Jersey City Land Use.
 
-The Vite `base` is relative, so the same artifact works at the project Pages path and in
-local preview.
+No production deployment should run from a developer's computer.
 
 ## Manual validation
 
@@ -39,13 +55,14 @@ npm run check
 npm run preview
 ```
 
-`npm run check` creates the same `dist/` directory uploaded by the deployment workflow.
+`npm run check` creates and verifies the same `dist/` directory saved by GitHub Actions.
 
 ## Rollback
 
-Revert the faulty commit on `main` through a pull request. The resulting push builds and
-deploys the prior source state as a new Pages deployment. GitHub also retains deployment
-history in **Actions → Deploy GitHub Pages** for diagnosis.
+Revert the faulty commit on `main` through a pull request. The resulting Actions run
+builds, checks, and deploys the prior source state as a new immutable Vercel deployment.
+Vercel retains deployment history for emergency rollback, but routine releases must
+remain traceable to a checked `main` commit.
 
 Do not manually edit generated files in `dist/`; the directory is ignored and replaced
 on every build.

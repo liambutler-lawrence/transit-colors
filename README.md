@@ -49,7 +49,7 @@ redevelopment-plan, and historic-district boundaries can be compared independent
 These categories are transparent visualization heuristics, not legal land-use findings.
 
 The public site is deployed at
-[liambutler-lawrence.github.io/transit-colors](https://liambutler-lawrence.github.io/transit-colors/).
+[maps.liambutlerlawrence.com](https://maps.liambutlerlawrence.com/).
 
 ## Technology
 
@@ -83,6 +83,10 @@ npm run check
 ```
 
 This verifies formatting, lint rules, strict types, tests, and the production build.
+
+Production deployment runs only in GitHub Actions from `main`. The workflow saves the
+exact checked artifact, then uploads its files by digest to the project-scoped Vercel
+deployment API. Local computers cannot run the production deploy script.
 
 ## Documentation
 
