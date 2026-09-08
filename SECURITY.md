@@ -21,3 +21,8 @@ including exploit details.
 
 Never include tokens, private feed URLs, personal data, or credentials in a report, test
 fixture, issue, or pull request.
+
+Production deployment credentials belong only in encrypted GitHub Actions secrets. Use a
+separate, time-limited Vercel credential restricted to this project; never share one
+site's deployment token with another project or run production deployment from a local
+computer.

@@ -1,4 +1,5 @@
 dist/
+.vercel/
 AGENTS.md
 node_modules/
 data/
