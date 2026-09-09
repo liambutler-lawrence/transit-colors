@@ -2,9 +2,16 @@ import maplibregl, {
   type ExpressionSpecification,
   type GeoJSONSource,
   type ImageSource,
+  type LineLayerSpecification,
 } from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 import { Protocol } from 'pmtiles';
+import { createTransitRoadTiles } from '../transit-road-tiles.js';
+
+export const transitRoadTiles = createTransitRoadTiles();
+maplibregl.addProtocol('transit-roads', transitRoadTiles.load);
+export const heatmapRoadLayers = new Map<string, LineLayerSpecification>();
+export const roadTileTemplates: string[] = [];
 
 import { CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE } from '../circumference-map.js';
 import {
@@ -34,7 +41,7 @@ export const AREAS: Record<AreaKey, AreaConfig> = {
     center: [-99.1332, 19.4326],
     zoom: 10.5,
     circumference: 'data/cdmx-circumference.json?v=20260728d',
-    streetTiles: 'data/cdmx-streets.pmtiles?v=20260725h',
+    liveRoads: true,
     stations: 'data/cdmx-stations.geojson?v=20260725h',
     metadata: 'data/cdmx-metadata.json?v=20260725h',
     schedules: 'data/cdmx-schedules.json?v=20260725h',
@@ -572,10 +579,6 @@ export const runtime: AppRuntime = {
   },
   futureStreetAccessStationIds: [],
   initialLoadComplete: false,
-  liveStreetRefreshInFlight: false,
-  liveStreetRefreshPending: false,
-  liveStreetRefreshSequence: 0,
-  liveStreetRefreshTimer: undefined,
   loadingCanFinish: false,
   loadingOperation: initialLoadingOperation,
   loadedStations: {
@@ -642,17 +645,6 @@ export let circumferenceState = circumferenceStates[initialAreaKey];
 export function setActiveCircumferenceState(areaKey: AreaKey): void {
   circumferenceState = circumferenceStates[areaKey];
 }
-
-export const LIVE_ROAD_CLASSES = new Set([
-  'motorway',
-  'trunk',
-  'primary',
-  'secondary',
-  'tertiary',
-  'minor',
-  'service',
-  'track',
-]);
 
 export const stationColor = expressionSpecificationSchema.parse([
   'match',

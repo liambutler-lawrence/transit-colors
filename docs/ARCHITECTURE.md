@@ -124,9 +124,16 @@ without moving the camera, so ordinary map navigation replaces the old city mode
 
 ## Static data
 
-Small GeoJSON and JSON datasets are read directly. CDMX streets are distributed as
-PMTiles so the browser requests only visible ranges. Roads for the other four areas are
-derived from visible OpenFreeMap road features at runtime.
+Small GeoJSON and JSON datasets are read directly. All five heatmaps use the basemap's
+OpenFreeMap vector tiles. `src/transit-road-tiles.ts` splits transportation lines at
+shared junctions and into short scoring segments inside those tiles, preserving their
+original road properties and all non-road layers. Each tile receives transit access
+scores before MapLibre renders it. Heatmap mode changes only the native road layers'
+colors, including casings and pedestrian streets; their geometry, zoom limits, filters,
+widths, opacity and draw order remain shared with the ordinary map. Station-filter or
+city changes version the tile URLs and cancel stale requests. Camera movement uses
+MapLibre's native tile loading without a separate street overlay or idle-time refresh.
+The historical CDMX street PMTiles archive remains available for offline data workflows.
 
 The clock-skew dataset is committed as land-clipped MultiPolygons. The browser uses a
 projection-aware custom WebGL fill rather than precomputed color bands, allowing the

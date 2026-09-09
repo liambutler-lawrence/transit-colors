@@ -4,6 +4,8 @@ import type {
   LngLatBoundsLike,
 } from 'maplibre-gl';
 
+import { isHeatmapRoadLayer, ROAD_SOURCE } from '../transit-road-tiles.js';
+
 import { bestStreetTravelTime, distanceMeters, timeScaleStops } from '../routing.js';
 import type { AccessCandidate, AccessTravel } from '../routing/types.js';
 import {
@@ -76,6 +78,9 @@ import {
   futureStationLayers,
   futureStationModes,
   futureStationToggle,
+  heatmapRoadLayers,
+  roadTileTemplates,
+  transitRoadTiles,
   isMode,
   legendEl,
   legendLabelsEl,
@@ -327,25 +332,22 @@ export function activeStationCollection(): StationCollection {
   };
 }
 
-export function activeStreetLayerId(): string {
-  return AREAS[runtime.activeAreaKey].liveRoads
-    ? 'live-street-proximity'
-    : 'street-proximity';
-}
-
 export function activeStreetSourceId(): string {
-  return AREAS[runtime.activeAreaKey].liveRoads ? 'live-streets' : 'streets';
+  return ROAD_SOURCE;
 }
 
 export function syncStreetColor(): void {
-  const layerId = activeStreetLayerId();
-  if (map.getLayer(layerId)) {
+  const enabled = runtime.activeProduct === 'access' && streetToggle.checked;
+  const color =
+    state.destination && state.transitTimes
+      ? timeStreetColor(activeAccessTransitTimes(), state.timeScaleMinutes)
+      : streetColorExpression();
+  for (const layer of heatmapRoadLayers.values()) {
+    if (!map.getLayer(layer.id)) continue;
     map.setPaintProperty(
-      layerId,
+      layer.id,
       'line-color',
-      state.destination && state.transitTimes
-        ? timeStreetColor(activeAccessTransitTimes(), state.timeScaleMinutes)
-        : streetColorExpression(),
+      enabled ? color : layer.paint?.['line-color'],
     );
   }
 }
@@ -437,11 +439,12 @@ export function selectedStreetTravelTime(
 }
 
 export function visibleTiledStreets(): StreetProperties[] {
-  const layerId = activeStreetLayerId();
+  const layers = [...heatmapRoadLayers.keys()];
   const sourceId = activeStreetSourceId();
   if (
+    runtime.activeProduct !== 'access' ||
     !streetToggle.checked ||
-    !map.getLayer(layerId) ||
+    !layers.length ||
     !map.getSource(sourceId) ||
     !map.isSourceLoaded(sourceId)
   ) {
@@ -449,7 +452,7 @@ export function visibleTiledStreets(): StreetProperties[] {
   }
 
   const byId = new Map<string | number, StreetProperties>();
-  for (const feature of map.queryRenderedFeatures({ layers: [layerId] })) {
+  for (const feature of map.queryRenderedFeatures({ layers })) {
     const properties = streetPropertiesSchema.safeParse(feature.properties);
     if (!properties.success) continue;
     const propertyId = properties.data['i'];
@@ -515,15 +518,7 @@ export function updateViewportStatistics(
 }
 
 export function syncStreetVisibility(): void {
-  const visible = runtime.activeProduct === 'access' && streetToggle.checked;
-  setLayerVisibility(
-    'street-proximity',
-    visible && !AREAS[runtime.activeAreaKey].liveRoads,
-  );
-  setLayerVisibility(
-    'live-street-proximity',
-    visible && Boolean(AREAS[runtime.activeAreaKey].liveRoads),
-  );
+  syncStreetColor();
 }
 
 export function beginLoading(label: string, type: LoadingOperation['type']): void {
@@ -579,7 +574,17 @@ export function installBasemap(): void {
     for (const [sourceId, source] of Object.entries(
       runtime.pendingBasemapStyle.sources ?? {},
     )) {
-      if (!map.getSource(sourceId)) map.addSource(sourceId, source);
+      if (map.getSource(sourceId)) continue;
+      if (sourceId === ROAD_SOURCE && source.type === 'vector' && source.tiles) {
+        roadTileTemplates.splice(0, roadTileTemplates.length, ...source.tiles);
+        transitRoadTiles.setStations(activeStationCollection().features);
+        map.addSource(sourceId, {
+          ...source,
+          tiles: transitRoadTiles.urls(source.tiles),
+        });
+      } else {
+        map.addSource(sourceId, source);
+      }
     }
 
     for (const layer of runtime.pendingBasemapStyle.layers ?? []) {
@@ -589,9 +594,11 @@ export function installBasemap(): void {
             ? map.getLayer('station-points-open')
               ? 'station-points-open'
               : undefined
-            : map.getLayer('street-proximity')
-              ? 'street-proximity'
+            : map.getLayer('circumference-gradient-cdmx')
+              ? 'circumference-gradient-cdmx'
               : undefined;
+        if (isHeatmapRoadLayer(layer))
+          heatmapRoadLayers.set(layer.id, structuredClone(layer));
         map.addLayer(layer, beforeLayer);
       }
     }
