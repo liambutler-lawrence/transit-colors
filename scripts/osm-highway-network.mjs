@@ -12,11 +12,7 @@ const MAX_DIRECT_CONNECTOR_METERS = 25_000;
 const MAX_RECIPROCAL_ENDPOINT_GAP_METERS = 2_500;
 const MAX_RAMP_CORRESPONDENCE_SAMPLES = 240;
 const RAMP_CORRESPONDENCE_SPACING_METERS = 25;
-const RAMP_TERMINAL_HOOK_WINDOW_METERS = 75;
-const MAX_RAMP_TERMINAL_TURN_DEGREES = 32;
-const MAX_RAMP_TERMINAL_HOOK_VERTICES_PER_END = 2;
-const RAMP_CENTERLINE_SMOOTHING_PASSES = 5;
-const MAX_RAMP_CENTERLINE_SMOOTHING_OFFSET_METERS = 8;
+const MIN_PAIRED_TANGENT_ALIGNMENT = 0.62;
 
 function decodeOplString(value) {
   return value.replace(/%([0-9a-fA-F]{2})/g, (_, hexadecimal) =>
@@ -351,7 +347,11 @@ function nearestOpposingSample(sample, chain, grid, chainById) {
     for (let y = cellY - 2; y <= cellY + 2; y += 1) {
       for (const candidate of grid.get(`${x},${y}`) ?? []) {
         if (candidate.chainId === chain.id) continue;
-        if (dot(sample.direction, candidate.direction) > -0.62) continue;
+        if (
+          dot(sample.direction, candidate.direction) > -MIN_PAIRED_TANGENT_ALIGNMENT
+        ) {
+          continue;
+        }
         const segmentKey = `${candidate.chainId}:${candidate.sourceSegmentIndex}`;
         if (visitedSegments.has(segmentKey)) continue;
         visitedSegments.add(segmentKey);
@@ -937,44 +937,6 @@ function directedConnectorPaths(component, graph, attachments, osm) {
   return paths;
 }
 
-function attachmentAtPartDistance(part, partIndex, distanceAlongPartMeters) {
-  const targetDistance = Math.max(
-    0,
-    Math.min(lineLengthMeters(part.coordinates), distanceAlongPartMeters),
-  );
-  let traversedMeters = 0;
-  for (
-    let segmentIndex = 0;
-    segmentIndex < part.coordinates.length - 1;
-    segmentIndex += 1
-  ) {
-    const start = part.coordinates[segmentIndex];
-    const end = part.coordinates[segmentIndex + 1];
-    const segmentLengthMeters = geodesicDistanceMeters(start, end);
-    if (
-      traversedMeters + segmentLengthMeters >= targetDistance ||
-      segmentIndex === part.coordinates.length - 2
-    ) {
-      const distanceAlongMeters = targetDistance - traversedMeters;
-      const fraction =
-        segmentLengthMeters === 0 ? 0 : distanceAlongMeters / segmentLengthMeters;
-      return {
-        coordinate: [
-          Number((start[0] + (end[0] - start[0]) * fraction).toFixed(7)),
-          Number((start[1] + (end[1] - start[1]) * fraction).toFixed(7)),
-        ],
-        distanceAlongMeters,
-        distanceAlongPartMeters: targetDistance,
-        distanceMeters: 0,
-        partIndex,
-        segmentIndex,
-      };
-    }
-    traversedMeters += segmentLengthMeters;
-  }
-  throw new Error(`Highway part ${part.id} has no segment for a ramp attachment.`);
-}
-
 function rampCurveSamples(coordinates) {
   const lengthMeters = lineLengthMeters(coordinates);
   const sampleCount = Math.max(
@@ -990,260 +952,52 @@ function rampCurveSamples(coordinates) {
   );
 }
 
-function localMeters(coordinate, origin) {
-  const latitudeRadians = (origin[1] * Math.PI) / 180;
-  return [
-    (coordinate[0] - origin[0]) * 111_320 * Math.cos(latitudeRadians),
-    (coordinate[1] - origin[1]) * 110_574,
-  ];
-}
-
-function coordinateFromLocalMeters(coordinate, origin) {
-  const latitudeRadians = (origin[1] * Math.PI) / 180;
-  return [
-    Number(
-      (origin[0] + coordinate[0] / (111_320 * Math.cos(latitudeRadians))).toFixed(7),
-    ),
-    Number((origin[1] + coordinate[1] / 110_574).toFixed(7)),
-  ];
-}
-
-function alignedRampSamples(samples, commonStart, commonEnd, origin) {
-  const originalStart = localMeters(samples[0].coordinate, origin);
-  const originalEnd = localMeters(samples.at(-1).coordinate, origin);
-  const targetStart = localMeters(commonStart, origin);
-  const targetEnd = localMeters(commonEnd, origin);
-  const totalDistanceMeters = samples.at(-1).distanceMeters;
-  return samples.map((sample) => {
-    const progress =
-      totalDistanceMeters === 0 ? 0 : sample.distanceMeters / totalDistanceMeters;
-    const coordinate = localMeters(sample.coordinate, origin);
-    return {
-      ...sample,
-      // Align endpoints only for the correspondence search. The final
-      // centerline still uses geodesic midpoints of the unmodified paths.
-      aligned: [
-        coordinate[0] +
-          (targetStart[0] - originalStart[0]) * (1 - progress) +
-          (targetEnd[0] - originalEnd[0]) * progress,
-        coordinate[1] +
-          (targetStart[1] - originalStart[1]) * (1 - progress) +
-          (targetEnd[1] - originalEnd[1]) * progress,
-      ],
-      progress,
-    };
-  });
-}
-
-function correspondenceCost(first, second, chordLengthSquared) {
-  const distanceSquared =
-    (first.aligned[0] - second.aligned[0]) ** 2 +
-    (first.aligned[1] - second.aligned[1]) ** 2;
-  const progressPenalty =
-    (first.progress - second.progress) ** 2 *
-    Math.min(250_000, chordLengthSquared * 0.02);
-  const tangentPenalty = (1 - dot(first.direction, second.direction)) * 225;
-  return distanceSquared + progressPenalty + tangentPenalty;
-}
-
-function monotoneCurveCorrespondence(firstSamples, secondSamples) {
-  const firstCount = firstSamples.length;
-  const secondCount = secondSamples.length;
-  const previous = new Float64Array(secondCount).fill(Infinity);
-  const current = new Float64Array(secondCount).fill(Infinity);
-  const predecessors = new Uint8Array(firstCount * secondCount);
-  const chordLengthSquared =
-    (firstSamples.at(-1).aligned[0] - firstSamples[0].aligned[0]) ** 2 +
-    (firstSamples.at(-1).aligned[1] - firstSamples[0].aligned[1]) ** 2;
-  // Dynamic time warping gives every point an order-preserving partner. A
-  // loop can therefore consume more samples than a direct ramp without being
-  // forced to match the same normalized-distance position.
-  for (let firstIndex = 0; firstIndex < firstCount; firstIndex += 1) {
-    current.fill(Infinity);
-    for (let secondIndex = 0; secondIndex < secondCount; secondIndex += 1) {
-      const cost = correspondenceCost(
-        firstSamples[firstIndex],
-        secondSamples[secondIndex],
-        chordLengthSquared,
-      );
-      if (firstIndex === 0 && secondIndex === 0) {
-        current[secondIndex] = cost;
-        continue;
-      }
-      const diagonal =
-        firstIndex > 0 && secondIndex > 0 ? previous[secondIndex - 1] : Infinity;
-      const advanceFirst =
-        firstIndex > 0
-          ? previous[secondIndex] + RAMP_CORRESPONDENCE_SPACING_METERS ** 2
-          : Infinity;
-      const advanceSecond =
-        secondIndex > 0
-          ? current[secondIndex - 1] + RAMP_CORRESPONDENCE_SPACING_METERS ** 2
-          : Infinity;
-      const best = Math.min(diagonal, advanceFirst, advanceSecond);
-      current[secondIndex] = best + cost;
-      predecessors[firstIndex * secondCount + secondIndex] =
-        best === diagonal ? 1 : best === advanceFirst ? 2 : 3;
-    }
-    previous.set(current);
-  }
-
-  const correspondence = [];
-  let firstIndex = firstCount - 1;
-  let secondIndex = secondCount - 1;
-  while (firstIndex > 0 || secondIndex > 0) {
-    correspondence.push([firstIndex, secondIndex]);
-    const predecessor = predecessors[firstIndex * secondCount + secondIndex];
-    if (predecessor === 1) {
-      firstIndex -= 1;
-      secondIndex -= 1;
-    } else if (predecessor === 2) {
-      firstIndex -= 1;
-    } else {
-      secondIndex -= 1;
-    }
-  }
-  correspondence.push([0, 0]);
-  return correspondence.reverse();
-}
-
-function turnDegrees(first, middle, last) {
-  const incoming = vector(first, middle);
-  const outgoing = vector(middle, last);
-  return (
-    (Math.acos(Math.max(-1, Math.min(1, dot(incoming, outgoing)))) * 180) / Math.PI
-  );
-}
-
 /**
- * Removes only sharp terminal vertices created by a repeated dynamic-time-
- * warping match. Real reciprocal paths diverge and merge tangentially; a
- * 32° kink within 75 m of the shared mainline attachment is correspondence
- * noise, not physical ramp geometry. Endpoints remain exact graph junctions.
+ * Project onto the nearest segment with a matching travel tangent, exactly as
+ * opposing mainline samples are paired. Both inputs run in the same direction.
+ * No endpoint warping, normalized-distance matching, or post-average smoothing
+ * may move these midpoints away from the source carriageways.
  */
-export function removeRampTerminalHooks(coordinates) {
-  const smoothed = [...coordinates];
-  for (const fromStart of [true, false]) {
-    for (
-      let removal = 0;
-      removal < MAX_RAMP_TERMINAL_HOOK_VERTICES_PER_END;
-      removal += 1
-    ) {
-      let distanceFromEndpointMeters = 0;
-      let sharpest = null;
-      for (let offset = 1; offset < smoothed.length - 1; offset += 1) {
-        const index = fromStart ? offset : smoothed.length - 1 - offset;
-        const endpointNeighborIndex = fromStart ? index - 1 : index + 1;
-        distanceFromEndpointMeters += geodesicDistanceMeters(
-          smoothed[endpointNeighborIndex],
-          smoothed[index],
-        );
-        if (distanceFromEndpointMeters > RAMP_TERMINAL_HOOK_WINDOW_METERS) break;
-        const turn = turnDegrees(
-          smoothed[index - 1],
-          smoothed[index],
-          smoothed[index + 1],
-        );
-        if (!sharpest || turn > sharpest.turn) {
-          sharpest = { index, turn };
-        }
-      }
-      if (!sharpest || sharpest.turn <= MAX_RAMP_TERMINAL_TURN_DEGREES) {
-        break;
-      }
-      smoothed.splice(sharpest.index, 1);
-    }
-  }
-  return smoothed;
-}
-
-/**
- * Suppresses the alternating midpoint jitter left by many-to-one dynamic-time-
- * warping matches. Repeated [1, 2, 1] filtering is a compact Gaussian
- * low-pass: it rounds only high-frequency movement while preserving the
- * averaged curve's overall form. Every vertex remains within eight meters of
- * its unsmoothed position, and the exact graph-junction endpoints are fixed.
- */
-export function smoothRampCenterline(coordinates) {
-  if (coordinates.length < 4) return coordinates;
-  const origin = midpoint(coordinates[0], coordinates.at(-1));
-  const original = coordinates.map((coordinate) => localMeters(coordinate, origin));
-  let smoothed = original.map((coordinate) => [...coordinate]);
-  for (let pass = 0; pass < RAMP_CENTERLINE_SMOOTHING_PASSES; pass += 1) {
-    smoothed = smoothed.map((coordinate, index) => {
-      if (index === 0 || index === smoothed.length - 1) {
-        return [...original[index]];
-      }
-      return [
-        (smoothed[index - 1][0] + 2 * coordinate[0] + smoothed[index + 1][0]) / 4,
-        (smoothed[index - 1][1] + 2 * coordinate[1] + smoothed[index + 1][1]) / 4,
-      ];
-    });
-  }
-  const bounded = smoothed.map((coordinate, index) => {
-    if (index === 0 || index === smoothed.length - 1) {
-      return [...original[index]];
-    }
-    const longitudeOffset = coordinate[0] - original[index][0];
-    const latitudeOffset = coordinate[1] - original[index][1];
-    const offsetMeters = Math.hypot(longitudeOffset, latitudeOffset);
-    const scale =
-      offsetMeters > MAX_RAMP_CENTERLINE_SMOOTHING_OFFSET_METERS
-        ? MAX_RAMP_CENTERLINE_SMOOTHING_OFFSET_METERS / offsetMeters
-        : 1;
-    return [
-      original[index][0] + longitudeOffset * scale,
-      original[index][1] + latitudeOffset * scale,
-    ];
-  });
-  const result = bounded.map((coordinate) =>
-    coordinateFromLocalMeters(coordinate, origin),
-  );
-  result[0] = coordinates[0];
-  result[result.length - 1] = coordinates.at(-1);
-  return result;
-}
-
 export function averageReciprocalPathCoordinates(
   firstCoordinates,
   secondCoordinates,
   startCoordinate,
   endCoordinate,
 ) {
-  const firstRawSamples = rampCurveSamples(firstCoordinates);
-  const secondRawSamples = rampCurveSamples(secondCoordinates);
-  const origin = midpoint(startCoordinate, endCoordinate);
-  const firstSamples = alignedRampSamples(
-    firstRawSamples,
-    startCoordinate,
-    endCoordinate,
-    origin,
-  );
-  const secondSamples = alignedRampSamples(
-    secondRawSamples,
-    startCoordinate,
-    endCoordinate,
-    origin,
-  );
-  const coordinates = monotoneCurveCorrespondence(firstSamples, secondSamples).map(
-    ([firstIndex, secondIndex]) =>
-      midpoint(
-        firstRawSamples[firstIndex].coordinate,
-        secondRawSamples[secondIndex].coordinate,
-      ),
-  );
-  coordinates[0] = startCoordinate;
-  coordinates[coordinates.length - 1] = endCoordinate;
-  const deduplicated = coordinates.filter(
-    (coordinate, index) =>
-      index === 0 || geodesicDistanceMeters(coordinates[index - 1], coordinate) > 0.25,
-  );
-  const withoutTerminalHooks = removeRampTerminalHooks(deduplicated);
-  const smoothed = smoothRampCenterline(withoutTerminalHooks);
-  if (lineLengthMeters(smoothed) >= 5) return smoothed;
-  return lineLengthMeters(withoutTerminalHooks) >= 5
-    ? withoutTerminalHooks
-    : deduplicated;
+  const [reference, opposite] =
+    lineLengthMeters(firstCoordinates) <= lineLengthMeters(secondCoordinates)
+      ? [firstCoordinates, secondCoordinates]
+      : [secondCoordinates, firstCoordinates];
+  const segments = opposite.slice(1).map((end, index) => ({
+    start: opposite[index],
+    end,
+    direction: vector(opposite[index], end),
+  }));
+  const coordinates = [startCoordinate];
+  for (const sample of rampCurveSamples(reference).slice(1, -1)) {
+    let best = null;
+    for (const segment of segments) {
+      if (dot(sample.direction, segment.direction) < MIN_PAIRED_TANGENT_ALIGNMENT) {
+        continue;
+      }
+      const projected = projectCoordinateOntoSegment(
+        sample.coordinate,
+        segment.start,
+        segment.end,
+      );
+      const distanceMeters = geodesicDistanceMeters(sample.coordinate, projected);
+      if (!best || distanceMeters < best.distanceMeters) {
+        best = { coordinate: projected, distanceMeters };
+      }
+    }
+    if (!best) continue;
+    const coordinate = midpoint(sample.coordinate, best.coordinate);
+    if (geodesicDistanceMeters(coordinates.at(-1), coordinate) > 0.25) {
+      coordinates.push(coordinate);
+    }
+  }
+  coordinates.push(endCoordinate);
+  return coordinates;
 }
 
 function travelDirectionAtNode(coordinates, nodeIndex) {
@@ -1393,54 +1147,116 @@ function reciprocalPathPairs(paths, groupByPartIndex) {
   return { pairs, unpairedPathCount: paths.length - used.size };
 }
 
-function attachmentForCoordinateOnPart(part, partIndex, coordinate) {
-  let best = null;
-  let startDistanceMeters = 0;
-  for (
-    let segmentIndex = 0;
-    segmentIndex < part.coordinates.length - 1;
-    segmentIndex += 1
-  ) {
-    const start = part.coordinates[segmentIndex];
-    const end = part.coordinates[segmentIndex + 1];
-    const projected = projectCoordinateOntoSegment(coordinate, start, end).map(
-      (value) => Number(value.toFixed(7)),
-    );
-    const distanceMeters = geodesicDistanceMeters(coordinate, projected);
-    const distanceAlongMeters = geodesicDistanceMeters(start, projected);
-    if (!best || distanceMeters < best.distanceMeters) {
-      best = {
-        coordinate: projected,
-        distanceAlongMeters,
-        distanceAlongPartMeters: startDistanceMeters + distanceAlongMeters,
-        distanceMeters,
-        partIndex,
-        segmentIndex,
-      };
-    }
-    startDistanceMeters += geodesicDistanceMeters(start, end);
-  }
-  return best;
+function outerReciprocalAttachment(first, second, parts, atStart) {
+  // In the forward path's travel direction, start at the earlier split and end
+  // at the later merge. The shorter ramp is extended along its own carriageway.
+  const part = parts[first.partIndex];
+  const partDirection = vector(
+    part.coordinates[first.segmentIndex],
+    part.coordinates[first.segmentIndex + 1],
+  );
+  const direction = first.travelDirections?.[0] ?? partDirection;
+  const alongTravel =
+    first.partIndex === second.partIndex
+      ? (second.distanceAlongPartMeters - first.distanceAlongPartMeters) *
+        dot(partDirection, direction)
+      : dot(vector(first.coordinate, second.coordinate), direction);
+  return alongTravel >= 0 === atStart ? first : second;
 }
 
-function averageReciprocalAttachment(first, second, parts) {
-  if (first.partIndex === second.partIndex) {
-    return attachmentAtPartDistance(
-      parts[first.partIndex],
-      first.partIndex,
-      (first.distanceAlongPartMeters + second.distanceAlongPartMeters) / 2,
-    );
+function mainlineContinuationGraph(osm, ways) {
+  const forward = new Map();
+  const backward = new Map();
+  for (const way of ways) {
+    for (let index = 1; index < way.nodeIds.length; index += 1) {
+      const from = way.nodeIds[index - 1];
+      const to = way.nodeIds[index];
+      const start = osm.nodes.get(from).coordinate;
+      const end = osm.nodes.get(to).coordinate;
+      for (const [graph, nodeId, nextNodeId, first, last] of [
+        [forward, from, to, start, end],
+        [backward, to, from, end, start],
+      ]) {
+        const entries = graph.get(nodeId) ?? [];
+        entries.push({
+          nextNodeId,
+          coordinate: last,
+          direction: vector(first, last),
+          wayId: way.id,
+        });
+        graph.set(nodeId, entries);
+      }
+    }
   }
-  const averageCoordinate = midpoint(first.coordinate, second.coordinate);
-  return [first.partIndex, second.partIndex]
-    .map((partIndex) =>
-      attachmentForCoordinateOnPart(parts[partIndex], partIndex, averageCoordinate),
-    )
-    .sort(
-      (firstCandidate, secondCandidate) =>
-        firstCandidate.distanceMeters - secondCandidate.distanceMeters ||
-        firstCandidate.partIndex - secondCandidate.partIndex,
-    )[0];
+  return { forward, backward };
+}
+
+function mainlineExtension(osm, graph, attachment, target, part, backwards) {
+  const origin = osm.nodes.get(attachment.nodeId).coordinate;
+  const maximumDistance = geodesicDistanceMeters(origin, target) * 2 + 250;
+  const eligibleWays = new Set(part.sourceWayIds);
+  let nodeId = attachment.nodeId;
+  let coordinate = origin;
+  let direction = attachment.travelDirections?.[0];
+  if (direction && backwards) direction = direction.map((value) => -value);
+  const visited = new Set([nodeId]);
+  const coordinates = [origin];
+  let best = {
+    distance: geodesicDistanceMeters(origin, target),
+    coordinates: [origin],
+  };
+  let traversed = 0;
+  while (traversed < maximumDistance) {
+    const candidates = (graph.get(nodeId) ?? [])
+      .filter((edge) => !visited.has(edge.nextNodeId))
+      .map((edge) => ({
+        ...edge,
+        alignment: direction ? dot(direction, edge.direction) : 1,
+      }))
+      .filter((edge) => edge.alignment > 0.25)
+      .sort(
+        (first, second) =>
+          (Number(eligibleWays.has(second.wayId)) -
+            Number(eligibleWays.has(first.wayId))) *
+            2 +
+          second.alignment -
+          first.alignment,
+      );
+    const next = candidates[0];
+    if (!next) break;
+    const projected = projectCoordinateOntoSegment(target, coordinate, next.coordinate);
+    const distance = geodesicDistanceMeters(projected, target);
+    if (distance < best.distance) {
+      best = { distance, coordinates: [...coordinates, projected] };
+    }
+    traversed += geodesicDistanceMeters(coordinate, next.coordinate);
+    coordinate = next.coordinate;
+    nodeId = next.nextNodeId;
+    direction = next.direction;
+    coordinates.push(coordinate);
+    visited.add(nodeId);
+  }
+  return best.coordinates;
+}
+
+function extendReciprocalPath(osm, path, start, end, parts, graph) {
+  const before = mainlineExtension(
+    osm,
+    graph.backward,
+    path.firstAttachment,
+    start,
+    parts[path.firstAttachment.partIndex],
+    true,
+  );
+  const after = mainlineExtension(
+    osm,
+    graph.forward,
+    path.secondAttachment,
+    end,
+    parts[path.secondAttachment.partIndex],
+    false,
+  );
+  return [...before.reverse().slice(0, -1), ...path.coordinates, ...after.slice(1)];
 }
 
 function topologyCoordinate(part, coordinate, key) {
@@ -1952,6 +1768,7 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
   const partSegmentGrid = buildPartSegmentGrid(parts);
   const sourceWayIdToPartIndices = indexPartsBySourceWay(parts);
   const graph = connectorSegmentGraph(connectorWays);
+  const continuationGraph = mainlineContinuationGraph(osm, mainlineWays);
   const mainlinePartIndicesByNode = new Map();
   const mainlineDirectionsByNodeAndPart = new Map();
   for (const way of mainlineWays) {
@@ -2014,8 +1831,6 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
       const coordinates = path.nodeIds.map(
         (nodeId) => osm.nodes.get(nodeId).coordinate,
       );
-      coordinates[0] = path.firstAttachment.coordinate;
-      coordinates[coordinates.length - 1] = path.secondAttachment.coordinate;
       return lineLengthMeters(coordinates) < 5
         ? []
         : [
@@ -2034,21 +1849,37 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
   }
   const paired = reciprocalPathPairs(allDirectedPaths, mainlineGroupByPartIndex(parts));
   for (const [forward, reverse] of paired.pairs) {
-    const startAttachment = averageReciprocalAttachment(
+    const startAttachment = outerReciprocalAttachment(
       forward.firstAttachment,
       reverse.secondAttachment,
       parts,
+      true,
     );
-    const endAttachment = averageReciprocalAttachment(
+    const endAttachment = outerReciprocalAttachment(
       forward.secondAttachment,
       reverse.firstAttachment,
       parts,
+      false,
     );
     const startPartIndex = startAttachment.partIndex;
     const endPartIndex = endAttachment.partIndex;
     const coordinates = averageReciprocalPathCoordinates(
-      forward.coordinates,
-      [...reverse.coordinates].reverse(),
+      extendReciprocalPath(
+        osm,
+        forward,
+        startAttachment.coordinate,
+        endAttachment.coordinate,
+        parts,
+        continuationGraph,
+      ),
+      extendReciprocalPath(
+        osm,
+        reverse,
+        endAttachment.coordinate,
+        startAttachment.coordinate,
+        parts,
+        continuationGraph,
+      ).reverse(),
       startAttachment.coordinate,
       endAttachment.coordinate,
     );

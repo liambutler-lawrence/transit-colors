@@ -7,6 +7,7 @@ import Pbf from 'pbf';
 import { PMTiles } from 'pmtiles';
 
 import { hasProperSelfIntersection } from '../scripts/highway-cycle.mjs';
+import { geodesicDistanceMeters } from '../scripts/wgs84-geodesy.mjs';
 import {
   highwayCircumferenceDataSchema,
   highwayFeatureCollection,
@@ -58,6 +59,7 @@ test('North America highway data publishes one validated maximum and full vector
     data.methodology.optimizationMethod,
     'detailed-topology-preserving-perimeter-ears',
   );
+  assert.match(data.centerline_method, /Closest-tangent.*staggered joins/);
   assert.equal(data.network.featureCount, data.methodology.sourceFeatureCount);
   assert.equal(data.network.sourceLayer, 'highways');
   assert.match(data.network.tileUrl, /\.pmtiles$/);
@@ -172,6 +174,31 @@ test('regenerated tiles retain centered mainlines and separate ramps continent-w
           properties['role'] === 'connector' &&
           properties['divided'] === 'Averaged directional pair',
       ),
+    );
+
+    // The west end used to stop at the average of the two ramp joins. The
+    // regenerated ramp must continue along I-20 to its earlier physical split.
+    const florencePoint = [-79.8543729, 34.1982187];
+    const florenceTile = webMercatorTile(...florencePoint, 14);
+    const tile = await archive.getZxy(14, florenceTile.x, florenceTile.y);
+    assert.ok(tile);
+    const layer = new VectorTile(new Pbf(tile.data)).layers['highways'];
+    const rampCoordinates = [];
+    for (let index = 0; index < layer.length; index += 1) {
+      const feature = layer.feature(index);
+      if (feature.properties['role'] !== 'connector') continue;
+      const geometry = feature.toGeoJSON(florenceTile.x, florenceTile.y, 14).geometry;
+      rampCoordinates.push(
+        ...(geometry.type === 'LineString'
+          ? geometry.coordinates
+          : geometry.coordinates.flat()),
+      );
+    }
+    assert.ok(
+      rampCoordinates.some(
+        (coordinate) => geodesicDistanceMeters(florencePoint, coordinate) < 20,
+      ),
+      'Florence ramp tiles must include the mainline continuation',
     );
 
     const toronto407 = await highwayPropertiesNear(archive, -79.54, 43.79);

@@ -1,5 +1,8 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
+import { readFileSync } from 'node:fs';
+import { geodesicDistanceMeters } from './wgs84-geodesy.mjs';
+import { hasProperSelfIntersection } from './highway-cycle.mjs';
 
 import {
   averageReciprocalPathCoordinates,
@@ -9,48 +12,8 @@ import {
   classifyOsmMotorwayWay,
   parseOplLine,
   prepareWays,
-  removeRampTerminalHooks,
-  smoothRampCenterline,
   traceMotorwayChains,
 } from './osm-highway-network.mjs';
-
-function coordinateBounds(coordinates) {
-  return coordinates.reduce(
-    (bounds, [longitude, latitude]) => [
-      Math.min(bounds[0], longitude),
-      Math.min(bounds[1], latitude),
-      Math.max(bounds[2], longitude),
-      Math.max(bounds[3], latitude),
-    ],
-    [Infinity, Infinity, -Infinity, -Infinity],
-  );
-}
-
-function maximumTurnDegrees(coordinates) {
-  let maximum = 0;
-  for (let index = 1; index < coordinates.length - 1; index += 1) {
-    const vector = (first, second) => {
-      const latitudeScale = Math.cos((((first[1] + second[1]) / 2) * Math.PI) / 180);
-      const longitude = (second[0] - first[0]) * latitudeScale;
-      const latitude = second[1] - first[1];
-      const length = Math.hypot(longitude, latitude);
-      return [longitude / length, latitude / length];
-    };
-    const incoming = vector(coordinates[index - 1], coordinates[index]);
-    const outgoing = vector(coordinates[index], coordinates[index + 1]);
-    const turn =
-      (Math.acos(
-        Math.max(
-          -1,
-          Math.min(1, incoming[0] * outgoing[0] + incoming[1] * outgoing[1]),
-        ),
-      ) *
-        180) /
-      Math.PI;
-    maximum = Math.max(maximum, turn);
-  }
-  return maximum;
-}
 
 test('OPL parser preserves explicit node identities and motorway tags', () => {
   const node = parseOplLine('n42 v1 dV c0 t x-73.4 y41.1');
@@ -257,8 +220,8 @@ test('source-mapped ramps remain paired after carriageways diverge early', () =>
 
   assert.equal(result.connectors.length, 1);
   assert.equal(result.statistics.unpairedConnectorPathCount, 0);
-  assert.deepEqual(result.connectors[0].coordinates[0], [0.005, 0]);
-  assert.deepEqual(result.connectors[0].coordinates.at(-1), [0.005, 0.02]);
+  assert.deepEqual(result.connectors[0].coordinates[0], [0, 0]);
+  assert.deepEqual(result.connectors[0].coordinates.at(-1), [0.01, 0.02]);
 });
 
 test('reciprocal matcher uses directional legs instead of nearest ramp endpoints', () => {
@@ -348,117 +311,194 @@ test('reciprocal matcher uses directional legs instead of nearest ramp endpoints
   assert.equal(result.statistics.unpairedConnectorPathCount, 1);
 });
 
-test('shape-aware ramp average retains a smaller loop between unlike paths', () => {
-  const directPath = [
-    [0, -0.012],
-    [0.002, -0.008],
-    [0.007, -0.003],
-    [0.012, 0],
-  ];
-  const loopPath = [
-    [0, 0.012],
-    [-0.006, 0.011],
-    [-0.01, 0.006],
-    [-0.009, 0],
-    [-0.006, -0.005],
-    [0, -0.007],
-    [0.006, -0.005],
-    [0.01, -0.001],
-    [0.012, 0.001],
-  ];
+const metersCoordinate = ([x, y]) => [x / 111_320, y / 110_574];
+const coordinateMeters = ([x, y]) => [x * 111_320, y * 110_574];
+
+test('ramp midpoints use closest tangent projections despite unequal path lengths', () => {
   const averaged = averageReciprocalPathCoordinates(
-    directPath,
-    loopPath,
-    [0, 0],
-    [0.012, 0.0005],
-  );
-  const bounds = coordinateBounds(averaged);
-  assert.deepEqual(averaged[0], [0, 0]);
-  assert.deepEqual(averaged.at(-1), [0.012, 0.0005]);
-  assert.ok(bounds[0] < -0.004 && bounds[0] > -0.006);
-  assert.ok(bounds[1] < -0.009 && bounds[1] > -0.01);
-  assert.ok(averaged.length > 100);
-});
-
-test('terminal correspondence hooks are removed from Chattanooga ramp averages', () => {
-  const eastConnector = [
-    [-85.4537644, 34.9652314],
-    [-85.4536329, 34.9654011],
-    [-85.4535015, 34.9655709],
-    [-85.45337, 34.9657406],
-    [-85.4531764, 34.9658891],
-    [-85.4529741, 34.9660346],
-    [-85.4527772, 34.9661854],
-    [-85.4526008, 34.9663566],
-    [-85.4524239, 34.9665273],
-    [-85.4522485, 34.9666992],
-    [-85.4457247, 34.9712172],
-    [-85.4454567, 34.9712576],
-    [-85.4451879, 34.9712928],
-    [-85.4449174, 34.9713163],
-    [-85.4446481, 34.971342],
-    [-85.4443871, 34.9713982],
-    [-85.4441256, 34.971449],
-    [-85.4438784, 34.9714714],
-    [-85.4436682, 34.9714276],
-    [-85.4435813, 34.9713509],
-  ];
-  const northConnector = [
-    [-85.4537644, 34.9652314],
-    [-85.4537913, 34.9653383],
-    [-85.4537075, 34.9655095],
-    [-85.4535817, 34.965673],
-    [-85.4533934, 34.9658258],
-    [-85.4532085, 34.9659804],
-    [-85.4530255, 34.9661362],
-    [-85.4528639, 34.9663082],
-    [-85.4527268, 34.9664974],
-    [-85.4525981, 34.9666907],
-    [-85.4547389, 34.9749091],
-    [-85.4548749, 34.9750992],
-    [-85.4550077, 34.9752909],
-    [-85.4550533, 34.9753916],
-    [-85.4551406, 34.9755966],
-    [-85.4552265, 34.9758024],
-    [-85.4553137, 34.9760076],
-    [-85.4554044, 34.9762075],
-    [-85.4555594, 34.9762972],
-    [-85.4557131, 34.9763876],
-  ];
-  const eastSmoothed = removeRampTerminalHooks(eastConnector);
-  const northSmoothed = removeRampTerminalHooks(northConnector);
-
-  assert.deepEqual(eastSmoothed[0], eastConnector[0]);
-  assert.deepEqual(eastSmoothed.at(-1), eastConnector.at(-1));
-  assert.deepEqual(northSmoothed[0], northConnector[0]);
-  assert.deepEqual(northSmoothed.at(-1), northConnector.at(-1));
-  assert.equal(eastConnector.length - eastSmoothed.length, 2);
-  assert.equal(northConnector.length - northSmoothed.length, 2);
-});
-
-test('paired ramp centerlines suppress correspondence jitter without moving endpoints', () => {
-  const longitudeScale = 111_320 * Math.cos((35.3 * Math.PI) / 180);
-  const latitudeScale = 110_574;
-  const jitteryCurve = Array.from({ length: 41 }, (_, index) => {
-    const progress = index / 40;
-    const angle = Math.PI + (Math.PI / 2) * progress;
-    const radius = 280 + (index % 2 === 0 ? -5 : 5);
-    return [
-      -85.15 + (Math.cos(angle) * radius) / longitudeScale,
-      35.3 + (Math.sin(angle) * radius) / latitudeScale,
-    ];
-  });
-  const smoothed = smoothRampCenterline(jitteryCurve);
-
-  assert.deepEqual(smoothed[0], jitteryCurve[0]);
-  assert.deepEqual(smoothed.at(-1), jitteryCurve.at(-1));
-  assert.equal(smoothed.length, jitteryCurve.length);
-  assert.ok(maximumTurnDegrees(smoothed) < maximumTurnDegrees(jitteryCurve) * 0.45);
-  for (const [index, coordinate] of smoothed.entries()) {
-    const longitudeOffset = (coordinate[0] - jitteryCurve[index][0]) * longitudeScale;
-    const latitudeOffset = (coordinate[1] - jitteryCurve[index][1]) * latitudeScale;
-    assert.ok(Math.hypot(longitudeOffset, latitudeOffset) <= 8.1);
+    [
+      [0, 0],
+      [1000, 0],
+    ].map(metersCoordinate),
+    [
+      [-200, 100],
+      [2000, 100],
+    ].map(metersCoordinate),
+    metersCoordinate([0, 50]),
+    metersCoordinate([1000, 50]),
+  ).map(coordinateMeters);
+  for (const [index, [x, y]] of averaged.entries()) {
+    assert.ok(Math.abs(x - (1000 * index) / (averaged.length - 1)) < 0.02);
+    assert.ok(Math.abs(y - 50) < 0.02);
   }
+});
+
+test('ramp tangent pairing rejects a nearer segment running back the other way', () => {
+  const averaged = averageReciprocalPathCoordinates(
+    [
+      [0, 0],
+      [1000, 0],
+    ].map(metersCoordinate),
+    [
+      [0, 100],
+      [1200, 100],
+      [1200, 10],
+      [-200, 10],
+    ].map(metersCoordinate),
+    metersCoordinate([0, 50]),
+    metersCoordinate([1000, 50]),
+  ).map(coordinateMeters);
+  assert.ok(averaged.length > 20);
+  assert.ok(averaged.every(([, y]) => Math.abs(y - 50) < 0.02));
+});
+
+test('curved ramps retain closest normal midpoints without endpoint warping', () => {
+  const arc = (radius, from, to) =>
+    Array.from({ length: 301 }, (_, i) => {
+      const angle = ((from + ((to - from) * i) / 300) * Math.PI) / 180;
+      return metersCoordinate([Math.cos(angle) * radius, Math.sin(angle) * radius]);
+    });
+  const averaged = averageReciprocalPathCoordinates(
+    arc(300, 0, 90),
+    arc(360, -30, 120),
+    metersCoordinate([330, 0]),
+    metersCoordinate([0, 330]),
+  ).map(coordinateMeters);
+  assert.ok(averaged.length > 15);
+  for (const [x, y] of averaged) {
+    assert.ok(x >= -0.1 && y >= -0.1);
+    assert.ok(Math.abs(Math.hypot(x, y) - 330) < 0.1);
+  }
+});
+
+test('staggered ramp joins continue along the source mainline on both ends', () => {
+  const points = {
+    aBefore: [-300, 0],
+    aSplit: [0, 0],
+    aAfter: [1400, 0],
+    aWestStart: [1400, 20],
+    aMerge: [400, 20],
+    aMiddle: [200, 20],
+    aWestEnd: [-300, 20],
+    bBefore: [-300, 1000],
+    bMerge: [900, 1000],
+    bAfter: [1400, 1000],
+    bWestStart: [1400, 1020],
+    bSplit: [1200, 1020],
+    bWestEnd: [-300, 1020],
+    f1: [300, 60],
+    f2: [600, 500],
+    f3: [800, 980],
+    r1: [600, 80],
+    r2: [750, 500],
+    r3: [950, 960],
+  };
+  const nodes = new Map(
+    Object.entries(points).map(([id, point]) => [
+      id,
+      {
+        coordinate: metersCoordinate(point),
+        tags: {},
+      },
+    ]),
+  );
+  // Split the westbound carriageway into OSM ways to exercise node continuity.
+  const mainlines = [
+    { id: 'ae', nodeIds: ['aBefore', 'aSplit', 'aAfter'] },
+    { id: 'aw1', nodeIds: ['aWestStart', 'aMerge'] },
+    { id: 'aw2', nodeIds: ['aMerge', 'aMiddle'] },
+    { id: 'aw3', nodeIds: ['aMiddle', 'aWestEnd'] },
+    { id: 'be', nodeIds: ['bBefore', 'bMerge', 'bAfter'] },
+    { id: 'bw', nodeIds: ['bWestStart', 'bSplit', 'bWestEnd'] },
+  ];
+  const parts = [
+    {
+      id: 'a',
+      role: 'mainline',
+      tokens: ['A'],
+      sourceWayIds: ['ae', 'aw1', 'aw2', 'aw3'],
+      coordinates: [
+        [-300, 10],
+        [1400, 10],
+      ].map(metersCoordinate),
+    },
+    {
+      id: 'b',
+      role: 'mainline',
+      tokens: ['B'],
+      sourceWayIds: ['be', 'bw'],
+      coordinates: [
+        [-300, 1010],
+        [1400, 1010],
+      ].map(metersCoordinate),
+    },
+  ];
+  const ramps = [
+    { id: 'f', nodeIds: ['aSplit', 'f1', 'f2', 'f3', 'bMerge'] },
+    { id: 'r', nodeIds: ['bSplit', 'r3', 'r2', 'r1', 'aMerge'] },
+  ];
+  const result = buildRampConnectors({ nodes }, mainlines, parts, ramps);
+  assert.equal(result.connectors.length, 1);
+  const connector = result.connectors[0];
+  const coordinates = connector.coordinates.map(coordinateMeters);
+  assert.ok(Math.abs(coordinates[0][0]) < 0.02);
+  assert.ok(Math.abs(coordinates.at(-1)[0] - 1200) < 0.02);
+  const early = coordinates.filter(([x]) => x > 100 && x < 250);
+  assert.ok(early.length > 3);
+  for (const [x, y] of early) assert.ok(Math.abs(y - (x * 0.2 + 20) / 2) < 0.1);
+  const late = coordinates.filter(([x]) => x > 1000 && x < 1150);
+  assert.ok(late.length > 3);
+  for (const [x, y] of late) {
+    const projectedX = (2 * x + 0.24 * (1000 - 732)) / (2 + 0.24 ** 2);
+    const rampY = 732 + projectedX * 0.24;
+    assert.ok(Math.abs(y - (rampY + 1000) / 2) < 0.1);
+  }
+  assert.ok(
+    parts[0].coordinates.some((p) => p.join() === connector.coordinates[0].join()),
+  );
+  assert.ok(
+    parts[1].coordinates.some((p) => p.join() === connector.coordinates.at(-1).join()),
+  );
+});
+
+test('Florence interchange keeps four continuous reciprocal connectors at source junctions', () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL('./fixtures/florence-interchange.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  const osm = { nodes: new Map(fixture.nodes), ways: fixture.ways };
+  const built = buildOsmHighwayCenterlines(osm);
+  const connectors = built.parts.filter((part) => part.role === 'connector');
+  assert.equal(connectors.length, 4);
+  for (const connector of connectors) {
+    assert.equal(hasProperSelfIntersection(connector.coordinates), false);
+    assert.ok(connector.coordinates.length > 30);
+    // Endpoints must meet the mainline without the old diagonal terminal hooks.
+    assert.ok(
+      geodesicDistanceMeters(connector.coordinates[0], connector.coordinates[1]) < 40,
+    );
+    assert.ok(
+      geodesicDistanceMeters(
+        connector.coordinates.at(-2),
+        connector.coordinates.at(-1),
+      ) < 40,
+    );
+    for (const [partIndex, coordinate] of [
+      [connector.startMainlinePartIndex, connector.coordinates[0]],
+      [connector.endMainlinePartIndex, connector.coordinates.at(-1)],
+    ]) {
+      assert.ok(
+        built.parts[partIndex].coordinates.some(
+          (point) => point.join() === coordinate.join(),
+        ),
+      );
+    }
+  }
+  const graph = buildPairedOsmSourceTopologyGraph(osm, built.parts);
+  assert.equal(graph.statistics.sourceConnectorPartCount, 4);
+  assert.equal(graph.statistics.explicitTopologyKeyCount, 8);
 });
 
 test('unpaired one-way ramps are excluded from display and topology', () => {
