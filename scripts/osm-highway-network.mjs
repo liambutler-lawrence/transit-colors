@@ -1810,7 +1810,328 @@ export function buildPairedOsmSourceTopologyGraph(osm, averagedParts) {
   };
 }
 
+function mainlineEndpoint(part, attachment) {
+  if (geodesicDistanceMeters(part.coordinates[0], part.coordinates.at(-1)) < 0.25) {
+    return null;
+  }
+  if (
+    attachment.segmentIndex === 0 &&
+    geodesicDistanceMeters(attachment.coordinate, part.coordinates[0]) < 0.25
+  ) {
+    return 'start';
+  }
+  if (
+    attachment.segmentIndex === part.coordinates.length - 2 &&
+    geodesicDistanceMeters(attachment.coordinate, part.coordinates.at(-1)) < 0.25
+  ) {
+    return 'end';
+  }
+  return null;
+}
+
+function mainlineJunctionGroups(parts, junctions) {
+  const parents = new Map();
+  const find = (key) => {
+    if (!parents.has(key)) parents.set(key, key);
+    const parent = parents.get(key);
+    if (parent === key) return key;
+    const root = find(parent);
+    parents.set(key, root);
+    return root;
+  };
+  const union = (first, second) => parents.set(find(first), find(second));
+  for (const [partIndex, part] of parts.entries()) {
+    for (const endpoint of ['start', 'end']) {
+      const endpointId = `${partIndex}:${endpoint}`;
+      find(endpointId);
+      for (const key of part[`${endpoint}TopologyKeys`] ?? []) {
+        union(endpointId, key);
+      }
+    }
+  }
+  for (const [index, junction] of junctions.entries()) {
+    for (const attachment of junction.attachments) {
+      const endpoint = mainlineEndpoint(parts[attachment.partIndex], attachment);
+      if (endpoint) union(`junction:${index}`, `${attachment.partIndex}:${endpoint}`);
+    }
+  }
+  const groups = new Map();
+  for (const [index, junction] of junctions.entries()) {
+    const root = find(`junction:${index}`);
+    const group = groups.get(root) ?? { junctions: [], endpoints: new Map() };
+    group.junctions.push(junction);
+    groups.set(root, group);
+  }
+  for (const partIndex of parts.keys()) {
+    for (const endpoint of ['start', 'end']) {
+      const group = groups.get(find(`${partIndex}:${endpoint}`));
+      if (!group) continue;
+      const endpoints = group.endpoints.get(partIndex) ?? new Set();
+      endpoints.add(endpoint);
+      group.endpoints.set(partIndex, endpoints);
+    }
+  }
+  return [...groups.values()];
+}
+
+function applyMainlineJunctions(part, insertions) {
+  const start = insertions.find((insertion) => insertion.endpoint === 'start');
+  const end = insertions.find((insertion) => insertion.endpoint === 'end');
+  const startExtends =
+    start &&
+    coordinateProjectionFraction(
+      start.coordinate,
+      part.coordinates[0],
+      part.coordinates[1],
+    ) < 0;
+  const endExtends =
+    end &&
+    coordinateProjectionFraction(
+      end.coordinate,
+      part.coordinates.at(-2),
+      part.coordinates.at(-1),
+    ) > 1;
+  const startDistance = startExtends
+    ? -Infinity
+    : (start?.distanceAlongPartMeters ?? -Infinity);
+  const endDistance = endExtends
+    ? Infinity
+    : (end?.distanceAlongPartMeters ?? Infinity);
+  const vertices = [];
+  let distance = 0;
+  for (const [index, coordinate] of part.coordinates.entries()) {
+    if (index > 0)
+      distance += geodesicDistanceMeters(part.coordinates[index - 1], coordinate);
+    if (distance > startDistance + 0.25 && distance < endDistance - 0.25) {
+      vertices.push({ coordinate, position: index, priority: 0 });
+    }
+  }
+  for (const insertion of insertions) {
+    if (insertion.endpoint) continue;
+    if (
+      insertion.distanceAlongPartMeters < startDistance - 0.25 ||
+      insertion.distanceAlongPartMeters > endDistance + 0.25
+    ) {
+      throw new Error(
+        `Mainline junction lies beyond a trimmed endpoint of ${part.id}.`,
+      );
+    }
+    const segmentLength = geodesicDistanceMeters(
+      part.coordinates[insertion.segmentIndex],
+      part.coordinates[insertion.segmentIndex + 1],
+    );
+    const fraction =
+      segmentLength === 0
+        ? 0
+        : Math.min(1, Math.max(0, insertion.distanceAlongMeters / segmentLength));
+    // Segment-local order is exact at a vertex; adding long cumulative
+    // distances can put an endpoint insertion just beyond that vertex.
+    vertices.push({
+      ...insertion,
+      position: insertion.segmentIndex + fraction,
+      priority: fraction === 0 ? 1 : -1,
+    });
+  }
+  vertices.sort(
+    (first, second) =>
+      first.position - second.position || first.priority - second.priority,
+  );
+  if (start) vertices.unshift(start);
+  if (end) vertices.push(end);
+  part.coordinates = vertices
+    .map((vertex) => vertex.coordinate)
+    .filter(
+      (coordinate, index, coordinates) =>
+        index === 0 ||
+        geodesicDistanceMeters(coordinates[index - 1], coordinate) > 0.25,
+    );
+}
+
+function mainlineReversalCount(coordinates) {
+  let count = 0;
+  for (let index = 1; index < coordinates.length - 1; index += 1) {
+    const [before, point, after] = coordinates.slice(index - 1, index + 2);
+    if (
+      geodesicDistanceMeters(before, point) < 1 ||
+      geodesicDistanceMeters(point, after) < 1
+    )
+      continue;
+    if (dot(vector(before, point), vector(point, after)) < -0.1) count += 1;
+  }
+  return count;
+}
+
+function joinMainlineJunctions(parts, grid, junctions) {
+  const lengths = parts.map((part) => lineLengthMeters(part.coordinates));
+  const groups = mainlineJunctionGroups(parts, junctions);
+  for (const group of groups) {
+    group.legacy = group.junctions.flatMap((junction) => {
+      const coordinate = [0, 1].map((axis) =>
+        Number(
+          (
+            junction.attachments.reduce(
+              (sum, attachment) => sum + attachment.coordinate[axis],
+              0,
+            ) / junction.attachments.length
+          ).toFixed(7),
+        ),
+      );
+      return junction.attachments.map((attachment) => ({
+        ...attachment,
+        coordinate,
+        keys: [`osm-mainline-junction:${junction.nodeId}`],
+      }));
+    });
+    // A short loop or two separate ends of a road must not be collapsed into
+    // a single merge. Ordinary way segmentation also is not a branch merge.
+    if (
+      !group.junctions.some((junction) => junction.branch) ||
+      group.endpoints.size === 0 ||
+      [...group.endpoints.values()].some((endpoints) => endpoints.size > 1)
+    )
+      continue;
+    group.proposed = [];
+    const attachments = group.junctions.flatMap((junction) => junction.attachments);
+    // Both directional source merges can clamp to the same branch terminal.
+    // They describe one centerline junction, including any existing split-part
+    // endpoint keys. Do not append them and then revisit the old terminal.
+    const positions = group.junctions
+      .filter((junction) => junction.branch)
+      .map((junction) => junction.coordinate);
+    const center = [0, 1].map(
+      (axis) =>
+        positions.reduce((sum, coordinate) => sum + coordinate[axis], 0) /
+        positions.length,
+    );
+    const anchor = attachments.reduce((best, attachment) => {
+      const clearance = (entry) =>
+        Math.min(
+          entry.distanceAlongPartMeters,
+          lengths[entry.partIndex] - entry.distanceAlongPartMeters,
+        );
+      return clearance(attachment) > clearance(best) ? attachment : best;
+    });
+    const project = (partIndex) =>
+      attachmentForNode({
+        grid,
+        mainlinePartIndices: new Set([partIndex]),
+        nodeCoordinate: center,
+        maximumDistanceMeters: PAIR_SEARCH_METERS * 3,
+      });
+    // Keep the continuing midpoint line in place. The shared point must be on
+    // that line, rather than the average of two off-line attachment locations.
+    const commonCoordinate = project(anchor.partIndex).coordinate;
+    const partIndices = new Set([
+      ...attachments.map((attachment) => attachment.partIndex),
+      ...group.endpoints.keys(),
+    ]);
+    for (const partIndex of partIndices) {
+      const attachment = attachmentForNode({
+        grid,
+        mainlinePartIndices: new Set([partIndex]),
+        nodeCoordinate: commonCoordinate,
+        maximumDistanceMeters: PAIR_SEARCH_METERS * 3,
+      });
+      if (!attachment)
+        throw new Error(`Cannot place mainline junction on ${parts[partIndex].id}.`);
+      const endpoints = group.endpoints.get(partIndex);
+      for (const endpoint of endpoints ?? [null]) {
+        group.proposed.push({
+          ...attachment,
+          coordinate: commonCoordinate,
+          endpoint,
+          keys: group.junctions.map(
+            (junction) => `osm-mainline-junction:${junction.nodeId}`,
+          ),
+        });
+      }
+    }
+  }
+  // Moving a terminal must not erase a different junction farther along that
+  // part. Retain the existing topology for these overlapping, complex cases.
+  const individualByPart = new Map();
+  for (const group of groups) {
+    for (const entry of group.legacy) {
+      const entries = individualByPart.get(entry.partIndex) ?? [];
+      entries.push(entry);
+      individualByPart.set(entry.partIndex, entries);
+    }
+  }
+  const originalReversals = new Map();
+  let changed;
+  do {
+    changed = false;
+    const byPart = new Map();
+    for (const group of groups) {
+      for (const entry of group.proposed ?? group.legacy) {
+        const entries = byPart.get(entry.partIndex) ?? [];
+        entries.push({ ...entry, group });
+        byPart.set(entry.partIndex, entries);
+      }
+    }
+    for (const group of groups) {
+      if (!group.proposed) continue;
+      const conflicts = group.proposed.some(
+        (entry) =>
+          entry.endpoint &&
+          ((entry.endpoint === 'start'
+            ? entry.distanceAlongPartMeters >= lengths[entry.partIndex] - 0.25
+            : entry.distanceAlongPartMeters <= 0.25) ||
+            (byPart.get(entry.partIndex) ?? []).some(
+              (other) =>
+                other.group !== group &&
+                (entry.endpoint === 'start'
+                  ? other.distanceAlongPartMeters < entry.distanceAlongPartMeters - 0.25
+                  : other.distanceAlongPartMeters >
+                    entry.distanceAlongPartMeters + 0.25),
+            )),
+      );
+      if (conflicts) {
+        group.proposed = null;
+        changed = true;
+      }
+    }
+    if (changed) continue;
+    for (const [partIndex, entries] of byPart) {
+      const proposedGroups = new Set(
+        entries.map((entry) => entry.group).filter((group) => group.proposed),
+      );
+      if (proposedGroups.size === 0) continue;
+      if (!originalReversals.has(partIndex)) {
+        const original = { ...parts[partIndex] };
+        applyMainlineJunctions(original, individualByPart.get(partIndex) ?? []);
+        originalReversals.set(partIndex, mainlineReversalCount(original.coordinates));
+      }
+      const proposed = { ...parts[partIndex] };
+      applyMainlineJunctions(proposed, entries);
+      // A candidate merge cannot introduce additional folds in a curved or
+      // multiply paired approach. Keep those individual attachments intact.
+      if (
+        mainlineReversalCount(proposed.coordinates) > originalReversals.get(partIndex)
+      ) {
+        for (const group of proposedGroups) group.proposed = null;
+        changed = true;
+      }
+    }
+  } while (changed);
+  const insertionsByPart = new Map();
+  for (const group of groups) {
+    for (const entry of group.proposed ?? group.legacy) {
+      const entries = insertionsByPart.get(entry.partIndex) ?? [];
+      entries.push(entry);
+      insertionsByPart.set(entry.partIndex, entries);
+      for (const key of entry.keys)
+        topologyCoordinate(parts[entry.partIndex], entry.coordinate, key);
+    }
+  }
+  for (const [partIndex, insertions] of insertionsByPart) {
+    applyMainlineJunctions(parts[partIndex], insertions);
+  }
+  return { mergedGroups: groups.filter((group) => group.proposed).length };
+}
+
 export function connectMainlinePartsAtSourceNodes(osm, mainlineWays, parts) {
+  const wayById = new Map(mainlineWays.map((way) => [way.id, way]));
   const sourceWayIdToPartIndices = indexPartsBySourceWay(parts);
   const partSegmentGrid = buildPartSegmentGrid(parts);
   const wayIdsByNodeId = new Map();
@@ -1822,8 +2143,7 @@ export function connectMainlinePartsAtSourceNodes(osm, mainlineWays, parts) {
       wayIdsByNodeId.set(nodeId, wayIds);
     }
   }
-  const insertionsByPart = new Map();
-  let junctionCount = 0;
+  const junctions = [];
   for (const [nodeId, wayIds] of wayIdsByNodeId) {
     if (wayIds.size < 2) continue;
     const partIndices = new Set(
@@ -1836,35 +2156,24 @@ export function connectMainlinePartsAtSourceNodes(osm, mainlineWays, parts) {
       nodeCoordinate: osm.nodes.get(nodeId).coordinate,
     });
     if (attachments.length < 2) continue;
-    const commonCoordinate = [
-      Number(
-        (
-          attachments.reduce(
-            (total, attachment) => total + attachment.coordinate[0],
-            0,
-          ) / attachments.length
-        ).toFixed(7),
-      ),
-      Number(
-        (
-          attachments.reduce(
-            (total, attachment) => total + attachment.coordinate[1],
-            0,
-          ) / attachments.length
-        ).toFixed(7),
-      ),
-    ];
-    const topologyKey = `osm-mainline-junction:${nodeId}`;
-    for (const attachment of attachments) {
-      const entries = insertionsByPart.get(attachment.partIndex) ?? [];
-      entries.push({ ...attachment, coordinate: commonCoordinate });
-      insertionsByPart.set(attachment.partIndex, entries);
-      topologyCoordinate(parts[attachment.partIndex], commonCoordinate, topologyKey);
+    const neighbors = new Set();
+    for (const wayId of wayIds) {
+      const way = wayById.get(wayId);
+      for (const [index, id] of way.nodeIds.entries()) {
+        if (id !== nodeId) continue;
+        if (index > 0) neighbors.add(way.nodeIds[index - 1]);
+        if (index + 1 < way.nodeIds.length) neighbors.add(way.nodeIds[index + 1]);
+      }
     }
-    junctionCount += 1;
+    junctions.push({
+      attachments,
+      nodeId,
+      coordinate: osm.nodes.get(nodeId).coordinate,
+      branch: neighbors.size > 2,
+    });
   }
-  insertPartProjections(parts, insertionsByPart);
-  return { junctionCount };
+  joinMainlineJunctions(parts, partSegmentGrid, junctions);
+  return { junctionCount: junctions.length };
 }
 
 export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
