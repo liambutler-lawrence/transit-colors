@@ -6,6 +6,7 @@ import { hasProperSelfIntersection } from './highway-cycle.mjs';
 
 import {
   averageReciprocalPathCoordinates,
+  buildAveragedMainlines,
   buildOsmHighwayCenterlines,
   buildPairedOsmSourceTopologyGraph,
   buildRampConnectors,
@@ -314,6 +315,126 @@ test('reciprocal matcher uses directional legs instead of nearest ramp endpoints
 
 const metersCoordinate = ([x, y]) => [x / 111_320, y / 110_574];
 const coordinateMeters = ([x, y]) => [x * 111_320, y * 110_574];
+
+test('mainline midpoints stop at both ends of the shared carriageway extent', () => {
+  for (const reverseIds of [false, true]) {
+    const chains = [
+      [
+        [0, 0],
+        [1000, 0],
+      ],
+      Array.from({ length: 13 }, (_, index) => [800 - index * 50, 20]),
+    ].map((coordinates, index) => ({
+      id: `chain-${reverseIds ? 2 - index : index + 1}`,
+      coordinates: coordinates.map(metersCoordinate),
+      sourceWayIds: [`way-${index}`],
+      tokens: new Set(['A']),
+    }));
+    const result = buildAveragedMainlines(chains);
+    assert.equal(result.parts.length, 1);
+    const coordinates = result.parts[0].coordinates.map(coordinateMeters);
+    assert.ok(coordinates.length > 10);
+    for (const [x, y] of coordinates) {
+      assert.ok(
+        x >= 200 - 0.02 && x <= 800 + 0.02,
+        `unpaired longitudinal tail at ${x}`,
+      );
+      assert.ok(Math.abs(y - 10) < 0.02);
+    }
+  }
+});
+
+test('interior corner vertices remain eligible for mainline midpoint matching', () => {
+  const chains = [
+    [
+      [0, -20],
+      [520, -20],
+      [520, 500],
+    ],
+    [
+      [500, 500],
+      [500, 0],
+      [0, 0],
+    ],
+  ].map((coordinates, index) => ({
+    id: `chain-${index + 1}`,
+    coordinates: coordinates.map(metersCoordinate),
+    sourceWayIds: [`way-${index}`],
+    tokens: new Set(['A']),
+  }));
+  const result = buildAveragedMainlines(chains);
+  assert.equal(result.parts.length, 1);
+  const coordinates = result.parts[0].coordinates.map(coordinateMeters);
+  assert.ok(coordinates.some(([x, y]) => x > 495 && y < 0));
+  assert.ok(coordinates.some(([x, y]) => x > 500 && y > 480));
+});
+
+test('a closed carriageway has no terminal gap at its source seam', () => {
+  const chains = [500, 450].map((radius, index) => {
+    const coordinates = Array.from({ length: 72 }, (_, sampleIndex) => {
+      const angle = (sampleIndex / 72) * Math.PI * 2 * (index === 0 ? 1 : -1);
+      return metersCoordinate([Math.cos(angle) * radius, Math.sin(angle) * radius]);
+    });
+    coordinates.push(coordinates[0]);
+    return {
+      id: `chain-${index + 1}`,
+      coordinates,
+      startNodeId: `seam-${index}`,
+      endNodeId: `seam-${index}`,
+      sourceWayIds: [`way-${index}`],
+      tokens: new Set(['A']),
+    };
+  });
+  const result = buildAveragedMainlines(chains);
+  assert.equal(result.parts.length, 1);
+  assert.deepEqual(result.parts[0].coordinates[0], result.parts[0].coordinates.at(-1));
+  assert.ok(
+    geodesicDistanceMeters(result.parts[0].coordinates[0], metersCoordinate([475, 0])) <
+      0.02,
+  );
+});
+
+test('Stone Mountain mainline has no unsupported terminal spur and keeps both ramp pairs', () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL('./fixtures/stone-mountain-interchange.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  const osm = { nodes: new Map(fixture.nodes), ways: fixture.ways };
+  const built = buildOsmHighwayCenterlines(osm);
+  const mainline = built.parts.find(
+    (part) => part.role === 'mainline' && part.sourceWayIds.includes('9178261'),
+  );
+  const oldSpurTip = [-84.1702383, 33.8189497];
+  assert.ok(
+    mainline.coordinates.every(
+      (point) => geodesicDistanceMeters(point, oldSpurTip) > 90,
+    ),
+  );
+  assert.ok(
+    mainline.coordinates.some(
+      (point) => geodesicDistanceMeters(point, [-84.1717399, 33.8181365]) < 1,
+    ),
+  );
+  const connectors = built.parts.filter((part) => part.role === 'connector');
+  assert.equal(connectors.length, 2);
+  for (const connector of connectors) {
+    for (const [partIndex, coordinate] of [
+      [connector.startMainlinePartIndex, connector.coordinates[0]],
+      [connector.endMainlinePartIndex, connector.coordinates.at(-1)],
+    ]) {
+      assert.ok(
+        built.parts[partIndex].coordinates.some(
+          (point) => point.join() === coordinate.join(),
+        ),
+      );
+    }
+  }
+  const graph = buildPairedOsmSourceTopologyGraph(osm, built.parts);
+  assert.equal(graph.statistics.sourceConnectorPartCount, 2);
+  assert.equal(graph.statistics.explicitTopologyKeyCount, 4);
+});
 
 test('ramp midpoints use closest tangent projections despite unequal path lengths', () => {
   const averaged = averageReciprocalPathCoordinates(
