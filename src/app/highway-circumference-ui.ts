@@ -52,7 +52,7 @@ import {
   updateStatus,
 } from './context.js';
 
-const HIGHWAY_DATA_URL = 'data/north-america-highway-circumference.json?v=20260909e';
+const HIGHWAY_DATA_URL = 'data/north-america-highway-circumference.json?v=20260909f';
 let highwayData: HighwayCircumferenceData | null = null;
 let highwayPromise: Promise<HighwayCircumferenceData> | null = null;
 const HIGHWAY_GRADIENT_SOURCE_ID = 'highway-circumference-gradient';
