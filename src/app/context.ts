@@ -343,6 +343,7 @@ export const futureStationToggle = requiredElement(
 );
 export const areaSelect = requiredElement('#metro-area', HTMLSelectElement);
 export const accessResultAreaEl = requiredElement('#access-result-area', HTMLElement);
+export const accessResultsEl = requiredElement('#access-results', HTMLElement);
 export const accessProductButton = requiredElement(
   '#product-access',
   HTMLButtonElement,
@@ -566,6 +567,7 @@ export const initialLoadingOperation: LoadingOperation = {
 };
 
 export const runtime: AppRuntime = {
+  transitAreas: new Map(),
   activeAreaKey: initialAreaKey,
   activeProduct: initialProduct,
   basemapInstallScheduled: false,
@@ -845,7 +847,8 @@ export function timeStreetColor(
       for (const [stationId, minutes] of transitTimes) {
         stationTime.push(stationId, Number(minutes.toFixed(2)));
       }
-      stationTime.push(90);
+      // Other metros have no route to this destination, at any color scale.
+      stationTime.push(stops.redMinutes);
       candidateTimes.push([
         '+',
         [
@@ -881,7 +884,7 @@ export function timeStreetColor(
           stationTime.push(stationIndex, Number(minutes.toFixed(2)));
         }
       }
-      stationTime.push(90);
+      stationTime.push(stops.redMinutes);
       candidateTimes.push([
         '+',
         [
@@ -913,7 +916,7 @@ export function timeStreetColor(
 
   const totalTime =
     candidateTimes.length === 0
-      ? 90
+      ? stops.redMinutes
       : candidateTimes.length === 1
         ? candidateTimes[0]
         : ['min', ...candidateTimes];

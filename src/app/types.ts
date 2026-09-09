@@ -4,6 +4,7 @@ import type {
   StyleSpecification,
 } from 'maplibre-gl';
 import { z } from 'zod';
+import type { TransitAreaData } from '../transit-atlas.js';
 
 import type {
   CircumferenceCandidate,
@@ -78,6 +79,7 @@ export interface AppState {
 }
 
 export interface AppRuntime {
+  transitAreas: Map<AreaKey, TransitAreaData>;
   activeAreaKey: AreaKey;
   activeProduct: Product;
   basemapInstallScheduled: boolean;

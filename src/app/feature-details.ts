@@ -259,8 +259,12 @@ export function showStreetFeature(props: StreetProperties): void {
   if (state.destination && state.transitTimes) {
     const travel = selectedStreetTravelTime(props);
     if (!travel) {
-      featureSummaryEl.textContent = 'No station types selected';
+      featureSummaryEl.textContent = activeStationModes.size
+        ? 'No transit route to the selected destination from this area.'
+        : 'No station types selected';
       renderDetails([{ label: 'OSM highway', value: props.h }]);
+      routeBreakdownEl.replaceChildren();
+      routeBreakdownEl.hidden = true;
       return;
     }
 
@@ -342,9 +346,12 @@ export function updateDestinationSummary(): void {
 
 export function rebuildDestinationTransitGraph(): void {
   if (!AREAS[runtime.activeAreaKey].supportsDestination) return;
-  const baseGraph = buildTransitGraph(runtime.loadedStations.features, {
-    includeFuture: futureStationToggle.checked,
-  });
+  const baseGraph = buildTransitGraph(
+    runtime.transitAreas.get(runtime.activeAreaKey)?.stations.features ?? [],
+    {
+      includeFuture: futureStationToggle.checked,
+    },
+  );
   state.transitGraph = state.schedules?.graph?.e
     ? attachScheduleGraph(baseGraph, state.schedules)
     : baseGraph;

@@ -1287,12 +1287,14 @@ body {
   line-height: 1.35;
 }
 
-.circumference-results {
+.circumference-results,
+.access-results {
   display: grid;
   gap: 10px;
 }
 
-.circumference-result {
+.circumference-result,
+.access-result {
   min-width: 0;
   padding: 11px;
   border: 1px solid #e4d5ca;
@@ -1303,7 +1305,8 @@ body {
     box-shadow 120ms ease;
 }
 
-.circumference-result[data-focused='true'] {
+.circumference-result[data-focused='true'],
+.access-result[data-focused='true'] {
   border-color: #d48a68;
   box-shadow: 0 0 0 2px rgba(219, 111, 63, 0.1);
 }
@@ -1353,9 +1356,21 @@ body {
   font-weight: 850;
 }
 
-.circumference-result[data-focused='true'] .focus-action {
+.circumference-result[data-focused='true'] .focus-action,
+.access-result[data-focused='true'] .focus-action {
   color: #ffffff;
   background: #9d4e2d;
+}
+
+.access-results {
+  margin-bottom: 16px;
+}
+
+.results-intro {
+  margin: 0 0 10px;
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.4;
 }
 
 .result-metrics {

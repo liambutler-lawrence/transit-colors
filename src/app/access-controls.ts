@@ -55,6 +55,7 @@ import {
   MODE_DISTANCE_PROPERTIES,
   MODE_LABELS,
   accessResultAreaEl,
+  accessResultsEl,
   accessProductButton,
   accessProductEl,
   activeStationModes,
@@ -435,7 +436,12 @@ export function selectedStreetTravelTime(
   properties: StreetProperties,
   transitTimes: ReadonlyMap<string, number> = activeAccessTransitTimes(),
 ): AccessTravel | null {
-  return bestStreetTravelTime(streetAccessCandidates(properties), transitTimes);
+  return bestStreetTravelTime(
+    streetAccessCandidates(properties).filter((candidate) =>
+      transitTimes.has(candidate.stationId),
+    ),
+    transitTimes,
+  );
 }
 
 export function visibleTiledStreets(): StreetProperties[] {
@@ -711,6 +717,38 @@ export function renderMetadata(metadata: Metadata): void {
   );
 }
 
+export function renderAccessResults(): void {
+  const areas = [...runtime.transitAreas.entries()].sort(
+    ([firstKey, first], [secondKey, second]) =>
+      second.coverageAreaSquareMeters - first.coverageAreaSquareMeters ||
+      AREAS[firstKey].label.localeCompare(AREAS[secondKey].label),
+  );
+  accessResultsEl.replaceChildren(
+    ...areas.map(([areaKey, data], index) => {
+      const selected = areaKey === runtime.activeAreaKey;
+      const card = document.createElement('article');
+      card.className = 'access-result';
+      card.dataset['focused'] = String(selected);
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'result-focus-button';
+      button.dataset['accessArea'] = areaKey;
+      button.setAttribute('aria-pressed', String(selected));
+      button.setAttribute('aria-label', `Focus map on ${AREAS[areaKey].label}`);
+      const heading = document.createElement('h3');
+      heading.textContent = `${index + 1}. ${AREAS[areaKey].label}`;
+      const coverage = document.createElement('small');
+      coverage.textContent = `${Math.round(data.coverageAreaSquareMeters / 1_000_000).toLocaleString('en-US')} km² non-red area`;
+      const action = document.createElement('span');
+      action.className = 'focus-action';
+      action.textContent = selected ? 'Selected' : 'Focus map';
+      button.append(heading, coverage, action);
+      card.append(button);
+      return card;
+    }),
+  );
+}
+
 export interface DestinationChoice {
   readonly representative: StationFeature;
   readonly stationIds: string[];
@@ -910,7 +948,7 @@ export function resetSelection(): void {
 export function updateAreaChrome(areaKey: AreaKey): void {
   const area = AREAS[areaKey];
   areaSelect.value = areaKey;
-  accessResultAreaEl.textContent = area.label;
+  accessResultAreaEl.textContent = `Destination metro: ${area.label}`;
   document.title =
     runtime.activeProduct === 'timezone'
       ? 'Clock Skew Map — Transit Colors'
@@ -927,9 +965,7 @@ export function updateAreaChrome(areaKey: AreaKey): void {
         ? 'Interactive Jersey City parcel map of land use, status, zoning, and historic districts'
         : runtime.activeProduct === 'circumference'
           ? `All maximum-area circumferential routes map, focused on ${area.label}`
-          : area.supportsDestination
-            ? `${area.label} transit access and travel time map`
-            : `${area.label} transit proximity map`,
+          : `All metro networks transit access map, destination metro ${area.label}`,
   );
   destinationControlEl.hidden = !area.supportsDestination;
   departureControlEl.hidden = !area.supportsDestination;
