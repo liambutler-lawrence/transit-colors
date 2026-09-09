@@ -7,7 +7,10 @@ import {
   CIRCUMFERENCE_GRADIENT_MAX_DISTANCE_METERS,
   CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE,
   circumferenceGradientBounds,
+  circumferenceGradientCanvasCoordinate,
+  circumferenceGradientDistanceForArea,
   circumferenceGradientOpacity,
+  circumferenceGradientViewportBounds,
   renderCircumferenceGradient,
 } from './circumference-map.ts';
 
@@ -156,6 +159,99 @@ test('the circumference gradient radiates on both sides of a closed route', () =
   const alphaAt = (x, y) => renderedImage.data[(y * canvas.width + x) * 4 + 3];
   assert.ok(alphaAt(10, 10) > 0, 'inside-side pixel has gradient alpha');
   assert.ok(alphaAt(3, 10) > 0, 'outside-side pixel has gradient alpha');
+});
+
+test('gradient width increases logarithmically with enclosed area', () => {
+  assert.equal(circumferenceGradientDistanceForArea(0), 0);
+  assert.equal(circumferenceGradientDistanceForArea(9e6), 10_000);
+  assert.equal(circumferenceGradientDistanceForArea(99e6), 20_000);
+  assert.equal(circumferenceGradientDistanceForArea(999e6), 30_000);
+  const continental = circumferenceGradientDistanceForArea(6.155e12);
+  assert.ok(continental > 67_000 && continental < 69_000);
+  assert.throws(() => circumferenceGradientDistanceForArea(-1));
+  assert.throws(() => circumferenceGradientDistanceForArea(Infinity));
+});
+
+test('continental gradient pixels and masks align with Web Mercator latitude', () => {
+  let renderedImage;
+  const canvas = {
+    width: 512,
+    height: 512,
+    getContext: () => ({
+      clearRect() {},
+      createImageData: (width, height) => ({
+        data: new Uint8ClampedArray(width * height * 4),
+      }),
+      putImageData(image) {
+        renderedImage = image;
+      },
+    }),
+  };
+  const bounds = [-125, 20, -70, 55];
+  const route = [
+    [-120, 25],
+    [-80, 25],
+    [-80, 40],
+    [-120, 40],
+    [-120, 25],
+  ];
+  renderCircumferenceGradient(canvas, route, bounds, [], 40_000);
+  const [x, y] = circumferenceGradientCanvasCoordinate([-100, 40], bounds, 512, 512);
+  const alpha = (px, py) =>
+    renderedImage.data[(Math.floor(py) * 512 + Math.floor(px)) * 4 + 3];
+  assert.ok(alpha(x, y) > 100, 'gradient starts at the projected boundary');
+  const oldLatitudeY = ((55 - 40) / (55 - 20)) * 512;
+  assert.ok(Math.abs(y - oldLatitudeY) > 20);
+  assert.equal(
+    alpha(x, oldLatitudeY),
+    0,
+    'no displaced copy on the old linear latitude scale',
+  );
+});
+
+test('zoomed gradient bounds cover the viewport without using a continent-sized texture', () => {
+  const envelope = [-126, 24, -66, 50];
+  assert.deepEqual(
+    circumferenceGradientViewportBounds(envelope, [-180, -80, 180, 80]),
+    envelope,
+  );
+  const local = circumferenceGradientViewportBounds(envelope, [-123, 47, -122, 48]);
+  assert.ok(local[0] < -123 && local[2] > -122);
+  assert.ok(local[1] < 47 && local[3] > 48);
+  assert.ok(local[2] - local[0] < 2);
+  assert.equal(circumferenceGradientViewportBounds(envelope, [100, 1, 104, 2]), null);
+});
+
+test('pixels beyond the fade stay fully transparent across latitude scales', () => {
+  let renderedImage;
+  const canvas = {
+    width: 8,
+    height: 128,
+    getContext: () => ({
+      clearRect() {},
+      createImageData: (width, height) => ({
+        data: new Uint8ClampedArray(width * height * 4),
+      }),
+      putImageData(image) {
+        renderedImage = image;
+      },
+    }),
+  };
+  const route = [
+    [-120, 25],
+    [-110, 25],
+    [-110, 45],
+    [-120, 45],
+    [-120, 25],
+  ];
+  renderCircumferenceGradient(
+    canvas,
+    route,
+    [-90, 20, -80, 55],
+    [],
+    67_892.33626975366,
+  );
+  assert.ok(renderedImage.data.every((value) => value === 0));
 });
 
 test('the sidebar follows product, mode, results, and selection hierarchy', async () => {

@@ -118,6 +118,13 @@ margin, so the finite raster has no visible rectangular edge. An area-level near
 mask—independent from the landmasses used in the result statistics—and the detailed
 basemap water layer terminate the field at coastlines before that maximum distance.
 
+Highways use a separate gradient source and a complete interior polygon fill. Their
+outside-only fade width is `10 km × log10(1 + enclosed area in km²)`, about 67.9 km for
+the current continental circle; the legend reports that distance. Gradient pixels and
+coast masks use Web Mercator coordinates with local ground-distance scaling. A cached
+segment index preserves every boundary bend, and the highway texture is cropped and
+redrawn after map movement or resize to retain detail at close zooms.
+
 The heatmap has one active local data area because street and schedule data are loaded
 per region. A `moveend` listener activates the nearest supported metro at local zoom
 without moving the camera, so ordinary map navigation replaces the old city mode switch.

@@ -112,10 +112,14 @@ export function syncCircumferenceVisibility(): void {
     setLayerVisibility(
       `circumference-gradient-${areaKey}`,
       routeGradientToggle.checked &&
-        ((highwayVisible && areaKey === 'cdmx') ||
-          (routeVisible && Boolean(circumferenceStates[areaKey].selected))),
+        routeVisible &&
+        Boolean(circumferenceStates[areaKey].selected),
     );
   }
+  setLayerVisibility(
+    'highway-circumference-gradient',
+    highwayVisible && routeGradientToggle.checked,
+  );
   setLayerVisibility('circumference-area', routeVisible && routeAreaToggle.checked);
   setLayerVisibility(
     'highway-circumference-area',
