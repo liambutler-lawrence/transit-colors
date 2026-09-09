@@ -74,6 +74,7 @@ export function osmRouteObservation(data, relationId) {
   if (!relation) throw new Error(`OpenStreetMap relation ${relationId} is missing`);
 
   const coordinates = [];
+  let previousTrackMember = null;
   for (const member of relation.members.filter(({ type }) => type === 'way')) {
     const way = elementByKey.get(elementKey('way', member.ref));
     if (
@@ -82,6 +83,16 @@ export function osmRouteObservation(data, relationId) {
     ) {
       continue;
     }
+    // Some route relations accidentally repeat a track member consecutively.
+    // Appending it again reverses the same track and invents a jump to the next
+    // way. Keep later revisits and explicit changes of traversal role intact.
+    if (
+      member.ref === previousTrackMember?.ref &&
+      member.role === previousTrackMember.role
+    ) {
+      continue;
+    }
+    previousTrackMember = member;
     const wayCoordinates = way.nodes
       .map((nodeId) => elementByKey.get(elementKey('node', nodeId)))
       .filter(Boolean)

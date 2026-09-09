@@ -1,7 +1,10 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
 
-import { buildOsmRouteCenterlines } from './osm-route-centerlines.mjs';
+import {
+  buildOsmRouteCenterlines,
+  osmRouteObservation,
+} from './osm-route-centerlines.mjs';
 import { stationEdgeKey } from './gtfs-shape-centerlines.mjs';
 
 function relationData(relationId, latitudeOffset, reverse = false) {
@@ -32,6 +35,64 @@ function relationData(relationId, latitudeOffset, reverse = false) {
     ],
   };
 }
+
+function multiWayRelation(wayIds) {
+  return {
+    elements: [
+      ...[
+        [0, 0],
+        [0.01, 0],
+        [0.015, -0.005],
+        [0.02, 0],
+        [0.03, 0],
+      ].map(([lon, lat], index) => ({ type: 'node', id: index + 1, lon, lat })),
+      ...[
+        [10, [1, 2]],
+        [11, [2, 3, 4]],
+        [12, [4, 5]],
+      ].map(([id, nodes]) => ({
+        type: 'way',
+        id,
+        nodes,
+        tags: { railway: 'subway' },
+      })),
+      {
+        type: 'relation',
+        id: 100,
+        members: wayIds.map((ref) => ({ type: 'way', ref, role: '' })),
+      },
+    ],
+  };
+}
+
+test('consecutive duplicate OSM track members do not retrace a section', () => {
+  const expected = [
+    [0, 0],
+    [0.01, 0],
+    [0.015, -0.005],
+    [0.02, 0],
+    [0.03, 0],
+  ];
+  for (const wayIds of [
+    [10, 11, 11, 12],
+    [10, 10, 11, 12, 12],
+  ]) {
+    assert.deepEqual(
+      osmRouteObservation(multiWayRelation(wayIds), 100).coordinates,
+      expected,
+    );
+  }
+});
+
+test('OSM routes retain nonconsecutive revisits to a track member', () => {
+  const observation = osmRouteObservation(multiWayRelation([10, 11, 12, 11, 10]), 100);
+  assert.deepEqual(observation.coordinates.at(-1), [0, 0]);
+  assert.equal(
+    observation.coordinates.filter(([lon, lat]) => lon === 0.015 && lat === -0.005)
+      .length,
+    2,
+  );
+});
 
 test('OpenStreetMap directional route relations average between track sides', () => {
   const stationCoordinateById = new Map([
