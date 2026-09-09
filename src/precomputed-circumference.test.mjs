@@ -334,6 +334,32 @@ test('parallel branches taper at their physical split across every metro', async
   }
 });
 
+test('Singapore Downtown Line crosses directly from Bayfront to Downtown without a spike', async () => {
+  const [routeData, schedules] = await Promise.all([
+    readFile(
+      new URL('../data/singapore-circumference.json', import.meta.url),
+      'utf8',
+    ).then(JSON.parse),
+    readFile(new URL('../data/singapore-schedules.json', import.meta.url), 'utf8').then(
+      JSON.parse,
+    ),
+  ]);
+  const fromId = 'gtfs/singapore-rail/DT16-CE1/DT';
+  const toId = 'gtfs/singapore-rail/DT17/DT';
+  const segment = routeData.track.network.segments.find(
+    ({ from, to }) => from.id === fromId && to.id === toId,
+  );
+  assert.ok(segment);
+  const scheduleGeometry = schedules.graph.g[fromId].find(([id]) => id === toId)[1];
+  assert.deepEqual(segment.coordinates, scheduleGeometry);
+  // The two source tracks cross the bay south of Bayfront. A repeated OSM
+  // member previously pulled their average north toward Promenade, producing
+  // a 2.37 km spike instead of this roughly 0.9 km station-to-station section.
+  assert.ok(lineLengthMeters(segment.coordinates) > 800);
+  assert.ok(lineLengthMeters(segment.coordinates) < 1_100);
+  assert.ok(segment.coordinates.every(([, lat]) => lat <= 1.2821));
+});
+
 test('Singapore includes the completed Circle Line closure', async () => {
   const routeData = circumferenceGeometryVariantsSchema.parse(
     JSON.parse(
