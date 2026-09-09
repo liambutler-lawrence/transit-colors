@@ -7,6 +7,8 @@ import { geodesicDistanceMeters, geodesicMidpoint } from './wgs84-geodesy.mjs';
 
 const SAMPLE_SPACING_METERS = 50;
 const PAIR_SEARCH_METERS = 160;
+const MAX_PAIRED_CONTINUATION_WIDTH_METERS = 2_000;
+const MAX_PAIRED_CONTINUATION_LENGTH_METERS = 25_000;
 const GRID_SIZE_DEGREES = 0.002;
 const MAX_DIRECT_CONNECTOR_METERS = 25_000;
 const MAX_RECIPROCAL_ENDPOINT_GAP_METERS = 2_500;
@@ -339,12 +341,27 @@ function gridCell([longitude, latitude]) {
   ];
 }
 
-function nearestOpposingSample(sample, chain, grid, chainById) {
+function nearestOpposingSample(
+  sample,
+  chain,
+  grid,
+  chainById,
+  maximumDistanceMeters = PAIR_SEARCH_METERS,
+) {
   const [cellX, cellY] = gridCell(sample.coordinate);
+  const cellRadius =
+    maximumDistanceMeters === PAIR_SEARCH_METERS
+      ? 2
+      : Math.ceil(
+          maximumDistanceMeters /
+            (110_000 *
+              GRID_SIZE_DEGREES *
+              Math.cos((sample.coordinate[1] * Math.PI) / 180)),
+        ) + 1;
   const nearestByChain = new Map();
   const visitedSegments = new Set();
-  for (let x = cellX - 2; x <= cellX + 2; x += 1) {
-    for (let y = cellY - 2; y <= cellY + 2; y += 1) {
+  for (let x = cellX - cellRadius; x <= cellX + cellRadius; x += 1) {
+    for (let y = cellY - cellRadius; y <= cellY + cellRadius; y += 1) {
       for (const candidate of grid.get(`${x},${y}`) ?? []) {
         if (candidate.chainId === chain.id) continue;
         if (
@@ -367,7 +384,7 @@ function nearestOpposingSample(sample, chain, grid, chainById) {
           sample.coordinate,
           projectedCoordinate,
         );
-        if (distanceMeters > PAIR_SEARCH_METERS) continue;
+        if (distanceMeters > maximumDistanceMeters) continue;
         const routePenalty =
           chain.tokens.size > 0 &&
           candidateChain.tokens.size > 0 &&
@@ -410,7 +427,12 @@ function nearestOpposingSample(sample, chain, grid, chainById) {
     ) {
       continue;
     }
-    if (!best || match.score < best.score) best = match;
+    if (!best || match.score < best.score) {
+      best = {
+        ...match,
+        sourcePosition: match.sourceSegmentIndex + Math.max(0, Math.min(1, fraction)),
+      };
+    }
   }
   return best;
 }
@@ -444,6 +466,87 @@ function midpoint(first, second) {
   return geodesicMidpoint(first, second).map((value) => Number(value.toFixed(7)));
 }
 
+function continueBoundedCarriagewayPairs(chain, matches, grid, chainById) {
+  const continuations = [];
+  for (let index = 1; index < matches.length - 1; index += 1) {
+    if (matches[index] || !matches[index - 1]) continue;
+    const start = index;
+    while (index < matches.length && !matches[index]) index += 1;
+    const before = matches[start - 1];
+    const after = matches[index];
+    // Only continue an already established pair, confirmed on both sides of
+    // the gap. Never extend an unmatched terminal or switch opposing roads.
+    if (
+      !after ||
+      before.chainId !== after.chainId ||
+      before.sourcePosition <= after.sourcePosition ||
+      chain.samples[index].distanceMeters - chain.samples[start - 1].distanceMeters >
+        MAX_PAIRED_CONTINUATION_LENGTH_METERS
+    ) {
+      continue;
+    }
+    const continuation = [];
+    let prior = before;
+    let priorMidpoint = midpoint(
+      chain.samples[start - 1].coordinate,
+      before.coordinate,
+    );
+    for (let gapIndex = start; gapIndex <= index; gapIndex += 1) {
+      const sample = chain.samples[gapIndex];
+      const match =
+        gapIndex === index
+          ? after
+          : nearestOpposingSample(
+              sample,
+              chain,
+              grid,
+              chainById,
+              MAX_PAIRED_CONTINUATION_WIDTH_METERS,
+            );
+      if (
+        !match ||
+        match.chainId !== before.chainId ||
+        match.sourcePosition > prior.sourcePosition + 1e-9 ||
+        match.sourcePosition < after.sourcePosition - 1e-9
+      ) {
+        break;
+      }
+      if (
+        gapIndex !== index &&
+        nearestOpposingSample(
+          match,
+          chainById.get(match.chainId),
+          grid,
+          chainById,
+          MAX_PAIRED_CONTINUATION_WIDTH_METERS,
+        )?.chainId !== chain.id
+      ) {
+        break;
+      }
+      const coordinate = midpoint(sample.coordinate, match.coordinate);
+      if (
+        geodesicDistanceMeters(priorMidpoint, coordinate) >
+        SAMPLE_SPACING_METERS * 2.8
+      ) {
+        break;
+      }
+      continuation.push(match);
+      prior = match;
+      priorMidpoint = coordinate;
+    }
+    // Every sample must have a valid closest opposing tangent, in reverse
+    // order along the same continuous source chain. A closer competing road
+    // on either side invalidates the continuation; never force the partner through
+    // a junction with a different nearest opposing carriageway.
+    if (continuation.length !== index - start + 1) continue;
+    for (let offset = 0; offset < index - start; offset += 1) {
+      matches[start + offset] = continuation[offset];
+    }
+    continuations.push({ start: start - 1, end: index, chainId: before.chainId });
+  }
+  return continuations;
+}
+
 export function buildAveragedMainlines(chains) {
   const sampledChains = chains.map(resampleChain);
   const chainById = new Map(sampledChains.map((chain) => [chain.id, chain]));
@@ -459,8 +562,22 @@ export function buildAveragedMainlines(chains) {
   }
 
   const parts = [];
+  let widePairContinuationCount = 0;
+  let widePairSampleCount = 0;
   const endpointsByTopologyKey = new Map();
   for (const chain of sampledChains) {
+    const matches = chain.samples.map((sample) =>
+      nearestOpposingSample(sample, chain, grid, chainById),
+    );
+    const continuedMatches = [...matches];
+    const continuations = continueBoundedCarriagewayPairs(
+      chain,
+      continuedMatches,
+      grid,
+      chainById,
+    );
+    const partIndicesByStartSample = new Map();
+    const partIndicesByEndSample = new Map();
     let coordinates = [];
     let matchCount = 0;
     let matchedChainId = null;
@@ -520,6 +637,8 @@ export function buildAveragedMainlines(chains) {
         };
         const partIndex = parts.length;
         parts.push(part);
+        partIndicesByStartSample.set(runStartSampleIndex, partIndex);
+        partIndicesByEndSample.set(runEndSampleIndex, partIndex);
         for (const startTopologyKey of startTopologyKeys) {
           const endpoints = endpointsByTopologyKey.get(startTopologyKey) ?? [];
           endpoints.push(`${partIndex}:start`);
@@ -540,7 +659,7 @@ export function buildAveragedMainlines(chains) {
       runEndMatchSampleIndex = null;
     };
     for (const [sampleIndex, sample] of chain.samples.entries()) {
-      const match = nearestOpposingSample(sample, chain, grid, chainById);
+      const match = matches[sampleIndex];
       if (!match) {
         finishPart();
         priorRunEndTopologyKey = null;
@@ -571,6 +690,52 @@ export function buildAveragedMainlines(chains) {
       coordinates.push(coordinate);
     }
     finishPart();
+    for (const continuation of continuations) {
+      const beforeIndex = partIndicesByEndSample.get(continuation.start);
+      const afterIndex = partIndicesByStartSample.get(continuation.end);
+      if (beforeIndex === undefined || afterIndex === undefined) continue;
+      const before = parts[beforeIndex];
+      const after = parts[afterIndex];
+      if (
+        before.pairedChainId !== continuation.chainId ||
+        after.pairedChainId !== continuation.chainId
+      ) {
+        continue;
+      }
+      const startKey = `${chain.id}:wide-pair:${continuation.start}`;
+      const endKey = `${chain.id}:wide-pair:${continuation.end}`;
+      before.endTopologyKeys.push(startKey);
+      after.startTopologyKeys.push(endKey);
+      const partIndex = parts.length;
+      const bridgeCoordinates = [before.coordinates.at(-1)];
+      for (let i = continuation.start + 1; i < continuation.end; i += 1) {
+        bridgeCoordinates.push(
+          midpoint(chain.samples[i].coordinate, continuedMatches[i].coordinate),
+        );
+      }
+      bridgeCoordinates.push(after.coordinates[0]);
+      // Keep existing feature extents: merging long features changes which
+      // distant junctions attach to their terminals. The new sampled section
+      // joins their exact endpoints through explicit shared topology keys.
+      parts.push({
+        ...before,
+        id: `osm-mainline-${partIndex + 1}`,
+        coordinates: bridgeCoordinates,
+        startNodeId: null,
+        endNodeId: null,
+        startTopologyKeys: [startKey],
+        endTopologyKeys: [endKey],
+        continuationEndpoints: { beforeId: before.id, afterId: after.id },
+        continuationSampleCount: continuation.end - continuation.start - 1,
+      });
+      endpointsByTopologyKey.set(startKey, [
+        `${beforeIndex}:end`,
+        `${partIndex}:start`,
+      ]);
+      endpointsByTopologyKey.set(endKey, [`${partIndex}:end`, `${afterIndex}:start`]);
+      widePairContinuationCount += 1;
+      widePairSampleCount += continuation.end - continuation.start - 1;
+    }
     chain.pairCoverage = matchCount / chain.samples.length;
   }
   const endpointParents = new Map(
@@ -601,7 +766,12 @@ export function buildAveragedMainlines(chains) {
   }
   for (const endpointIds of endpointGroups.values()) {
     if (endpointIds.length < 2) continue;
-    const coordinates = endpointIds.map((endpointId) => {
+    // Continuations reuse established endpoints; their duplicate coordinates
+    // must not change the mean of an existing multi-feature endpoint group.
+    const originalEndpointIds = endpointIds.filter(
+      (endpointId) => !parts[Number(endpointId.split(':')[0])].continuationEndpoints,
+    );
+    const coordinates = originalEndpointIds.map((endpointId) => {
       const [partIndexValue, endpoint] = endpointId.split(':');
       const part = parts[Number(partIndexValue)];
       return endpoint === 'start' ? part.coordinates[0] : part.coordinates.at(-1);
@@ -634,6 +804,8 @@ export function buildAveragedMainlines(chains) {
     statistics: {
       averagedPartCount: parts.length,
       chainCount: sampledChains.length,
+      widePairContinuationCount,
+      widePairSampleCount,
       pairedChainCount: sampledChains.filter((chain) => chain.pairCoverage > 0.5)
         .length,
       sampleCount: sampledChains.reduce(
@@ -2130,7 +2302,55 @@ function joinMainlineJunctions(parts, grid, junctions) {
   return { mergedGroups: groups.filter((group) => group.proposed).length };
 }
 
+function attachWidePairContinuations(parts, continuations) {
+  const partById = new Map(parts.map((part) => [part.id, part]));
+  for (const continuation of continuations) {
+    const before = partById.get(continuation.continuationEndpoints.beforeId);
+    const after = partById.get(continuation.continuationEndpoints.afterId);
+    const coordinates = [
+      before.coordinates.at(-1),
+      ...continuation.coordinates.slice(1, -1),
+      after.coordinates[0],
+    ];
+    const joined = [before.coordinates.at(-2), ...coordinates, after.coordinates[1]];
+    if (
+      mainlineReversalCount(joined) > 0 ||
+      coordinates.some(
+        (point, index) =>
+          index > 0 &&
+          geodesicDistanceMeters(coordinates[index - 1], point) >
+            SAMPLE_SPACING_METERS * 2.8,
+      )
+    ) {
+      before.endTopologyKeys = before.endTopologyKeys.filter(
+        (key) => !continuation.startTopologyKeys.includes(key),
+      );
+      after.startTopologyKeys = after.startTopologyKeys.filter(
+        (key) => !continuation.endTopologyKeys.includes(key),
+      );
+      continue;
+    }
+    continuation.coordinates = coordinates;
+    parts.push(continuation);
+  }
+}
+
 export function connectMainlinePartsAtSourceNodes(osm, mainlineWays, parts) {
+  const continuations = parts.filter((part) => part.continuationEndpoints);
+  if (continuations.length > 0) {
+    // Resolve the existing network first. A new continuity segment already
+    // has explicit endpoint connections and must not reclassify old junctions
+    // by changing a long feature's extent or joining its endpoint groups.
+    const existingParts = parts.filter((part) => !part.continuationEndpoints);
+    const statistics = connectMainlinePartsAtSourceNodes(
+      osm,
+      mainlineWays,
+      existingParts,
+    );
+    attachWidePairContinuations(existingParts, continuations);
+    parts.splice(0, parts.length, ...existingParts);
+    return statistics;
+  }
   const wayById = new Map(mainlineWays.map((way) => [way.id, way]));
   const sourceWayIdToPartIndices = indexPartsBySourceWay(parts);
   const partSegmentGrid = buildPartSegmentGrid(parts);
@@ -2362,6 +2582,14 @@ export function buildOsmHighwayCenterlines(osm) {
     parts: [...averaged.parts, ...ramps.connectors],
     statistics: {
       ...averaged.statistics,
+      averagedPartCount: averaged.parts.length,
+      widePairContinuationCount: averaged.parts.filter(
+        (part) => part.continuationEndpoints,
+      ).length,
+      widePairSampleCount: averaged.parts.reduce(
+        (total, part) => total + (part.continuationSampleCount ?? 0),
+        0,
+      ),
       mainlineJunctionCount: mainlineTopology.junctionCount,
       ...ramps.statistics,
     },
