@@ -228,6 +228,37 @@ test('regenerated tiles retain centered mainlines and separate ramps continent-w
     }
     assert.equal(northernConnectors.size, 1, 'one centerline for the northern turn');
 
+    // Memorial Drive's centerline must end where its opposing carriageway
+    // stops, without a tail formed by repeatedly pairing with its endpoint.
+    const oldSpurTip = [-84.1702383, 33.8189497];
+    const stoneTile = webMercatorTile(...oldSpurTip, 14);
+    const stoneData = await archive.getZxy(14, stoneTile.x, stoneTile.y);
+    assert.ok(stoneData);
+    const stoneLayer = new VectorTile(new Pbf(stoneData.data)).layers['highways'];
+    const stoneMainlineCoordinates = [];
+    for (let index = 0; index < stoneLayer.length; index += 1) {
+      const feature = stoneLayer.feature(index);
+      if (feature.properties['role'] !== 'mainline') continue;
+      const geometry = feature.toGeoJSON(stoneTile.x, stoneTile.y, 14).geometry;
+      stoneMainlineCoordinates.push(
+        ...(geometry.type === 'LineString'
+          ? geometry.coordinates
+          : geometry.coordinates.flat()),
+      );
+    }
+    assert.ok(
+      stoneMainlineCoordinates.every(
+        (point) => geodesicDistanceMeters(point, oldSpurTip) > 25,
+      ),
+      'Stone Mountain tiles must omit the unsupported mainline spur',
+    );
+    assert.ok(
+      stoneMainlineCoordinates.some(
+        (point) => geodesicDistanceMeters(point, [-84.1717399, 33.8181365]) < 20,
+      ),
+      'Stone Mountain tiles must retain the valid approach centerline',
+    );
+
     const toronto407 = await highwayPropertiesNear(archive, -79.54, 43.79);
     assert.ok(
       toronto407.some(

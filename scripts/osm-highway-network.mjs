@@ -341,7 +341,7 @@ function gridCell([longitude, latitude]) {
 
 function nearestOpposingSample(sample, chain, grid, chainById) {
   const [cellX, cellY] = gridCell(sample.coordinate);
-  let best = null;
+  const nearestByChain = new Map();
   const visitedSegments = new Set();
   for (let x = cellX - 2; x <= cellX + 2; x += 1) {
     for (let y = cellY - 2; y <= cellY + 2; y += 1) {
@@ -375,21 +375,47 @@ function nearestOpposingSample(sample, chain, grid, chainById) {
             ? 110
             : 0;
         const score = distanceMeters + routePenalty;
-        if (!best || score < best.score) {
-          best = {
+        const nearest = nearestByChain.get(candidate.chainId);
+        if (!nearest || score < nearest.score) {
+          nearestByChain.set(candidate.chainId, {
             ...candidate,
             coordinate: projectedCoordinate,
             distanceMeters,
             score,
-          };
+          });
         }
       }
     }
   }
+  let best = null;
+  for (const match of nearestByChain.values()) {
+    const opposingChain = chainById.get(match.chainId);
+    const coordinates = opposingChain.coordinates;
+    const closed =
+      opposingChain.startNodeId != null &&
+      opposingChain.startNodeId === opposingChain.endNodeId;
+    const fraction = coordinateProjectionFraction(
+      sample.coordinate,
+      coordinates[match.sourceSegmentIndex],
+      coordinates[match.sourceSegmentIndex + 1],
+    );
+    // A terminal point cannot act as an opposing carriageway after that
+    // carriageway ends. Reject the whole chain's nearest match, so a farther
+    // interior vertex cannot replace the same invalid endpoint. Interior bends
+    // may still use their closest vertex where adjacent segments meet.
+    if (
+      !closed &&
+      ((match.sourceSegmentIndex === 0 && fraction < -1e-9) ||
+        (match.sourceSegmentIndex === coordinates.length - 2 && fraction > 1 + 1e-9))
+    ) {
+      continue;
+    }
+    if (!best || match.score < best.score) best = match;
+  }
   return best;
 }
 
-function projectCoordinateOntoSegment(point, start, end) {
+function coordinateProjectionFraction(point, start, end) {
   const referenceLatitude = ((point[1] + start[1] + end[1]) / 3) * (Math.PI / 180);
   const longitudeScale = Math.cos(referenceLatitude);
   const startX = start[0] * longitudeScale;
@@ -398,17 +424,16 @@ function projectCoordinateOntoSegment(point, start, end) {
   const segmentX = endX - startX;
   const segmentY = end[1] - start[1];
   const squaredLength = segmentX * segmentX + segmentY * segmentY;
-  const fraction =
-    squaredLength === 0
-      ? 0
-      : Math.max(
-          0,
-          Math.min(
-            1,
-            ((pointX - startX) * segmentX + (point[1] - start[1]) * segmentY) /
-              squaredLength,
-          ),
-        );
+  return squaredLength === 0
+    ? 0
+    : ((pointX - startX) * segmentX + (point[1] - start[1]) * segmentY) / squaredLength;
+}
+
+function projectCoordinateOntoSegment(point, start, end) {
+  const fraction = Math.max(
+    0,
+    Math.min(1, coordinateProjectionFraction(point, start, end)),
+  );
   return [
     start[0] + (end[0] - start[0]) * fraction,
     start[1] + (end[1] - start[1]) * fraction,
