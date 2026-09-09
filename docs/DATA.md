@@ -167,6 +167,21 @@ to that mainline. The attachment search can span an early carriageway split, but
 for that source-mapped endpoint; a bridge, tunnel, or other coordinate-only crossing
 therefore cannot become an intersection.
 
+After reciprocal ramps are attached, every displayed mainline end is audited against
+both source carriageways. If both terminate exclusively in different, already
+represented `motorway_link` movements, the common mainline stops at its outermost
+existing ramp attachment. A reciprocal movement using both terminal sides, an
+unrepresented exit, a mainline continuation, or another mainline junction prevents
+trimming. This removes redundant tails even when the physical pavement remains parallel
+beyond the split. Ramp geometry and attachment coordinates are preserved.
+
+The September 2026 audit checked 13,594 ends and removed seven tails totaling 1,429.7 m,
+including the 443.4 m tail north of Morelia. The recorded source nodes and retained
+attachments are in `scripts/fixtures/mainline-ending-audit.json`; the tile regression
+checks every recorded location. `scripts/fixtures/morelia-interchange.json` exercises
+the complete build from source roads. These checks cover terminal support and
+connectivity; they are not a visual certification of every interchange's ramp curves.
+
 The continental boundary is assembled directly on the detailed biconnected graph. A
 northeastern cycle is routed through Highway 407, Ottawa, Québec, and coastal New
 England; independent node-disjoint perimeter ears then add I-495 in southeastern

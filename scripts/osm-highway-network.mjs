@@ -4,6 +4,10 @@ import { spawn } from 'node:child_process';
 import readline from 'node:readline';
 
 import { hasProperSelfIntersection } from './highway-cycle.mjs';
+import {
+  buildMainlineEndingIndex,
+  trimRampOnlyMainlineTails,
+} from './highway-mainline-endings.mjs';
 
 import { geodesicDistanceMeters, geodesicMidpoint } from './wgs84-geodesy.mjs';
 
@@ -2791,6 +2795,11 @@ export function buildOsmHighwayCenterlines(osm) {
     averaged.parts,
     prepared.connectors,
   );
+  const endingAudit = trimRampOnlyMainlineTails(
+    averaged.parts,
+    ramps.connectors,
+    buildMainlineEndingIndex(chains, prepared.mainlines, prepared.connectors),
+  );
   return {
     ...averaged,
     parts: [...averaged.parts, ...ramps.connectors],
@@ -2806,6 +2815,7 @@ export function buildOsmHighwayCenterlines(osm) {
       ),
       mainlineJunctionCount: mainlineTopology.junctionCount,
       ...ramps.statistics,
+      ...endingAudit.statistics,
     },
     connectorWays: prepared.connectors,
     mainlineWays: prepared.mainlines,

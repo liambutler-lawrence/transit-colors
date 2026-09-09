@@ -53,6 +53,46 @@ async function highwayPropertiesNear(archive, longitude, latitude) {
   return [...propertiesById.values()];
 }
 
+async function assertTrimmedMainlineEnd(archive, ending) {
+  const mainlineCoordinates = [];
+  const connectorIds = new Set();
+  const visitedTiles = new Set();
+  for (const point of [ending.from, ending.to]) {
+    const { x, y } = webMercatorTile(...point, 14);
+    if (visitedTiles.has(`${x},${y}`)) continue;
+    visitedTiles.add(`${x},${y}`);
+    const tile = await archive.getZxy(14, x, y);
+    assert.ok(tile);
+    const layer = new VectorTile(new Pbf(tile.data)).layers['highways'];
+    for (let index = 0; index < layer.length; index += 1) {
+      const feature = layer.feature(index);
+      if (feature.properties['role'] === 'connector')
+        connectorIds.add(feature.properties['id']);
+      if (feature.properties['id'] !== ending.partId) continue;
+      const geometry = feature.toGeoJSON(x, y, 14).geometry;
+      mainlineCoordinates.push(
+        ...(geometry.type === 'LineString'
+          ? geometry.coordinates
+          : geometry.coordinates.flat()),
+      );
+    }
+  }
+  assert.ok(
+    mainlineCoordinates.some((point) => geodesicDistanceMeters(point, ending.to) < 2),
+    `${ending.partId} retains the approach to its ramp attachment`,
+  );
+  assert.ok(
+    mainlineCoordinates.every(
+      (point) =>
+        geodesicDistanceMeters(point, ending.from) > ending.distanceMeters * 0.75,
+    ),
+    `${ending.partId} omits its redundant terminal tail`,
+  );
+  for (const id of ending.connectorIds) {
+    assert.ok(connectorIds.has(id), `${ending.partId} retains reciprocal ramp ${id}`);
+  }
+}
+
 test('North America highway data publishes one validated maximum and full vector network', () => {
   assert.equal(data.methodology.optimizationStatus, 'validated-detailed');
   assert.equal(
@@ -166,6 +206,15 @@ test('regenerated tiles retain centered mainlines and separate ramps continent-w
   };
   try {
     const archive = new PMTiles(source);
+    const endingAudit = JSON.parse(
+      await readFile(
+        new URL('../scripts/fixtures/mainline-ending-audit.json', import.meta.url),
+        'utf8',
+      ),
+    );
+    for (const ending of endingAudit.trims) {
+      await assertTrimmedMainlineEnd(archive, ending);
+    }
     const norwalk = await highwayPropertiesNear(archive, -73.4204, 41.109);
     assert.ok(
       norwalk.some(

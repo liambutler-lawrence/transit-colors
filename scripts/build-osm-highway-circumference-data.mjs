@@ -125,9 +125,9 @@ const landmassBuffer = await readFile(landmassSourcePath);
 let derived;
 try {
   derived = deserialize(await readFile(derivedCachePath));
-  if (derived.displayTopologyVersion !== 22) {
+  if (derived.displayTopologyVersion !== 23) {
     throw new Error(
-      'The cached display topology predates continuous ramp-bend correspondence.',
+      'The cached display topology predates the source-topology audit of ramp-only mainline tails.',
     );
   }
   console.log(`Reused ${derivedCachePath}.`);
@@ -150,7 +150,7 @@ try {
   console.log(detailed.statistics);
   derived = {
     detailed,
-    displayTopologyVersion: 22,
+    displayTopologyVersion: 23,
   };
   await writeFile(derivedCachePath, serialize(derived));
 
@@ -179,7 +179,7 @@ try {
   derived = {
     compressed,
     detailed,
-    displayTopologyVersion: 22,
+    displayTopologyVersion: 23,
     graphStatistics,
     sourceCompressed: compressed,
     sourceGraphParts: exactGraph.parts.map(({ id, role, tokens }) => ({
@@ -188,13 +188,13 @@ try {
       tokens,
     })),
     sourceGraphStatistics: graphStatistics,
-    sourceTopologyVersion: 23,
+    sourceTopologyVersion: 24,
   };
   await writeFile(derivedCachePath, serialize(derived));
 }
 globalThis.gc?.();
 const { detailed } = derived;
-if (derived.sourceTopologyVersion !== 23) {
+if (derived.sourceTopologyVersion !== 24) {
   console.time('Read OSM mainline continuity topology');
   const osm = await readOsmMotorwayPbf(sourcePath);
   console.timeEnd('Read OSM mainline continuity topology');
@@ -223,7 +223,7 @@ if (derived.sourceTopologyVersion !== 23) {
     exactEdges: sourceGraph.edges.length,
     exactNodes: sourceGraph.coordinateByNodeId.size,
   };
-  derived.sourceTopologyVersion = 23;
+  derived.sourceTopologyVersion = 24;
   console.timeEnd('Build explicit paired-centerline route graph');
   console.log(derived.sourceGraphStatistics);
   await writeFile(derivedCachePath, serialize(derived));

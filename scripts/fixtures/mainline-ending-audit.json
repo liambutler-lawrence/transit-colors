@@ -1,0 +1,72 @@
+{
+  "trims": [
+    {
+      "partId": "osm-mainline-474",
+      "side": "start",
+      "from": [-96.7162386, 40.8628379],
+      "to": [-96.7156805, 40.8615618],
+      "distanceMeters": 149.32028106274043,
+      "sourceNodes": ["134928540", "134942035"],
+      "connectorIds": ["osm-connector-2286", "osm-connector-2285"]
+    },
+    {
+      "partId": "osm-mainline-491",
+      "side": "start",
+      "from": [-90.5695106, 41.8256224],
+      "to": [-90.5695508, 41.8256219],
+      "distanceMeters": 3.3401399729453822,
+      "sourceNodes": ["611522714", "611522711"],
+      "connectorIds": ["osm-connector-2585", "osm-connector-2586"]
+    },
+    {
+      "partId": "osm-mainline-500",
+      "side": "end",
+      "from": [-90.5252794, 41.5960723],
+      "to": [-90.5238763, 41.591974],
+      "distanceMeters": 469.97877461277744,
+      "sourceNodes": ["9158607650", "8188204089"],
+      "connectorIds": ["osm-connector-2622", "osm-connector-2623"]
+    },
+    {
+      "partId": "osm-mainline-5248",
+      "side": "start",
+      "from": [-101.2044415, 19.8812978],
+      "to": [-101.2073167, 19.8784307],
+      "distanceMeters": 443.4168822554469,
+      "sourceNodes": ["6900982908", "4177543260"],
+      "connectorIds": ["osm-connector-4783", "osm-connector-4784"]
+    },
+    {
+      "partId": "osm-mainline-5495",
+      "side": "start",
+      "from": [-97.4913403, 18.827889],
+      "to": [-97.4909602, 18.825468],
+      "distanceMeters": 278.69087988354147,
+      "sourceNodes": ["8784249344", "465627077"],
+      "connectorIds": ["osm-connector-4043", "osm-connector-4042"]
+    },
+    {
+      "partId": "osm-mainline-5745",
+      "side": "end",
+      "from": [-81.5160742, 40.7606991],
+      "to": [-81.5160485, 40.7611037],
+      "distanceMeters": 44.98291720078674,
+      "sourceNodes": ["199898070", "199907031"],
+      "connectorIds": ["osm-connector-3344", "osm-connector-3345"]
+    },
+    {
+      "partId": "osm-mainline-5879",
+      "side": "start",
+      "from": [-75.2926079, 43.0804269],
+      "to": [-75.2921727, 43.080593],
+      "distanceMeters": 39.9564342722239,
+      "sourceNodes": ["212850500", "212859989"],
+      "connectorIds": ["osm-connector-3559", "osm-connector-3558"]
+    }
+  ],
+  "statistics": {
+    "auditedMainlineEndCount": 13594,
+    "trimmedRampOnlyTailCount": 7,
+    "trimmedRampOnlyTailMeters": 1429.6863092604624
+  }
+}
