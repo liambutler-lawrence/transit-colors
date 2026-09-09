@@ -3,6 +3,8 @@
 import { spawn } from 'node:child_process';
 import readline from 'node:readline';
 
+import { hasProperSelfIntersection } from './highway-cycle.mjs';
+
 import { geodesicDistanceMeters, geodesicMidpoint } from './wgs84-geodesy.mjs';
 
 const SAMPLE_SPACING_METERS = 50;
@@ -1149,11 +1151,172 @@ function rampCurveSamples(coordinates) {
   );
 }
 
+function rampSourceCurve(coordinates) {
+  const distances = [0];
+  for (let index = 1; index < coordinates.length; index += 1) {
+    distances.push(
+      distances.at(-1) +
+        geodesicDistanceMeters(coordinates[index - 1], coordinates[index]),
+    );
+  }
+  return { coordinates, distances };
+}
+
+function rampPointAlong(curve, distance) {
+  const { coordinates, distances } = curve;
+  let index = 1;
+  while (index < distances.length - 1 && distances[index] < distance) index += 1;
+  const fraction =
+    (distance - distances[index - 1]) / (distances[index] - distances[index - 1] || 1);
+  return {
+    coordinate: coordinates[index - 1].map(
+      (value, axis) => value + (coordinates[index][axis] - value) * fraction,
+    ),
+    direction: vector(coordinates[index - 1], coordinates[index]),
+  };
+}
+
+function rampCorrespondenceWindows(matches) {
+  const windows = [];
+  for (let index = 1; index < matches.length; index += 1) {
+    const before = matches[index - 1];
+    const after = matches[index];
+    const advance = after.oppositeDistance - before.oppositeDistance;
+    const spacing = after.referenceDistance - before.referenceDistance;
+    // A nearest-tangent switch can omit an entire source bend between two
+    // neighboring samples. Ordinary projections and short source corners stay exact.
+    if (advance <= Math.max(75, 4 * spacing)) continue;
+    const margin = Math.max(50, advance / 2);
+    let start = index - 1;
+    let end = index;
+    while (
+      start > 0 &&
+      before.referenceDistance - matches[start].referenceDistance < margin
+    ) {
+      start -= 1;
+    }
+    while (
+      end < matches.length - 1 &&
+      matches[end].referenceDistance - after.referenceDistance < margin
+    ) {
+      end += 1;
+    }
+    if (windows.length && start <= windows.at(-1).end) {
+      windows.at(-1).end = Math.max(end, windows.at(-1).end);
+    } else {
+      windows.push({ start, end });
+    }
+  }
+  return windows;
+}
+
+function rampCorrespondenceSlope(first, last) {
+  return Math.max(
+    0,
+    (last.oppositeDistance - first.oppositeDistance) /
+      (last.referenceDistance - first.referenceDistance),
+  );
+}
+
+function rampBendMetrics(coordinates) {
+  let maximum = 0;
+  let backwards = 0;
+  for (let index = 1; index < coordinates.length - 1; index += 1) {
+    const [before, point, after] = coordinates.slice(index - 1, index + 2);
+    if (
+      geodesicDistanceMeters(before, point) < 1 ||
+      geodesicDistanceMeters(point, after) < 1
+    )
+      continue;
+    const alignment = dot(vector(before, point), vector(point, after));
+    maximum = Math.max(maximum, 1 - alignment);
+    if (alignment < 0) backwards += 1;
+  }
+  return { maximum, backwards };
+}
+
+function continuousRampCorrespondence(
+  matches,
+  reference,
+  opposite,
+  coordinateForMatch,
+) {
+  const result = [...matches];
+  for (const { start, end } of rampCorrespondenceWindows(matches).toReversed()) {
+    const first = matches[start];
+    const last = matches[end];
+    const referenceSpan = last.referenceDistance - first.referenceDistance;
+    const oppositeSpan = last.oppositeDistance - first.oppositeDistance;
+    if (oppositeSpan <= 0) continue;
+    const slope = oppositeSpan / referenceSpan;
+    let firstSlope =
+      start > 0 ? rampCorrespondenceSlope(matches[start - 1], first) : slope;
+    let lastSlope =
+      end < matches.length - 1
+        ? rampCorrespondenceSlope(last, matches[end + 1])
+        : slope;
+    // Limit Hermite derivatives so correspondence moves forward on both source
+    // paths. Interpolate distance along the roads, never the resulting map line.
+    const slopeNorm = Math.hypot(firstSlope / slope, lastSlope / slope);
+    if (slopeNorm > 3) {
+      firstSlope *= 3 / slopeNorm;
+      lastSlope *= 3 / slopeNorm;
+    }
+    const sampleCount = Math.ceil(
+      (referenceSpan + oppositeSpan) / RAMP_CORRESPONDENCE_SPACING_METERS,
+    );
+    const replacement = [first];
+    let valid = true;
+    for (let index = 1; index < sampleCount; index += 1) {
+      const t = index / sampleCount;
+      const referenceDistance = first.referenceDistance + t * referenceSpan;
+      const oppositeDistance =
+        (2 * t ** 3 - 3 * t ** 2 + 1) * first.oppositeDistance +
+        (t ** 3 - 2 * t ** 2 + t) * referenceSpan * firstSlope +
+        (-2 * t ** 3 + 3 * t ** 2) * last.oppositeDistance +
+        (t ** 3 - t ** 2) * referenceSpan * lastSlope;
+      const sample = rampPointAlong(reference, referenceDistance);
+      const paired = rampPointAlong(opposite, oppositeDistance);
+      // A skipped loop can contain travel in the opposite direction. It must
+      // not be pulled into a different movement just to make correspondence continuous.
+      if (dot(sample.direction, paired.direction) < 0.25) {
+        valid = false;
+        break;
+      }
+      replacement.push({
+        referenceDistance,
+        oppositeDistance,
+        sample: sample.coordinate,
+        opposite: paired.coordinate,
+      });
+    }
+    if (!valid) continue;
+    replacement.push(last);
+    const before = start > 0 ? [matches[start - 1]] : [];
+    const after = end < matches.length - 1 ? [matches[end + 1]] : [];
+    const oldCoordinates = [...before, ...matches.slice(start, end + 1), ...after].map(
+      coordinateForMatch,
+    );
+    const newCoordinates = [...before, ...replacement, ...after].map(
+      coordinateForMatch,
+    );
+    // Include the joins to untouched samples: a repaired bend cannot introduce
+    // a sharper corner or a backward turn at the edge of its correspondence window.
+    if (
+      rampBendMetrics(newCoordinates).maximum >
+      rampBendMetrics(oldCoordinates).maximum + 1e-4
+    )
+      continue;
+    result.splice(start, end - start + 1, ...replacement);
+  }
+  return result;
+}
+
 /**
- * Project onto the nearest segment with a matching travel tangent, exactly as
- * opposing mainline samples are paired. Both inputs run in the same direction.
- * No endpoint warping, normalized-distance matching, or post-average smoothing
- * may move these midpoints away from the source carriageways.
+ * Closest tangent-aligned projections supply the correspondence anchors. When
+ * their source positions jump across a bend, continue monotonically along both
+ * carriageways through that bend before taking their WGS84 midpoints. Both
+ * inputs run in the same direction; endpoints and final midpoints are never warped.
  */
 export function averageReciprocalPathCoordinates(
   firstCoordinates,
@@ -1165,18 +1328,20 @@ export function averageReciprocalPathCoordinates(
     lineLengthMeters(firstCoordinates) <= lineLengthMeters(secondCoordinates)
       ? [firstCoordinates, secondCoordinates]
       : [secondCoordinates, firstCoordinates];
+  const referenceCurve = rampSourceCurve(reference);
+  const oppositeCurve = rampSourceCurve(opposite);
   const segments = opposite.slice(1).map((end, index) => ({
     start: opposite[index],
     end,
+    distanceAlong: oppositeCurve.distances[index],
     direction: vector(opposite[index], end),
   }));
-  const coordinates = [startCoordinate];
-  for (const sample of rampCurveSamples(reference).slice(1, -1)) {
+  const matches = [];
+  for (const sample of rampCurveSamples(reference)) {
     let best = null;
     for (const segment of segments) {
-      if (dot(sample.direction, segment.direction) < MIN_PAIRED_TANGENT_ALIGNMENT) {
+      if (dot(sample.direction, segment.direction) < MIN_PAIRED_TANGENT_ALIGNMENT)
         continue;
-      }
       const projected = projectCoordinateOntoSegment(
         sample.coordinate,
         segment.start,
@@ -1184,16 +1349,65 @@ export function averageReciprocalPathCoordinates(
       );
       const distanceMeters = geodesicDistanceMeters(sample.coordinate, projected);
       if (!best || distanceMeters < best.distanceMeters) {
-        best = { coordinate: projected, distanceMeters };
+        best = {
+          opposite: projected,
+          oppositeDistance:
+            segment.distanceAlong + geodesicDistanceMeters(segment.start, projected),
+          distanceMeters,
+        };
       }
     }
-    if (!best) continue;
-    const coordinate = midpoint(sample.coordinate, best.coordinate);
-    if (geodesicDistanceMeters(coordinates.at(-1), coordinate) > 0.25) {
-      coordinates.push(coordinate);
-    }
+    if (best)
+      matches.push({
+        ...best,
+        sample: sample.coordinate,
+        referenceDistance: sample.distanceMeters,
+      });
   }
-  coordinates.push(endCoordinate);
+  const length = referenceCurve.distances.at(-1);
+  const coordinateForMatch = (match) => {
+    if (match.referenceDistance === 0) return startCoordinate;
+    if (Math.abs(match.referenceDistance - length) < 1e-6) return endCoordinate;
+    return midpoint(match.sample, match.opposite);
+  };
+  const paired = continuousRampCorrespondence(
+    matches,
+    referenceCurve,
+    oppositeCurve,
+    coordinateForMatch,
+  );
+  const midpointCoordinates = (correspondence) => {
+    const coordinates = [startCoordinate];
+    for (const match of correspondence) {
+      if (
+        match.referenceDistance === 0 ||
+        Math.abs(match.referenceDistance - length) < 1e-6
+      )
+        continue;
+      const coordinate = coordinateForMatch(match);
+      if (geodesicDistanceMeters(coordinates.at(-1), coordinate) > 0.25)
+        coordinates.push(coordinate);
+    }
+    coordinates.push(endCoordinate);
+    return coordinates;
+  };
+  const coordinates = midpointCoordinates(paired);
+  if (
+    paired.length === matches.length &&
+    paired.every((match, index) => match === matches[index])
+  )
+    return coordinates;
+  const original = midpointCoordinates(matches);
+  const before = rampBendMetrics(original);
+  const after = rampBendMetrics(coordinates);
+  // Check the complete output after endpoint attachment and duplicate removal.
+  // Even a locally regular correspondence can intersect another part of a loop.
+  if (
+    after.backwards > before.backwards ||
+    after.maximum > before.maximum + 1e-4 ||
+    (hasProperSelfIntersection(coordinates) && !hasProperSelfIntersection(original))
+  )
+    return original;
   return coordinates;
 }
 

@@ -207,6 +207,33 @@ test('regenerated tiles retain centered mainlines and separate ramps continent-w
       'Florence ramp tiles must include the mainline continuation',
     );
 
+    // Sugarloaf's eastbound connector must trace the previously skipped source
+    // bend; the old kink sits over 35 metres away from this part of the midpoint.
+    const sugarloafPoint = [-83.9068282, 33.9743684];
+    const sugarloafTile = webMercatorTile(...sugarloafPoint, 14);
+    const sugarloafData = await archive.getZxy(14, sugarloafTile.x, sugarloafTile.y);
+    assert.ok(sugarloafData);
+    const sugarloafLayer = new VectorTile(new Pbf(sugarloafData.data)).layers[
+      'highways'
+    ];
+    const sugarloafCoordinates = [];
+    for (let index = 0; index < sugarloafLayer.length; index += 1) {
+      const feature = sugarloafLayer.feature(index);
+      if (feature.properties['role'] !== 'connector') continue;
+      const geometry = feature.toGeoJSON(sugarloafTile.x, sugarloafTile.y, 14).geometry;
+      sugarloafCoordinates.push(
+        ...(geometry.type === 'LineString'
+          ? geometry.coordinates
+          : geometry.coordinates.flat()),
+      );
+    }
+    assert.ok(
+      sugarloafCoordinates.some(
+        (coordinate) => geodesicDistanceMeters(sugarloafPoint, coordinate) < 15,
+      ),
+      'Sugarloaf ramp tiles must follow the continuous midpoint through the curve',
+    );
+
     // The northern I-285 / I-85 connection previously appeared twice, once
     // for the direct ramps and once for their longer collector alternatives.
     const atlantaPoint = [-84.2597, 33.893045];
