@@ -92,7 +92,13 @@ The highway criterion uses a separate compact runtime schema in
 `src/highway-circumference.ts`. Its offline builder operates on a network-wide
 OpenStreetMap divided-road graph. It pairs lane-qualified one-way carriageways into a
 sampled centerline, classifies direct motorway-link paths as connector edges, and
-inserts their endpoints into the mainline geometry. Geometry crossings never create
+inserts their endpoints into the mainline geometry. Ramp samples use the closest point
+on a tangent-aligned opposing segment and its WGS84 geodesic midpoint, as mainlines do.
+The shorter of the two oriented paths supplies the samples; endpoints are never warped
+to create correspondence and the midpoints are not smoothed afterward. Where ramp joins
+are staggered, the path extends along its actual source mainline carriageway through
+explicit OSM nodes, from the earlier split to the later merge. Only then are the shared
+centerline endpoints attached to the mainline graph. Geometry crossings never create
 graph nodes; topology comes from explicit shared source nodes. The continental stages
 are largest-component selection, 2-core pruning, degree-two compression, a detailed
 northeastern perimeter cycle, and independent detailed node-disjoint ears for

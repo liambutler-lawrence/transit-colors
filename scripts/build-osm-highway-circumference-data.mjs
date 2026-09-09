@@ -125,9 +125,9 @@ const landmassBuffer = await readFile(landmassSourcePath);
 let derived;
 try {
   derived = deserialize(await readFile(derivedCachePath));
-  if (derived.displayTopologyVersion !== 10) {
+  if (derived.displayTopologyVersion !== 11) {
     throw new Error(
-      'The cached display topology predates source-mapped interchange attachments.',
+      'The cached display topology predates nearest-tangent ramps with mainline continuations.',
     );
   }
   console.log(`Reused ${derivedCachePath}.`);
@@ -150,7 +150,7 @@ try {
   console.log(detailed.statistics);
   derived = {
     detailed,
-    displayTopologyVersion: 10,
+    displayTopologyVersion: 11,
   };
   await writeFile(derivedCachePath, serialize(derived));
 
@@ -179,7 +179,7 @@ try {
   derived = {
     compressed,
     detailed,
-    displayTopologyVersion: 10,
+    displayTopologyVersion: 11,
     graphStatistics,
     sourceCompressed: compressed,
     sourceGraphParts: exactGraph.parts.map(({ id, role, tokens }) => ({
@@ -188,13 +188,13 @@ try {
       tokens,
     })),
     sourceGraphStatistics: graphStatistics,
-    sourceTopologyVersion: 11,
+    sourceTopologyVersion: 12,
   };
   await writeFile(derivedCachePath, serialize(derived));
 }
 globalThis.gc?.();
 const { detailed } = derived;
-if (derived.sourceTopologyVersion !== 11) {
+if (derived.sourceTopologyVersion !== 12) {
   console.time('Read OSM mainline continuity topology');
   const osm = await readOsmMotorwayPbf(sourcePath);
   console.timeEnd('Read OSM mainline continuity topology');
@@ -223,7 +223,7 @@ if (derived.sourceTopologyVersion !== 11) {
     exactEdges: sourceGraph.edges.length,
     exactNodes: sourceGraph.coordinateByNodeId.size,
   };
-  derived.sourceTopologyVersion = 11;
+  derived.sourceTopologyVersion = 12;
   console.timeEnd('Build explicit paired-centerline route graph');
   console.log(derived.sourceGraphStatistics);
   await writeFile(derivedCachePath, serialize(derived));
@@ -384,7 +384,7 @@ if (process.env['HIGHWAY_REUSE_EXISTING_TILES'] === '1') {
 
 const output = {
   centerline_method:
-    'Network-wide geodesic midpoint of paired opposing OSM motorway carriageways and reciprocal directional ramp paths',
+    'Closest-tangent geodesic midpoints of opposing OSM motorway carriageways and reciprocal ramps, continued along source mainlines through staggered joins',
   criterion:
     'Separated controlled-access mainlines (2+ lanes per direction where lane counts are explicit) with paired reciprocal motorway-link connectors',
   landmass: {
