@@ -118,9 +118,20 @@ margin, so the finite raster has no visible rectangular edge. An area-level near
 mask—independent from the landmasses used in the result statistics—and the detailed
 basemap water layer terminate the field at coastlines before that maximum distance.
 
-The heatmap has one active local data area because street and schedule data are loaded
-per region. A `moveend` listener activates the nearest supported metro at local zoom
-without moving the camera, so ordinary map navigation replaces the old city mode switch.
+The heatmap eagerly loads and caches all five station datasets together. Its station
+source and road scorer retain every metro as the camera moves; there is no zoom
+threshold or camera-triggered metro load. Selecting a sidebar card changes the camera
+target and local destination/schedule context, while preserving global mode/future
+filters. Clicking a station in another metro selects its destination context directly.
+Routing graphs stay local to the selected metro; the station lookup covers the entire
+atlas.
+
+Heatmap cards are ranked once by the union of 5 km catchments around all open stations,
+the full range before the default distance scale's darkest red. Overlapping catchments
+and co-located platforms count once. `src/transit-coverage.ts` integrates exposed circle
+arcs in each metro's local WGS84 distance plane, matching the road scorer's distance
+metric. The geographic area includes water, is independent of road widths and zoom, and
+remains fixed when filters or the optional destination/time scale change.
 
 ## Static data
 
@@ -130,10 +141,12 @@ shared junctions and into short scoring segments inside those tiles, preserving 
 original road properties and all non-road layers. Each tile receives transit access
 scores before MapLibre renders it. Heatmap mode changes only the native road layers'
 colors, including casings and pedestrian streets; their geometry, zoom limits, filters,
-widths, opacity and draw order remain shared with the ordinary map. Station-filter or
-city changes version the tile URLs and cancel stale requests. Camera movement uses
-MapLibre's native tile loading without a separate street overlay or idle-time refresh.
-The historical CDMX street PMTiles archive remains available for offline data workflows.
+widths, opacity and draw order remain shared with the ordinary map. Each metro retains
+its own local distance projection, even when a world tile spans several metros. Station
+filter changes version tile URLs and cancel stale requests; selecting a metro does not.
+Camera movement uses MapLibre's native tile loading without a separate street overlay or
+idle-time refresh. The historical CDMX street PMTiles archive remains available for
+offline data workflows.
 
 The clock-skew dataset is committed as land-clipped MultiPolygons. The browser uses a
 projection-aware custom WebGL fill rather than precomputed color bands, allowing the

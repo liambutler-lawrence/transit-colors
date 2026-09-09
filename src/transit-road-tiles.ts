@@ -8,11 +8,84 @@ import type {
 import Pbf from 'pbf';
 
 import type { Coordinate, StationFeature, StreetFeature } from './domain.js';
+import { metersPerDegreeAtLatitude } from './geodesy.js';
 import { createStreetAccessScorer } from './routing.js';
 import type { StreetAccessScorer } from './routing/types.js';
 
 export const ROAD_SOURCE = 'openmaptiles';
 export const ROAD_SOURCE_LAYER = 'transportation';
+
+/** Keep each metro's distance projection independent of the other continents.
+ * Every tile can contain roads from several metros, even at globe scale.
+ */
+export function createAtlasStreetScorer(
+  stations: readonly StationFeature[],
+): StreetAccessScorer | null {
+  const groups = new Map<string, StationFeature[]>();
+  for (const station of stations) {
+    const key = String(station.properties['area_key'] ?? 'default');
+    const group = groups.get(key) ?? [];
+    group.push(station);
+    groups.set(key, group);
+  }
+  const regions = [...groups.values()].map((features) => {
+    const longitudes = features.map((feature) => feature.geometry.coordinates[0]);
+    const latitudes = features.map((feature) => feature.geometry.coordinates[1]);
+    return {
+      west: Math.min(...longitudes),
+      east: Math.max(...longitudes),
+      south: Math.min(...latitudes),
+      north: Math.max(...latitudes),
+      scale: metersPerDegreeAtLatitude(
+        latitudes.reduce((sum, latitude) => sum + latitude, 0) / latitudes.length,
+      ),
+      scorer: createStreetAccessScorer(features, {
+        exhaustive: true,
+        stationFilter: () => true,
+      }),
+    };
+  });
+  if (!regions.length) return null;
+  const batches = (
+    streets: StreetFeature[],
+  ): Map<StreetAccessScorer, StreetFeature[]> => {
+    const result = new Map<StreetAccessScorer, StreetFeature[]>();
+    for (const street of streets) {
+      const point = street.geometry.coordinates[0];
+      if (!point) continue;
+      let nearest = regions[0];
+      let distance = Infinity;
+      for (const region of regions) {
+        const dx = Math.max(region.west - point[0], 0, point[0] - region.east);
+        const dy = Math.max(region.south - point[1], 0, point[1] - region.north);
+        const candidate = Math.hypot(
+          dx * region.scale.longitude,
+          dy * region.scale.latitude,
+        );
+        if (candidate < distance) {
+          nearest = region;
+          distance = candidate;
+        }
+      }
+      if (!nearest) continue;
+      const batch = result.get(nearest.scorer) ?? [];
+      batch.push(street);
+      result.set(nearest.scorer, batch);
+    }
+    return result;
+  };
+  return {
+    score: (streets, options) => {
+      for (const [scorer, batch] of batches(streets)) scorer.score(batch, options);
+      return streets;
+    },
+    scoreAsync: async (streets, options) => {
+      for (const [scorer, batch] of batches(streets))
+        await scorer.scoreAsync(batch, options);
+      return streets;
+    },
+  };
+}
 
 export function isHeatmapRoadLayer(
   layer: LayerSpecification,
@@ -215,18 +288,14 @@ export function createTransitRoadTiles(): {
       const nextKey = JSON.stringify(
         stations.map((station) => [
           station.properties.id,
+          station.properties['area_key'],
           station.geometry.coordinates,
         ]),
       );
       if (stationKey === nextKey) return false;
       stationKey = nextKey;
       revision += 1;
-      scorer = stations.length
-        ? createStreetAccessScorer(stations, {
-            exhaustive: true,
-            stationFilter: () => true,
-          })
-        : null;
+      scorer = createAtlasStreetScorer(stations);
       return true;
     },
   };

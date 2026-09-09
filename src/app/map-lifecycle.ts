@@ -1,13 +1,12 @@
 import { VectorTileSource } from 'maplibre-gl';
 import { ROAD_SOURCE } from '../transit-road-tiles.js';
+import { atlasStationMetadata, createTransitAtlasLoader } from '../transit-atlas.js';
 
 import { selectCircumferenceCandidate } from '../circumference.js';
 import { createCircumferenceGradientSource } from '../circumference-gradient-source.js';
 import {
   landmassDataSchema,
-  metadataSchema,
   scheduleSchema,
-  stationCollectionSchema,
   stationPropertiesSchema,
   streetPropertiesSchema,
   type StationCollection,
@@ -28,6 +27,7 @@ import {
   installBasemap,
   renderDestinationOptions,
   renderMetadata,
+  renderAccessResults,
   resetDestinationRouting,
   resetSelection,
   runMapUpdate,
@@ -74,6 +74,7 @@ import {
   COLORS,
   MODE_LABELS,
   activeStationModes,
+  accessResultsEl,
   areaSelect,
   circumferenceCanvases,
   circumferenceResultsEl,
@@ -160,13 +161,23 @@ export function installHover(): void {
       if (!feature) return;
       const properties = stationPropertiesSchema.safeParse(feature.properties);
       if (!properties.success) return;
-      showStationFeature(properties.data);
-      if (
-        AREAS[runtime.activeAreaKey].supportsDestination &&
-        properties.data.status === 'open' &&
-        properties.data.name
-      ) {
-        selectDestination(properties.data.id);
+      const inspect = (): void => {
+        showStationFeature(properties.data);
+        if (
+          AREAS[runtime.activeAreaKey].supportsDestination &&
+          properties.data.status === 'open' &&
+          properties.data.name
+        ) {
+          selectDestination(properties.data.id);
+        }
+      };
+      const areaKey = properties.data['area_key'];
+      if (isAreaKey(areaKey) && areaKey !== runtime.activeAreaKey) {
+        void loadArea(areaKey, { fit: false }).then(() => {
+          if (runtime.activeAreaKey === areaKey) inspect();
+        });
+      } else {
+        inspect();
       }
     });
   }
@@ -417,7 +428,9 @@ export function scheduleDestinationSetup(
       prepareCircumferenceRoute(sequence);
     };
 
-    if ('requestIdleCallback' in window) {
+    if (runtime.initialLoadComplete) {
+      initializeDestination();
+    } else if ('requestIdleCallback' in window) {
       window.requestIdleCallback(initializeDestination, { timeout: 2_000 });
     } else {
       setTimeout(initializeDestination, 0);
@@ -437,6 +450,19 @@ export function scheduleDestinationSetup(
   }
 }
 
+const loadTransitAtlas = createTransitAtlasLoader(AREAS, AREA_KEYS);
+
+async function installTransitAtlas(): Promise<void> {
+  const atlas = await loadTransitAtlas();
+  if (runtime.transitAreas.size) return;
+  runtime.transitAreas = atlas;
+  runtime.loadedStations = {
+    type: 'FeatureCollection',
+    features: [...atlas.values()].flatMap((area) => area.stations.features),
+  };
+  renderMetadata(atlasStationMetadata(runtime.loadedStations));
+}
+
 export async function loadArea(
   areaKey: AreaKey,
   {
@@ -447,7 +473,8 @@ export async function loadArea(
   const area = AREAS[areaKey];
   const sequence = ++runtime.loadSequence;
 
-  if (!initial) beginLoading(`Loading ${area.label}`, 'area');
+  if (!initial && !runtime.transitAreas.size)
+    beginLoading('Loading metro networks', 'area');
   runtime.activeAreaKey = areaKey;
   setActiveCircumferenceState(areaKey);
   if (initial) setCurrentDeparture(area);
@@ -456,27 +483,29 @@ export async function loadArea(
   resetSelection();
 
   try {
-    const [stations, metadata] = await Promise.all([
-      fetchParsed(area.stations, stationCollectionSchema),
-      fetchParsed(area.metadata, metadataSchema),
-    ]);
+    await installTransitAtlas();
+    const data = runtime.transitAreas.get(areaKey);
+    if (!data) throw new Error(`Missing transit data for ${areaKey}`);
+    const { stations, metadata } = data;
 
     if (sequence !== runtime.loadSequence) return;
 
     state.metadata = metadata;
     state.stationById = new Map(
-      stations.features.map((feature) => [feature.properties.id, feature]),
+      runtime.loadedStations.features.map((feature) => [
+        feature.properties.id,
+        feature,
+      ]),
     );
 
-    runtime.loadedStations = stations;
     runtime.streetAccessStationIds = stations.features
       .filter((feature) => feature.properties.status === 'open')
       .map((feature) => feature.properties.id);
     runtime.futureStreetAccessStationIds = stations.features
       .filter((feature) => feature.properties.status !== 'open')
       .map((feature) => feature.properties.id);
-    renderMetadata(metadata);
-    installMapData(stations);
+    renderAccessResults();
+    if (!geoJsonSource('stations')) installMapData(runtime.loadedStations);
     if (fit) applyMapBounds(metadata);
 
     if (area.liveRoads && runtime.pendingBasemapStyle) installBasemap();
@@ -532,6 +561,7 @@ export async function initialize(): Promise<void> {
             ).catch(() => null),
           })),
         ),
+        installTransitAtlas(),
       ]);
     runtime.pendingBasemapStyle = basemapStyle;
     runtime.circumferenceLandmasses = landmasses;
@@ -636,36 +666,6 @@ futureStationToggle.addEventListener('change', () => {
   });
 });
 
-function nearestConfiguredArea(): AreaKey | null {
-  if (map.getZoom() < 7) return null;
-  const center = map.getCenter();
-  let nearest: { readonly areaKey: AreaKey; readonly distance: number } | null = null;
-  for (const areaKey of AREA_KEYS) {
-    const [longitude, latitude] = AREAS[areaKey].center;
-    const longitudeScale = Math.cos((center.lat * Math.PI) / 180);
-    const distance = Math.hypot(
-      (center.lng - longitude) * longitudeScale,
-      center.lat - latitude,
-    );
-    if (!nearest || distance < nearest.distance) {
-      nearest = { areaKey, distance };
-    }
-  }
-  return nearest && nearest.distance <= 4 ? nearest.areaKey : null;
-}
-
-function followAccessMapFocus(): void {
-  if (runtime.activeProduct !== 'access' || runtime.loadingOperation?.type === 'area') {
-    return;
-  }
-  const areaKey = nearestConfiguredArea();
-  if (!areaKey || areaKey === runtime.activeAreaKey) return;
-  void loadArea(areaKey, { fit: false });
-}
-
-map.on('moveend', () => {
-  followAccessMapFocus();
-});
 map.on('idle', () => {
   const sourceId = activeStreetSourceId();
   if (!map.getSource(sourceId) || !map.isSourceLoaded(sourceId)) return;
@@ -700,6 +700,20 @@ areaSelect.addEventListener('change', () => {
     focusCircumferenceArea(areaKey);
   }
   void loadArea(areaKey, { fit: runtime.activeProduct !== 'circumference' });
+});
+
+accessResultsEl.addEventListener('click', (event) => {
+  const target = event.target;
+  if (!(target instanceof Element)) return;
+  const button = target.closest<HTMLButtonElement>('button[data-access-area]');
+  if (!button || !accessResultsEl.contains(button)) return;
+  const areaKey = button.dataset['accessArea'];
+  if (!isAreaKey(areaKey)) return;
+  if (areaKey === runtime.activeAreaKey && state.metadata) {
+    applyMapBounds(state.metadata);
+  } else {
+    void loadArea(areaKey);
+  }
 });
 
 circumferenceResultsEl.addEventListener('click', (event) => {
