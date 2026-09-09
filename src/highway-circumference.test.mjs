@@ -259,6 +259,43 @@ test('regenerated tiles retain centered mainlines and separate ramps continent-w
       'Stone Mountain tiles must retain the valid approach centerline',
     );
 
+    // Viaducto's two directional merge nodes must render as one shared
+    // mainline junction, without the former inserted-point reversals.
+    const viaductoPoint = [-99.1744359, 19.398513];
+    const viaductoTile = webMercatorTile(...viaductoPoint, 14);
+    const viaductoData = await archive.getZxy(14, viaductoTile.x, viaductoTile.y);
+    assert.ok(viaductoData);
+    const viaductoLayer = new VectorTile(new Pbf(viaductoData.data)).layers['highways'];
+    const viaductoLines = [];
+    for (let index = 0; index < viaductoLayer.length; index += 1) {
+      const feature = viaductoLayer.feature(index);
+      const geometry = feature.toGeoJSON(viaductoTile.x, viaductoTile.y, 14).geometry;
+      const lines =
+        geometry.type === 'LineString' ? [geometry.coordinates] : geometry.coordinates;
+      for (const line of lines) {
+        const nearby = line.filter(
+          ([x, y]) => x > -99.176 && x < -99.1735 && y > 19.3978 && y < 19.399,
+        );
+        if (nearby.length < 2) continue;
+        assert.equal(feature.properties['role'], 'mainline');
+        const direction = Math.sign(nearby.at(-1)[0] - nearby[0][0]);
+        for (let i = 1; i < nearby.length; i += 1) {
+          assert.ok(
+            (nearby[i][0] - nearby[i - 1][0]) * direction > 0,
+            'Viaducto mainline tiles must not double back',
+          );
+        }
+        viaductoLines.push(nearby);
+      }
+    }
+    assert.ok(viaductoLines.length >= 2);
+    assert.ok(
+      viaductoLines.every((line) =>
+        line.some((point) => geodesicDistanceMeters(point, viaductoPoint) < 5),
+      ),
+      'both approaches must include the shared merge vertex',
+    );
+
     const toronto407 = await highwayPropertiesNear(archive, -79.54, 43.79);
     assert.ok(
       toronto407.some(

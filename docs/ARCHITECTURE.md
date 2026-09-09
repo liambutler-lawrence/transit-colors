@@ -95,27 +95,33 @@ sampled centerline, classifies direct motorway-link paths as connector edges, an
 inserts their endpoints into the mainline geometry. Mainline matching stops at the
 actual overlap of the carriageways: a nearest projection past an opposing chain's
 terminal rejects that chain, rather than clamping to its endpoint or using a farther
-interior vertex. Closest vertices at ordinary interior bends remain valid. Reciprocal
-collector-road alternatives are consolidated to the pair with the shortest mean
-directional ramp distance only when both directions share a source junction and directed
-segment and connect the same mainline legs. Shared collector stems for distinct turns
-remain separate; proximity alone never merges connections. Ramp samples use the closest
-point on a tangent-aligned opposing segment and its WGS84 geodesic midpoint, as
-mainlines do. The shorter of the two oriented paths supplies the samples; endpoints are
-never warped to create correspondence and the midpoints are not smoothed afterward.
-Where ramp joins are staggered, the path extends along its actual source mainline
-carriageway through explicit OSM nodes, from the earlier split to the later merge. Only
-then are the shared centerline endpoints attached to the mainline graph. Geometry
-crossings never create graph nodes; topology comes from explicit shared source nodes.
-The continental stages are largest-component selection, 2-core pruning, degree-two
-compression, a detailed northeastern perimeter cycle, and independent detailed
-node-disjoint ears for southeastern Massachusetts and the southern/western perimeter.
-The northeastern cycle is explicitly anchored through Highway 407, Ottawa, Québec, and
-coastal New England. Every ear uses explicit source junctions. A small hook where two
-consecutive averaged edges overshoot their shared junction is clipped only between those
-adjacent tails; any nonlocal geometric crossing forbids the responsible corridor and
-triggers another routing attempt. The accepted boundary is a simple cycle in both graph
-topology and rendered geometry.
+interior vertex. Closest vertices at ordinary interior bends remain valid. At a mainline
+merge, directional source junctions that attach to the same branch terminal share one
+centerline vertex on the continuing midpoint line. Existing endpoint keys carry that
+vertex across split centerline parts. Terminal geometry is extended or trimmed in travel
+order; interior insertions are projected again after the shared coordinate is chosen. A
+merge adjustment cannot collapse a short loop, trim past a different junction, or add
+backward turns to an approach; those complex attachments retain their individual source
+topology. Reciprocal collector-road alternatives are consolidated to the pair with the
+shortest mean directional ramp distance only when both directions share a source
+junction and directed segment and connect the same mainline legs. Shared collector stems
+for distinct turns remain separate; proximity alone never merges connections. Ramp
+samples use the closest point on a tangent-aligned opposing segment and its WGS84
+geodesic midpoint, as mainlines do. The shorter of the two oriented paths supplies the
+samples; endpoints are never warped to create correspondence and the midpoints are not
+smoothed afterward. Where ramp joins are staggered, the path extends along its actual
+source mainline carriageway through explicit OSM nodes, from the earlier split to the
+later merge. Only then are the shared centerline endpoints attached to the mainline
+graph. Geometry crossings never create graph nodes; topology comes from explicit shared
+source nodes. The continental stages are largest-component selection, 2-core pruning,
+degree-two compression, a detailed northeastern perimeter cycle, and independent
+detailed node-disjoint ears for southeastern Massachusetts and the southern/western
+perimeter. The northeastern cycle is explicitly anchored through Highway 407, Ottawa,
+Québec, and coastal New England. Every ear uses explicit source junctions. A small hook
+where two consecutive averaged edges overshoot their shared junction is clipped only
+between those adjacent tails; any nonlocal geometric crossing forbids the responsible
+corridor and triggers another routing attempt. The accepted boundary is a simple cycle
+in both graph topology and rendered geometry.
 
 The circumference map keeps one independent route state and gradient image source per
 metro area. It merges all complete networks and selected boundaries into one GeoJSON
