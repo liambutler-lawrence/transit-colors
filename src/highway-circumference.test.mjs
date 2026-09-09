@@ -61,6 +61,11 @@ test('North America highway data publishes one validated maximum and full vector
   );
   assert.match(data.centerline_method, /Closest-tangent.*staggered joins/);
   assert.equal(data.network.featureCount, data.methodology.sourceFeatureCount);
+  assert.equal(
+    data.network.featureCount,
+    data.methodology.osmPrecisionMainlineCount +
+      data.methodology.interchangeConnectorCount,
+  );
   assert.equal(data.network.sourceLayer, 'highways');
   assert.match(data.network.tileUrl, /\.pmtiles$/);
   assert.ok(data.network.featureCount > 10_000);
@@ -295,6 +300,37 @@ test('regenerated tiles retain centered mainlines and separate ramps continent-w
       ),
       'both approaches must include the shared merge vertex',
     );
+
+    // The wide median at Coachochitlán must remain a continuous centerline
+    // in the published vector data, as well as in the source pairing tests.
+    const coachochitlanTile = webMercatorTile(-100.027, 19.8557, 14);
+    const coachochitlanData = await archive.getZxy(
+      14,
+      coachochitlanTile.x,
+      coachochitlanTile.y,
+    );
+    assert.ok(coachochitlanData);
+    const coachochitlanLayer = new VectorTile(new Pbf(coachochitlanData.data)).layers[
+      'highways'
+    ];
+    let continuousWideMedian = false;
+    for (let index = 0; index < coachochitlanLayer.length; index += 1) {
+      const feature = coachochitlanLayer.feature(index);
+      if (feature.properties['role'] !== 'mainline') continue;
+      const geometry = feature.toGeoJSON(
+        coachochitlanTile.x,
+        coachochitlanTile.y,
+        14,
+      ).geometry;
+      const lines =
+        geometry.type === 'LineString' ? [geometry.coordinates] : geometry.coordinates;
+      continuousWideMedian ||= lines.some(
+        (line) =>
+          line.some(([x, y]) => x < -100.032 && y > 19.854 && y < 19.857) &&
+          line.some(([x, y]) => x > -100.022 && y > 19.854 && y < 19.857),
+      );
+    }
+    assert.ok(continuousWideMedian, 'Coachochitlán tiles must span the wide median');
 
     const toronto407 = await highwayPropertiesNear(archive, -79.54, 43.79);
     assert.ok(
