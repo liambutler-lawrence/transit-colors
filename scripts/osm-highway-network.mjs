@@ -1056,6 +1056,79 @@ function mainlineGroupByPartIndex(parts) {
   return new Map([...parent.keys()].map((partIndex) => [partIndex, find(partIndex)]));
 }
 
+function sameMainlineLeg(first, second, groupByPartIndex) {
+  if (first.nodeId === second.nodeId) return true;
+  const firstGroup = groupByPartIndex.get(first.partIndex) ?? first.partIndex;
+  const secondGroup = groupByPartIndex.get(second.partIndex) ?? second.partIndex;
+  return (
+    firstGroup === secondGroup &&
+    geodesicDistanceMeters(first.coordinate, second.coordinate) <=
+      MAX_RECIPROCAL_ENDPOINT_GAP_METERS &&
+    (first.travelDirections ?? []).some((firstDirection) =>
+      (second.travelDirections ?? []).some(
+        (secondDirection) =>
+          dot(firstDirection, secondDirection) >= MIN_PAIRED_TANGENT_ALIGNMENT,
+      ),
+    )
+  );
+}
+
+function sameDirectedRampMovement(first, second, groupByPartIndex) {
+  // Collector roads can offer several splits/merges for the same movement.
+  // Require a shared source junction AND directed segment: nearby curves or
+  // shared road names alone do not make two connections interchangeable.
+  return (
+    (first.firstAttachment.nodeId === second.firstAttachment.nodeId ||
+      first.secondAttachment.nodeId === second.secondAttachment.nodeId) &&
+    sameMainlineLeg(first.firstAttachment, second.firstAttachment, groupByPartIndex) &&
+    sameMainlineLeg(
+      first.secondAttachment,
+      second.secondAttachment,
+      groupByPartIndex,
+    ) &&
+    first.edgeIndices.some((edgeIndex) => second.edgeIndices.includes(edgeIndex))
+  );
+}
+
+export function selectShortestReciprocalMovements(pairs, groupByPartIndex) {
+  const accepted = [];
+  const pairsByJunction = new Map();
+  // Minimize mean ramp distance across both directions (ranking by their sum
+  // is equivalent). This favors later departures and earlier arrivals without
+  // bias toward one travel direction. Leave both paths intact for averaging.
+  const ordered = [...pairs].sort(
+    (first, second) =>
+      first[0].distanceMeters +
+      first[1].distanceMeters -
+      (second[0].distanceMeters + second[1].distanceMeters),
+  );
+  for (const pair of ordered) {
+    const keys = [
+      `start:${pair[0].firstAttachment.nodeId}`,
+      `end:${pair[0].secondAttachment.nodeId}`,
+    ];
+    const alternatives = new Set(keys.flatMap((key) => pairsByJunction.get(key) ?? []));
+    if (
+      [...alternatives].some((other) =>
+        pair.every((path, index) =>
+          sameDirectedRampMovement(path, other[index], groupByPartIndex),
+        ),
+      )
+    ) {
+      continue;
+    }
+    accepted.push(pair);
+    for (const key of keys) {
+      const entries = pairsByJunction.get(key) ?? [];
+      entries.push(pair);
+      pairsByJunction.set(key, entries);
+    }
+  }
+  // Preserve the original relative ordering after selecting representatives.
+  const retained = new Set(accepted);
+  return pairs.filter((pair) => retained.has(pair));
+}
+
 function reciprocalPathPairs(paths, groupByPartIndex) {
   const groups = new Map();
   for (const [pathIndex, path] of paths.entries()) {
@@ -1144,7 +1217,12 @@ function reciprocalPathPairs(paths, groupByPartIndex) {
       pairs.push([candidate.first.path, candidate.second.path]);
     }
   }
-  return { pairs, unpairedPathCount: paths.length - used.size };
+  const distinctPairs = selectShortestReciprocalMovements(pairs, groupByPartIndex);
+  return {
+    alternativePathCount: (pairs.length - distinctPairs.length) * 2,
+    pairs: distinctPairs,
+    unpairedPathCount: paths.length - used.size,
+  };
 }
 
 function outerReciprocalAttachment(first, second, parts, atStart) {
@@ -1921,6 +1999,7 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
   return {
     connectors,
     statistics: {
+      alternativeConnectorPathCount: paired.alternativePathCount,
       connectorComponentCount: components.length,
       directedConnectorPathCount: allDirectedPaths.length,
       directConnectorCount: connectors.length,

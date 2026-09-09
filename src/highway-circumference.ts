@@ -36,6 +36,7 @@ export const highwayCircumferenceDataSchema = z.object({
   landmass_source_url: z.url(),
   landmass_source_version: z.string().min(1),
   methodology: z.object({
+    alternativeRampPathCount: z.number().int().nonnegative(),
     biconnectedBlockCount: z.number().int().positive(),
     compressedEdgeCount: z.number().int().positive(),
     compressedNodeCount: z.number().int().positive(),

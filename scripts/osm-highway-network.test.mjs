@@ -12,6 +12,7 @@ import {
   classifyOsmMotorwayWay,
   parseOplLine,
   prepareWays,
+  selectShortestReciprocalMovements,
   traceMotorwayChains,
 } from './osm-highway-network.mjs';
 
@@ -499,6 +500,106 @@ test('Florence interchange keeps four continuous reciprocal connectors at source
   const graph = buildPairedOsmSourceTopologyGraph(osm, built.parts);
   assert.equal(graph.statistics.sourceConnectorPartCount, 4);
   assert.equal(graph.statistics.explicitTopologyKeyCount, 8);
+});
+
+test('collector alternatives minimize mean ramp distance while retaining distinct source routes', () => {
+  const attachment = (nodeId, partIndex, coordinate, direction) => ({
+    nodeId,
+    partIndex,
+    coordinate,
+    travelDirections: [direction],
+  });
+  const forwardStart = attachment('a', 0, [0, 0], [1, 0]);
+  const forwardEnd = attachment('b', 1, [0.01, 0.01], [1, 0]);
+  const reverseStart = attachment('c', 1, [0.01, 0.011], [-1, 0]);
+  const reverseEnd = attachment('d', 0, [0, 0.001], [-1, 0]);
+  const pair = (forwardDistance, reverseDistance, forwardEdges, reverseEdges) => [
+    {
+      firstAttachment: forwardStart,
+      secondAttachment: forwardEnd,
+      distanceMeters: forwardDistance,
+      edgeIndices: forwardEdges,
+    },
+    {
+      firstAttachment: reverseStart,
+      secondAttachment: reverseEnd,
+      distanceMeters: reverseDistance,
+      edgeIndices: reverseEdges,
+    },
+  ];
+  // The first option is shorter in one direction, but longer on average.
+  const uneven = pair(800, 2400, [1, 2], [3, 4]);
+  const shorterMean = pair(1200, 1500, [1, 5], [3, 6]);
+  // Identical-looking endpoints alone must not collapse independent ramps.
+  const independent = pair(700, 700, [7, 8], [9, 10]);
+  const groups = new Map([
+    [0, 0],
+    [1, 1],
+  ]);
+  assert.deepEqual(
+    selectShortestReciprocalMovements([uneven, shorterMean, independent], groups),
+    [shorterMean, independent],
+  );
+  assert.deepEqual(
+    selectShortestReciprocalMovements([independent, shorterMean, uneven], groups),
+    [independent, shorterMean],
+  );
+});
+
+test('Atlanta collector alternatives produce one reciprocal centerline per interchange side', () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL('./fixtures/atlanta-interchange.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  for (const ways of [fixture.ways, [...fixture.ways].reverse()]) {
+    const osm = { nodes: new Map(fixture.nodes), ways };
+    const built = buildOsmHighwayCenterlines(osm);
+    const connectors = built.parts.filter((part) => part.role === 'connector');
+    assert.equal(built.statistics.directedConnectorPathCount, 10);
+    assert.equal(built.statistics.alternativeConnectorPathCount, 2);
+    assert.equal(built.statistics.unpairedConnectorPathCount, 0);
+    assert.equal(connectors.length, 4);
+    const leg = ([longitude, latitude]) =>
+      `${latitude > 33.893 ? 'N' : 'S'}${longitude < -84.26 ? 'W' : 'E'}`;
+    assert.deepEqual(
+      new Set(
+        connectors.map((connector) =>
+          [leg(connector.coordinates[0]), leg(connector.coordinates.at(-1))]
+            .sort()
+            .join(':'),
+        ),
+      ),
+      new Set(['NE:NW', 'NE:SE', 'SE:SW', 'NW:SW']),
+    );
+    const north = connectors.find((connector) =>
+      [connector.coordinates[0], connector.coordinates.at(-1)].every(
+        ([, latitude]) => latitude > 33.893,
+      ),
+    );
+    // Keep the direct pair rather than the longer Buford Highway collector
+    // alternative. Shared collector stems for OTHER turns must remain usable.
+    assert.ok(north.sourceWayIds.includes('9165657'));
+    assert.ok(north.sourceWayIds.includes('9164185'));
+    assert.ok(!north.sourceWayIds.includes('9164970'));
+    assert.equal(hasProperSelfIntersection(north.coordinates), false);
+    for (const connector of connectors) {
+      for (const [partIndex, coordinate] of [
+        [connector.startMainlinePartIndex, connector.coordinates[0]],
+        [connector.endMainlinePartIndex, connector.coordinates.at(-1)],
+      ]) {
+        assert.ok(
+          built.parts[partIndex].coordinates.some(
+            (point) => point.join() === coordinate.join(),
+          ),
+        );
+      }
+    }
+    const graph = buildPairedOsmSourceTopologyGraph(osm, built.parts);
+    assert.equal(graph.statistics.sourceConnectorPartCount, 4);
+    assert.equal(graph.statistics.explicitTopologyKeyCount, 8);
+  }
 });
 
 test('unpaired one-way ramps are excluded from display and topology', () => {

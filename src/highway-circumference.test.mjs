@@ -104,6 +104,7 @@ test('North America highway data publishes one validated maximum and full vector
   assert.ok(data.methodology.directionalRampPathCount > 12_000);
   assert.equal(
     data.methodology.directionalRampPathCount -
+      data.methodology.alternativeRampPathCount -
       data.methodology.interchangeConnectorCount * 2,
     data.methodology.unpairedRampPathCount,
   );
@@ -200,6 +201,32 @@ test('regenerated tiles retain centered mainlines and separate ramps continent-w
       ),
       'Florence ramp tiles must include the mainline continuation',
     );
+
+    // The northern I-285 / I-85 connection previously appeared twice, once
+    // for the direct ramps and once for their longer collector alternatives.
+    const atlantaPoint = [-84.2597, 33.893045];
+    const atlantaTile = webMercatorTile(...atlantaPoint, 14);
+    const atlantaData = await archive.getZxy(14, atlantaTile.x, atlantaTile.y);
+    assert.ok(atlantaData);
+    const atlantaLayer = new VectorTile(new Pbf(atlantaData.data)).layers['highways'];
+    const northernConnectors = new Set();
+    for (let index = 0; index < atlantaLayer.length; index += 1) {
+      const feature = atlantaLayer.feature(index);
+      if (feature.properties['role'] !== 'connector') continue;
+      const geometry = feature.toGeoJSON(atlantaTile.x, atlantaTile.y, 14).geometry;
+      const coordinates =
+        geometry.type === 'LineString'
+          ? geometry.coordinates
+          : geometry.coordinates.flat();
+      if (
+        coordinates.some(
+          (coordinate) => geodesicDistanceMeters(atlantaPoint, coordinate) < 20,
+        )
+      ) {
+        northernConnectors.add(feature.properties['id']);
+      }
+    }
+    assert.equal(northernConnectors.size, 1, 'one centerline for the northern turn');
 
     const toronto407 = await highwayPropertiesNear(archive, -79.54, 43.79);
     assert.ok(
