@@ -2,6 +2,7 @@ import type { Coordinate } from './domain.js';
 import { metersPerDegreeAtLatitude } from './geodesy.js';
 import type { BoundsTuple } from './circumference-gradient-source.js';
 import type { Point } from './routing/types.js';
+import { RouteDistanceIndex } from './route-distance-index.js';
 
 export const CIRCUMFERENCE_GRADIENT_COAST_LAYER_ID = 'water';
 export const CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE = 1024;
@@ -10,82 +11,35 @@ const CIRCUMFERENCE_GRADIENT_TRANSPARENT_PADDING_METERS = 500;
 
 type Color = [number, number, number];
 
-function pointToSegmentDistance(point: Point, start: Point, end: Point): number {
-  const deltaX = end.x - start.x;
-  const deltaY = end.y - start.y;
-  if (deltaX === 0 && deltaY === 0) {
-    return Math.hypot(point.x - start.x, point.y - start.y);
-  }
+const MERCATOR_RADIUS_METERS = 6_378_137;
+const MAX_MERCATOR_LATITUDE = 85.051129;
+const routeIndexes = new WeakMap<readonly Coordinate[], RouteDistanceIndex>();
 
-  const position = Math.max(
-    0,
-    Math.min(
-      1,
-      ((point.x - start.x) * deltaX + (point.y - start.y) * deltaY) /
-        (deltaX ** 2 + deltaY ** 2),
-    ),
-  );
-  return Math.hypot(
-    point.x - (start.x + deltaX * position),
-    point.y - (start.y + deltaY * position),
-  );
+function mercatorY(latitude: number): number {
+  const radians =
+    (Math.max(-MAX_MERCATOR_LATITUDE, Math.min(MAX_MERCATOR_LATITUDE, latitude)) *
+      Math.PI) /
+    180;
+  return MERCATOR_RADIUS_METERS * Math.asinh(Math.tan(radians));
 }
 
-function simplifyOpenLine(points: readonly Point[], tolerance: number): Point[] {
-  if (points.length <= 2) return [...points];
-  const first = points[0];
-  const last = points.at(-1);
-  if (!first || !last) return [];
-
-  let maximumDistance = 0;
-  let splitIndex = -1;
-  for (let index = 1; index < points.length - 1; index += 1) {
-    const point = points[index];
-    if (!point) continue;
-    const distance = pointToSegmentDistance(point, first, last);
-    if (distance > maximumDistance) {
-      maximumDistance = distance;
-      splitIndex = index;
-    }
-  }
-  if (maximumDistance <= tolerance || splitIndex === -1) {
-    return [first, last];
-  }
-  return [
-    ...simplifyOpenLine(points.slice(0, splitIndex + 1), tolerance).slice(0, -1),
-    ...simplifyOpenLine(points.slice(splitIndex), tolerance),
-  ];
+function latitudeFromMercatorY(y: number): number {
+  return (Math.atan(Math.sinh(y / MERCATOR_RADIUS_METERS)) * 180) / Math.PI;
 }
 
-function simplifyClosedLine(points: readonly Point[], tolerance: number): Point[] {
-  const first = points[0];
-  const last = points.at(-1);
-  if (!first || !last) return [];
-  const ring =
-    points.length > 2 && first.x === last.x && first.y === last.y
-      ? points.slice(0, -1)
-      : [...points];
-  const ringFirst = ring[0];
-  if (!ringFirst) return [];
-  if (ring.length <= 3) return [...ring, ringFirst];
+function project([longitude, latitude]: Coordinate): Point {
+  return {
+    x: ((longitude * Math.PI) / 180) * MERCATOR_RADIUS_METERS,
+    y: mercatorY(latitude),
+  };
+}
 
-  let oppositeIndex = 1;
-  let maximumDistance = 0;
-  for (let index = 1; index < ring.length; index += 1) {
-    const point = ring[index];
-    if (!point) continue;
-    const distance = Math.hypot(point.x - ringFirst.x, point.y - ringFirst.y);
-    if (distance > maximumDistance) {
-      maximumDistance = distance;
-      oppositeIndex = index;
-    }
+/** 10 km per decade of enclosed square kilometers, continuous down to zero. */
+export function circumferenceGradientDistanceForArea(areaSquareMeters: number): number {
+  if (!Number.isFinite(areaSquareMeters) || areaSquareMeters < 0) {
+    throw new Error('Gradient area must be finite and nonnegative.');
   }
-  const firstHalf = simplifyOpenLine(ring.slice(0, oppositeIndex + 1), tolerance);
-  const secondHalf = simplifyOpenLine(
-    [...ring.slice(oppositeIndex), ringFirst],
-    tolerance,
-  );
-  return [...firstHalf.slice(0, -1), ...secondHalf];
+  return 10_000 * Math.log10(1 + areaSquareMeters / 1_000_000);
 }
 
 function blend(first: Color, second: Color, amount: number): Color {
@@ -105,7 +59,7 @@ function gradientColor(amount: number): Color {
     : blend(middleColor, coastColor, (amount - 0.45) / 0.55);
 }
 
-function canvasCoordinate(
+export function circumferenceGradientCanvasCoordinate(
   [longitude, latitude]: Coordinate,
   bounds: BoundsTuple,
   width: number,
@@ -114,14 +68,15 @@ function canvasCoordinate(
   const [west, south, east, north] = bounds;
   return [
     ((longitude - west) / (east - west)) * width,
-    ((north - latitude) / (north - south)) * height,
+    ((mercatorY(north) - mercatorY(latitude)) / (mercatorY(north) - mercatorY(south))) *
+      height,
   ];
 }
 
 /**
  * Produces a route-relative texture envelope with a fully transparent border.
  * The image source remains finite, but the visible field has no rectangular
- * edge because every boundary lies beyond the 10 km fade distance.
+ * edge because every boundary lies beyond the selected fade distance.
  */
 export function circumferenceGradientBounds(
   routeCoordinates: readonly Coordinate[],
@@ -153,9 +108,9 @@ export function circumferenceGradientBounds(
 
   return [
     Math.max(-180, west - paddingMeters / longitudeScale),
-    Math.max(-90, south - paddingMeters / latitudeScale),
+    Math.max(-MAX_MERCATOR_LATITUDE, south - paddingMeters / latitudeScale),
     Math.min(180, east + paddingMeters / longitudeScale),
-    Math.min(90, north + paddingMeters / latitudeScale),
+    Math.min(MAX_MERCATOR_LATITUDE, north + paddingMeters / latitudeScale),
   ];
 }
 
@@ -168,10 +123,27 @@ export function circumferenceGradientOpacity(
   return Math.max(1, Math.round(116 * (1 - amount)));
 }
 
+/** Crop the texture to the visible region so close zooms retain boundary detail. */
+export function circumferenceGradientViewportBounds(
+  envelope: BoundsTuple,
+  viewport: BoundsTuple,
+): BoundsTuple | null {
+  const [west, south, east, north] = viewport;
+  const xPadding = (east - west) * 0.2;
+  const yPadding = (mercatorY(north) - mercatorY(south)) * 0.2;
+  const bounds: BoundsTuple = [
+    Math.max(envelope[0], west - xPadding),
+    Math.max(envelope[1], latitudeFromMercatorY(mercatorY(south) - yPadding)),
+    Math.min(envelope[2], east + xPadding),
+    Math.min(envelope[3], latitudeFromMercatorY(mercatorY(north) + yPadding)),
+  ];
+  return bounds[0] < bounds[2] && bounds[1] < bounds[3] ? bounds : null;
+}
+
 /**
- * Renders an unsigned route-distance field into a MapLibre canvas source. The
- * optional land rings are applied as one alpha mask so the texture radiates
- * across nearby land on both sides of the route and terminates at every coast.
+ * Render in the same Web Mercator coordinates as the image source. Ground
+ * distance uses the local latitude scale, including across continental bounds.
+ * The optional outside-only mask leaves the full interior to the polygon fill.
  */
 export function renderCircumferenceGradient(
   canvas: HTMLCanvasElement,
@@ -179,73 +151,36 @@ export function renderCircumferenceGradient(
   bounds: BoundsTuple,
   landmassPolygons: readonly Coordinate[][][],
   maxDistanceMeters = CIRCUMFERENCE_GRADIENT_MAX_DISTANCE_METERS,
+  outsideOnly = false,
 ): void {
   const context = canvas.getContext('2d', { alpha: true });
   if (!context) throw new Error('Canvas 2D rendering is unavailable.');
   const width = canvas.width;
   const height = canvas.height;
   const [west, south, east, north] = bounds;
-  const referenceLatitude = (south + north) / 2;
-  const metricScale = metersPerDegreeAtLatitude(referenceLatitude);
-  const metersPerLongitudeDegree = metricScale.longitude;
-  const metersPerLatitudeDegree = metricScale.latitude;
-  const project = ([longitude, latitude]: Coordinate): Point => ({
-    x: (longitude - west) * metersPerLongitudeDegree,
-    y: (latitude - south) * metersPerLatitudeDegree,
-  });
-  const route = simplifyClosedLine(
-    routeCoordinates.map(project),
-    Math.max(
-      ((east - west) * metersPerLongitudeDegree) / width,
-      ((north - south) * metersPerLatitudeDegree) / height,
-    ) * 0.65,
-  );
-  const segments = route.slice(1).flatMap((end, index) => {
-    const start = route[index];
-    return start ? [{ end, start }] : [];
-  });
-  const segmentCellSize = Math.max(1, maxDistanceMeters);
-  const segmentsByCell = new Map<string, typeof segments>();
-  for (const segment of segments) {
-    const west = Math.min(segment.start.x, segment.end.x) - maxDistanceMeters;
-    const east = Math.max(segment.start.x, segment.end.x) + maxDistanceMeters;
-    const south = Math.min(segment.start.y, segment.end.y) - maxDistanceMeters;
-    const north = Math.max(segment.start.y, segment.end.y) + maxDistanceMeters;
-    for (
-      let cellX = Math.floor(west / segmentCellSize);
-      cellX <= Math.floor(east / segmentCellSize);
-      cellX += 1
-    ) {
-      for (
-        let cellY = Math.floor(south / segmentCellSize);
-        cellY <= Math.floor(north / segmentCellSize);
-        cellY += 1
-      ) {
-        const cellKey = `${cellX},${cellY}`;
-        const cell = segmentsByCell.get(cellKey) ?? [];
-        cell.push(segment);
-        segmentsByCell.set(cellKey, cell);
-      }
-    }
+  const northY = mercatorY(north);
+  const southY = mercatorY(south);
+  let routeIndex = routeIndexes.get(routeCoordinates);
+  if (!routeIndex) {
+    routeIndex = new RouteDistanceIndex(routeCoordinates.map(project));
+    routeIndexes.set(routeCoordinates, routeIndex);
   }
   const image = context.createImageData(width, height);
 
   for (let pixelY = 0; pixelY < height; pixelY += 1) {
-    const latitude = north - ((pixelY + 0.5) / height) * (north - south);
+    const y = northY - ((pixelY + 0.5) / height) * (northY - southY);
+    const latitude = latitudeFromMercatorY(y);
+    const groundScale =
+      metersPerDegreeAtLatitude(latitude).longitude /
+      ((Math.PI / 180) * MERCATOR_RADIUS_METERS);
+    const projectedLimit = maxDistanceMeters / groundScale;
     for (let pixelX = 0; pixelX < width; pixelX += 1) {
       const longitude = west + ((pixelX + 0.5) / width) * (east - west);
-      const point = project([longitude, latitude]);
-
-      let distance = Number.POSITIVE_INFINITY;
-      const cellKey = `${Math.floor(point.x / segmentCellSize)},${Math.floor(
-        point.y / segmentCellSize,
-      )}`;
-      for (const segment of segmentsByCell.get(cellKey) ?? []) {
-        distance = Math.min(
-          distance,
-          pointToSegmentDistance(point, segment.start, segment.end),
-        );
-      }
+      const point = { x: ((longitude * Math.PI) / 180) * MERCATOR_RADIUS_METERS, y };
+      const projectedDistance = routeIndex.distance(point, projectedLimit);
+      // Keep rounding at the search cutoff from exposing a faint texture edge.
+      if (projectedDistance >= projectedLimit) continue;
+      const distance = projectedDistance * groundScale;
       const opacity = circumferenceGradientOpacity(distance, maxDistanceMeters);
       if (opacity === 0) continue;
       const amount = Math.min(1, distance / maxDistanceMeters);
@@ -268,13 +203,36 @@ export function renderCircumferenceGradient(
     for (const polygon of landmassPolygons) {
       for (const ring of polygon) {
         for (const [index, coordinate] of ring.entries()) {
-          const [x, y] = canvasCoordinate(coordinate, bounds, width, height);
+          const [x, y] = circumferenceGradientCanvasCoordinate(
+            coordinate,
+            bounds,
+            width,
+            height,
+          );
           if (index === 0) context.moveTo(x, y);
           else context.lineTo(x, y);
         }
         context.closePath();
       }
     }
+    context.fill('evenodd');
+    context.restore();
+  }
+  if (outsideOnly) {
+    context.save();
+    context.globalCompositeOperation = 'destination-out';
+    context.beginPath();
+    for (const [index, coordinate] of routeCoordinates.entries()) {
+      const [x, y] = circumferenceGradientCanvasCoordinate(
+        coordinate,
+        bounds,
+        width,
+        height,
+      );
+      if (index === 0) context.moveTo(x, y);
+      else context.lineTo(x, y);
+    }
+    context.closePath();
     context.fill('evenodd');
     context.restore();
   }

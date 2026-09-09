@@ -1,5 +1,6 @@
 import { map } from './context.js';
 import { expressionSpecificationSchema } from './types.js';
+import { installHighwayGradient } from './highway-circumference-ui.js';
 
 const featureLineOffset = expressionSpecificationSchema.parse([
   'interpolate',
@@ -14,6 +15,7 @@ const featureLineOffset = expressionSpecificationSchema.parse([
 ]);
 
 export function installCircumferenceLayers(): void {
+  installHighwayGradient();
   map.addLayer({
     id: 'highway-circumference-area',
     type: 'fill',
@@ -21,8 +23,8 @@ export function installCircumferenceLayers(): void {
     filter: ['==', ['get', 'kind'], 'highway-inside'],
     layout: { visibility: 'none' },
     paint: {
-      'fill-color': '#fff1d8',
-      'fill-opacity': 0.34,
+      'fill-color': '#fff4df',
+      'fill-opacity': 0.46,
     },
   });
 

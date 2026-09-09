@@ -132,6 +132,11 @@ test('highway map collection separates thin network, thick route, and inside', (
     new Set(['highway-inside', 'highway-route-mainline', 'highway-route-connector']),
   );
   assert.equal(collection.features.length, data.route.segments.length + 1);
+  const inside = collection.features.find(
+    ({ properties }) => properties.kind === 'highway-inside',
+  );
+  assert.equal(inside.geometry.type, 'Polygon');
+  assert.deepEqual(inside.geometry.coordinates, [data.route.coordinates]);
   assert.ok(data.route.segments.some((segment) => segment.role === 'connector'));
   assert.ok(data.route.segments.some((segment) => segment.role === 'mainline'));
 });
