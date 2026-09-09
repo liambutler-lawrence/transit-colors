@@ -125,9 +125,9 @@ const landmassBuffer = await readFile(landmassSourcePath);
 let derived;
 try {
   derived = deserialize(await readFile(derivedCachePath));
-  if (derived.displayTopologyVersion !== 11) {
+  if (derived.displayTopologyVersion !== 12) {
     throw new Error(
-      'The cached display topology predates nearest-tangent ramps with mainline continuations.',
+      'The cached display topology predates shortest reciprocal collector connections.',
     );
   }
   console.log(`Reused ${derivedCachePath}.`);
@@ -150,7 +150,7 @@ try {
   console.log(detailed.statistics);
   derived = {
     detailed,
-    displayTopologyVersion: 11,
+    displayTopologyVersion: 12,
   };
   await writeFile(derivedCachePath, serialize(derived));
 
@@ -179,7 +179,7 @@ try {
   derived = {
     compressed,
     detailed,
-    displayTopologyVersion: 11,
+    displayTopologyVersion: 12,
     graphStatistics,
     sourceCompressed: compressed,
     sourceGraphParts: exactGraph.parts.map(({ id, role, tokens }) => ({
@@ -188,13 +188,13 @@ try {
       tokens,
     })),
     sourceGraphStatistics: graphStatistics,
-    sourceTopologyVersion: 12,
+    sourceTopologyVersion: 13,
   };
   await writeFile(derivedCachePath, serialize(derived));
 }
 globalThis.gc?.();
 const { detailed } = derived;
-if (derived.sourceTopologyVersion !== 12) {
+if (derived.sourceTopologyVersion !== 13) {
   console.time('Read OSM mainline continuity topology');
   const osm = await readOsmMotorwayPbf(sourcePath);
   console.timeEnd('Read OSM mainline continuity topology');
@@ -223,7 +223,7 @@ if (derived.sourceTopologyVersion !== 12) {
     exactEdges: sourceGraph.edges.length,
     exactNodes: sourceGraph.coordinateByNodeId.size,
   };
-  derived.sourceTopologyVersion = 12;
+  derived.sourceTopologyVersion = 13;
   console.timeEnd('Build explicit paired-centerline route graph');
   console.log(derived.sourceGraphStatistics);
   await writeFile(derivedCachePath, serialize(derived));
@@ -398,6 +398,7 @@ const output = {
     'https://www.naturalearthdata.com/downloads/10m-physical-vectors/10m-land/',
   landmass_source_version: '5.1.1',
   methodology: {
+    alternativeRampPathCount: detailed.statistics.alternativeConnectorPathCount,
     biconnectedBlockCount: 1,
     compressedEdgeCount: sourceGraphStatistics.compressedEdges,
     compressedNodeCount: sourceGraphStatistics.compressedNodes,

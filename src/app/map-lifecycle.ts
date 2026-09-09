@@ -273,7 +273,7 @@ export function installMapData(stations: StationCollection): void {
   });
 
   const highwayTilesUrl = new URL(
-    'data/north-america-highways.pmtiles?v=20260909a',
+    'data/north-america-highways.pmtiles?v=20260909b',
     window.location.href,
   ).href;
   map.addSource('highway-network', {
