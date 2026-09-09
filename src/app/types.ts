@@ -36,7 +36,6 @@ export interface AreaConfig {
   readonly metadata: string;
   readonly schedules: string;
   readonly stations: string;
-  readonly streetTiles?: string;
   readonly supportsDestination: boolean;
   readonly timezone: string;
   readonly zoom: number;
@@ -86,10 +85,6 @@ export interface AppRuntime {
   circumferenceSchedules: Record<AreaKey, Schedule | null>;
   futureStreetAccessStationIds: string[];
   initialLoadComplete: boolean;
-  liveStreetRefreshInFlight: boolean;
-  liveStreetRefreshPending: boolean;
-  liveStreetRefreshSequence: number;
-  liveStreetRefreshTimer: number | undefined;
   loadingCanFinish: boolean;
   loadingOperation: LoadingOperation | null;
   loadedStations: StationCollection;

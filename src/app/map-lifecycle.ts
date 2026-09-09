@@ -1,19 +1,16 @@
-import type { FeatureIdentifier } from 'maplibre-gl';
+import { VectorTileSource } from 'maplibre-gl';
+import { ROAD_SOURCE } from '../transit-road-tiles.js';
 
 import { selectCircumferenceCandidate } from '../circumference.js';
 import { createCircumferenceGradientSource } from '../circumference-gradient-source.js';
-import { createStreetAccessScorer, splitStreetFeatures } from '../routing.js';
 import {
   landmassDataSchema,
-  mapFeaturePropertiesSchema,
   metadataSchema,
   scheduleSchema,
   stationCollectionSchema,
   stationPropertiesSchema,
-  streetFeatureSchema,
   streetPropertiesSchema,
   type StationCollection,
-  type StreetFeature,
 } from '../domain.js';
 import { fetchParsed } from '../parse.js';
 import {
@@ -35,7 +32,6 @@ import {
   resetSelection,
   runMapUpdate,
   setActiveProduct,
-  streetColorExpression,
   syncStationFilters,
   syncStationVisibility,
   syncStreetColor,
@@ -59,7 +55,6 @@ import {
   installHighwayHover,
 } from './highway-circumference-ui.js';
 import { installJerseyCityLandUse } from './land-use-ui.js';
-import { firstSymbolLayerId } from './map-ui-utils.js';
 import { installTimezoneSkew } from './timezone-skew-ui.js';
 import { fetchTimezoneMapData } from './timezone-data.js';
 import {
@@ -77,7 +72,6 @@ import {
   AREAS,
   AREA_KEYS,
   COLORS,
-  LIVE_ROAD_CLASSES,
   MODE_LABELS,
   activeStationModes,
   areaSelect,
@@ -92,6 +86,9 @@ import {
   futureStationFilter,
   futureStationToggle,
   geoJsonSource,
+  heatmapRoadLayers,
+  roadTileTemplates,
+  transitRoadTiles,
   initialAreaKey,
   initialProduct,
   isAreaKey,
@@ -126,48 +123,22 @@ import {
 
 export function installHover(): void {
   const stationLayerIds = ['station-points-open', 'station-points-future'];
-  const streetLayers = [
-    { id: 'street-proximity', source: 'streets', sourceLayer: 'streets' },
-    { id: 'live-street-proximity', source: 'live-streets' },
-  ];
-
-  for (const layer of streetLayers) {
-    let hoveredId: string | number | null = null;
-    const target = (id: string | number): FeatureIdentifier => ({
-      source: layer.source,
-      ...(layer.sourceLayer ? { sourceLayer: layer.sourceLayer } : {}),
-      id,
-    });
-
-    map.on('mousemove', layer.id, (event) => {
-      const feature = event.features?.[0];
-      if (!feature || feature.id === undefined) return;
-      const properties = streetPropertiesSchema.safeParse(feature.properties);
-      if (!properties.success) return;
-
-      if (hoveredId !== null) {
-        map.setFeatureState(target(hoveredId), { hover: false });
-      }
-      hoveredId = feature.id;
-      map.setFeatureState(target(hoveredId), { hover: true });
-      showStreetFeature(properties.data);
-      map.getCanvas().style.cursor = 'pointer';
-    });
-
-    map.on('mouseleave', layer.id, () => {
-      if (hoveredId !== null) {
-        map.setFeatureState(target(hoveredId), { hover: false });
-      }
-      hoveredId = null;
-      map.getCanvas().style.cursor = '';
-    });
-
-    map.on('click', layer.id, (event) => {
-      const feature = event.features?.[0];
-      const properties = streetPropertiesSchema.safeParse(feature?.properties);
-      if (properties.success) showStreetFeature(properties.data);
-    });
-  }
+  const inspectStreet = (point: { x: number; y: number }): boolean => {
+    if (runtime.activeProduct !== 'access' || !streetToggle.checked) return false;
+    const layers = [...heatmapRoadLayers.keys()];
+    if (!layers.length) return false;
+    const feature = map.queryRenderedFeatures([point.x, point.y], { layers })[0];
+    const properties = streetPropertiesSchema.safeParse(feature?.properties);
+    if (!feature || !properties.success) return false;
+    showStreetFeature(properties.data);
+    return true;
+  };
+  map.on('mousemove', (event) => {
+    map.getCanvas().style.cursor = inspectStreet(event.point) ? 'pointer' : '';
+  });
+  map.on('click', (event) => {
+    inspectStreet(event.point);
+  });
 
   for (const layerId of stationLayerIds) {
     map.on('mousemove', layerId, (event) => {
@@ -257,152 +228,12 @@ export function installHover(): void {
   installHighwayHover();
 }
 
-export function loadedLiveRoads(): StreetFeature[] {
-  const roadLayerIds = map
-    .getStyle()
-    .layers.filter(
-      (layer) =>
-        layer.type === 'line' &&
-        layer.source === 'openmaptiles' &&
-        layer['source-layer'] === 'transportation' &&
-        !/(?:_casing$|rail|hatching|path|pedestrian)/.test(layer.id),
-    )
-    .map((layer) => layer.id);
-  const features = map.queryRenderedFeatures({ layers: roadLayerIds });
-  const seen = new Set<string>();
-  const roads: StreetFeature[] = [];
-
-  for (const feature of features) {
-    const propertyPayload: unknown = feature.properties;
-    const parsedProperties = mapFeaturePropertiesSchema.safeParse(propertyPayload);
-    if (!parsedProperties.success) continue;
-    const properties = parsedProperties.data;
-    const roadClass = properties['class'];
-    if (typeof roadClass !== 'string') continue;
-    if (!LIVE_ROAD_CLASSES.has(roadClass)) continue;
-
-    const lines =
-      feature.geometry?.type === 'LineString'
-        ? [feature.geometry.coordinates]
-        : feature.geometry?.type === 'MultiLineString'
-          ? feature.geometry.coordinates
-          : [];
-
-    for (const coordinates of lines) {
-      if (!Array.isArray(coordinates) || coordinates.length < 2) continue;
-      const candidate = streetFeatureSchema.safeParse({
-        type: 'Feature',
-        geometry: { type: 'LineString', coordinates },
-        properties: {
-          n:
-            typeof properties['name'] === 'string'
-              ? properties['name']
-              : typeof properties['name:latin'] === 'string'
-                ? properties['name:latin']
-                : '',
-          h: roadClass,
-          class: roadClass,
-          brunnel:
-            typeof properties['brunnel'] === 'string' ? properties['brunnel'] : '',
-          d: 0,
-        },
-      });
-      if (!candidate.success) continue;
-      const key = `${roadClass}|${candidate.data.properties['brunnel'] ?? ''}|${JSON.stringify(coordinates)}`;
-      if (seen.has(key)) continue;
-      seen.add(key);
-      roads.push(candidate.data);
-    }
-  }
-
-  // Always split shared junctions so one source feature cannot give several
-  // blocks one score. A looser cap keeps the generalized overview lightweight;
-  // local zooms use the same 200m block-scale cap as the precomputed tiles.
-  return splitStreetFeatures(roads, {
-    maxLengthMeters: map.getZoom() < 12 ? 400 : 200,
-  });
-}
-
-export async function refreshLiveStreetData(
-  refreshSequence: number,
-  areaSequence: number,
-): Promise<void> {
-  if (
-    refreshSequence !== runtime.liveStreetRefreshSequence ||
-    areaSequence !== runtime.loadSequence ||
-    !AREAS[runtime.activeAreaKey].liveRoads ||
-    !map.getSource('live-streets')
-  ) {
-    return;
-  }
-
-  if (runtime.liveStreetRefreshInFlight) {
-    runtime.liveStreetRefreshPending = true;
-    return;
-  }
-
-  runtime.liveStreetRefreshInFlight = true;
-  try {
-    const roadFeatures = loadedLiveRoads();
-    if (roadFeatures.length === 0) return;
-
-    const activeStations = activeStationCollection().features;
-    updateStatus('Indexing streets');
-
-    if (activeStations.length > 0) {
-      await createStreetAccessScorer(activeStations, {
-        exhaustive: true,
-        stationFilter: () => true,
-      }).scoreAsync(roadFeatures, { batchSize: 500, candidateCount: 5 });
-    } else {
-      for (const feature of roadFeatures) {
-        feature.properties.d = runtime.maxDistanceMeters;
-        feature.properties['s'] = '';
-      }
-    }
-
-    if (
-      refreshSequence !== runtime.liveStreetRefreshSequence ||
-      areaSequence !== runtime.loadSequence ||
-      !AREAS[runtime.activeAreaKey].liveRoads
-    ) {
-      return;
-    }
-
-    geoJsonSource('live-streets')?.setData({
-      type: 'FeatureCollection',
-      features: roadFeatures,
-    });
-    syncStreetColor();
-    syncStreetVisibility();
-    updateViewportStatistics();
-    updateStatus(state.destination ? 'Destination set' : 'Ready');
-  } finally {
-    runtime.liveStreetRefreshInFlight = false;
-    if (runtime.liveStreetRefreshPending) {
-      runtime.liveStreetRefreshPending = false;
-      scheduleLiveStreetRefresh();
-    }
-  }
-}
-
 export function scheduleLiveStreetRefresh(): void {
-  if (runtime.activeProduct !== 'access' || !AREAS[runtime.activeAreaKey].liveRoads)
-    return;
-
-  window.clearTimeout(runtime.liveStreetRefreshTimer);
-  const refreshSequence = ++runtime.liveStreetRefreshSequence;
-  const areaSequence = runtime.loadSequence;
-  runtime.liveStreetRefreshTimer = window.setTimeout(() => {
-    const refresh = (): void => {
-      void refreshLiveStreetData(refreshSequence, areaSequence);
-    };
-    if (map.areTilesLoaded()) {
-      refresh();
-    } else {
-      void map.once('idle', refresh);
-    }
-  }, 120);
+  if (!transitRoadTiles.setStations(activeStationCollection().features)) return;
+  const source = map.getSource(ROAD_SOURCE);
+  if (source instanceof VectorTileSource) {
+    source.setTiles(transitRoadTiles.urls(roadTileTemplates));
+  }
 }
 
 export function installMapData(stations: StationCollection): void {
@@ -412,26 +243,6 @@ export function installMapData(stations: StationCollection): void {
     existingStations.setData(stations);
     return;
   }
-
-  const labelLayerId = firstSymbolLayerId();
-  const streetTiles = AREAS['cdmx'].streetTiles;
-  if (streetTiles === undefined) {
-    throw new Error('CDMX street tile URL is not configured');
-  }
-  const streetTilesUrl = new URL(streetTiles, window.location.href).href;
-
-  map.addSource('streets', {
-    type: 'vector',
-    url: `pmtiles://${streetTilesUrl}`,
-    attribution: '© OpenStreetMap contributors',
-    promoteId: 'i',
-  });
-
-  map.addSource('live-streets', {
-    type: 'geojson',
-    data: { type: 'FeatureCollection', features: [] },
-    generateId: true,
-  });
 
   map.addSource('stations', {
     type: 'geojson',
@@ -492,51 +303,6 @@ export function installMapData(stations: StationCollection): void {
       },
     });
   }
-
-  map.addLayer(
-    {
-      id: 'street-proximity',
-      type: 'line',
-      source: 'streets',
-      'source-layer': 'streets',
-      layout: {
-        visibility: 'none',
-      },
-      paint: {
-        'line-color': streetColorExpression(),
-        'line-width': ['interpolate', ['linear'], ['zoom'], 9, 0.75, 12, 1.8, 15, 4.2],
-        'line-opacity': [
-          'case',
-          ['boolean', ['feature-state', 'hover'], false],
-          1,
-          0.78,
-        ],
-      },
-    },
-    labelLayerId ?? undefined,
-  );
-
-  map.addLayer(
-    {
-      id: 'live-street-proximity',
-      type: 'line',
-      source: 'live-streets',
-      layout: {
-        visibility: 'none',
-      },
-      paint: {
-        'line-color': streetColorExpression(),
-        'line-width': ['interpolate', ['linear'], ['zoom'], 9, 0.75, 12, 1.8, 15, 4.2],
-        'line-opacity': [
-          'case',
-          ['boolean', ['feature-state', 'hover'], false],
-          1,
-          0.78,
-        ],
-      },
-    },
-    labelLayerId ?? undefined,
-  );
 
   map.addLayer({
     id: 'station-points-open',
@@ -680,8 +446,6 @@ export async function loadArea(
 ): Promise<void> {
   const area = AREAS[areaKey];
   const sequence = ++runtime.loadSequence;
-  runtime.liveStreetRefreshSequence += 1;
-  window.clearTimeout(runtime.liveStreetRefreshTimer);
 
   if (!initial) beginLoading(`Loading ${area.label}`, 'area');
   runtime.activeAreaKey = areaKey;
@@ -872,30 +636,6 @@ futureStationToggle.addEventListener('change', () => {
   });
 });
 
-map.on('sourcedataloading', (event) => {
-  if (
-    event.sourceId !== 'streets' ||
-    AREAS[runtime.activeAreaKey].liveRoads ||
-    !runtime.initialLoadComplete
-  ) {
-    return;
-  }
-
-  if (!runtime.loadingOperation) {
-    beginLoading('Loading area', 'area');
-  }
-});
-
-map.on('sourcedata', (event) => {
-  if (
-    event.sourceId === 'openmaptiles' &&
-    event.isSourceLoaded &&
-    AREAS[runtime.activeAreaKey].liveRoads
-  ) {
-    scheduleLiveStreetRefresh();
-  }
-});
-
 function nearestConfiguredArea(): AreaKey | null {
   if (map.getZoom() < 7) return null;
   const center = map.getCenter();
@@ -924,7 +664,6 @@ function followAccessMapFocus(): void {
 }
 
 map.on('moveend', () => {
-  scheduleLiveStreetRefresh();
   followAccessMapFocus();
 });
 map.on('idle', () => {
