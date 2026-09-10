@@ -18,6 +18,7 @@ from shapely.ops import transform, unary_union
 
 cache = Path(sys.argv[1])
 output = Path(sys.argv[2])
+source_files = {s['file'] for s in json.loads(Path('scripts/automatic-timezone-sources.json').read_text())}
 
 
 def read(name):
@@ -165,7 +166,7 @@ wide_first = unresolved([n for n in nodes if n['level'] == 1])
 def second_features(code):
     if code != 'CAN':
         filename = code + '2.geojson'
-        if not (cache / filename).exists():
+        if filename not in source_files:
             return
         for f in read(filename)['features']:
             p = f['properties']
@@ -177,7 +178,9 @@ def second_features(code):
                                  shx=io.BytesIO(z.read(stem + '.shx')),
                                  dbf=io.BytesIO(z.read(stem + '.dbf')), encoding='latin1')
         transformer = Transformer.from_crs(CRS.from_wkt(z.read(stem + '.prj').decode()), 'EPSG:4326', always_xy=True)
-        province = {'24': 'CA-QC', '35': 'CA-ON', '59': 'CA-BC', '61': 'CA-NT', '62': 'CA-NU'}
+        province = {'10': 'CA-NL', '11': 'CA-PE', '12': 'CA-NS', '13': 'CA-NB',
+                    '24': 'CA-QC', '35': 'CA-ON', '46': 'CA-MB', '47': 'CA-SK',
+                    '48': 'CA-AB', '59': 'CA-BC', '60': 'CA-YT', '61': 'CA-NT', '62': 'CA-NU'}
         for f in reader.iterShapeRecords():
             p = f.record.as_dict()
             parent_iso = province.get(p['PRUID'])
@@ -197,6 +200,25 @@ for code, parents in first_levels.items():
     parent_shapes = [shapes[p['id']] for p in parents]
     tree = STRtree(parent_shapes)
     count = 0
+    # Principal ISO regions can already contain smaller ISO units in Natural
+    # Earth (e.g. Kalimantan's provinces and Scotland's council areas). These
+    # are the next hierarchy level, ahead of any deeper administrative source.
+    iso_children = set()
+    for parent in needed:
+        grouped = {}
+        for f in admin1:
+            p = f['properties']
+            child_iso = p['iso_3166_2'] or ''
+            if p['adm0_a3'] == code and iso.get(child_iso, {}).get('parent') == parent['iso_code']:
+                grouped.setdefault(child_iso, []).append(valid(shape(f['geometry'])))
+        if not grouped:
+            continue
+        iso_children.add(parent['id'])
+        for child_iso, geometries in grouped.items():
+            node('admin2:' + code + ':' + child_iso, iso[child_iso]['name'], country,
+                 unary_union(geometries), 2, parent=parent['id'], iso=child_iso,
+                 source='natural-earth-admin1')
+            count += 1
     for key, name, iso_code, geometry, parent_iso in second_features(code):
         if parent_iso:
             parent = next((p for p in parents if p['iso_code'] == parent_iso), None)
@@ -206,7 +228,7 @@ for code, parents in first_levels.items():
                 continue
             parent_index = max(candidates, key=lambda i: geometry.intersection(parent_shapes[i]).area)
             parent = parents[parent_index]
-        if parent is None or parent['id'] not in wide_first:
+        if parent is None or parent['id'] not in wide_first or parent['id'] in iso_children:
             continue
         node('admin2:' + code + ':' + key, name, country, geometry, 2,
              parent=parent['id'], iso=iso_code,

@@ -94,5 +94,53 @@
     "url": "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/90a1d52/releaseData/gbOpen/MEX/ADM1/geoBoundaries-MEX-ADM1.geojson",
     "license": "Creative Commons Attribution 3.0 Intergovernmental Organisations (CC BY 3.0 IGO)",
     "sha256": "7cfdc0e6a3f1420ba57b12b971db9b3c9febda8e7b00565e159a25b6dd4f35e0"
+  },
+  {
+    "id": "geoboundaries-ARG2",
+    "file": "ARG2.geojson",
+    "name": "geoBoundaries Argentina ADM2 (2020); Instituto Geografico Nacional and UNHCR, OCHA ROLAC",
+    "url": "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/9469f09/releaseData/gbOpen/ARG/ADM2/geoBoundaries-ARG-ADM2.geojson",
+    "license": "Creative Commons Attribution 3.0 Intergovernmental Organisations (CC BY 3.0 IGO)",
+    "sha256": "f35dae5a257302dea5bd1549ae135baf82e7ee7491918854c3db9bbdec890177"
+  },
+  {
+    "id": "geoboundaries-AUS2",
+    "file": "AUS2.geojson",
+    "name": "geoBoundaries Australia ADM2 (2022); Australian Bureau of Statistics",
+    "url": "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/9469f09/releaseData/gbOpen/AUS/ADM2/geoBoundaries-AUS-ADM2.geojson",
+    "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+    "sha256": "b70870c890477b75abab7fdad3c643d93d10d02d6928407f9eee88bd97ea963f"
+  },
+  {
+    "id": "geoboundaries-BRA2",
+    "file": "BRA2.geojson",
+    "name": "geoBoundaries Brazil ADM2 (2020); Instituto Brasileiro de Geografia e Estatística (IBGE), OCHA ROLAC",
+    "url": "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/9469f09/releaseData/gbOpen/BRA/ADM2/geoBoundaries-BRA-ADM2.geojson",
+    "license": "Creative Commons Attribution 3.0 Intergovernmental Organisations (CC BY 3.0 IGO)",
+    "sha256": "96ea7bcc19deb6cdac5afa0f36be31d26767b92bc0e1db568b1b6e943df9a9ed"
+  },
+  {
+    "id": "geoboundaries-JPN2",
+    "file": "JPN2.geojson",
+    "name": "geoBoundaries Japan ADM2 (2017); OpenStreetMap, Wambacher",
+    "url": "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/9469f09/releaseData/gbOpen/JPN/ADM2/geoBoundaries-JPN-ADM2.geojson",
+    "license": "Creative Commons Attribution-ShareAlike 2.0",
+    "sha256": "27a0a8fa84fdab6d56b2da1c295b3c71090190d155f6b463bfd5c47beffba972"
+  },
+  {
+    "id": "geoboundaries-KAZ2",
+    "file": "KAZ2.geojson",
+    "name": "geoBoundaries Kazakhstan ADM2 (2017); OpenStreetMap, Wambacher",
+    "url": "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/9469f09/releaseData/gbOpen/KAZ/ADM2/geoBoundaries-KAZ-ADM2.geojson",
+    "license": "Open Data Commons Open Database License 1.0",
+    "sha256": "b69520a12a7e3642c3ee48d6b2fcae0776c70fe5f757d6235beca3e9710833ae"
+  },
+  {
+    "id": "geoboundaries-ZAF2",
+    "file": "ZAF2.geojson",
+    "name": "geoBoundaries South Africa ADM2 (2020); OCHA ROSEA, South African Municipal Demarcation Board",
+    "url": "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/9469f09/releaseData/gbOpen/ZAF/ADM2/geoBoundaries-ZAF-ADM2.geojson",
+    "license": "Creative Commons Attribution 3.0 Intergovernmental Organisations (CC BY 3.0 IGO)",
+    "sha256": "6cc504ad835b37823da687a3fd3f0cab63608a6c8a5ad906e1011f1554bbbbdd"
   }
 ]

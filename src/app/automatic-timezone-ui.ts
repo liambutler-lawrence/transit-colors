@@ -1,4 +1,5 @@
 import {
+  AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES,
   assignAutomaticTimezones,
   automaticTimezoneDataSchema,
   type AutomaticTimezoneAssignment,
@@ -63,19 +64,18 @@ export function automaticTimezoneActive(): boolean {
 
 function fallbackDescription(assignment: AutomaticTimezoneAssignment): string {
   if (assignment.fallback === 'too-wide')
-    return 'Second-level region still exceeds the strict ±60-minute limit; temporary UTC+0.';
+    return `The best whole-hour UTC offset still leaves more than ${AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES} minutes of maximum skew in this second-level region; temporary UTC+0.`;
   if (assignment.fallback === 'uncovered-area') return assignment.region.coverage_note;
   return 'No usable child subdivisions in the boundary sources; temporary UTC+0.';
 }
 
 function renderSummary(assignments: readonly AutomaticTimezoneAssignment[]): void {
-  const strict = assignments.filter(({ fit }) => fit?.toleranceMinutes === 30).length;
-  const relaxed = assignments.filter(({ fit }) => fit?.toleranceMinutes === 60).length;
+  const accepted = assignments.filter(({ fit }) => fit).length;
   const fallbacks = assignments.filter(({ fallback }) => fallback);
   const tooWide = fallbacks.filter(({ fallback }) => fallback === 'too-wide').length;
   const gaps = fallbacks.filter(({ fallback }) => fallback === 'uncovered-area').length;
   const missing = fallbacks.length - tooWide - gaps;
-  summary.textContent = `${strict} regions fit ±30 min; ${relaxed} fit ±60 min. ${tooWide} second-level regions use UTC+0 because they are still too wide. ${missing} regions lack usable subdivisions; ${gaps} boundary coverage gaps also use UTC+0.`;
+  summary.textContent = `${accepted} regions have an optimized maximum skew of ${AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES} minutes or less. ${tooWide} second-level regions use UTC+0 because their best maximum skew still exceeds ${AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES} minutes. ${missing} regions lack usable subdivisions; ${gaps} boundary coverage gaps also use UTC+0.`;
   exceptions.hidden = fallbacks.length === 0;
   exceptionSummary.textContent = `UTC+0 exceptions (${fallbacks.length})`;
   exceptionList.replaceChildren(
@@ -103,7 +103,7 @@ function renderSummary(assignments: readonly AutomaticTimezoneAssignment[]): voi
 async function loadAutomaticTimezones(): Promise<void> {
   if (layer) return;
   const data = await fetchParsed(
-    'data/timezone-automatic-regions.json?v=20260910b',
+    'data/timezone-automatic-regions.json?v=20260910c',
     automaticTimezoneDataSchema,
   );
   const assignments = assignAutomaticTimezones(data.regions);
@@ -268,7 +268,7 @@ export function inspectAutomaticTimezone(longitude: number, latitude: number): b
     {
       label: 'Rule',
       value: fit
-        ? `Entire region strictly within ±${fit.toleranceMinutes} min`
+        ? `Smallest maximum skew is at most ${AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES} minutes`
         : fallbackDescription(assignment),
     },
     {
