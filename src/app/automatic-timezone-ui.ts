@@ -2,6 +2,8 @@ import {
   AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES,
   assignAutomaticTimezones,
   automaticTimezoneDataSchema,
+  automaticTimezoneOptions,
+  customizeAutomaticTimezone,
   type AutomaticTimezoneAssignment,
 } from '../automatic-timezones.js';
 import { fetchParsed } from '../parse.js';
@@ -43,6 +45,13 @@ const rules = requiredElement('#timezone-rules', HTMLSelectElement);
 const info = requiredElement('#timezone-automatic-info', HTMLElement);
 const summary = requiredElement('#timezone-automatic-summary', HTMLElement);
 const reloadButton = requiredElement('#timezone-automatic-reload', HTMLButtonElement);
+const customization = requiredElement(
+  '#timezone-automatic-customization',
+  HTMLFieldSetElement,
+);
+const offsetSelect = requiredElement('#timezone-automatic-offset', HTMLSelectElement);
+const resetButton = requiredElement('#timezone-automatic-reset', HTMLButtonElement);
+const offsetNote = requiredElement('#timezone-automatic-offset-note', HTMLElement);
 const exceptions = requiredElement(
   '#timezone-automatic-exceptions',
   HTMLDetailsElement,
@@ -62,6 +71,12 @@ const officialControls = ['history', 'season', 'simulator'].map((name) =>
 const FILL_ID = 'timezone-automatic-fill';
 const POLAR_FILL_ID = 'timezone-automatic-fill-polar';
 const BORDER_ID = 'timezone-automatic-borders';
+const SELECTED_BORDER_ID = 'timezone-automatic-selected-border';
+const STORAGE_KEY = 'transit-colors:automatic-timezone-offsets:v1';
+const overrides = new Map<string, number>();
+let assignments: AutomaticTimezoneAssignment[] = [];
+let selected: { assignment: AutomaticTimezoneAssignment; longitude: number } | null =
+  null;
 let layer: TimezoneSkewLayer | null = null;
 let polarLayer: TimezoneSkewLayer | null = null;
 let hitIndex: PolygonHitIndex<AutomaticTimezoneAssignment> | null = null;
@@ -85,7 +100,7 @@ function renderSummary(assignments: readonly AutomaticTimezoneAssignment[]): voi
   const tooWide = fallbacks.filter(({ fallback }) => fallback === 'too-wide').length;
   const gaps = fallbacks.filter(({ fallback }) => fallback === 'uncovered-area').length;
   const missing = fallbacks.length - tooWide - gaps;
-  summary.textContent = `${accepted} regions have an optimized maximum skew of ${AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES} minutes or less. ${tooWide} second-level regions use UTC+0 because their best maximum skew still exceeds ${AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES} minutes. ${missing} regions lack usable subdivisions; ${gaps} boundary coverage gaps also use UTC+0.`;
+  summary.textContent = `${accepted} regions have a maximum skew of ${AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES} minutes or less. ${tooWide} second-level regions use UTC+0 because their best maximum skew still exceeds ${AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES} minutes. ${missing} regions lack usable subdivisions; ${gaps} boundary coverage gaps also use UTC+0.${overrides.size ? ` ${overrides.size} regions use your custom offsets.` : ''}`;
   exceptions.hidden = fallbacks.length === 0;
   exceptionSummary.textContent = `UTC+0 exceptions (${fallbacks.length})`;
   exceptionList.replaceChildren(
@@ -110,10 +125,92 @@ function renderSummary(assignments: readonly AutomaticTimezoneAssignment[]): voi
   );
 }
 
+function effectiveAssignment(
+  assignment: AutomaticTimezoneAssignment,
+): AutomaticTimezoneAssignment {
+  return customizeAutomaticTimezone(
+    assignment,
+    overrides.get(assignment.region.id) ?? null,
+  );
+}
+
+function restoreOverrides(): void {
+  try {
+    const stored: unknown = JSON.parse(
+      window.localStorage.getItem(STORAGE_KEY) ?? '{}',
+    );
+    if (!stored || typeof stored !== 'object' || Array.isArray(stored)) return;
+    for (const assignment of assignments) {
+      const offset: unknown = Reflect.get(stored, assignment.region.id);
+      if (typeof offset !== 'number' || offset === assignment.offsetHours) continue;
+      try {
+        // Revalidate against current leaves and boundaries after every data update.
+        customizeAutomaticTimezone(assignment, offset);
+        overrides.set(assignment.region.id, offset);
+      } catch {
+        // A formerly valid choice may no longer fit this region.
+      }
+    }
+  } catch {
+    // Unavailable storage or invalid saved data leaves automatic choices intact.
+  }
+}
+
+function changeSelectedOffset(offset: number | null): void {
+  if (!selected) return;
+  const base = selected.assignment;
+  const effective = customizeAutomaticTimezone(base, offset);
+  if (effective === base) overrides.delete(base.region.id);
+  else overrides.set(base.region.id, effective.offsetHours);
+  layer?.setOffsets(overrides);
+  polarLayer?.setOffsets(overrides);
+  renderSummary(assignments.map(effectiveAssignment));
+  renderAutomaticTimezoneDetails(base, selected.longitude);
+  try {
+    window.localStorage.setItem(
+      STORAGE_KEY,
+      JSON.stringify(Object.fromEntries(overrides)),
+    );
+    offsetNote.textContent += ' Saved in this browser.';
+  } catch {
+    offsetNote.textContent +=
+      ' Applied for this session; browser storage is unavailable.';
+  }
+}
+
+function renderCustomization(base: AutomaticTimezoneAssignment): void {
+  customization.hidden = selected === null;
+  if (!selected) return;
+  const alternatives = automaticTimezoneOptions(base.region.longitude_ranges).filter(
+    ({ offsetHours }) => offsetHours !== base.offsetHours,
+  );
+  const defaultDetail = base.fit
+    ? ` · max ${base.fit.maximumSkewMinutes.toFixed(2)} min`
+    : ' · fallback';
+  offsetSelect.replaceChildren(
+    new Option(`Automatic · ${formatUtcOffset(base.offsetHours)}${defaultDetail}`, ''),
+    ...alternatives.map(
+      ({ offsetHours, maximumSkewMinutes }) =>
+        new Option(
+          `${formatUtcOffset(offsetHours)} · max ${maximumSkewMinutes.toFixed(2)} min`,
+          String(offsetHours),
+        ),
+    ),
+  );
+  const override = overrides.get(base.region.id);
+  offsetSelect.value = override === undefined ? '' : String(override);
+  offsetSelect.disabled = alternatives.length === 0;
+  resetButton.disabled = override === undefined;
+  offsetNote.textContent = alternatives.length
+    ? 'Each alternative keeps the entire region’s maximum skew below 45 minutes. Boundaries and the region name stay the same.'
+    : 'No alternative whole-hour UTC offset keeps this region’s maximum skew below 45 minutes.';
+}
+
 async function loadAutomaticTimezones(): Promise<void> {
   if (layer) return;
   const data = await fetchParsed(automaticDataUrl, automaticTimezoneDataSchema);
-  const assignments = assignAutomaticTimezones(data.regions);
+  assignments = assignAutomaticTimezones(data.regions);
+  restoreOverrides();
   const features: TimezoneSkewCollection['features'] = assignments.map(
     ({ region, offsetHours }, id) => ({
       type: 'Feature',
@@ -121,7 +218,8 @@ async function loadAutomaticTimezones(): Promise<void> {
       geometry: region.geometry,
       properties: {
         id,
-        timezone_name: region.naming?.timezone_name ?? region.id,
+        // Stable region IDs keep offsets independent even if display names change.
+        timezone_name: region.id,
         offset_hours: offsetHours,
         offset_label: formatUtcOffset(offsetHours),
         places: region.name,
@@ -137,7 +235,7 @@ async function loadAutomaticTimezones(): Promise<void> {
   const polarIds = new Set(polarFeatures.map(({ id }) => id));
   const mesh = triangulateTimezoneData(
     { features: features.filter(({ id }) => !polarIds.has(id)) },
-    new Map(),
+    overrides,
   );
   hitIndex = new PolygonHitIndex(
     assignments.map((assignment) => ({
@@ -171,7 +269,7 @@ async function loadAutomaticTimezones(): Promise<void> {
   // the pole. Draw whole polar land regions above them, on a neutral land base,
   // so neither a water slit nor a differently colored circular cap shows through.
   polarLayer = new TimezoneSkewLayer(
-    triangulateTimezoneData({ features: polarFeatures }, new Map()),
+    triangulateTimezoneData({ features: polarFeatures }, overrides),
     POLAR_FILL_ID,
     true,
   );
@@ -190,7 +288,18 @@ async function loadAutomaticTimezones(): Promise<void> {
     },
     firstSymbolLayerId(),
   );
-  renderSummary(assignments);
+  map.addLayer(
+    {
+      id: SELECTED_BORDER_ID,
+      type: 'line',
+      source: 'timezone-automatic-regions',
+      filter: ['==', ['get', 'timezone_name'], ''],
+      layout: { visibility: 'none' },
+      paint: { 'line-color': '#244f8f', 'line-width': 2.2 },
+    },
+    firstSymbolLayerId(),
+  );
+  renderSummary(assignments.map(effectiveAssignment));
 }
 
 export function installAutomaticTimezoneControl(onChange: () => void): void {
@@ -200,8 +309,16 @@ export function installAutomaticTimezoneControl(onChange: () => void): void {
   reloadButton.addEventListener('click', () => {
     window.location.reload();
   });
+  offsetSelect.addEventListener('change', () => {
+    changeSelectedOffset(offsetSelect.value === '' ? null : Number(offsetSelect.value));
+  });
+  resetButton.addEventListener('click', () => {
+    changeSelectedOffset(null);
+  });
   rules.addEventListener('change', () => {
     const active = automaticTimezoneActive();
+    selected = null;
+    customization.hidden = true;
     info.hidden = !active;
     officialMethodNote.hidden = active;
     for (const control of officialControls) {
@@ -240,6 +357,10 @@ export function syncAutomaticTimezoneVisibility(): void {
     BORDER_ID,
     active && (timezoneColorsToggle.checked || timezoneBoundariesToggle.checked),
   );
+  setLayerVisibility(
+    SELECTED_BORDER_ID,
+    active && selected !== null && timezoneBoundariesToggle.checked,
+  );
   if (map.getLayer(BORDER_ID)) {
     map.setPaintProperty(
       BORDER_ID,
@@ -251,27 +372,58 @@ export function syncAutomaticTimezoneVisibility(): void {
 
 export function positionAutomaticTimezoneLayers(before: string | undefined): void {
   if (map.getLayer(FILL_ID)) map.moveLayer(FILL_ID, before);
-  for (const id of [POLAR_FILL_ID, BORDER_ID])
+  for (const id of [POLAR_FILL_ID, BORDER_ID, SELECTED_BORDER_ID])
     if (map.getLayer(id)) map.moveLayer(id, firstSymbolLayerId());
 }
 
-export function inspectAutomaticTimezone(longitude: number, latitude: number): boolean {
+export function inspectAutomaticTimezone(
+  longitude: number,
+  latitude: number,
+  pin = false,
+): boolean {
   const assignment = hitIndex?.find(longitude, latitude);
+  if (pin) {
+    selected = assignment ? { assignment, longitude } : null;
+    customization.hidden = !selected;
+    if (map.getLayer(SELECTED_BORDER_ID))
+      map.setFilter(SELECTED_BORDER_ID, [
+        '==',
+        ['get', 'timezone_name'],
+        assignment?.region.id ?? '',
+      ]);
+    syncAutomaticTimezoneVisibility();
+  } else if (selected) {
+    // Keep the clicked target stable while the pointer travels to the sidebar.
+    return Boolean(assignment);
+  }
   if (!assignment) return false;
+  renderAutomaticTimezoneDetails(assignment, longitude);
+  return true;
+}
+
+function renderAutomaticTimezoneDetails(
+  base: AutomaticTimezoneAssignment,
+  longitude: number,
+): void {
+  const assignment = effectiveAssignment(base);
   const { region, fit, offsetHours } = assignment;
+  const customized = overrides.has(region.id);
   const skew = solarNoonSkewMinutes(longitude, offsetHours);
-  timezoneSelectionTypeEl.textContent = assignment.fallback
-    ? 'Automatic · UTC+0 fallback'
-    : 'Automatic time zone';
+  timezoneSelectionTypeEl.textContent = customized
+    ? 'Automatic · Custom offset'
+    : assignment.fallback
+      ? 'Automatic · UTC+0 fallback'
+      : 'Automatic time zone';
   timezoneNameEl.textContent = `${region.naming?.timezone_name ?? region.name} · ${formatUtcOffset(offsetHours)}`;
   timezoneSummaryEl.textContent = `Solar noon here would fall near ${formatSolarNoon(skew)}—${describeSolarNoonSkew(skew)}.`;
+  renderCustomization(base);
   replaceMetadata(timezoneMetadataEl, [
     { label: 'Geographic region', value: region.name },
     { label: 'Country or territory', value: region.country_name },
     {
       label: 'Region level',
       value:
-        assignment.fallback === 'uncovered-area'
+        base.fallback === 'uncovered-area'
           ? 'Boundary coverage gap'
           : ['Country', 'First-level subdivision', 'Second-level subdivision'][
               region.level
@@ -304,13 +456,18 @@ export function inspectAutomaticTimezone(longitude: number, latitude: number): b
     },
     { label: 'ISO code (source)', value: region.iso_code },
     { label: 'Longitude', value: formatLongitude(longitude) },
-    { label: 'Calculated UTC offset', value: formatUtcOffset(offsetHours) },
+    {
+      label: customized ? 'Custom UTC offset' : 'Calculated UTC offset',
+      value: formatUtcOffset(offsetHours),
+    },
     { label: 'Solar noon', value: formatSolarNoon(skew) },
     {
       label: 'Rule',
-      value: fit
-        ? `Smallest maximum skew is at most ${AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES} minutes`
-        : fallbackDescription(assignment),
+      value: customized
+        ? 'Custom whole-hour offset with maximum skew below 45 minutes'
+        : fit
+          ? `Smallest maximum skew is at most ${AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES} minutes`
+          : fallbackDescription(assignment),
     },
     {
       label: 'Maximum region skew',
@@ -328,5 +485,4 @@ export function inspectAutomaticTimezone(longitude: number, latitude: number): b
     },
     { label: 'Source region ID', value: region.id },
   ]);
-  return true;
 }

@@ -6,6 +6,8 @@ import {
   AUTOMATIC_TIMEZONE_ASSIGNMENT_RULES,
   assignAutomaticTimezones,
   automaticTimezoneDataSchema,
+  automaticTimezoneOptions,
+  customizeAutomaticTimezone,
   fitAutomaticTimezone,
   optimizeAutomaticTimezone,
 } from './automatic-timezones.ts';
@@ -101,6 +103,74 @@ test('ambiguous meridians minimize worst-case skew, then favor UTC+0', () => {
   assert.equal(fitAutomaticTimezone([[7, 9]]).offsetHours, 1);
   assert.equal(fitAutomaticTimezone([[6, 9]]).offsetHours, 0);
   assert.equal(fitAutomaticTimezone([[-9, -6]]).offsetHours, 0);
+});
+
+test('custom offsets include all whole-hour choices strictly below 45 minutes', () => {
+  assert.deepEqual(automaticTimezoneOptions([[6, 8]]), [
+    { offsetHours: 0, maximumSkewMinutes: 32 },
+    { offsetHours: 1, maximumSkewMinutes: 36 },
+  ]);
+  assert.deepEqual(automaticTimezoneOptions([[3.75, 8]]), [
+    { offsetHours: 0, maximumSkewMinutes: 32 },
+  ]); // UTC+1 would be exactly 45, so it is not a custom option.
+  assert.equal(automaticTimezoneOptions([[-11.25, 11.25]]).length, 0);
+  assert.equal(automaticTimezoneOptions([[-12, 12]]).length, 0);
+  assert.deepEqual(
+    automaticTimezoneOptions([
+      [6, 8],
+      [10, 12],
+    ]),
+    [{ offsetHours: 1, maximumSkewMinutes: 36 }],
+  ); // Every island must fit, not just the largest polygon.
+  assert.deepEqual(
+    automaticTimezoneOptions([
+      [174, 179],
+      [-179, -174],
+    ]),
+    [{ offsetHours: 12, maximumSkewMinutes: 24 }],
+  ); // The date line has one canonical offset.
+});
+
+test('customizing a final region changes its skew without changing the hierarchy or its neighbors', () => {
+  const original = assignAutomaticTimezones([
+    region('country', 0, -50, 50),
+    region('state', 1, -50, 50, 'country'),
+    region('city', 2, 6, 8, 'state'),
+    region('neighbor', 2, 7, 9, 'state'),
+  ]);
+  const [city, neighbor] = original;
+  const customized = customizeAutomaticTimezone(city, 1);
+  assert.equal(customized.offsetHours, 1);
+  assert.equal(customized.fit.maximumSkewMinutes, 36);
+  assert.equal(customized.region, city.region);
+  assert.equal(city.offsetHours, 0);
+  assert.equal(neighbor.offsetHours, 1);
+  assert.equal(customizeAutomaticTimezone(city, null), city);
+  assert.equal(customizeAutomaticTimezone(city, 0), city);
+  for (const invalid of [-1, 2, 0.5, NaN, Infinity])
+    assert.throws(
+      () => customizeAutomaticTimezone(city, invalid),
+      /no eligible custom offset/,
+    );
+  const atLimit = assignAutomaticTimezones([region('limit', 0, 3.75, 8)])[0];
+  assert.throws(
+    () => customizeAutomaticTimezone(atLimit, 1),
+    /no eligible custom offset/,
+  );
+});
+
+test('fallback regions expose only geographically eligible choices and can reset to their original fallback', () => {
+  const [gap, wide] = assignAutomaticTimezones([
+    { ...region('gap', 0, 25, 28), coverage_note: 'No boundary coverage.' },
+    region('wide', 0, -50, 50),
+  ]);
+  const custom = customizeAutomaticTimezone(gap, 2);
+  assert.equal(custom.offsetHours, 2);
+  assert.equal(custom.fallback, null);
+  assert.equal(custom.fit.maximumSkewMinutes, 20);
+  assert.equal(custom.region, gap.region);
+  assert.equal(customizeAutomaticTimezone(gap, null).fallback, 'uncovered-area');
+  assert.throws(() => customizeAutomaticTimezone(wide, 1), /no eligible custom offset/);
 });
 
 test('a country at the 45-minute limit stays whole even when children fit tighter', () => {

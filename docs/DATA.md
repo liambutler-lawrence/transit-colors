@@ -302,6 +302,18 @@ invariant failures before committing the snapshot. Never commit `.gtfs-cache` or
 
 ## Automatic time-zone regions
 
+Clicking a final automatic region pins its details and exposes a custom offset menu.
+Alternatives are whole-hour UTC offsets whose maximum skew across every longitude
+interval is strictly below 45 minutes. The hierarchy still uses the inclusive 45-minute
+subdivision rule; customization never changes boundaries, levels, or names. The default
+choice and reset button restore the original minimax offset or UTC+0 fallback. Regions
+with no eligible alternative explain that in the menu.
+
+Custom offsets are keyed by source region ID and saved in browser local storage.
+Restored choices are checked against the current final regions and their full extents;
+obsolete or newly invalid choices are ignored. Fill colors, selected-point solar noon,
+maximum region skew, and fallback counts all use the effective custom offsets.
+
 Clock Skew's automatic option loads a content-hashed build asset generated from
 `data/timezone-automatic-regions.json` only when selected. The browser runs
 `assignAutomaticTimezones` against the recorded hierarchy; the offline builder uses the

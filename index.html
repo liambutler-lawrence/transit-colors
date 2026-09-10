@@ -474,6 +474,10 @@
                     populated place is available, the geographic name is retained and
                     flagged on inspection. Names do not change boundaries or offsets.
                   </p>
+                  <p>
+                    Click a region to customize its UTC offset using options with a
+                    maximum skew below 45 minutes. Click another region to select it.
+                  </p>
                   <details
                     id="timezone-automatic-exceptions"
                     class="timezone-period-changes"
@@ -614,6 +618,22 @@
                   Hover or click any colored land area to compare clock noon with mean
                   solar noon.
                 </span>
+                <fieldset
+                  id="timezone-automatic-customization"
+                  class="timezone-period-control timezone-simulator-control"
+                  hidden
+                >
+                  <legend>Customize this region</legend>
+                  <label for="timezone-automatic-offset">Region UTC offset</label>
+                  <select
+                    id="timezone-automatic-offset"
+                    aria-describedby="timezone-automatic-offset-note"
+                  ></select>
+                  <button id="timezone-automatic-reset" type="button" disabled>
+                    Reset to automatic
+                  </button>
+                  <p id="timezone-automatic-offset-note" role="status"></p>
+                </fieldset>
                 <dl id="timezone-metadata" class="feature-metadata"></dl>
               </div>
               <p class="method-note timezone-method-note">
