@@ -100,7 +100,7 @@ function renderSummary(assignments: readonly AutomaticTimezoneAssignment[]): voi
   const tooWide = fallbacks.filter(({ fallback }) => fallback === 'too-wide').length;
   const gaps = fallbacks.filter(({ fallback }) => fallback === 'uncovered-area').length;
   const missing = fallbacks.length - tooWide - gaps;
-  summary.textContent = `${accepted} regions have a maximum skew of ${AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES} minutes or less. ${tooWide} second-level regions use UTC+0 because their best maximum skew still exceeds ${AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES} minutes. ${missing} regions lack usable subdivisions; ${gaps} boundary coverage gaps also use UTC+0.${overrides.size ? ` ${overrides.size} regions use your custom offsets.` : ''}`;
+  summary.textContent = `${accepted} regions have a maximum skew of ${AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES} minutes or less. ${tooWide} second-level regions use UTC+0 because their best maximum skew still exceeds ${AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES} minutes. ${missing} regions lack usable subdivisions; ${gaps} boundary coverage gaps also use UTC+0.${overrides.size ? ` ${overrides.size} custom ${overrides.size === 1 ? 'offset' : 'offsets'} applied.` : ''}`;
   exceptions.hidden = fallbacks.length === 0;
   exceptionSummary.textContent = `UTC+0 exceptions (${fallbacks.length})`;
   exceptionList.replaceChildren(
