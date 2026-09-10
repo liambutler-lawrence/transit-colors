@@ -351,6 +351,55 @@ boundary files retain their listed Statistics Canada, ODbL, CC BY, or CC BY-SA t
 Those data licenses are separate from this repository's MIT code license. The browser
 dataset embeds the source manifest, and the map credits the source providers.
 
+Each terminal region also has an `Area/City` name, assigned **after** resolving the
+country/first-level/second-level hierarchy. Naming does not change its borders, level,
+longitude extents, or UTC decision. A place must have its center inside that region's
+polygon and belong to the same source country grouping. A metro spanning multiple
+regions only names the region containing its center: New York State is
+`America/New_York`, while New Jersey is `America/Newark`. Ciudad de México retains
+`America/Mexico_City`.
+
+The primary gazetteer is Natural Earth's 5.1.2 populated places. Centers are ranked by
+`POP_MAX`, its metropolitan population estimate. Non-UN entries where `POP_MAX` equals
+the city-proper `POP_MIN` instead use the larger of that count and the source's LandScan
+catchment estimates (`MAX_POP10`, `MAX_POP20`, `MAX_POP50`, `MAX_POP300`, `MAX_POP310`).
+This accounts for places such as Newark whose `POP_MAX` alone is a city-proper count.
+The population vintages and definitions vary; these are source estimates for naming, not
+current census totals or a new delineation of metro boundaries. See
+[Natural Earth's population methodology](https://www.naturalearthdata.com/downloads/10m-cultural-vectors/10m-populated-places/).
+
+If a region contains no primary place, the largest settlement in the pinned GeoNames
+`cities500` snapshot supplies its name. Neighborhoods and abandoned/historical places
+are excluded. These city-proper counts never compete against primary metro estimates.
+GeoNames selections and primary places below 50,000 people are identified as settlement
+fallbacks in the inspector. Regions with no matching populated place, including boundary
+coverage gaps, receive an explicitly flagged `Etc/Geographic_name` identifier. A nearby
+city outside the region is never borrowed. GeoNames data is
+[CC BY 4.0](https://download.geonames.org/export/dump/).
+
+Names use the selected center's IANA geographic area prefix, not its official timezone
+city or UTC rules. Spaces become underscores, and names use the source ASCII spelling.
+Population ties resolve by ASCII name, then source ID. Homonyms receive an
+administrative suffix; a matching existing `Area/City` keeps its bare name. These unique
+identifiers describe the simulation and are not additional IANA timezones. The inspector
+retains the administrative name, level, calculated offset, naming basis, population, and
+source.
+
+The committed `scripts/data/automatic-timezone-places.json.gz` contains both verified
+gazetteers (about 5.3 MiB). It is an offline build input and is not shipped to browsers;
+the runtime dataset includes only each selected name and its provenance. To regenerate
+the snapshot from `populated-places.geojson` and `cities500.zip` in a local source
+cache:
+
+```sh
+python3 scripts/prepare-automatic-timezone-places.py /path/to/source/cache
+```
+
+The preparation script verifies both source SHA-256 digests and writes deterministic
+gzip output. GeoNames' download URL changes over time; refreshing its snapshot requires
+an intentional checksum and snapshot-date update. Normal region rebuilds use the
+committed gazetteer and do not download the rolling GeoNames export.
+
 To rebuild (Python 3.13 or newer):
 
 ```sh
