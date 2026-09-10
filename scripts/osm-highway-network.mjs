@@ -2873,6 +2873,156 @@ function rampAttachmentResolver(osm, parts, sourceParts, grid, continuationGraph
   return { resolve, repairs, originalByNode };
 }
 
+function mixedMainlineReturn(path, osm, waysById, parts, graph, grid, sourceParts) {
+  // A motorway may narrow to one lane in only one direction, while the
+  // reverse direction remains classified as mainline. Follow its established
+  // opposing carriageway to an explicit junction on the other highway.
+  for (const atStart of [true, false]) {
+    const branch = atStart ? path.firstAttachment : path.secondAttachment;
+    const through = atStart ? path.secondAttachment : path.firstAttachment;
+    const part = parts[branch.partIndex];
+    // Allow one sample of terminal projection tolerance on the averaged line.
+    if (
+      Math.min(
+        geodesicDistanceMeters(branch.coordinate, part.coordinates[0]),
+        geodesicDistanceMeters(branch.coordinate, part.coordinates.at(-1)),
+      ) > SAMPLE_SPACING_METERS
+    )
+      continue;
+    const origin = osm.nodes.get(branch.nodeId).coordinate;
+    const sourceWays = new Set(part.sourceWayIds);
+    const targetWays = new Set(parts[through.partIndex].sourceWayIds);
+    // Shared source ways already describe a through corridor, not a missing
+    // reciprocal merge between two different highways.
+    if ([...sourceWays].some((id) => targetWays.has(id))) continue;
+    let seed = null;
+    for (const wayId of sourceWays) {
+      const way = waysById.get(wayId);
+      if (!way) continue;
+      const coordinates =
+        way.coordinates ?? way.nodeIds.map((id) => osm.nodes.get(id).coordinate);
+      for (const [index, nodeId] of way.nodeIds.entries()) {
+        const coordinate = coordinates[index];
+        if (Math.abs(coordinate[1] - origin[1]) > 0.002) continue;
+        const distanceMeters = geodesicDistanceMeters(origin, coordinate);
+        if (distanceMeters > PAIR_SEARCH_METERS) continue;
+        const direction = travelDirectionAtNode(coordinates, index);
+        if (
+          !(branch.travelDirections ?? []).some(
+            (other) => dot(direction, other) < -MIN_PAIRED_TANGENT_ALIGNMENT,
+          )
+        )
+          continue;
+        if (
+          !seed ||
+          distanceMeters < seed.distanceMeters ||
+          (distanceMeters === seed.distanceMeters && nodeId < seed.nodeId)
+        )
+          seed = { nodeId, distanceMeters, direction };
+      }
+    }
+    if (!seed) continue;
+    const searchGraph = atStart ? graph.backward : graph.forward;
+    const queue = new MinimumDistanceHeap();
+    const distances = new Map([[seed.nodeId, 0]]);
+    const previous = new Map();
+    queue.push({ nodeId: seed.nodeId, distanceMeters: 0 });
+    let found = null;
+    while (queue.size > 0) {
+      const current = queue.pop();
+      if (distances.get(current.nodeId) !== current.distanceMeters) continue;
+      if (blockingTrafficSignal(osm.nodes.get(current.nodeId))) continue;
+      const allEdges = [
+        ...(graph.forward.get(current.nodeId) ?? []),
+        ...(graph.backward.get(current.nodeId) ?? []),
+      ];
+      const targetParts = new Set(
+        allEdges
+          .filter((edge) => targetWays.has(edge.wayId))
+          .flatMap((edge) => sourceParts.get(edge.wayId) ?? []),
+      );
+      if (current.nodeId !== seed.nodeId && targetParts.size > 0) {
+        const attachment = attachmentForNode({
+          grid,
+          mainlinePartIndices: targetParts,
+          nodeCoordinate: osm.nodes.get(current.nodeId).coordinate,
+        });
+        if (attachment) {
+          found = { ...current, attachment };
+          break;
+        }
+        continue;
+      }
+      for (const edge of searchGraph.get(current.nodeId) ?? []) {
+        // Stay on the known opposite carriageway. Way splits can introduce
+        // an unrepresented segment, but may not switch to another source pair.
+        if (!sourceWays.has(edge.wayId) && (sourceParts.get(edge.wayId) ?? []).length)
+          continue;
+        const incoming =
+          previous.get(current.nodeId)?.direction ??
+          seed.direction.map((value) => value * (atStart ? -1 : 1));
+        if (dot(incoming, edge.direction) < MIN_PAIRED_TANGENT_ALIGNMENT) continue;
+        const distanceMeters =
+          current.distanceMeters +
+          geodesicDistanceMeters(
+            osm.nodes.get(current.nodeId).coordinate,
+            edge.coordinate,
+          );
+        if (
+          distanceMeters > MAX_RECIPROCAL_ENDPOINT_GAP_METERS ||
+          distanceMeters >= (distances.get(edge.nextNodeId) ?? Infinity)
+        )
+          continue;
+        distances.set(edge.nextNodeId, distanceMeters);
+        previous.set(edge.nextNodeId, { ...edge, nodeId: current.nodeId });
+        queue.push({ nodeId: edge.nextNodeId, distanceMeters });
+      }
+    }
+    if (!found) continue;
+    const nodeIds = [found.nodeId];
+    const sourceWayIds = [];
+    while (previous.has(nodeIds.at(-1))) {
+      const edge = previous.get(nodeIds.at(-1));
+      sourceWayIds.push(edge.wayId);
+      nodeIds.push(edge.nodeId);
+    }
+    if (!atStart) nodeIds.reverse();
+    const branchAttachment = {
+      ...branch,
+      nodeId: seed.nodeId,
+      travelDirections: [seed.direction],
+    };
+    const direction = atStart
+      ? vector(
+          osm.nodes.get(nodeIds[0]).coordinate,
+          osm.nodes.get(nodeIds[1]).coordinate,
+        )
+      : vector(
+          osm.nodes.get(nodeIds.at(-2)).coordinate,
+          osm.nodes.get(nodeIds.at(-1)).coordinate,
+        );
+    const throughAttachment = {
+      ...found.attachment,
+      nodeId: found.nodeId,
+      travelDirections: [direction],
+    };
+    if (reciprocalDirectionPenalty(through, throughAttachment) > 0.2) continue;
+    return {
+      coordinates: nodeIds.map((id) => osm.nodes.get(id).coordinate),
+      distanceMeters: found.distanceMeters,
+      edgeIndices: nodeIds
+        .slice(1)
+        .map((id, index) => `mainline:${nodeIds[index]}:${id}`),
+      firstAttachment: atStart ? throughAttachment : branchAttachment,
+      secondAttachment: atStart ? branchAttachment : throughAttachment,
+      mixedMainline: true,
+      nodeIds,
+      sourceWayIds: [...new Set(sourceWayIds)],
+    };
+  }
+  return null;
+}
+
 export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
   const partSegmentGrid = buildPartSegmentGrid(parts);
   const sourceWayIdToPartIndices = indexPartsBySourceWay(parts);
@@ -3003,6 +3153,42 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
       ),
     ),
   ];
+  const pairedPaths = new Set(pairs.flat().map(pathIdentity));
+  const waysById = new Map(mainlineWays.map((way) => [way.id, way]));
+  const connectorById = new Map(connectorWays.map((way) => [way.id, way]));
+  const mixedPaths = [];
+  const mixedPairs = [];
+  for (const path of available) {
+    if (
+      pairedPaths.has(pathIdentity(path)) ||
+      !path.sourceWayIds.every(
+        (id) => connectorById.get(id)?.tags?.highway === 'motorway',
+      )
+    )
+      continue;
+    const reverse = mixedMainlineReturn(
+      path,
+      osm,
+      waysById,
+      parts,
+      continuationGraph,
+      partSegmentGrid,
+      sourceWayIdToPartIndices,
+    );
+    if (!reverse) continue;
+    mixedPairs.push([path, reverse]);
+    mixedPaths.push(reverse);
+  }
+  const shortestMixedPairs = selectShortestReciprocalMovements(
+    mixedPairs,
+    groupByPartIndex,
+  );
+  const selectedMixedPairs = new Set(shortestMixedPairs);
+  const alternativeMixedPaths = mixedPairs
+    .filter((pair) => !selectedMixedPairs.has(pair))
+    .flat();
+  pairs.push(...shortestMixedPairs);
+  let mixedMainlineConnectorCount = 0;
   for (const [pairIndex, [forward, reverse]] of pairs.entries()) {
     const isInferred = pairIndex >= established.pairs.length;
     const startAttachment = outerReciprocalAttachment(
@@ -3077,6 +3263,10 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
         ...new Set([...parts[startPartIndex].tokens, ...parts[endPartIndex].tokens]),
       ],
     };
+    if (reverse.mixedMainline) {
+      connector.mixedMainline = true;
+      mixedMainlineConnectorCount += 1;
+    }
     connectors.push(connector);
     for (const [attachment, topologyKey] of [
       [startAttachment, startTopologyKey],
@@ -3097,10 +3287,14 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
     appliedNodes.has(repair.nodeId),
   );
   const directedPathCount = new Set(
-    [...originalDirectedPaths, ...allDirectedPaths].map(pathIdentity),
+    [...originalDirectedPaths, ...allDirectedPaths, ...mixedPaths].map(pathIdentity),
   ).size;
   const alternativePathCount = new Set(
-    [...established.alternativePaths, ...inferred.alternativePaths]
+    [
+      ...established.alternativePaths,
+      ...inferred.alternativePaths,
+      ...alternativeMixedPaths,
+    ]
       .map(pathIdentity)
       .filter((key) => !acceptedPathKeys.has(key)),
   ).size;
@@ -3108,6 +3302,7 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
     connectors,
     attachmentRepairs,
     statistics: {
+      mixedMainlineConnectorCount,
       candidateRampAttachmentCount: resolver.repairs.length,
       repairedRampAttachmentCount: attachmentRepairs.length,
       rejectedInferredConnectorCount,
