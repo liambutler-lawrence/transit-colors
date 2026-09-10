@@ -21,6 +21,8 @@ export const RUNTIME_DATA_FILES: readonly string[] = [
   'jersey-city-land-use-summary.json',
   'jersey-city-land-use.pmtiles',
   'north-america-highway-circumference.json',
+  'north-america-highway-circumference-summary.json',
+  'north-america-highways-route.pmtiles',
   'north-america-highways.pmtiles',
   'nyc-circumference.json',
   'nyc-metadata.json',

@@ -3,7 +3,10 @@ import { ROAD_SOURCE } from '../transit-road-tiles.js';
 import { atlasStationMetadata, createTransitAtlasLoader } from '../transit-atlas.js';
 
 import { selectCircumferenceCandidate } from '../circumference.js';
-import { createCircumferenceGradientSource } from '../circumference-gradient-source.js';
+import {
+  createCircumferenceGradientSource,
+  EMPTY_CIRCUMFERENCE_GRADIENT_URL,
+} from '../circumference-gradient-source.js';
 import {
   landmassDataSchema,
   scheduleSchema,
@@ -76,7 +79,6 @@ import {
   activeStationModes,
   accessResultsEl,
   areaSelect,
-  circumferenceCanvases,
   circumferenceResultsEl,
   circumferenceScheduleDaySelect,
   circumferenceScheduleTimeInput,
@@ -267,9 +269,9 @@ export function installMapData(stations: StationCollection): void {
   });
 
   map.addSource('highway-circumference', {
-    type: 'geojson',
-    data: { type: 'FeatureCollection', features: [] },
-    generateId: true,
+    type: 'vector',
+    url: `pmtiles://${new URL('data/north-america-highways-route.pmtiles?v=20260910a', window.location.href).href}`,
+    promoteId: 'segment_id',
   });
 
   const highwayTilesUrl = new URL(
@@ -298,7 +300,7 @@ export function installMapData(stations: StationCollection): void {
     map.addSource(
       sourceId,
       createCircumferenceGradientSource(
-        circumferenceCanvases[areaKey].toDataURL('image/png'),
+        EMPTY_CIRCUMFERENCE_GRADIENT_URL,
         gradientBounds,
       ),
     );

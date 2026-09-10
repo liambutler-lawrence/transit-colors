@@ -1,25 +1,23 @@
 import {
-  circumferenceGradientCoordinates,
+  EMPTY_CIRCUMFERENCE_GRADIENT_URL,
+  type BoundsTuple,
   createCircumferenceGradientSource,
 } from '../circumference-gradient-source.js';
 import {
   CIRCUMFERENCE_GRADIENT_COAST_LAYER_ID,
   CIRCUMFERENCE_GRADIENT_MAX_DISTANCE_METERS,
   CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE,
-  circumferenceGradientBounds,
   circumferenceGradientDistanceForArea,
   circumferenceGradientViewportBounds,
-  renderCircumferenceGradient,
 } from '../circumference-map.js';
 import {
-  highwayBounds,
-  highwayCircumferenceDataSchema,
-  highwayFeatureCollection,
+  highwayCircumferenceSummarySchema,
   highwayMapFeaturePropertiesSchema,
-  type HighwayCircumferenceData,
+  type HighwayCircumferenceSummary,
   type HighwayFeatureProperties,
 } from '../highway-circumference.js';
 import { fetchParsed } from '../parse.js';
+import { gradientRenderer } from './gradient-rendering.js';
 import type { MetadataDetail } from './types.js';
 import {
   circumferenceDepartureControlEl,
@@ -34,7 +32,6 @@ import {
   compactPanelQuery,
   formatArea,
   formatRouteLength,
-  geoJsonSource,
   imageSource,
   map,
   routeAreaToggle,
@@ -52,23 +49,19 @@ import {
   updateStatus,
 } from './context.js';
 
-const HIGHWAY_DATA_URL = 'data/north-america-highway-circumference.json?v=20260909l';
-let highwayData: HighwayCircumferenceData | null = null;
-let highwayPromise: Promise<HighwayCircumferenceData> | null = null;
+const HIGHWAY_DATA_URL =
+  'data/north-america-highway-circumference-summary.json?v=20260910a';
+const HIGHWAY_GEOMETRY_URL =
+  'data/north-america-highway-circumference.json?v=20260909l';
+let highwayData: HighwayCircumferenceSummary | null = null;
+let highwayPromise: Promise<HighwayCircumferenceSummary> | null = null;
 const HIGHWAY_GRADIENT_SOURCE_ID = 'highway-circumference-gradient';
-const highwayGradientCanvas = document.createElement('canvas');
-highwayGradientCanvas.id = 'circumference-gradient-canvas-highway';
-highwayGradientCanvas.width = CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE;
-highwayGradientCanvas.height = CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE;
-highwayGradientCanvas.hidden = true;
-document.body.append(highwayGradientCanvas);
-let highwayGradientBoundsKey = '';
 
 export function installHighwayGradient(): void {
   map.addSource(
     HIGHWAY_GRADIENT_SOURCE_ID,
     createCircumferenceGradientSource(
-      highwayGradientCanvas.toDataURL('image/png'),
+      EMPTY_CIRCUMFERENCE_GRADIENT_URL,
       [-125, 24, -66, 50],
     ),
   );
@@ -119,6 +112,7 @@ export function syncHighwayLayerVisibility(): void {
   setLayerVisibility('highway-circumference-route-line', visible);
   setLayerVisibility('highway-circumference-route-connector-casing', visible);
   setLayerVisibility('highway-circumference-route-connector-line', visible);
+  refreshHighwayGradient();
 }
 
 function setParentControlHidden(control: Element, hidden: boolean): void {
@@ -174,7 +168,7 @@ function replaceMetadata(details: readonly MetadataDetail[]): void {
   );
 }
 
-function highwayResultCard(data: HighwayCircumferenceData): HTMLElement {
+function highwayResultCard(data: HighwayCircumferenceSummary): HTMLElement {
   const result = document.createElement('article');
   result.className = 'circumference-result';
   result.dataset['focused'] = 'true';
@@ -268,56 +262,58 @@ function positionHighwayGradient(): void {
   }
 }
 
-function updateHighwayGradient(
-  data: HighwayCircumferenceData,
-  cropToViewport = false,
-): void {
-  const source = imageSource(HIGHWAY_GRADIENT_SOURCE_ID);
-  if (!source) return;
-  const maxDistance = circumferenceGradientDistanceForArea(data.route.areaSquareMeters);
-  const envelope = circumferenceGradientBounds(data.route.coordinates, maxDistance);
-  const viewport = map.getBounds();
-  const gradientBounds = cropToViewport
-    ? circumferenceGradientViewportBounds(envelope, [
-        viewport.getWest(),
-        viewport.getSouth(),
-        viewport.getEast(),
-        viewport.getNorth(),
-      ])
-    : envelope;
-  if (!gradientBounds) return;
-  const boundsKey = gradientBounds.map((value) => value.toFixed(7)).join(',');
-  if (boundsKey === highwayGradientBoundsKey) return;
-  renderCircumferenceGradient(
-    highwayGradientCanvas,
-    data.route.coordinates,
-    gradientBounds,
-    data.landmass.mask,
-    maxDistance,
-    true,
-  );
-  source.updateImage({
-    coordinates: circumferenceGradientCoordinates(gradientBounds),
-    url: highwayGradientCanvas.toDataURL('image/png'),
-  });
-  highwayGradientBoundsKey = boundsKey;
-}
-
-function refreshHighwayGradient(): void {
+export function refreshHighwayGradient(): void {
+  const data = highwayData;
   if (
-    highwayData &&
-    highwayCriterionActive() &&
-    runtime.activeProduct === 'circumference'
+    !data ||
+    !highwayCriterionActive() ||
+    runtime.activeProduct !== 'circumference' ||
+    !routeGradientToggle.checked
   ) {
-    updateHighwayGradient(highwayData, true);
+    gradientRenderer.cancel(HIGHWAY_GRADIENT_SOURCE_ID);
+    return;
   }
+  if (!imageSource(HIGHWAY_GRADIENT_SOURCE_ID)) return;
+  gradientRenderer.configure(HIGHWAY_GRADIENT_SOURCE_ID, {
+    highwayUrl: new URL(HIGHWAY_GEOMETRY_URL, window.location.href).href,
+  });
+  const envelope = data.route.gradientBounds;
+  const bounds = map.getBounds();
+  const viewport: BoundsTuple = [
+    bounds.getWest(),
+    bounds.getSouth(),
+    bounds.getEast(),
+    bounds.getNorth(),
+  ];
+  const visibleBounds = circumferenceGradientViewportBounds(envelope, viewport, 0);
+  const gradientBounds = circumferenceGradientViewportBounds(envelope, viewport);
+  if (!gradientBounds || !visibleBounds) {
+    gradientRenderer.cancel(HIGHWAY_GRADIENT_SOURCE_ID);
+    return;
+  }
+  const canvas = map.getCanvas();
+  gradientRenderer.request(
+    HIGHWAY_GRADIENT_SOURCE_ID,
+    {
+      bounds: gradientBounds,
+      width: Math.min(
+        CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE,
+        Math.max(256, Math.ceil(canvas.clientWidth * 1.4)),
+      ),
+      height: Math.min(
+        CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE,
+        Math.max(256, Math.ceil(canvas.clientHeight * 1.4)),
+      ),
+    },
+    visibleBounds,
+  );
 }
 
 export function fitHighwayCircumference({
   animate = true,
 }: { readonly animate?: boolean } = {}): void {
   if (!highwayData) return;
-  map.fitBounds(highwayBounds(highwayData.route.coordinates), {
+  map.fitBounds(highwayData.route.bounds, {
     padding: compactPanelQuery.matches ? 30 : 56,
     duration: animate ? 620 : 0,
   });
@@ -329,8 +325,6 @@ function renderHighwayCircumference({
   const data = highwayData;
   if (!data) return;
   syncCircumferenceCriterionControls();
-  geoJsonSource('highway-circumference')?.setData(highwayFeatureCollection(data));
-  updateHighwayGradient(data);
   renderHighwayResults();
   circumferenceSelectionTypeEl.textContent = 'Selected highway circle';
   circumferenceNameEl.textContent = 'North America controlled-access maximum';
@@ -434,9 +428,9 @@ export function showHighwayFeature(properties: HighwayFeatureProperties): void {
   routeAvoidSegmentButton.disabled = true;
 }
 
-async function loadHighwayCircumference(): Promise<HighwayCircumferenceData> {
+async function loadHighwayCircumference(): Promise<HighwayCircumferenceSummary> {
   if (highwayData) return highwayData;
-  highwayPromise ??= fetchParsed(HIGHWAY_DATA_URL, highwayCircumferenceDataSchema);
+  highwayPromise ??= fetchParsed(HIGHWAY_DATA_URL, highwayCircumferenceSummarySchema);
   highwayData = await highwayPromise;
   return highwayData;
 }
@@ -468,7 +462,7 @@ export function installHighwayHover(): void {
   let hovered: {
     readonly id: string | number;
     readonly source: 'highway-circumference' | 'highway-network';
-    readonly sourceLayer?: 'highways';
+    readonly sourceLayer?: 'highways' | 'boundary';
   } | null = null;
   for (const layerId of [
     'highway-circumference-route-connector-line',
@@ -483,9 +477,7 @@ export function installHighwayHover(): void {
       const source: 'highway-circumference' | 'highway-network' = networkFeature
         ? 'highway-network'
         : 'highway-circumference';
-      const sourceLayer: 'highways' | undefined = networkFeature
-        ? 'highways'
-        : undefined;
+      const sourceLayer = networkFeature ? 'highways' : 'boundary';
       const properties = highwayMapFeaturePropertiesSchema.safeParse(
         feature.properties,
       );

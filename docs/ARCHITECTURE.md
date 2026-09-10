@@ -88,26 +88,34 @@ manual alternatives, and the complete eligible network. The browser validates an
 renders these files; it never runs the combinatorial search during page load or a
 schedule change.
 
-The highway criterion uses a separate compact runtime schema in
-`src/highway-circumference.ts`. Its offline builder operates on a network-wide
-OpenStreetMap divided-road graph. It pairs lane-qualified one-way carriageways into a
-sampled centerline, classifies direct motorway-link paths as connector edges, and
-inserts their endpoints into the mainline geometry. Initial pairing searches within 160
-metres. A missing run may continue an established pair through a wider median only when
-the same opposing source chain is confirmed at both ends. Every intervening sample must
-have a closest opposing tangent within 2 kilometres, progress monotonically along that
-chain, and keep consecutive midpoints within the normal sampling limit. Runs longer than
-25 kilometres, unbounded gaps, and changes of opposing chain remain unmatched; there is
-no straight-line gap bridge. Mainline matching stops at the actual overlap of the
-carriageways: a nearest projection past an opposing chain's terminal rejects that chain,
-rather than clamping to its endpoint or using a farther interior vertex. Closest
-vertices at ordinary interior bends remain valid. At a mainline merge, directional
-source junctions that attach to the same branch terminal share one centerline vertex on
-the continuing midpoint line. Existing endpoint keys carry that vertex across split
-centerline parts. Terminal geometry is extended or trimmed in travel order; interior
-insertions are projected again after the shared coordinate is chosen. A merge adjustment
-cannot collapse a short loop, trim past a different junction, or add backward turns to
-an approach; those complex attachments retain their individual source topology.
+The highway criterion uses schemas in `src/highway-circumference.ts`. The UI reads a
+small summary containing labels, statistics, camera bounds, and gradient bounds. The
+complete boundary and its interior are compiled to a separate PMTiles archive at zooms
+0–14; the browser fetches only visible tiles instead of cloning the continental GeoJSON
+to and from MapLibre workers. `build:tiles:highway-route` can rebuild these display
+assets from the unchanged precise route JSON, and the full highway builder also
+regenerates them. The gradient worker alone fetches and validates that precise JSON,
+keeping large geometry parsing and indexing off the UI thread.
+
+The offline builder operates on a network-wide OpenStreetMap divided-road graph. It
+pairs lane-qualified one-way carriageways into a sampled centerline, classifies direct
+motorway-link paths as connector edges, and inserts their endpoints into the mainline
+geometry. Initial pairing searches within 160 metres. A missing run may continue an
+established pair through a wider median only when the same opposing source chain is
+confirmed at both ends. Every intervening sample must have a closest opposing tangent
+within 2 kilometres, progress monotonically along that chain, and keep consecutive
+midpoints within the normal sampling limit. Runs longer than 25 kilometres, unbounded
+gaps, and changes of opposing chain remain unmatched; there is no straight-line gap
+bridge. Mainline matching stops at the actual overlap of the carriageways: a nearest
+projection past an opposing chain's terminal rejects that chain, rather than clamping to
+its endpoint or using a farther interior vertex. Closest vertices at ordinary interior
+bends remain valid. At a mainline merge, directional source junctions that attach to the
+same branch terminal share one centerline vertex on the continuing midpoint line.
+Existing endpoint keys carry that vertex across split centerline parts. Terminal
+geometry is extended or trimmed in travel order; interior insertions are projected again
+after the shared coordinate is chosen. A merge adjustment cannot collapse a short loop,
+trim past a different junction, or add backward turns to an approach; those complex
+attachments retain their individual source topology.
 
 A one-lane merge can also leave an unrelated pair between the branch's return roadway
 and the through road. The builder records each pair's complete source-chain intervals
@@ -178,8 +186,20 @@ Highways use a separate gradient source and a complete interior polygon fill. Th
 outside-only fade width is `10 km × log10(1 + enclosed area in km²)`, about 67.9 km for
 the current continental circle; the legend reports that distance. Gradient pixels and
 coast masks use Web Mercator coordinates with local ground-distance scaling. A cached
-segment index preserves every boundary bend, and the highway texture is cropped and
-redrawn after map movement or resize to retain detail at close zooms.
+segment index preserves every boundary bend, and the highway texture is cropped to a
+padded viewport to retain detail at close zooms.
+
+Metro and highway gradients render and encode PNGs in one lazy-loaded worker using
+OffscreenCanvas. The worker retains route geometry and its distance index between
+requests and skips pixels excluded by the coast/interior mask. Rendering yields in small
+batches so obsolete requests can be cancelled. The UI holds one active job and one
+latest replacement per source, waits 120 ms after movement, and pauses work and image
+uploads during gestures. Four cached images per source cover small pans and return
+visits when their coverage and projected resolution remain sufficient. Hidden sources
+cancel pending work; route changes invalidate old images. Blob URLs replace synchronous
+canvas-to-data-URL encoding, and the last good texture remains visible while new pixels
+or the worker script load. Worker errors preserve the image and allow a later view to
+retry without falling back to blocking main-thread rendering.
 
 The heatmap eagerly loads and caches all five station datasets together. Its station
 source and road scorer retain every metro as the camera moves; there is no zoom

@@ -20,6 +20,7 @@ export function installCircumferenceLayers(): void {
     id: 'highway-circumference-area',
     type: 'fill',
     source: 'highway-circumference',
+    'source-layer': 'boundary',
     filter: ['==', ['get', 'kind'], 'highway-inside'],
     layout: { visibility: 'none' },
     paint: {
@@ -110,6 +111,7 @@ export function installCircumferenceLayers(): void {
     id: 'highway-circumference-route-casing',
     type: 'line',
     source: 'highway-circumference',
+    'source-layer': 'boundary',
     filter: ['==', ['get', 'kind'], 'highway-route-mainline'],
     layout: {
       visibility: 'none',
@@ -127,6 +129,7 @@ export function installCircumferenceLayers(): void {
     id: 'highway-circumference-route-line',
     type: 'line',
     source: 'highway-circumference',
+    'source-layer': 'boundary',
     filter: ['==', ['get', 'kind'], 'highway-route-mainline'],
     layout: {
       visibility: 'none',
@@ -144,6 +147,7 @@ export function installCircumferenceLayers(): void {
     id: 'highway-circumference-route-connector-casing',
     type: 'line',
     source: 'highway-circumference',
+    'source-layer': 'boundary',
     filter: ['==', ['get', 'kind'], 'highway-route-connector'],
     layout: {
       visibility: 'none',
@@ -161,6 +165,7 @@ export function installCircumferenceLayers(): void {
     id: 'highway-circumference-route-connector-line',
     type: 'line',
     source: 'highway-circumference',
+    'source-layer': 'boundary',
     filter: ['==', ['get', 'kind'], 'highway-route-connector'],
     layout: {
       visibility: 'none',
