@@ -6,6 +6,7 @@ import {
 } from '../automatic-timezones.js';
 import { fetchParsed } from '../parse.js';
 import { PolygonHitIndex } from '../polygon-hit-index.js';
+import { polygonOutlines } from '../polygon-outlines.js';
 import { formatUtcOffset } from '../timezone-seasons.js';
 import {
   describeSolarNoonSkew,
@@ -52,8 +53,10 @@ const officialControls = ['history', 'season', 'simulator'].map((name) =>
   requiredElement(`#timezone-${name}-control`, HTMLFieldSetElement),
 );
 const FILL_ID = 'timezone-automatic-fill';
+const POLAR_FILL_ID = 'timezone-automatic-fill-polar';
 const BORDER_ID = 'timezone-automatic-borders';
 let layer: TimezoneSkewLayer | null = null;
+let polarLayer: TimezoneSkewLayer | null = null;
 let hitIndex: PolygonHitIndex<AutomaticTimezoneAssignment> | null = null;
 let loading: Promise<void> | null = null;
 let installed = false;
@@ -122,7 +125,16 @@ async function loadAutomaticTimezones(): Promise<void> {
       },
     }),
   );
-  const mesh = triangulateTimezoneData({ features }, new Map());
+  const polarFeatures = features.filter(({ geometry }) =>
+    geometry.coordinates.some((polygon) =>
+      polygon.some((ring) => ring.some(([, latitude]) => Math.abs(latitude) === 90)),
+    ),
+  );
+  const polarIds = new Set(polarFeatures.map(({ id }) => id));
+  const mesh = triangulateTimezoneData(
+    { features: features.filter(({ id }) => !polarIds.has(id)) },
+    new Map(),
+  );
   hitIndex = new PolygonHitIndex(
     assignments.map((assignment) => ({
       polygons: assignment.region.geometry.coordinates,
@@ -131,7 +143,16 @@ async function loadAutomaticTimezones(): Promise<void> {
   );
   map.addSource('timezone-automatic-regions', {
     type: 'geojson',
-    data: { type: 'FeatureCollection', features },
+    data: {
+      type: 'FeatureCollection',
+      features: features.map((feature) => ({
+        ...feature,
+        geometry: {
+          type: 'MultiLineString',
+          coordinates: polygonOutlines(feature.geometry.coordinates),
+        },
+      })),
+    },
     // Subpixel tile simplification keeps world-view lines inexpensive while
     // retaining detailed edges alongside the fill/hit polygons as users zoom in.
     tolerance: 0.1,
@@ -142,6 +163,15 @@ async function loadAutomaticTimezones(): Promise<void> {
   layer = new TimezoneSkewLayer(mesh, FILL_ID);
   const before = map.getLayer('water') ? 'water' : firstSymbolLayerId();
   map.addLayer(layer, before);
+  // Mercator basemap water tiles can stretch a coastal opening all the way to
+  // the pole. Draw whole polar land regions above them, on a neutral land base,
+  // so neither a water slit nor a differently colored circular cap shows through.
+  polarLayer = new TimezoneSkewLayer(
+    triangulateTimezoneData({ features: polarFeatures }, new Map()),
+    POLAR_FILL_ID,
+    true,
+  );
+  map.addLayer(polarLayer, firstSymbolLayerId());
   map.addLayer(
     {
       id: BORDER_ID,
@@ -154,7 +184,7 @@ async function loadAutomaticTimezones(): Promise<void> {
         'line-width': ['interpolate', ['linear'], ['zoom'], 1, 0.45, 5, 1.1],
       },
     },
-    before,
+    firstSymbolLayerId(),
   );
   renderSummary(assignments);
 }
@@ -194,6 +224,7 @@ export function installAutomaticTimezoneControl(onChange: () => void): void {
 export function syncAutomaticTimezoneVisibility(): void {
   const active = runtime.activeProduct === 'timezone' && automaticTimezoneActive();
   layer?.setVisible(active && timezoneColorsToggle.checked);
+  polarLayer?.setVisible(active && timezoneColorsToggle.checked);
   // Custom WebGL layers cannot reference a source. Keep the source-backed layer
   // active (with transparent lines) so its attribution survives hiding borders.
   setLayerVisibility(
@@ -210,8 +241,9 @@ export function syncAutomaticTimezoneVisibility(): void {
 }
 
 export function positionAutomaticTimezoneLayers(before: string | undefined): void {
-  for (const id of [FILL_ID, BORDER_ID])
-    if (map.getLayer(id)) map.moveLayer(id, before);
+  if (map.getLayer(FILL_ID)) map.moveLayer(FILL_ID, before);
+  for (const id of [POLAR_FILL_ID, BORDER_ID])
+    if (map.getLayer(id)) map.moveLayer(id, firstSymbolLayerId());
 }
 
 export function inspectAutomaticTimezone(longitude: number, latitude: number): boolean {

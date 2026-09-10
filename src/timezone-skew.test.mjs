@@ -139,7 +139,7 @@ test('the clock-skew color wash follows the shared globe projection', async () =
 
   assert.match(accessControls, /map\.setProjection\(\{ type: 'globe' \}\)/);
   assert.match(mapLifecycle, /map\.setProjection\(\{ type: 'globe' \}\)/);
-  assert.match(timezoneLayer, /gl_Position = projectTile\(a_position\)/);
+  assert.match(timezoneLayer, /gl_Position = projectTile\(a_position, a_position\)/);
   assert.match(timezoneLayer, /shaderData\.variantName/);
   assert.match(
     timezoneUi,

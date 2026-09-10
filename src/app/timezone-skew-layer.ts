@@ -35,6 +35,7 @@ function createProgram(
   gl: WebGLRenderingContext | WebGL2RenderingContext,
   shaderData: CustomRenderMethodInput['shaderData'],
   alpha = 0.82,
+  opaqueLand = false,
 ): TimezoneSkewProgram {
   const vertexShader = compileShader(
     gl,
@@ -47,7 +48,7 @@ function createProgram(
       attribute float a_skew;
       varying float v_skew;
       void main() {
-        gl_Position = projectTile(a_position);
+        gl_Position = projectTile(a_position, a_position);
         v_skew = a_skew;
       }
     `,
@@ -65,6 +66,7 @@ function createProgram(
         float intensity = clamp(abs(v_skew) / ${TIMEZONE_SKEW_LIMIT_MINUTES.toFixed(1)}, 0.0, 1.0);
         vec3 color = mix(neutral, v_skew >= 0.0 ? late : early, intensity);
         float alpha = ${alpha.toFixed(2)};
+        ${opaqueLand ? 'color = mix(neutral, color, alpha); alpha = 1.0;' : ''}
         gl_FragColor = vec4(color * alpha, alpha);
       }
     `,
@@ -170,6 +172,7 @@ export class TimezoneSkewLayer implements CustomLayerInterface {
   constructor(
     private readonly mesh: TimezoneSkewMesh,
     readonly id = FILL_LAYER_ID,
+    private readonly opaqueLand = false,
   ) {}
 
   setOffsets(offsets: ReadonlyMap<string, number>): void {
@@ -207,7 +210,7 @@ export class TimezoneSkewLayer implements CustomLayerInterface {
     if (!this.visible || !this.buffer) return;
     let bindings = this.programs.get(options.shaderData.variantName);
     if (!bindings) {
-      bindings = createProgram(gl, options.shaderData);
+      bindings = createProgram(gl, options.shaderData, 0.82, this.opaqueLand);
       this.programs.set(options.shaderData.variantName, bindings);
     }
     gl.useProgram(bindings.program);
