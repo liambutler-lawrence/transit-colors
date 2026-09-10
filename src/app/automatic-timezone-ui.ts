@@ -190,7 +190,19 @@ export function installAutomaticTimezoneControl(onChange: () => void): void {
 export function syncAutomaticTimezoneVisibility(): void {
   const active = runtime.activeProduct === 'timezone' && automaticTimezoneActive();
   layer?.setVisible(active && timezoneColorsToggle.checked);
-  setLayerVisibility(BORDER_ID, active && timezoneBoundariesToggle.checked);
+  // Custom WebGL layers cannot reference a source. Keep the source-backed layer
+  // active (with transparent lines) so its attribution survives hiding borders.
+  setLayerVisibility(
+    BORDER_ID,
+    active && (timezoneColorsToggle.checked || timezoneBoundariesToggle.checked),
+  );
+  if (map.getLayer(BORDER_ID)) {
+    map.setPaintProperty(
+      BORDER_ID,
+      'line-opacity',
+      timezoneBoundariesToggle.checked ? 0.8 : 0,
+    );
+  }
 }
 
 export function positionAutomaticTimezoneLayers(before: string | undefined): void {
