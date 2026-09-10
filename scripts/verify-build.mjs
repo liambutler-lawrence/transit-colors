@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
-import { readdir, stat } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile, readdir, stat } from 'node:fs/promises';
+import { basename, join } from 'node:path';
 import { pathToFileURL } from 'node:url';
 
 import { RUNTIME_DATA_FILES } from '../vite.config.ts';
@@ -37,6 +37,39 @@ export async function verifyBuild(directory = 'dist') {
     dataFiles,
     [...RUNTIME_DATA_FILES].sort(),
     'Production data must match the reviewed runtime allowlist.',
+  );
+
+  // Automatic boundary parents are pruned by the assignment algorithm. The
+  // browser must load its build's exact snapshot, never a mutable data URL.
+  const automaticAssets = files.filter((file) =>
+    /^assets\/timezone-automatic-regions-[\w-]+\.json$/.test(file),
+  );
+  assert.equal(
+    automaticAssets.length,
+    1,
+    'Automatic regions need one versioned asset.',
+  );
+  const automaticAsset = automaticAssets[0];
+  const [versionedData, compatibilityData] = await Promise.all([
+    readFile(join(directory, automaticAsset)),
+    readFile(join(directory, 'data/timezone-automatic-regions.json')),
+  ]);
+  assert.ok(
+    versionedData.equals(compatibilityData),
+    'The versioned boundary asset must match the checked snapshot.',
+  );
+  const scripts = await Promise.all(
+    files
+      .filter((file) => /^assets\/.*\.js$/.test(file))
+      .map((file) => readFile(join(directory, file), 'utf8')),
+  );
+  assert.ok(
+    scripts.some((script) => script.includes(basename(automaticAsset))),
+    'The app must reference the versioned boundary asset.',
+  );
+  assert.ok(
+    scripts.every((script) => !script.includes('timezone-automatic-regions.json?v=')),
+    'Mutable boundary URLs can mix old code with new hierarchy data.',
   );
 
   let totalBytes = 0;

@@ -1,6 +1,13 @@
 import { z } from 'zod';
 import { automaticTimezoneNameSchema } from './automatic-timezone-names.js';
 
+export const AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES = 45;
+export const AUTOMATIC_TIMEZONE_ASSIGNMENT_RULES = Object.freeze({
+  method: 'minimax-whole-hour',
+  maximum_skew_minutes: AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES,
+  maximum_subdivision_level: 2,
+});
+
 const longitudeRangeSchema = z.tuple([z.number(), z.number()]);
 const pointSchema = z.tuple([z.number(), z.number()]);
 const polygonsSchema = z.array(z.array(z.array(pointSchema).min(4)).min(1));
@@ -24,6 +31,13 @@ export const automaticRegionSchema = z.object({
 
 export const automaticTimezoneDataSchema = z.object({
   metadata: z.object({
+    // Parent geometry is pruned according to these rules. A different algorithm
+    // must not treat that parent as a drawable leaf or silently invent fallbacks.
+    assignment_rules: z.object({
+      method: z.literal(AUTOMATIC_TIMEZONE_ASSIGNMENT_RULES.method),
+      maximum_skew_minutes: z.literal(AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES),
+      maximum_subdivision_level: z.literal(2),
+    }),
     sources: z.array(
       z.object({
         id: z.string(),
@@ -41,7 +55,6 @@ export const automaticTimezoneDataSchema = z.object({
 export type AutomaticRegion = z.infer<typeof automaticRegionSchema>;
 export type AutomaticTimezoneData = z.infer<typeof automaticTimezoneDataSchema>;
 export type LongitudeRange = readonly [number, number];
-export const AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES = 45;
 export interface AutomaticTimezoneFit {
   readonly offsetHours: number;
   readonly maximumSkewMinutes: number;
@@ -144,5 +157,15 @@ export function assignAutomaticTimezones(
       },
     ];
   }
-  return regions.filter(({ parent_id }) => parent_id === null).flatMap(visit);
+  const assignments = regions
+    .filter(({ parent_id }) => parent_id === null)
+    .flatMap(visit);
+  for (const { region } of assignments) {
+    if (region.geometry.coordinates.length === 0) {
+      throw new Error(
+        `Automatic region has no geometry: ${region.id}. Reload the map with matching boundary data.`,
+      );
+    }
+  }
+  return assignments;
 }
