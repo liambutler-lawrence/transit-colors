@@ -66,8 +66,10 @@ const data = automaticTimezoneDataSchema.parse({
       license,
     })),
     notes: [
-      'Longitude extents use unsimplified source polygons. Display boundaries are simplified to 0.012 degrees and clipped to their parent footprint.',
-      'Overlapping longitude intervals are merged exactly. Display coordinates are rounded to five decimals; polygon pieces below 1e-5 square degrees are omitted, retaining the largest piece for tiny regions. All original islands still affect classification. Coverage gaps use non-topological display simplification.',
+      'Longitude extents use unsimplified source polygons. General display boundaries are simplified to 0.001 degrees and clipped to their parent footprint. Natural Earth remains a generalized 1:10 million source, not a detailed local boundary survey.',
+      'Mexico uses detailed INEGI states (2020) via geoBoundaries. Its country outline is the union of those same states, never a clip to Natural Earth. Shared state boundaries are simplified together with a 0.0001-degree coverage tolerance, retaining every polygon piece and six-decimal coordinates. Polygon validity and shared-edge coverage are checked after rounding.',
+      'The pinned Mexico source incorrectly assigns MX-MEX to Distrito Federal (shapeID 31927357B79016588373767); this is corrected to MX-CMX / Ciudad de México, separately from the State of Mexico.',
+      'Overlapping longitude intervals are merged exactly. Display coordinates are rounded to five decimals; general polygon pieces below 1e-7 square degrees are omitted, retaining the largest piece for tiny regions. All original islands still affect classification. Coverage gaps use non-topological display simplification.',
       'Natural Earth country/territory grouping follows the existing map; overseas dependencies with separate country entries are evaluated separately.',
       'ISO parent relationships group smaller units into first-level regions, including France, Spain and Indonesia. Boundary snapshots have different dates; source ISO codes can be historical.',
       'French Polynesia and the French Southern Territories use named administrative equivalents with source IDs where ISO subdivision codes do not exist.',

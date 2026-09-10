@@ -103,7 +103,7 @@ function renderSummary(assignments: readonly AutomaticTimezoneAssignment[]): voi
 async function loadAutomaticTimezones(): Promise<void> {
   if (layer) return;
   const data = await fetchParsed(
-    'data/timezone-automatic-regions.json?v=20260909a',
+    'data/timezone-automatic-regions.json?v=20260910a',
     automaticTimezoneDataSchema,
   );
   const assignments = assignAutomaticTimezones(data.regions);
@@ -132,8 +132,12 @@ async function loadAutomaticTimezones(): Promise<void> {
   map.addSource('timezone-automatic-regions', {
     type: 'geojson',
     data: { type: 'FeatureCollection', features },
+    // Subpixel tile simplification keeps world-view lines inexpensive while
+    // retaining detailed edges alongside the fill/hit polygons as users zoom in.
+    tolerance: 0.1,
+    maxzoom: 18,
     attribution:
-      'Automatic regions: <a href="https://www.naturalearthdata.com/">Natural Earth</a> · <a href="https://www.geoboundaries.org/">geoBoundaries</a> / © OpenStreetMap contributors · <a href="https://www.statcan.gc.ca/">Statistics Canada</a>',
+      'Automatic regions: <a href="https://www.naturalearthdata.com/">Natural Earth</a> · <a href="https://www.geoboundaries.org/">geoBoundaries</a> / © OpenStreetMap contributors · <a href="https://www.inegi.org.mx/">INEGI</a> · <a href="https://www.statcan.gc.ca/">Statistics Canada</a>',
   });
   layer = new TimezoneSkewLayer(mesh, FILL_ID);
   const before = map.getLayer('water') ? 'water' : firstSymbolLayerId();
@@ -247,6 +251,14 @@ export function inspectAutomaticTimezone(longitude: number, latitude: number): b
     },
     { label: 'Time of year', value: 'Fixed year-round; no daylight saving' },
     { label: 'Boundary source', value: region.source },
+    {
+      label: 'Boundary detail',
+      value: region.source.startsWith('natural-earth')
+        ? 'Generalized 1:10 million outlines; local borders may differ.'
+        : region.source === 'geoboundaries-MEX1'
+          ? 'Detailed INEGI state boundaries (2020).'
+          : undefined,
+    },
     { label: 'Source region ID', value: region.id },
   ]);
   return true;

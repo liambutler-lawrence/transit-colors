@@ -302,8 +302,9 @@ preserve islands on both sides of the date line without treating the country as 
 worldwide bounding box. The full interval matters, including the polygon's interior, not
 only its vertices or centroid.
 
-Natural Earth 1:10m country and subdivision boundaries provide the baseline. Countries
-and territories follow Natural Earth's country grouping; separately listed overseas
+Natural Earth **1:10 million** country and subdivision boundaries provide the baseline;
+these are generalized world-map outlines, not locally precise borders. Countries and
+territories follow Natural Earth's country grouping; separately listed overseas
 dependencies are evaluated separately. The pinned Debian `iso-codes` hierarchy groups
 smaller units into their principal ISO regions (notably France, Spain, and Indonesia).
 Boundary snapshots have different dates and some source ISO codes are historical.
@@ -316,17 +317,33 @@ not geoBoundaries' economic regions. China uses geoBoundaries' humanitarian
 **prefectures**, not the county-level units in its open ADM2 dataset. Chile, Norway,
 Russia, and the United States use geoBoundaries' administrative children.
 
+Mexico uses INEGI's detailed **2020 state boundaries**, distributed by geoBoundaries.
+Its country footprint is the union of the same 32 states, so detailed borders and
+islands are not clipped to a generalized Natural Earth coastline. State borders are
+simplified as one shared-edge coverage at a 0.0001-degree tolerance, retaining all
+polygon pieces and six-decimal coordinates. Validity and shared-edge coverage are
+checked after rounding. This avoids gaps and overlaps from simplifying neighboring
+states independently. The source incorrectly labels Distrito Federal as `MX-MEX`; the
+builder corrects that pinned feature to `MX-CMX` / Ciudad de México, keeping it distinct
+from the State of Mexico. Other countries still inherit their listed source's
+resolution; inspection explicitly identifies Natural Earth's generalized outlines.
+
 Second-level regions that still fail both tests receive UTC+0. Unavailable child
 boundaries and uncovered land between boundary datasets are **separate data fallbacks**,
 also temporarily UTC+0, and are named in the interface. No artificial subdivision is
 presented as an ISO unit. Antarctica, in particular, has no ISO subdivision hierarchy.
 Source polygons are intersected with their parent footprint for display, but their
 original, unsimplified extents determine eligibility. Overlapping longitude intervals
-are merged without changing their coverage. Display simplification is 0.012 degrees,
-with five-decimal coordinates. Polygon pieces below 1e-5 square degrees are omitted from
-display, retaining the largest piece for tiny regions; every original island still
-participates in the calculation. Coverage-gap strips use non-topological display
-simplification. Numerical overlay dust below 1e-10 square degrees is discarded.
+are merged without changing their coverage. General display simplification is 0.001
+degrees, with five-decimal coordinates. Polygon pieces below 1e-7 square degrees are
+omitted from display, retaining the largest piece for tiny regions; every original
+island still participates in the calculation. Coverage-gap strips use non-topological
+display simplification. Numerical overlay dust below 1e-10 square degrees is discarded.
+Mexico uses the shared-edge processing described above instead. The same display
+polygons drive border lines, color triangulation, and hover selection. MapLibre's
+GeoJSON simplification uses a subpixel tolerance of 0.1 and the tile source refines
+through zoom 18, retaining detailed edges at local zooms while keeping world-view lines
+inexpensive to draw.
 
 The source manifest in `scripts/automatic-timezone-sources.json` pins download URLs,
 SHA-256 digests, source names, and licenses. Natural Earth is public domain; the other
