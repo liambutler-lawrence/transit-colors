@@ -110,7 +110,7 @@ function countryOverrideActive(): boolean {
 function updateTimezoneResultNote(): void {
   if (automaticTimezoneActive()) {
     timezoneResultNoteEl.textContent =
-      'Color uses the automatically calculated whole-hour offset for each country or subdivision. UTC+0 exceptions are listed above.';
+      'Color uses each region’s whole-hour UTC offset, including your custom choices. UTC+0 exceptions are listed above.';
     return;
   }
   const baseNote = activeHistoricalPeriod
@@ -412,10 +412,10 @@ function renderTimezoneDetails(
   replaceMetadata(timezoneMetadataEl, metadata);
 }
 
-function inspectTimezone(event: MapMouseEvent): boolean {
+function inspectTimezone(event: MapMouseEvent, pin = false): boolean {
   if (runtime.activeProduct !== 'timezone') return false;
   if (automaticTimezoneActive())
-    return inspectAutomaticTimezone(event.lngLat.lng, event.lngLat.lat);
+    return inspectAutomaticTimezone(event.lngLat.lng, event.lngLat.lat, pin);
   const properties = timezoneHitIndex?.find(event.lngLat.lng, event.lngLat.lat);
   if (!properties) return false;
   const countryId = activeCountryFeature?.properties.id;
@@ -453,7 +453,7 @@ function installTimezoneHover(): void {
     });
   });
   map.on('click', (event) => {
-    inspectTimezone(event);
+    inspectTimezone(event, true);
   });
 }
 
