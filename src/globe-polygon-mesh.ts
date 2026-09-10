@@ -1,6 +1,11 @@
 import earcut, { flatten } from 'earcut';
+import { unwrapLongitudeRing } from './longitude-ring.js';
 
 const MAX_MERCATOR_LATITUDE = 85.051129;
+// MapLibre's two-argument projectTile overload maps these vertices to the exact
+// poles and clips them out when transitioning back to the flat map.
+export const GLOBE_NORTH_POLE_Y = -32768;
+export const GLOBE_SOUTH_POLE_Y = 32767;
 
 // MapLibre subdivides globe fills into an effective 128 × 128 world grid.
 // Custom layers do not receive that subdivision automatically, so keep our
@@ -18,7 +23,7 @@ interface MeshVertex {
 }
 
 export interface GlobePolygonMesh {
-  /** Repeated x, y, unwrapped-longitude triples for non-indexed triangles. */
+  /** Mercator x/y (or pole sentinel), longitude triples for each triangle. */
   readonly coordinates: Float32Array;
 }
 
@@ -27,38 +32,21 @@ function mercatorX(longitude: number): number {
 }
 
 function mercatorY(latitude: number): number {
-  const clampedLatitude = Math.max(
-    -MAX_MERCATOR_LATITUDE,
-    Math.min(MAX_MERCATOR_LATITUDE, latitude),
-  );
-  const radians = (clampedLatitude * Math.PI) / 180;
+  if (latitude >= 90) return GLOBE_NORTH_POLE_Y;
+  if (latitude <= -90) return GLOBE_SOUTH_POLE_Y;
+  const radians = (latitude * Math.PI) / 180;
   return (1 - Math.log(Math.tan(Math.PI / 4 + radians / 2)) / Math.PI) / 2;
-}
-
-function longitudeNearest(longitude: number, reference: number): number {
-  return longitude + 360 * Math.round((reference - longitude) / 360);
-}
-
-function unwrapRing(ring: LinearRing, firstReference: number): Position[] {
-  if (ring.length === 0) return [];
-  let previousLongitude = longitudeNearest(ring[0]?.[0] ?? 0, firstReference);
-  return ring.map(([longitude, latitude], index) => {
-    if (index > 0) {
-      previousLongitude = longitudeNearest(longitude, previousLongitude);
-    }
-    return [previousLongitude, latitude];
-  });
 }
 
 function unwrapPolygon(polygon: PolygonCoordinates): Position[][] {
   const outerRing = polygon[0];
   if (!outerRing || outerRing.length === 0) return [];
-  const unwrappedOuterRing = unwrapRing(outerRing, outerRing[0]?.[0] ?? 0);
+  const unwrappedOuterRing = unwrapLongitudeRing(outerRing, outerRing[0]?.[0] ?? 0);
   const outerLongitudes = unwrappedOuterRing.map(([longitude]) => longitude);
   const outerCenter = (Math.min(...outerLongitudes) + Math.max(...outerLongitudes)) / 2;
   return [
     unwrappedOuterRing,
-    ...polygon.slice(1).map((ring) => unwrapRing(ring, outerCenter)),
+    ...polygon.slice(1).map((ring) => unwrapLongitudeRing(ring, outerCenter)),
   ];
 }
 
@@ -80,6 +68,7 @@ function appendSubdividedTriangle(
   second: MeshVertex,
   third: MeshVertex,
   maximumSpan: number,
+  polar: boolean,
 ): void {
   const stack: (readonly [MeshVertex, MeshVertex, MeshVertex])[] = [
     [first, second, third],
@@ -91,7 +80,13 @@ function appendSubdividedTriangle(
     const spans = [edgeSpan(a, b), edgeSpan(b, c), edgeSpan(c, a)];
     const largestSpan = Math.max(...spans);
     if (largestSpan <= maximumSpan) {
-      output.push(a.x, a.y, a.longitude, b.x, b.y, b.longitude, c.x, c.y, c.longitude);
+      for (const vertex of triangle) {
+        output.push(
+          vertex.x,
+          polar ? mercatorY(90 - vertex.y * 360) : vertex.y,
+          vertex.longitude,
+        );
+      }
       continue;
     }
     const edgeIndex = spans.indexOf(largestSpan);
@@ -117,6 +112,12 @@ export function triangulateGlobePolygons(
   for (const polygon of polygons) {
     const unwrappedPolygon = unwrapPolygon(polygon);
     if (unwrappedPolygon.length === 0) continue;
+    // Mercator is infinite at the poles. Subdivide polar polygons in angular
+    // coordinates, then project each finished vertex, preserving the coastline
+    // beyond 85 degrees and reaching the actual pole without an artificial cap.
+    const polar = unwrappedPolygon.some((ring) =>
+      ring.some(([, latitude]) => Math.abs(latitude) > MAX_MERCATOR_LATITUDE),
+    );
     const flattened = flatten(unwrappedPolygon);
     const triangleIndices = earcut(
       flattened.vertices,
@@ -132,7 +133,7 @@ export function triangulateGlobePolygons(
         return {
           longitude,
           x: mercatorX(longitude),
-          y: mercatorY(latitude),
+          y: polar ? (90 - latitude) / 360 : mercatorY(latitude),
         };
       },
     );
@@ -141,7 +142,7 @@ export function triangulateGlobePolygons(
       const second = meshVertices[triangleIndices[index + 1] ?? -1];
       const third = meshVertices[triangleIndices[index + 2] ?? -1];
       if (!first || !second || !third) continue;
-      appendSubdividedTriangle(output, first, second, third, maximumSpan);
+      appendSubdividedTriangle(output, first, second, third, maximumSpan, polar);
     }
   }
   return { coordinates: new Float32Array(output) };

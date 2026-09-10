@@ -1,3 +1,5 @@
+import { unwrapLongitudeRing } from './longitude-ring.js';
+
 type Position = readonly [number, number];
 type LinearRing = readonly Position[];
 type PolygonCoordinates = readonly LinearRing[];
@@ -20,21 +22,8 @@ const CELL_SIZE = 10;
 const LONGITUDE_CELLS = 360 / CELL_SIZE;
 const LATITUDE_CELLS = 180 / CELL_SIZE;
 
-function longitudeNearest(longitude: number, reference: number): number {
-  return longitude + 360 * Math.round((reference - longitude) / 360);
-}
-
-function unwrapRing(ring: LinearRing, reference: number): Position[] {
-  if (ring.length === 0) return [];
-  let previousLongitude = longitudeNearest(ring[0]?.[0] ?? 0, reference);
-  return ring.map(([longitude, latitude], index) => {
-    if (index > 0) previousLongitude = longitudeNearest(longitude, previousLongitude);
-    return [previousLongitude, latitude];
-  });
-}
-
 function indexPolygon<T>(polygon: PolygonCoordinates, value: T): IndexedPolygon<T> {
-  const outerRing = unwrapRing(polygon[0] ?? [], polygon[0]?.[0]?.[0] ?? 0);
+  const outerRing = unwrapLongitudeRing(polygon[0] ?? [], polygon[0]?.[0]?.[0] ?? 0);
   const longitudes = outerRing.map(([longitude]) => longitude);
   const latitudes = outerRing.map(([, latitude]) => latitude);
   const minLongitude = Math.min(...longitudes);
@@ -47,7 +36,7 @@ function indexPolygon<T>(polygon: PolygonCoordinates, value: T): IndexedPolygon<
     maxLatitude: Math.max(...latitudes),
     rings: [
       outerRing,
-      ...polygon.slice(1).map((ring) => unwrapRing(ring, centerLongitude)),
+      ...polygon.slice(1).map((ring) => unwrapLongitudeRing(ring, centerLongitude)),
     ],
     value,
   };
