@@ -1,0 +1,2665 @@
+{
+  "nodes": [
+    [
+      "67017717",
+      {
+        "coordinate": [-81.1293683, 32.0700709],
+        "tags": {}
+      }
+    ],
+    [
+      "67032083",
+      {
+        "coordinate": [-81.116621, 32.066963],
+        "tags": {
+          "highway": "motorway_junction",
+          "ref": "165"
+        }
+      }
+    ],
+    [
+      "67032223",
+      {
+        "coordinate": [-81.135611, 32.0707092],
+        "tags": {}
+      }
+    ],
+    [
+      "67032289",
+      {
+        "coordinate": [-81.139552, 32.072696],
+        "tags": {}
+      }
+    ],
+    [
+      "67033027",
+      {
+        "coordinate": [-81.1117704, 32.0675398],
+        "tags": {
+          "highway": "motorway_junction",
+          "ref": "166"
+        }
+      }
+    ],
+    [
+      "67033060",
+      {
+        "coordinate": [-81.1050856, 32.0711228],
+        "tags": {}
+      }
+    ],
+    [
+      "67033066",
+      {
+        "coordinate": [-81.1050684, 32.0714647],
+        "tags": {}
+      }
+    ],
+    [
+      "67033067",
+      {
+        "coordinate": [-81.105454, 32.070951],
+        "tags": {}
+      }
+    ],
+    [
+      "67033069",
+      {
+        "coordinate": [-81.10601, 32.070371],
+        "tags": {}
+      }
+    ],
+    [
+      "67033071",
+      {
+        "coordinate": [-81.106561, 32.069955],
+        "tags": {}
+      }
+    ],
+    [
+      "67033077",
+      {
+        "coordinate": [-81.106936, 32.069692],
+        "tags": {}
+      }
+    ],
+    [
+      "67033079",
+      {
+        "coordinate": [-81.1074374, 32.0693918],
+        "tags": {}
+      }
+    ],
+    [
+      "67033081",
+      {
+        "coordinate": [-81.10781, 32.069178],
+        "tags": {}
+      }
+    ],
+    [
+      "67033083",
+      {
+        "coordinate": [-81.108159, 32.068986],
+        "tags": {}
+      }
+    ],
+    [
+      "67033084",
+      {
+        "coordinate": [-81.108446, 32.068849],
+        "tags": {}
+      }
+    ],
+    [
+      "67033086",
+      {
+        "coordinate": [-81.108866, 32.068657],
+        "tags": {}
+      }
+    ],
+    [
+      "67033087",
+      {
+        "coordinate": [-81.109491, 32.068393],
+        "tags": {}
+      }
+    ],
+    [
+      "67033093",
+      {
+        "coordinate": [-81.1117206, 32.068043],
+        "tags": {}
+      }
+    ],
+    [
+      "67033929",
+      {
+        "coordinate": [-81.1056085, 32.0752613],
+        "tags": {}
+      }
+    ],
+    [
+      "67035571",
+      {
+        "coordinate": [-81.1050899, 32.0745653],
+        "tags": {
+          "highway": "motorway_junction",
+          "noref": "yes"
+        }
+      }
+    ],
+    [
+      "67038024",
+      {
+        "coordinate": [-81.1344156, 32.0720738],
+        "tags": {}
+      }
+    ],
+    [
+      "67038035",
+      {
+        "coordinate": [-81.1330492, 32.070381],
+        "tags": {}
+      }
+    ],
+    [
+      "67040909",
+      {
+        "coordinate": [-81.132515, 32.071576],
+        "tags": {
+          "highway": "motorway_junction",
+          "ref": "164B"
+        }
+      }
+    ],
+    [
+      "67041945",
+      {
+        "coordinate": [-81.1352088, 32.0722053],
+        "tags": {
+          "highway": "motorway_junction",
+          "ref": "164A"
+        }
+      }
+    ],
+    [
+      "67044917",
+      {
+        "coordinate": [-81.1397841, 32.0719694],
+        "tags": {
+          "highway": "motorway_junction",
+          "ref": "164A"
+        }
+      }
+    ],
+    [
+      "67048401",
+      {
+        "coordinate": [-81.1050539, 32.081151],
+        "tags": {}
+      }
+    ],
+    [
+      "67060609",
+      {
+        "coordinate": [-81.102754, 32.071824],
+        "tags": {
+          "highway": "motorway_junction",
+          "ref": "167A",
+          "ref:left": "167B",
+          "ref:right": "167A"
+        }
+      }
+    ],
+    [
+      "67072188",
+      {
+        "coordinate": [-81.104977, 32.071637],
+        "tags": {}
+      }
+    ],
+    [
+      "67072190",
+      {
+        "coordinate": [-81.104786, 32.072147],
+        "tags": {}
+      }
+    ],
+    [
+      "67072192",
+      {
+        "coordinate": [-81.1046822, 32.0726866],
+        "tags": {}
+      }
+    ],
+    [
+      "67072205",
+      {
+        "coordinate": [-81.1046479, 32.0731666],
+        "tags": {}
+      }
+    ],
+    [
+      "67072210",
+      {
+        "coordinate": [-81.1050621, 32.0742457],
+        "tags": {}
+      }
+    ],
+    [
+      "67072223",
+      {
+        "coordinate": [-81.1059288, 32.0756557],
+        "tags": {}
+      }
+    ],
+    [
+      "67072225",
+      {
+        "coordinate": [-81.1063438, 32.0761957],
+        "tags": {}
+      }
+    ],
+    [
+      "67072227",
+      {
+        "coordinate": [-81.1064913, 32.0764737],
+        "tags": {}
+      }
+    ],
+    [
+      "67072229",
+      {
+        "coordinate": [-81.1066337, 32.0768085],
+        "tags": {}
+      }
+    ],
+    [
+      "67072232",
+      {
+        "coordinate": [-81.1067363, 32.0771073],
+        "tags": {}
+      }
+    ],
+    [
+      "67072234",
+      {
+        "coordinate": [-81.1067778, 32.0773096],
+        "tags": {}
+      }
+    ],
+    [
+      "67072236",
+      {
+        "coordinate": [-81.1068072, 32.0775665],
+        "tags": {}
+      }
+    ],
+    [
+      "67072239",
+      {
+        "coordinate": [-81.1068254, 32.0778502],
+        "tags": {}
+      }
+    ],
+    [
+      "67072244",
+      {
+        "coordinate": [-81.1068242, 32.0781014],
+        "tags": {}
+      }
+    ],
+    [
+      "67072246",
+      {
+        "coordinate": [-81.1067812, 32.0783814],
+        "tags": {}
+      }
+    ],
+    [
+      "67072248",
+      {
+        "coordinate": [-81.1065818, 32.0790268],
+        "tags": {}
+      }
+    ],
+    [
+      "67072252",
+      {
+        "coordinate": [-81.1064519, 32.0793392],
+        "tags": {}
+      }
+    ],
+    [
+      "67072254",
+      {
+        "coordinate": [-81.1061839, 32.0797717],
+        "tags": {}
+      }
+    ],
+    [
+      "67072256",
+      {
+        "coordinate": [-81.1057955, 32.0802733],
+        "tags": {}
+      }
+    ],
+    [
+      "67072260",
+      {
+        "coordinate": [-81.1053892, 32.0807319],
+        "tags": {}
+      }
+    ],
+    [
+      "67075157",
+      {
+        "coordinate": [-81.10331, 32.071728],
+        "tags": {}
+      }
+    ],
+    [
+      "67075158",
+      {
+        "coordinate": [-81.104034, 32.07154],
+        "tags": {}
+      }
+    ],
+    [
+      "67075161",
+      {
+        "coordinate": [-81.104772, 32.071264],
+        "tags": {}
+      }
+    ],
+    [
+      "67075165",
+      {
+        "coordinate": [-81.106283, 32.070416],
+        "tags": {}
+      }
+    ],
+    [
+      "67075167",
+      {
+        "coordinate": [-81.1066735, 32.0701482],
+        "tags": {}
+      }
+    ],
+    [
+      "67075169",
+      {
+        "coordinate": [-81.1073358, 32.0697252],
+        "tags": {}
+      }
+    ],
+    [
+      "67075171",
+      {
+        "coordinate": [-81.107698, 32.069493],
+        "tags": {}
+      }
+    ],
+    [
+      "67075174",
+      {
+        "coordinate": [-81.108257, 32.069198],
+        "tags": {}
+      }
+    ],
+    [
+      "67075176",
+      {
+        "coordinate": [-81.109171, 32.068759],
+        "tags": {}
+      }
+    ],
+    [
+      "67075178",
+      {
+        "coordinate": [-81.112871, 32.067051],
+        "tags": {}
+      }
+    ],
+    [
+      "67075181",
+      {
+        "coordinate": [-81.1136, 32.066831],
+        "tags": {}
+      }
+    ],
+    [
+      "67075186",
+      {
+        "coordinate": [-81.114292, 32.066744],
+        "tags": {}
+      }
+    ],
+    [
+      "67075187",
+      {
+        "coordinate": [-81.114646, 32.066729],
+        "tags": {}
+      }
+    ],
+    [
+      "67075190",
+      {
+        "coordinate": [-81.114969, 32.066729],
+        "tags": {}
+      }
+    ],
+    [
+      "67075193",
+      {
+        "coordinate": [-81.115625, 32.066764],
+        "tags": {}
+      }
+    ],
+    [
+      "67075195",
+      {
+        "coordinate": [-81.117047, 32.067081],
+        "tags": {}
+      }
+    ],
+    [
+      "67075197",
+      {
+        "coordinate": [-81.1177971, 32.0672607],
+        "tags": {}
+      }
+    ],
+    [
+      "67075203",
+      {
+        "coordinate": [-81.119048, 32.067559],
+        "tags": {}
+      }
+    ],
+    [
+      "67075217",
+      {
+        "coordinate": [-81.1250627, 32.0691124],
+        "tags": {}
+      }
+    ],
+    [
+      "67075219",
+      {
+        "coordinate": [-81.1259144, 32.0693295],
+        "tags": {}
+      }
+    ],
+    [
+      "67075222",
+      {
+        "coordinate": [-81.1284411, 32.0699203],
+        "tags": {}
+      }
+    ],
+    [
+      "67075224",
+      {
+        "coordinate": [-81.1290046, 32.0700107],
+        "tags": {}
+      }
+    ],
+    [
+      "67075228",
+      {
+        "coordinate": [-81.1334698, 32.0704246],
+        "tags": {}
+      }
+    ],
+    [
+      "67075230",
+      {
+        "coordinate": [-81.1342117, 32.0705061],
+        "tags": {}
+      }
+    ],
+    [
+      "67075243",
+      {
+        "coordinate": [-81.1403253, 32.0721377],
+        "tags": {}
+      }
+    ],
+    [
+      "67075316",
+      {
+        "coordinate": [-81.1015218, 32.0726446],
+        "tags": {}
+      }
+    ],
+    [
+      "67075318",
+      {
+        "coordinate": [-81.1017921, 32.0725267],
+        "tags": {}
+      }
+    ],
+    [
+      "67075320",
+      {
+        "coordinate": [-81.102832, 32.07218],
+        "tags": {}
+      }
+    ],
+    [
+      "67075321",
+      {
+        "coordinate": [-81.104013, 32.071824],
+        "tags": {}
+      }
+    ],
+    [
+      "67075324",
+      {
+        "coordinate": [-81.1045449, 32.0716392],
+        "tags": {}
+      }
+    ],
+    [
+      "67075328",
+      {
+        "coordinate": [-81.1049397, 32.0714647],
+        "tags": {}
+      }
+    ],
+    [
+      "67075329",
+      {
+        "coordinate": [-81.105461, 32.071182],
+        "tags": {}
+      }
+    ],
+    [
+      "67075330",
+      {
+        "coordinate": [-81.105829, 32.070951],
+        "tags": {}
+      }
+    ],
+    [
+      "67075334",
+      {
+        "coordinate": [-81.1068519, 32.0702885],
+        "tags": {}
+      }
+    ],
+    [
+      "67075338",
+      {
+        "coordinate": [-81.1076308, 32.0697919],
+        "tags": {}
+      }
+    ],
+    [
+      "67075340",
+      {
+        "coordinate": [-81.108213, 32.0694729],
+        "tags": {}
+      }
+    ],
+    [
+      "67075342",
+      {
+        "coordinate": [-81.1088607, 32.069196],
+        "tags": {}
+      }
+    ],
+    [
+      "67075344",
+      {
+        "coordinate": [-81.112552, 32.0677132],
+        "tags": {}
+      }
+    ],
+    [
+      "67075350",
+      {
+        "coordinate": [-81.1130763, 32.0675698],
+        "tags": {}
+      }
+    ],
+    [
+      "67075353",
+      {
+        "coordinate": [-81.1134467, 32.0674751],
+        "tags": {}
+      }
+    ],
+    [
+      "67075355",
+      {
+        "coordinate": [-81.113923, 32.0674092],
+        "tags": {}
+      }
+    ],
+    [
+      "67075357",
+      {
+        "coordinate": [-81.1142803, 32.067391],
+        "tags": {}
+      }
+    ],
+    [
+      "67075359",
+      {
+        "coordinate": [-81.114763, 32.0673722],
+        "tags": {}
+      }
+    ],
+    [
+      "67075360",
+      {
+        "coordinate": [-81.115873, 32.067433],
+        "tags": {}
+      }
+    ],
+    [
+      "67075362",
+      {
+        "coordinate": [-81.1161835, 32.0674643],
+        "tags": {}
+      }
+    ],
+    [
+      "67075363",
+      {
+        "coordinate": [-81.116701, 32.067526],
+        "tags": {}
+      }
+    ],
+    [
+      "67075365",
+      {
+        "coordinate": [-81.1175574, 32.067652],
+        "tags": {}
+      }
+    ],
+    [
+      "67075370",
+      {
+        "coordinate": [-81.119339, 32.067895],
+        "tags": {}
+      }
+    ],
+    [
+      "67075373",
+      {
+        "coordinate": [-81.1207583, 32.0682208],
+        "tags": {}
+      }
+    ],
+    [
+      "67075376",
+      {
+        "coordinate": [-81.125983, 32.069564],
+        "tags": {}
+      }
+    ],
+    [
+      "67075377",
+      {
+        "coordinate": [-81.128277, 32.0701628],
+        "tags": {}
+      }
+    ],
+    [
+      "67075378",
+      {
+        "coordinate": [-81.129947, 32.070704],
+        "tags": {}
+      }
+    ],
+    [
+      "67075379",
+      {
+        "coordinate": [-81.13369, 32.071885],
+        "tags": {}
+      }
+    ],
+    [
+      "67075384",
+      {
+        "coordinate": [-81.137149, 32.072485],
+        "tags": {}
+      }
+    ],
+    [
+      "67075387",
+      {
+        "coordinate": [-81.1408856, 32.0728029],
+        "tags": {}
+      }
+    ],
+    [
+      "67078674",
+      {
+        "coordinate": [-81.0926024, 32.0968306],
+        "tags": {
+          "highway": "motorway_junction",
+          "noref": "yes"
+        }
+      }
+    ],
+    [
+      "67078677",
+      {
+        "coordinate": [-81.0935549, 32.095185],
+        "tags": {}
+      }
+    ],
+    [
+      "67078680",
+      {
+        "coordinate": [-81.0939955, 32.0945755],
+        "tags": {}
+      }
+    ],
+    [
+      "67078777",
+      {
+        "coordinate": [-81.1029978, 32.083612],
+        "tags": {}
+      }
+    ],
+    [
+      "67161281",
+      {
+        "coordinate": [-81.1046385, 32.0816498],
+        "tags": {}
+      }
+    ],
+    [
+      "67161284",
+      {
+        "coordinate": [-81.104375, 32.0819489],
+        "tags": {}
+      }
+    ],
+    [
+      "436636657",
+      {
+        "coordinate": [-81.1367149, 32.0724348],
+        "tags": {}
+      }
+    ],
+    [
+      "436636658",
+      {
+        "coordinate": [-81.1351202, 32.0721915],
+        "tags": {}
+      }
+    ],
+    [
+      "436636659",
+      {
+        "coordinate": [-81.1349545, 32.0705967],
+        "tags": {}
+      }
+    ],
+    [
+      "436637768",
+      {
+        "coordinate": [-81.1046994, 32.0735957],
+        "tags": {}
+      }
+    ],
+    [
+      "436637771",
+      {
+        "coordinate": [-81.1101344, 32.0681374],
+        "tags": {
+          "highway": "motorway_junction"
+        }
+      }
+    ],
+    [
+      "436637792",
+      {
+        "coordinate": [-81.1055062, 32.0708319],
+        "tags": {}
+      }
+    ],
+    [
+      "436637870",
+      {
+        "coordinate": [-81.1049231, 32.073884],
+        "tags": {}
+      }
+    ],
+    [
+      "436637873",
+      {
+        "coordinate": [-81.1048313, 32.073394],
+        "tags": {}
+      }
+    ],
+    [
+      "436637876",
+      {
+        "coordinate": [-81.1048157, 32.0730411],
+        "tags": {}
+      }
+    ],
+    [
+      "436637882",
+      {
+        "coordinate": [-81.1048821, 32.0726271],
+        "tags": {}
+      }
+    ],
+    [
+      "436637885",
+      {
+        "coordinate": [-81.104974, 32.0724029],
+        "tags": {}
+      }
+    ],
+    [
+      "436637887",
+      {
+        "coordinate": [-81.1050334, 32.0722455],
+        "tags": {}
+      }
+    ],
+    [
+      "436637890",
+      {
+        "coordinate": [-81.10518, 32.071952],
+        "tags": {}
+      }
+    ],
+    [
+      "436637892",
+      {
+        "coordinate": [-81.1053056, 32.0717312],
+        "tags": {}
+      }
+    ],
+    [
+      "436637901",
+      {
+        "coordinate": [-81.1055147, 32.071501],
+        "tags": {}
+      }
+    ],
+    [
+      "436637903",
+      {
+        "coordinate": [-81.1057293, 32.071261],
+        "tags": {}
+      }
+    ],
+    [
+      "436637905",
+      {
+        "coordinate": [-81.1060346, 32.070964],
+        "tags": {}
+      }
+    ],
+    [
+      "436638326",
+      {
+        "coordinate": [-81.1052573, 32.0711447],
+        "tags": {}
+      }
+    ],
+    [
+      "661116909",
+      {
+        "coordinate": [-81.0926292, 32.0967813],
+        "tags": {}
+      }
+    ],
+    [
+      "661116912",
+      {
+        "coordinate": [-81.0947173, 32.0937184],
+        "tags": {}
+      }
+    ],
+    [
+      "661116913",
+      {
+        "coordinate": [-81.0932307, 32.0957104],
+        "tags": {}
+      }
+    ],
+    [
+      "801681502",
+      {
+        "coordinate": [-81.1219907, 32.068309],
+        "tags": {}
+      }
+    ],
+    [
+      "801681511",
+      {
+        "coordinate": [-81.121917, 32.0685187],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680586",
+      {
+        "coordinate": [-81.1062432, 32.0798973],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680587",
+      {
+        "coordinate": [-81.1067094, 32.0790348],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680596",
+      {
+        "coordinate": [-81.106695, 32.0787043],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680611",
+      {
+        "coordinate": [-81.1051713, 32.0744729],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680617",
+      {
+        "coordinate": [-81.1048625, 32.0740988],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680647",
+      {
+        "coordinate": [-81.1058833, 32.0803435],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680648",
+      {
+        "coordinate": [-81.106809, 32.078729],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680686",
+      {
+        "coordinate": [-81.1060229, 32.0756084],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680704",
+      {
+        "coordinate": [-81.0946955, 32.0939019],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680707",
+      {
+        "coordinate": [-81.1055046, 32.0808101],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680708",
+      {
+        "coordinate": [-81.1068865, 32.0784081],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680743",
+      {
+        "coordinate": [-81.106443, 32.0795927],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680759",
+      {
+        "coordinate": [-81.1069288, 32.0778437],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680761",
+      {
+        "coordinate": [-81.0936287, 32.0952583],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680763",
+      {
+        "coordinate": [-81.1069169, 32.0781048],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680771",
+      {
+        "coordinate": [-81.0927157, 32.0968101],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680794",
+      {
+        "coordinate": [-81.1054519, 32.0748747],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680822",
+      {
+        "coordinate": [-81.106924, 32.0775732],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680823",
+      {
+        "coordinate": [-81.0932582, 32.0958806],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680826",
+      {
+        "coordinate": [-81.1051249, 32.0812538],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680827",
+      {
+        "coordinate": [-81.1068414, 32.0770925],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680881",
+      {
+        "coordinate": [-81.1068835, 32.0772807],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680884",
+      {
+        "coordinate": [-81.1039501, 32.0824496],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680885",
+      {
+        "coordinate": [-81.1046504, 32.0818552],
+        "tags": {
+          "highway": "motorway_junction",
+          "noref": "yes"
+        }
+      }
+    ],
+    [
+      "1036680886",
+      {
+        "coordinate": [-81.1066656, 32.0765386],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680911",
+      {
+        "coordinate": [-81.1065727, 32.0793659],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680938",
+      {
+        "coordinate": [-81.1063772, 32.0760383],
+        "tags": {}
+      }
+    ],
+    [
+      "1036680948",
+      {
+        "coordinate": [-81.0926595, 32.096905],
+        "tags": {}
+      }
+    ],
+    [
+      "1166162791",
+      {
+        "coordinate": [-81.106477, 32.0761934],
+        "tags": {}
+      }
+    ],
+    [
+      "1346387846",
+      {
+        "coordinate": [-81.1048374, 32.0728283],
+        "tags": {}
+      }
+    ],
+    [
+      "1605817065",
+      {
+        "coordinate": [-81.0933954, 32.0954344],
+        "tags": {}
+      }
+    ],
+    [
+      "1605817078",
+      {
+        "coordinate": [-81.0934369, 32.0955611],
+        "tags": {}
+      }
+    ],
+    [
+      "1783650961",
+      {
+        "coordinate": [-81.0949293, 32.0936368],
+        "tags": {}
+      }
+    ],
+    [
+      "3373401595",
+      {
+        "coordinate": [-81.106825, 32.0779289],
+        "tags": {}
+      }
+    ],
+    [
+      "3373401596",
+      {
+        "coordinate": [-81.1069272, 32.0779351],
+        "tags": {}
+      }
+    ],
+    [
+      "5224128673",
+      {
+        "coordinate": [-81.134082, 32.0719959],
+        "tags": {}
+      }
+    ],
+    [
+      "5224128674",
+      {
+        "coordinate": [-81.1275549, 32.0697463],
+        "tags": {}
+      }
+    ],
+    [
+      "5224128677",
+      {
+        "coordinate": [-81.1368923, 32.0710797],
+        "tags": {}
+      }
+    ],
+    [
+      "5224128681",
+      {
+        "coordinate": [-81.1319598, 32.0703165],
+        "tags": {}
+      }
+    ],
+    [
+      "5224128728",
+      {
+        "coordinate": [-81.104088, 32.0825041],
+        "tags": {}
+      }
+    ],
+    [
+      "5224128729",
+      {
+        "coordinate": [-81.1155807, 32.0674023],
+        "tags": {}
+      }
+    ],
+    [
+      "5224128786",
+      {
+        "coordinate": [-81.1110203, 32.0677939],
+        "tags": {}
+      }
+    ],
+    [
+      "5224128787",
+      {
+        "coordinate": [-81.1132202, 32.0669271],
+        "tags": {}
+      }
+    ],
+    [
+      "5224128789",
+      {
+        "coordinate": [-81.1152654, 32.0673826],
+        "tags": {}
+      }
+    ],
+    [
+      "5224128790",
+      {
+        "coordinate": [-81.1049704, 32.0743534],
+        "tags": {}
+      }
+    ],
+    [
+      "5224128791",
+      {
+        "coordinate": [-81.1049751, 32.0740467],
+        "tags": {}
+      }
+    ],
+    [
+      "5224128792",
+      {
+        "coordinate": [-81.1052938, 32.0746742],
+        "tags": {}
+      }
+    ],
+    [
+      "5224128793",
+      {
+        "coordinate": [-81.1052281, 32.074807],
+        "tags": {}
+      }
+    ],
+    [
+      "5224128801",
+      {
+        "coordinate": [-81.1092878, 32.069019],
+        "tags": {}
+      }
+    ],
+    [
+      "5224128802",
+      {
+        "coordinate": [-81.1098042, 32.0684794],
+        "tags": {}
+      }
+    ],
+    [
+      "10687707077",
+      {
+        "coordinate": [-81.1112748, 32.0677766],
+        "tags": {}
+      }
+    ],
+    [
+      "12025698724",
+      {
+        "coordinate": [-81.1392897, 32.0718767],
+        "tags": {}
+      }
+    ],
+    [
+      "12025698725",
+      {
+        "coordinate": [-81.1387149, 32.071698],
+        "tags": {}
+      }
+    ],
+    [
+      "12025698727",
+      {
+        "coordinate": [-81.1380608, 32.0714812],
+        "tags": {}
+      }
+    ],
+    [
+      "12422096376",
+      {
+        "coordinate": [-81.1069285, 32.0702395],
+        "tags": {}
+      }
+    ],
+    [
+      "12422096377",
+      {
+        "coordinate": [-81.1066861, 32.0704529],
+        "tags": {}
+      }
+    ],
+    [
+      "13507240244",
+      {
+        "coordinate": [-81.134563, 32.0705447],
+        "tags": {}
+      }
+    ]
+  ],
+  "ways": [
+    {
+      "id": "9079977",
+      "nodeIds": [
+        "436637771",
+        "67033087",
+        "67033086",
+        "67033084",
+        "67033083",
+        "67033081",
+        "67033079"
+      ],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Other %Freeways %& %Expressways",
+        "NHS": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur",
+        "tiger:cfcc": "A21",
+        "tiger:county": "Chatham,% %GA",
+        "tiger:name_base": "Atlantic %Coastal",
+        "tiger:name_base_1": "State %Spur @4",
+        "tiger:name_base_2": "State %Route % %(Alt)",
+        "tiger:name_base_3": "United %States %Highway \u0017 %(Alt)",
+        "tiger:name_type": "Hwy",
+        "tiger:reviewed": "no"
+      },
+      "type": "way"
+    },
+    {
+      "id": "9084843",
+      "nodeIds": [
+        "67033079",
+        "67033077",
+        "67033071",
+        "67033069",
+        "436637792",
+        "436638326",
+        "67033066",
+        "67072188",
+        "67072190",
+        "67072192",
+        "67072205",
+        "436637768",
+        "1036680617"
+      ],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Other %Freeways %& %Expressways",
+        "NHS": "yes",
+        "bridge": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "layer": "2",
+        "maxspeed": "50 %mph",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur",
+        "tiger:cfcc": "A21",
+        "tiger:county": "Chatham,% %GA",
+        "tiger:name_base": "Atlantic %Coastal",
+        "tiger:name_base_1": "State %Spur @4",
+        "tiger:name_base_2": "State %Route % %(Alt)",
+        "tiger:name_base_3": "United %States %Highway \u0017 %(Alt)",
+        "tiger:name_type": "Hwy",
+        "tiger:reviewed": "no"
+      },
+      "type": "way"
+    },
+    {
+      "id": "9085703",
+      "nodeIds": [
+        "67075316",
+        "67075318",
+        "67075320",
+        "67075321",
+        "67075324",
+        "67075328"
+      ],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "45 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016",
+        "start_date": "1968",
+        "surface": "concrete",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "9093267",
+      "nodeIds": ["67035571", "5224128793", "67033929", "67072223", "67072225"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Other %Freeways %& %Expressways",
+        "NHS": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "lit": "yes",
+        "maxspeed": "50 %mph",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur",
+        "tiger:cfcc": "A21",
+        "tiger:county": "Chatham,% %GA",
+        "tiger:name_base": "Canal; %United %States %Highway \u0017 %(Alt); %Atlantic %Coastal",
+        "tiger:name_base_1": "State %Route % %(Alt); %State %Route % %(Alt); %United %States %Highway \u0017 %(Alt); %State %Spur @4",
+        "tiger:name_base_2": "State %Spur @4; %State %Spur @4; %State %Route % %(Alt); %State %Route % %(Alt)",
+        "tiger:name_base_3": "United %States %Highway \u0017 %(Alt); %State %Spur @4; %United %States %Highway \u0017 %(Alt)",
+        "tiger:name_direction_suffix_1": "N",
+        "tiger:name_type": "St; %Hwy",
+        "tiger:reviewed": "no"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393006",
+      "nodeIds": ["67075243", "67044917"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "destination:lanes": "|Lynes %Parkway;Garden %City",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016",
+        "source:hgv": "https://gamccd.net/Documents/OSP_GaOversizeTrkRouteMap.pdf",
+        "source:hgv:national_network": "https://hepgis-usdot.hub.arcgis.com/apps/usdot::national-network-conventional-combination-trucks-map/explore",
+        "start_date": "1968",
+        "turn:lanes": "|through;slight_right",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393008",
+      "nodeIds": ["436636657", "67075384"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "bridge": "yes",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "layer": "1",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393009",
+      "nodeIds": ["67075384", "67032289", "67075387"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393010",
+      "nodeIds": ["67038024", "436636658"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "bridge": "yes",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "4",
+        "layer": "1",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016;US \u0017",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393011",
+      "nodeIds": ["436636658", "67041945"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "4",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016;US \u0017",
+        "start_date": "1968",
+        "turn:lanes": "merge_to_right|||slight_right",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393012",
+      "nodeIds": ["436636659", "13507240244", "67075230", "67075228"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "destination": "Savannah",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "placement": "left_of:3",
+        "ref": "I \u0016",
+        "source:hgv": "https://gamccd.net/Documents/OSP_GaOversizeTrkRouteMap.pdf",
+        "source:hgv:national_network": "https://hepgis-usdot.hub.arcgis.com/apps/usdot::national-network-conventional-combination-trucks-map/explore",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393013",
+      "nodeIds": ["67032223", "436636659"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "bridge": "yes",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "layer": "1",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "placement": "left_of:3",
+        "ref": "I \u0016",
+        "source:hgv": "https://gamccd.net/Documents/OSP_GaOversizeTrkRouteMap.pdf",
+        "source:hgv:national_network": "https://hepgis-usdot.hub.arcgis.com/apps/usdot::national-network-conventional-combination-trucks-map/explore",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393014",
+      "nodeIds": ["67075228", "67038035"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "bridge": "yes",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "layer": "1",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "placement": "left_of:3",
+        "ref": "I \u0016",
+        "source:hgv": "https://gamccd.net/Documents/OSP_GaOversizeTrkRouteMap.pdf",
+        "source:hgv:national_network": "https://hepgis-usdot.hub.arcgis.com/apps/usdot::national-network-conventional-combination-trucks-map/explore",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393015",
+      "nodeIds": ["67038035", "5224128681", "67017717"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "placement": "left_of:3",
+        "ref": "I \u0016",
+        "source:hgv": "https://gamccd.net/Documents/OSP_GaOversizeTrkRouteMap.pdf",
+        "source:hgv:national_network": "https://hepgis-usdot.hub.arcgis.com/apps/usdot::national-network-conventional-combination-trucks-map/explore",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393167",
+      "nodeIds": ["67075197", "67075195"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "bridge": "yes",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "layer": "1",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016;US \u0017",
+        "source:hgv": "https://gamccd.net/Documents/OSP_GaOversizeTrkRouteMap.pdf",
+        "source:hgv:national_network": "https://hepgis-usdot.hub.arcgis.com/apps/usdot::national-network-conventional-combination-trucks-map/explore",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393168",
+      "nodeIds": ["67075195", "67032083"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016;US \u0017",
+        "source:hgv": "https://gamccd.net/Documents/OSP_GaOversizeTrkRouteMap.pdf",
+        "source:hgv:national_network": "https://hepgis-usdot.hub.arcgis.com/apps/usdot::national-network-conventional-combination-trucks-map/explore",
+        "start_date": "1968",
+        "turn:lanes": "slight_left|slight_left;slight_right|slight_right",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393169",
+      "nodeIds": ["67075363", "67075365"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "bridge": "yes",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "4",
+        "layer": "1",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016;US \u0017",
+        "start_date": "1968",
+        "turn:lanes": "merge_to_right|||",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393170",
+      "nodeIds": [
+        "67075365",
+        "67075370",
+        "67075373",
+        "801681511",
+        "67075376",
+        "67075377"
+      ],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016;US \u0017",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393172",
+      "nodeIds": ["67075167", "67075165", "67033067"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016",
+        "source:hgv": "https://gamccd.net/Documents/OSP_GaOversizeTrkRouteMap.pdf",
+        "source:hgv:national_network": "https://hepgis-usdot.hub.arcgis.com/apps/usdot::national-network-conventional-combination-trucks-map/explore",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393173",
+      "nodeIds": ["67075169", "67075167"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "bridge": "yes",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "layer": "1",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016",
+        "source:hgv": "https://gamccd.net/Documents/OSP_GaOversizeTrkRouteMap.pdf",
+        "source:hgv:national_network": "https://hepgis-usdot.hub.arcgis.com/apps/usdot::national-network-conventional-combination-trucks-map/explore",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393174",
+      "nodeIds": ["67075334", "12422096376"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "placement": "left_of:2",
+        "ref": "I \u0016;US \u0017",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393175",
+      "nodeIds": [
+        "67075344",
+        "67075350",
+        "67075353",
+        "67075355",
+        "67075357",
+        "67075359",
+        "5224128789",
+        "5224128729",
+        "67075360",
+        "67075362"
+      ],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "placement": "left_of:2",
+        "ref": "I \u0016;US \u0017",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393191",
+      "nodeIds": ["67075328", "67075329"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "bridge": "yes",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "layer": "1",
+        "maxspeed": "45 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393192",
+      "nodeIds": ["67075329", "67075330", "67075334"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "37393193",
+      "nodeIds": ["67033067", "67033060", "67075161"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "bridge": "yes",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "layer": "1",
+        "maxspeed": "45 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016",
+        "source:hgv": "https://gamccd.net/Documents/OSP_GaOversizeTrkRouteMap.pdf",
+        "source:hgv:national_network": "https://hepgis-usdot.hub.arcgis.com/apps/usdot::national-network-conventional-combination-trucks-map/explore",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "50060309",
+      "nodeIds": [
+        "67033027",
+        "10687707077",
+        "5224128802",
+        "67075176",
+        "67075174",
+        "67075171",
+        "67075169"
+      ],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016",
+        "source:hgv": "https://gamccd.net/Documents/OSP_GaOversizeTrkRouteMap.pdf",
+        "source:hgv:national_network": "https://hepgis-usdot.hub.arcgis.com/apps/usdot::national-network-conventional-combination-trucks-map/explore",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "50060310",
+      "nodeIds": ["67041945", "436636657"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "destination": "Macon",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "50060313",
+      "nodeIds": [
+        "67017717",
+        "67075224",
+        "67075222",
+        "5224128674",
+        "67075219",
+        "67075217",
+        "801681502",
+        "67075203",
+        "67075197"
+      ],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016;US \u0017",
+        "source:hgv": "https://gamccd.net/Documents/OSP_GaOversizeTrkRouteMap.pdf",
+        "source:hgv:national_network": "https://hepgis-usdot.hub.arcgis.com/apps/usdot::national-network-conventional-combination-trucks-map/explore",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "51824229",
+      "nodeIds": ["661116909", "67078674"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Other",
+        "NHS": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "lit": "yes",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur",
+        "tiger:cfcc": "A21",
+        "tiger:county": "Chatham,% %GA",
+        "tiger:name_base": "Canal; %United %States %Highway \u0017 %(Alt); %Atlantic %Coastal",
+        "tiger:name_base_1": "State %Route % %(Alt); %State %Route % %(Alt); %United %States %Highway \u0017 %(Alt); %State %Spur @4",
+        "tiger:name_base_2": "State %Spur @4; %State %Spur @4; %State %Route % %(Alt); %State %Route % %(Alt)",
+        "tiger:name_base_3": "United %States %Highway \u0017 %(Alt); %State %Spur @4; %United %States %Highway \u0017 %(Alt)",
+        "tiger:name_direction_suffix_1": "N",
+        "tiger:name_type": "St; %Hwy",
+        "tiger:reviewed": "no",
+        "turn:lanes": "through|slight_right"
+      },
+      "type": "way"
+    },
+    {
+      "id": "51824230",
+      "nodeIds": [
+        "67072225",
+        "67072227",
+        "67072229",
+        "67072232",
+        "67072234",
+        "67072236",
+        "67072239",
+        "3373401595",
+        "67072244",
+        "67072246",
+        "1036680596",
+        "67072248",
+        "67072252",
+        "67072254",
+        "67072256",
+        "67072260",
+        "67048401",
+        "67161281",
+        "67161284",
+        "1036680884"
+      ],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Other %Freeways %& %Expressways",
+        "NHS": "yes",
+        "bridge": "yes",
+        "bridge:name": "Eugene %Talmadge %Memorial %Bridge",
+        "bridge:structure": "cable-stayed",
+        "highway": "motorway",
+        "lanes": "2",
+        "layer": "2",
+        "lit": "yes",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur",
+        "tiger:cfcc": "A21",
+        "tiger:county": "Chatham,% %GA",
+        "tiger:name_base": "Canal;United %States %Highway \u0017 %(Alt);Atlantic %Coastal",
+        "tiger:name_base_1": "State %Route % %(Alt);State %Route % %(Alt);United %States %Highway \u0017 %(Alt);State %Spur @4",
+        "tiger:name_base_2": "State %Spur @4;State %Spur @4;State %Route % %(Alt);State %Route % %(Alt)",
+        "tiger:name_base_3": "United %States %Highway \u0017 %(Alt);State %Spur @4;United %States %Highway \u0017 %(Alt)",
+        "tiger:name_direction_suffix_1": "N",
+        "tiger:name_type": "St;Hwy",
+        "tiger:reviewed": "no"
+      },
+      "type": "way"
+    },
+    {
+      "id": "100946830",
+      "nodeIds": [
+        "436637876",
+        "1346387846",
+        "436637882",
+        "436637885",
+        "436637887",
+        "436637890",
+        "436637892",
+        "436637901",
+        "436637903",
+        "436637905"
+      ],
+      "tags": {
+        "NHS": "yes",
+        "bridge": "yes",
+        "highway": "motorway",
+        "lanes": "1",
+        "layer": "1",
+        "maxspeed": "50 %mph",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur"
+      },
+      "type": "way"
+    },
+    {
+      "id": "100946831",
+      "nodeIds": [
+        "1166162791",
+        "1036680938",
+        "1036680686",
+        "1036680794",
+        "5224128792",
+        "1036680611",
+        "67072210",
+        "5224128791",
+        "436637870"
+      ],
+      "tags": {
+        "NHS": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "lit": "yes",
+        "maxspeed": "50 %mph",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur"
+      },
+      "type": "way"
+    },
+    {
+      "id": "100946832",
+      "nodeIds": [
+        "1036680771",
+        "1036680823",
+        "1605817078",
+        "1036680761",
+        "1036680704",
+        "1783650961"
+      ],
+      "tags": {
+        "NHS": "yes",
+        "bridge": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "layer": "1",
+        "lit": "yes",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur"
+      },
+      "type": "way"
+    },
+    {
+      "id": "118807783",
+      "nodeIds": ["67075362", "67075363"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016;US \u0017",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "118807821",
+      "nodeIds": [
+        "67032083",
+        "67075193",
+        "67075190",
+        "67075187",
+        "67075186",
+        "67075181",
+        "5224128787"
+      ],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "destination": "Gwinnett %Street;Louisville %Road",
+        "destination:ref": "US \u0017;GA @4 %Spur",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "placement": "left_of:2",
+        "ref": "I \u0016;US \u0017",
+        "source:hgv": "https://gamccd.net/Documents/OSP_GaOversizeTrkRouteMap.pdf",
+        "source:hgv:national_network": "https://hepgis-usdot.hub.arcgis.com/apps/usdot::national-network-conventional-combination-trucks-map/explore",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "118807848",
+      "nodeIds": ["67040909", "67075379", "5224128673", "67038024"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016;US \u0017",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "119972504",
+      "nodeIds": ["1036680948", "1036680771"],
+      "tags": {
+        "NHS": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "lit": "yes",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur"
+      },
+      "type": "way"
+    },
+    {
+      "id": "166975141",
+      "nodeIds": [
+        "1036680885",
+        "1036680826",
+        "1036680707",
+        "1036680647",
+        "1036680586",
+        "1036680743",
+        "1036680911",
+        "1036680587",
+        "1036680648",
+        "1036680708",
+        "1036680763",
+        "3373401596",
+        "1036680759",
+        "1036680822",
+        "1036680881",
+        "1036680827",
+        "1036680886",
+        "1166162791"
+      ],
+      "tags": {
+        "NHS": "yes",
+        "alt_name": "Eugene %Talmadge %Memorial %Bridge",
+        "bridge": "yes",
+        "bridge:structure": "cable-stayed",
+        "highway": "motorway",
+        "lanes": "2",
+        "layer": "2",
+        "lit": "yes",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur",
+        "wikidata": "Q3514553",
+        "wikipedia": "en:Talmadge %Memorial %Bridge"
+      },
+      "type": "way"
+    },
+    {
+      "id": "166975142",
+      "nodeIds": [
+        "661116912",
+        "67078680",
+        "67078677",
+        "1605817065",
+        "661116913",
+        "661116909"
+      ],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Other %Freeways %& %Expressways",
+        "NHS": "yes",
+        "bridge": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "layer": "1",
+        "lit": "yes",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur",
+        "tiger:name_base": "Canal; %United %States %Highway \u0017 %(Alt); %Atlantic %Coastal",
+        "tiger:name_base_1": "State %Route % %(Alt); %State %Route % %(Alt); %United %States %Highway \u0017 %(Alt); %State %Spur @4",
+        "tiger:name_base_2": "State %Spur @4; %State %Spur @4; %State %Route % %(Alt); %State %Route % %(Alt)",
+        "tiger:name_base_3": "United %States %Highway \u0017 %(Alt); %State %Spur @4; %United %States %Highway \u0017 %(Alt)"
+      },
+      "type": "way"
+    },
+    {
+      "id": "539941981",
+      "nodeIds": ["67075377", "67075378", "67040909"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "destination:lanes": "|Lynes %Parkway|Lynes %Parkway;Garden %City",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016;US \u0017",
+        "start_date": "1968",
+        "turn:lanes": "||slight_right",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "539941982",
+      "nodeIds": [
+        "67044917",
+        "12025698724",
+        "12025698725",
+        "12025698727",
+        "5224128677",
+        "67032223"
+      ],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016",
+        "source:hgv": "https://gamccd.net/Documents/OSP_GaOversizeTrkRouteMap.pdf",
+        "source:hgv:national_network": "https://hepgis-usdot.hub.arcgis.com/apps/usdot::national-network-conventional-combination-trucks-map/explore",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "539942017",
+      "nodeIds": ["5224128728", "1036680885"],
+      "tags": {
+        "NHS": "yes",
+        "alt_name": "Eugene %Talmadge %Memorial %Bridge",
+        "bridge": "yes",
+        "bridge:structure": "cable-stayed",
+        "highway": "motorway",
+        "lanes": "2",
+        "layer": "2",
+        "lit": "yes",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur",
+        "turn:lanes": "through|through;slight_right",
+        "wikidata": "Q3514553",
+        "wikipedia": "en:Talmadge %Memorial %Bridge"
+      },
+      "type": "way"
+    },
+    {
+      "id": "539942018",
+      "nodeIds": ["1783650961", "5224128728"],
+      "tags": {
+        "NHS": "yes",
+        "bridge": "yes",
+        "bridge:name": "Talmadge %Memorial %Bridge",
+        "bridge:structure": "cable-stayed",
+        "highway": "motorway",
+        "lanes": "2",
+        "layer": "2",
+        "lit": "yes",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur"
+      },
+      "type": "way"
+    },
+    {
+      "id": "539942019",
+      "nodeIds": ["1036680617", "5224128790", "67035571"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Other %Freeways %& %Expressways",
+        "NHS": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "lit": "yes",
+        "maxspeed": "50 %mph",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur",
+        "tiger:cfcc": "A21",
+        "tiger:county": "Chatham,% %GA",
+        "tiger:name_base": "Canal; %United %States %Highway \u0017 %(Alt); %Atlantic %Coastal",
+        "tiger:name_base_1": "State %Route % %(Alt); %State %Route % %(Alt); %United %States %Highway \u0017 %(Alt); %State %Spur @4",
+        "tiger:name_base_2": "State %Spur @4; %State %Spur @4; %State %Route % %(Alt); %State %Route % %(Alt)",
+        "tiger:name_base_3": "United %States %Highway \u0017 %(Alt); %State %Spur @4; %United %States %Highway \u0017 %(Alt)",
+        "tiger:name_direction_suffix_1": "N",
+        "tiger:name_type": "St; %Hwy",
+        "tiger:reviewed": "no",
+        "turn:lanes": "through|through;slight_right"
+      },
+      "type": "way"
+    },
+    {
+      "id": "539942020",
+      "nodeIds": ["67033093", "67075344"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "placement": "left_of:2",
+        "ref": "I \u0016;US \u0017",
+        "start_date": "1968",
+        "turn:lanes": "||merge_to_left",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "539942052",
+      "nodeIds": ["67075161", "67075158", "67075157", "67060609"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "destination:lanes": "|Savannah;Civic Înter;Montgomery %Street;Downtown;Martin %Luther %King %Junior %Boulevard",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "45 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "ref": "I \u0016",
+        "source:hgv": "https://gamccd.net/Documents/OSP_GaOversizeTrkRouteMap.pdf",
+        "source:hgv:national_network": "https://hepgis-usdot.hub.arcgis.com/apps/usdot::national-network-conventional-combination-trucks-map/explore",
+        "start_date": "1968",
+        "surface": "concrete",
+        "turn:lanes": "through|through;slight_right",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "539942053",
+      "nodeIds": ["67033027", "5224128786", "436637771"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Other %Freeways %& %Expressways",
+        "NHS": "yes",
+        "destination": "Louisville %Road;Charleston;Gwinnett %Street",
+        "destination:ref": "US \u0017 %North",
+        "highway": "motorway",
+        "junction:ref": "166",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur",
+        "tiger:cfcc": "A21",
+        "tiger:county": "Chatham,% %GA",
+        "tiger:name_base": "Atlantic %Coastal",
+        "tiger:name_base_1": "State %Spur @4",
+        "tiger:name_base_2": "State %Route % %(Alt)",
+        "tiger:name_base_3": "United %States %Highway \u0017 %(Alt)",
+        "tiger:name_type": "Hwy",
+        "tiger:reviewed": "no",
+        "turn:lanes": "through|through;slight_right"
+      },
+      "type": "way"
+    },
+    {
+      "id": "539942054",
+      "nodeIds": ["5224128787", "67075178", "67033027"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "destination:lanes": "none|Martin %Luther %King %Junior %Boulevard;Montgomery %Street;Louisville %Road;Charleston|Gwinnett %Street",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "placement": "left_of:2",
+        "ref": "I \u0016;US \u0017",
+        "source:hgv": "https://gamccd.net/Documents/OSP_GaOversizeTrkRouteMap.pdf",
+        "source:hgv:national_network": "https://hepgis-usdot.hub.arcgis.com/apps/usdot::national-network-conventional-combination-trucks-map/explore",
+        "start_date": "1968",
+        "turn:lanes": "through|through;slight_right|slight_right",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "539942055",
+      "nodeIds": ["5224128801", "67033093"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "placement": "left_of:2",
+        "ref": "I \u0016;US \u0017",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "539942056",
+      "nodeIds": ["436637870", "436637873", "436637876"],
+      "tags": {
+        "NHS": "yes",
+        "bridge": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "layer": "1",
+        "maxspeed": "50 %mph",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur",
+        "turn:lanes": "|merge_to_left"
+      },
+      "type": "way"
+    },
+    {
+      "id": "539942065",
+      "nodeIds": ["67075338", "67075340", "67075342", "5224128801"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "placement": "left_of:2",
+        "ref": "I \u0016;US \u0017",
+        "start_date": "1968",
+        "turn:lanes": "||merge_to_left",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    },
+    {
+      "id": "539942066",
+      "nodeIds": ["436637905", "12422096377", "67075334"],
+      "tags": {
+        "NHS": "yes",
+        "highway": "motorway",
+        "lanes": "1",
+        "maxspeed": "50 %mph",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur"
+      },
+      "type": "way"
+    },
+    {
+      "id": "817934532",
+      "nodeIds": ["1036680884", "67078777", "661116912"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Other %Freeways %& %Expressways",
+        "NHS": "yes",
+        "bridge": "yes",
+        "bridge:name": "Talmadge %Memorial %Bridge",
+        "bridge:structure": "cable-stayed",
+        "highway": "motorway",
+        "lanes": "2",
+        "layer": "2",
+        "lit": "yes",
+        "name": "Atlantic %Coastal %Highway",
+        "oneway": "yes",
+        "ref": "US \u0017;GA @4 %Spur",
+        "tiger:cfcc": "A21",
+        "tiger:county": "Chatham,% %GA",
+        "tiger:name_base": "Canal;United %States %Highway \u0017 %(Alt);Atlantic %Coastal",
+        "tiger:name_base_1": "State %Route % %(Alt);State %Route % %(Alt);United %States %Highway \u0017 %(Alt);State %Spur @4",
+        "tiger:name_base_2": "State %Spur @4;State %Spur @4;State %Route % %(Alt);State %Route % %(Alt)",
+        "tiger:name_base_3": "United %States %Highway \u0017 %(Alt);State %Spur @4;United %States %Highway \u0017 %(Alt)",
+        "tiger:name_direction_suffix_1": "N",
+        "tiger:name_type": "St;Hwy",
+        "tiger:reviewed": "no"
+      },
+      "type": "way"
+    },
+    {
+      "id": "1342590337",
+      "nodeIds": ["12422096376", "67075338"],
+      "tags": {
+        "HFCS": "Principal %Arterial %- %Interstate",
+        "bicycle": "no",
+        "bridge": "yes",
+        "hgv": "designated",
+        "hgv:national_network": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "layer": "1",
+        "maxspeed": "55 %mph",
+        "minspeed": "40 %mph",
+        "name": "Jim %Gillis %Historic %Savannah %Parkway",
+        "oneway": "yes",
+        "placement": "left_of:2",
+        "ref": "I \u0016;US \u0017",
+        "start_date": "1968",
+        "unsigned_ref": "SR @4"
+      },
+      "type": "way"
+    }
+  ],
+  "connectorWayIds": ["100946830", "539942066"]
+}
