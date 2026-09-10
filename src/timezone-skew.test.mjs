@@ -130,16 +130,17 @@ test('clock-skew zones stop at land instead of including maritime extents', asyn
 });
 
 test('the clock-skew color wash follows the shared globe projection', async () => {
-  const [accessControls, mapLifecycle, timezoneUi] = await Promise.all([
+  const [accessControls, mapLifecycle, timezoneUi, timezoneLayer] = await Promise.all([
     readFile(new URL('./app/access-controls.ts', import.meta.url), 'utf8'),
     readFile(new URL('./app/map-lifecycle.ts', import.meta.url), 'utf8'),
     readFile(new URL('./app/timezone-skew-ui.ts', import.meta.url), 'utf8'),
+    readFile(new URL('./app/timezone-skew-layer.ts', import.meta.url), 'utf8'),
   ]);
 
   assert.match(accessControls, /map\.setProjection\(\{ type: 'globe' \}\)/);
   assert.match(mapLifecycle, /map\.setProjection\(\{ type: 'globe' \}\)/);
-  assert.match(timezoneUi, /gl_Position = projectTile\(a_position\)/);
-  assert.match(timezoneUi, /shaderData\.variantName/);
+  assert.match(timezoneLayer, /gl_Position = projectTile\(a_position\)/);
+  assert.match(timezoneLayer, /shaderData\.variantName/);
   assert.match(
     timezoneUi,
     /map\.addLayer\(timezoneLayer, timezoneVisualBeforeLayerId\(\)\)/,
@@ -163,15 +164,15 @@ test('clock-skew controls follow the upstream-to-downstream dependency order', a
 });
 
 test('the early-solar-noon side uses green instead of ocean blue', async () => {
-  const [html, styles, timezoneUi] = await Promise.all([
+  const [html, styles, timezoneLayer] = await Promise.all([
     readFile(new URL('../index.html', import.meta.url), 'utf8'),
     readFile(new URL('../styles.css', import.meta.url), 'utf8'),
-    readFile(new URL('./app/timezone-skew-ui.ts', import.meta.url), 'utf8'),
+    readFile(new URL('./app/timezone-skew-layer.ts', import.meta.url), 'utf8'),
   ]);
 
   assert.match(html, /two hours earlier in green/);
   assert.match(styles, /#159957 100%/);
-  assert.match(timezoneUi, /vec3 early = vec3\(0\.08, 0\.60, 0\.34\)/);
+  assert.match(timezoneLayer, /vec3 early = vec3\(0\.08, 0\.60, 0\.34\)/);
   assert.doesNotMatch(styles, /#3068ed/);
 });
 

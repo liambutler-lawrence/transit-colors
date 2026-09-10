@@ -449,7 +449,45 @@
                   12:00.
                 </p>
               </div>
-              <fieldset class="timezone-period-control timezone-history-control">
+              <fieldset class="timezone-period-control">
+                <legend>Time-zone rules</legend>
+                <label for="timezone-rules">Calculate offsets using</label>
+                <select id="timezone-rules" disabled>
+                  <option value="official">Official time zones</option>
+                  <option value="automatic">Automatic “correct” time zones</option>
+                </select>
+                <div id="timezone-automatic-info" hidden>
+                  <p>
+                    Keep a country together if all of it is strictly within ±30 minutes
+                    of a whole-hour UTC meridian, then try ±60 minutes. Otherwise split
+                    into first-level subdivisions, then second-level subdivisions. These
+                    offsets stay fixed year-round.
+                  </p>
+                  <p id="timezone-automatic-summary" role="status"></p>
+                  <details
+                    id="timezone-automatic-exceptions"
+                    class="timezone-period-changes"
+                    hidden
+                  >
+                    <summary id="timezone-automatic-exceptions-summary">
+                      UTC+0 exceptions
+                    </summary>
+                    <ul id="timezone-automatic-exceptions-list"></ul>
+                  </details>
+                  <p class="timezone-automatic-method">
+                    If two zones fit, choose the smallest worst-case skew; ties favor
+                    the offset closest to UTC+0, then the lower offset. The date-line
+                    meridian uses UTC+12. ISO regions are split into named
+                    administrative children where ISO has no second-level codes. Named
+                    administrative equivalents are used where a territory has no ISO
+                    subdivision codes. Boundary snapshots may use historical ISO codes.
+                  </p>
+                </div>
+              </fieldset>
+              <fieldset
+                id="timezone-history-control"
+                class="timezone-period-control timezone-history-control"
+              >
                 <legend>Official timezone history</legend>
                 <label for="timezone-history-period">Standard-offset era</label>
                 <select id="timezone-history-period" disabled>
@@ -460,7 +498,7 @@
                   standard-offset change.
                 </p>
               </fieldset>
-              <fieldset class="timezone-period-control">
+              <fieldset id="timezone-season-control" class="timezone-period-control">
                 <legend>Time of year</legend>
                 <span id="timezone-period-label" class="timezone-control-label">
                   Global UTC-offset pattern
@@ -500,7 +538,10 @@
                   <ul id="timezone-period-changes-list"></ul>
                 </details>
               </fieldset>
-              <fieldset class="timezone-period-control timezone-simulator-control">
+              <fieldset
+                id="timezone-simulator-control"
+                class="timezone-period-control timezone-simulator-control"
+              >
                 <legend>What if?</legend>
                 <label for="timezone-country">Country or territory</label>
                 <select id="timezone-country" disabled>

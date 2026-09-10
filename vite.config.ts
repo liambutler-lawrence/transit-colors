@@ -30,6 +30,7 @@ export const RUNTIME_DATA_FILES: readonly string[] = [
   'singapore-metadata.json',
   'singapore-schedules.json',
   'singapore-stations.geojson',
+  'timezone-automatic-regions.json',
   'timezone-skew-countries.geojson',
   'timezone-skew-countries.pmtiles',
   'timezone-skew-zones.geojson',

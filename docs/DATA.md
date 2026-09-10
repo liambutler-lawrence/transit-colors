@@ -283,3 +283,66 @@ git diff --stat data
 Inspect unexpectedly large changes, station-count changes, source metadata, and route
 invariant failures before committing the snapshot. Never commit `.gtfs-cache` or
 `.overpass-cache`.
+
+## Automatic time-zone regions
+
+Clock Skew's automatic option loads `data/timezone-automatic-regions.json` only when
+selected. The browser runs `assignAutomaticTimezones` against the recorded hierarchy;
+the offline builder uses the same TypeScript calculation to prune unnecessary child
+geometry. Official seasonal and historical settings do not affect these fixed offsets.
+
+Every polygon's original longitude interval is tested against whole-hour meridians (15
+degrees per hour). Every interval must fit **strictly** inside ±30 minutes; if none
+qualifies, try **strictly** inside ±60 minutes before subdividing. Exact boundary
+equality fails that test. A passing parent always remains whole, even when its children
+could achieve a tighter fit. Of multiple passing meridians, minimize the largest
+absolute skew, then minimize the absolute UTC offset, then choose the lower offset. The
+shared UTC−12/UTC+12 meridian is represented as UTC+12. Separate polygon intervals
+preserve islands on both sides of the date line without treating the country as a nearly
+worldwide bounding box. The full interval matters, including the polygon's interior, not
+only its vertices or centroid.
+
+Natural Earth 1:10m country and subdivision boundaries provide the baseline. Countries
+and territories follow Natural Earth's country grouping; separately listed overseas
+dependencies are evaluated separately. The pinned Debian `iso-codes` hierarchy groups
+smaller units into their principal ISO regions (notably France, Spain, and Indonesia).
+Boundary snapshots have different dates and some source ISO codes are historical.
+Greenland and Kiribati use geoBoundaries first-level boundaries. Named first-level
+administrative equivalents in French Polynesia and the French Southern Territories
+retain source IDs because they have no individual ISO subdivision codes. Where
+second-level units do not have ISO codes, their actual source identifiers are retained
+without inventing ISO codes. Canada uses Statistics Canada's **2021 census divisions**,
+not geoBoundaries' economic regions. China uses geoBoundaries' humanitarian
+**prefectures**, not the county-level units in its open ADM2 dataset. Chile, Norway,
+Russia, and the United States use geoBoundaries' administrative children.
+
+Second-level regions that still fail both tests receive UTC+0. Unavailable child
+boundaries and uncovered land between boundary datasets are **separate data fallbacks**,
+also temporarily UTC+0, and are named in the interface. No artificial subdivision is
+presented as an ISO unit. Antarctica, in particular, has no ISO subdivision hierarchy.
+Source polygons are intersected with their parent footprint for display, but their
+original, unsimplified extents determine eligibility. Overlapping longitude intervals
+are merged without changing their coverage. Display simplification is 0.012 degrees,
+with five-decimal coordinates. Polygon pieces below 1e-5 square degrees are omitted from
+display, retaining the largest piece for tiny regions; every original island still
+participates in the calculation. Coverage-gap strips use non-topological display
+simplification. Numerical overlay dust below 1e-10 square degrees is discarded.
+
+The source manifest in `scripts/automatic-timezone-sources.json` pins download URLs,
+SHA-256 digests, source names, and licenses. Natural Earth is public domain; the other
+boundary files retain their listed Statistics Canada, ODbL, CC BY, or CC BY-SA terms.
+Those data licenses are separate from this repository's MIT code license. The browser
+dataset embeds the source manifest, and the map credits the source providers.
+
+To rebuild (Python 3.13 or newer):
+
+```sh
+python3 -m venv /tmp/automatic-timezones-venv
+/tmp/automatic-timezones-venv/bin/pip install -r scripts/automatic-timezone-requirements.txt
+AUTOMATIC_TIMEZONE_PYTHON=/tmp/automatic-timezones-venv/bin/python npm run build:data:timezone-automatic
+```
+
+The builder downloads verified inputs to the ignored `data/.automatic-timezone-cache/`
+directory. Preparation can take several minutes for the detailed Canadian and Russian
+coastlines. Normal application builds use the committed runtime dataset and require
+neither Python nor boundary downloads.

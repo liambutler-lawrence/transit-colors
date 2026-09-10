@@ -1,0 +1,90 @@
+[
+  {
+    "id": "natural-earth",
+    "file": "admin0.geojson",
+    "name": "Natural Earth 1:10m Admin 0",
+    "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/ca96624a56bd078437bca8184e78163e5039ad19/geojson/ne_10m_admin_0_countries.geojson",
+    "license": "Public domain",
+    "sha256": "239eec57ac17f100a11e2536cffc56752c318b50ae765b0918ff7aab4ce8f255"
+  },
+  {
+    "id": "natural-earth-admin1",
+    "file": "admin1.geojson",
+    "name": "Natural Earth 1:10m Admin 1",
+    "url": "https://raw.githubusercontent.com/nvkelso/natural-earth-vector/ca96624a56bd078437bca8184e78163e5039ad19/geojson/ne_10m_admin_1_states_provinces.geojson",
+    "license": "Public domain",
+    "sha256": "22d0e3ad85eb3e27f17cabf8ba2d50e554fbc27a87796ff891d958185da62fb5"
+  },
+  {
+    "id": "iso-codes",
+    "file": "iso3166-2.json",
+    "name": "Debian iso-codes subdivision hierarchy",
+    "url": "https://raw.githubusercontent.com/sailfishos-mirror/iso-codes/06ac6bb7dea3ddb5e10868662f106d8bb23abf45/data/iso_3166-2.json",
+    "license": "LGPL-2.1-or-later",
+    "sha256": "78c90ef7fc25b5c2631aac5f089bc9ff6ec22c025c05b6ddbc087a1f1be2e46a"
+  },
+  {
+    "id": "geoboundaries-CHL2",
+    "file": "CHL2.geojson",
+    "name": "geoBoundaries Chile ADM2 (2017); OpenStreetMap, Wambacher",
+    "url": "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/9469f09/releaseData/gbOpen/CHL/ADM2/geoBoundaries-CHL-ADM2.geojson",
+    "license": "Open Data Commons Open Database License 1.0",
+    "sha256": "4f382f65ef2c86048dd146bd1202d1de8e90c6944414d8ab8f5f7fe44ddbdc77"
+  },
+  {
+    "id": "geoboundaries-CHN2",
+    "file": "CHN2.geojson",
+    "name": "geoBoundaries China ADM2 (2020); publicly available online sources, HDX",
+    "url": "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/9469f09/releaseData/gbHumanitarian/CHN/ADM2/geoBoundaries-CHN-ADM2.geojson",
+    "license": "Creative Commons Attribution 3.0 Intergovernmental Organisations (CC BY 3.0 IGO)",
+    "sha256": "12af10d8810b00d7258df7cc6cafa70023a3db41fc48e9f69846f6cfa543ac0b"
+  },
+  {
+    "id": "geoboundaries-NOR2",
+    "file": "NOR2.geojson",
+    "name": "geoBoundaries Norway ADM2 (2013); Geonorge, Mapping Authority of Norway",
+    "url": "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/9469f09/releaseData/gbOpen/NOR/ADM2/geoBoundaries-NOR-ADM2.geojson",
+    "license": "Creative Commons Attribution 4.0 International (CC BY 4.0)",
+    "sha256": "ede4f67652dab6c46c730b1883e1d447cacb224c7c14c1cb4684c0c7bfbf2c76"
+  },
+  {
+    "id": "geoboundaries-RUS2",
+    "file": "RUS2.geojson",
+    "name": "geoBoundaries Russian Federation ADM2 (2017); OpenStreetMap, Wambacher",
+    "url": "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/9469f09/releaseData/gbOpen/RUS/ADM2/geoBoundaries-RUS-ADM2.geojson",
+    "license": "Open Data Commons Open Database License 1.0",
+    "sha256": "74012237384e53061aa63b6e20b9be24f94facfe615b52bbe72e62a81fa68ff0"
+  },
+  {
+    "id": "geoboundaries-USA2",
+    "file": "USA2.geojson",
+    "name": "geoBoundaries United States of America ADM2 (2018); United States Census Bureau, MAF/TIGER Database",
+    "url": "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/9469f09/releaseData/gbOpen/USA/ADM2/geoBoundaries-USA-ADM2.geojson",
+    "license": "Public Domain",
+    "sha256": "81fdd384df8012e5007ed2994a8ab306352f3c48e32cd8ea99182195e8647f43"
+  },
+  {
+    "id": "geoboundaries-GRL1",
+    "file": "GRL1.geojson",
+    "name": "geoBoundaries Greenland ADM1 (2020); GeoBoundaries, Wikipedia",
+    "url": "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/9469f09/releaseData/gbOpen/GRL/ADM1/geoBoundaries-GRL-ADM1.geojson",
+    "license": "Creative Commons Attribution-ShareAlike 3.0 Unported",
+    "sha256": "a3132d9511f99c11a70aa40969567e29aa6f12d347117286025f87c6cdde86b0"
+  },
+  {
+    "id": "geoboundaries-KIR1",
+    "file": "KIR1.geojson",
+    "name": "geoBoundaries Kiribati ADM1 (2017); OpenStreetMap, Wambacher",
+    "url": "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/9469f09/releaseData/gbOpen/KIR/ADM1/geoBoundaries-KIR-ADM1.geojson",
+    "license": "Open Data Commons Open Database License 1.0",
+    "sha256": "93a0914dc2572951a72cae1aef5145bc056180d75b96812c770bff06e8d8e86f"
+  },
+  {
+    "id": "statcan-census",
+    "file": "CAN-census.zip",
+    "name": "Statistics Canada 2021 Census cartographic census divisions",
+    "url": "https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lcd_000b21a_e.zip",
+    "license": "Statistics Canada Open Licence",
+    "sha256": "1b638cea73fbf8349ba908d86be678272b2abcc74240fb0dfd9daf7a28457ad0"
+  }
+]
