@@ -13,6 +13,11 @@ for (const [fixture, title, requiredWays] of [
     'published mixed motorway merges',
     [['100946830', '539942066'], ['562358000']],
   ],
+  [
+    'through-motorway-audit.json',
+    'published motorway through connections',
+    [['504329517']],
+  ],
 ]) {
   test(`${title} retain their curves and both mainline connections across the network`, async () => {
     const audit = JSON.parse(

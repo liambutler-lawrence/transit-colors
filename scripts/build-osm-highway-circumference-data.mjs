@@ -125,9 +125,9 @@ const landmassBuffer = await readFile(landmassSourcePath);
 let derived;
 try {
   derived = deserialize(await readFile(derivedCachePath));
-  if (derived.displayTopologyVersion !== 28) {
+  if (derived.displayTopologyVersion !== 30) {
     throw new Error(
-      'The cached display topology predates mixed single-lane motorway merges.',
+      'The cached display topology predates single-lane through motorway connections.',
     );
   }
   console.log(`Reused ${derivedCachePath}.`);
@@ -151,7 +151,7 @@ try {
   console.log(detailed.statistics);
   derived = {
     detailed,
-    displayTopologyVersion: 28,
+    displayTopologyVersion: 30,
   };
   await writeFile(derivedCachePath, serialize(derived));
 
@@ -180,7 +180,7 @@ try {
   derived = {
     compressed,
     detailed,
-    displayTopologyVersion: 28,
+    displayTopologyVersion: 30,
     graphStatistics,
     sourceCompressed: compressed,
     sourceGraphParts: exactGraph.parts.map(({ id, role, tokens }) => ({
@@ -189,13 +189,13 @@ try {
       tokens,
     })),
     sourceGraphStatistics: graphStatistics,
-    sourceTopologyVersion: 29,
+    sourceTopologyVersion: 31,
   };
   await writeFile(derivedCachePath, serialize(derived));
 }
 globalThis.gc?.();
 const { detailed } = derived;
-if (derived.sourceTopologyVersion !== 29) {
+if (derived.sourceTopologyVersion !== 31) {
   console.time('Read OSM mainline continuity topology');
   const osm = await readOsmMotorwayPbf(sourcePath);
   console.timeEnd('Read OSM mainline continuity topology');
@@ -224,7 +224,7 @@ if (derived.sourceTopologyVersion !== 29) {
     exactEdges: sourceGraph.edges.length,
     exactNodes: sourceGraph.coordinateByNodeId.size,
   };
-  derived.sourceTopologyVersion = 29;
+  derived.sourceTopologyVersion = 31;
   console.timeEnd('Build explicit paired-centerline route graph');
   console.log(derived.sourceGraphStatistics);
   await writeFile(derivedCachePath, serialize(derived));

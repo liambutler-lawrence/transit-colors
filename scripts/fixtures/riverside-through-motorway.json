@@ -1,0 +1,874 @@
+{
+  "ways": [
+    {
+      "id": "504329510",
+      "nodeIds": [
+        "4945000357",
+        "4945000358",
+        "4945000359",
+        "192405741",
+        "4945000360",
+        "4945000361",
+        "4945000362",
+        "4945000363",
+        "4945000364"
+      ],
+      "tags": {
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329511",
+      "nodeIds": ["4945000364", "4945000365"],
+      "tags": {
+        "bridge": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "layer": "1",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329512",
+      "nodeIds": ["4945000365", "4945000366", "4945000367", "4945000368", "192405779"],
+      "tags": {
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329513",
+      "nodeIds": ["192405779", "4945000369"],
+      "tags": {
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9;US i"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329514",
+      "nodeIds": ["4945000369", "4945000370"],
+      "tags": {
+        "bridge": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "layer": "1",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9;US i"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329515",
+      "nodeIds": ["4945000370", "4945000371", "4945000372", "4945000373", "192405682"],
+      "tags": {
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9;US i",
+        "turn:lanes": "slight_left||"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329516",
+      "nodeIds": ["192405682", "192399291"],
+      "tags": {
+        "destination:lanes": "Parkville|none",
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9",
+        "turn:lanes": "none|slight_right"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329517",
+      "nodeIds": [
+        "192399291",
+        "4945000374",
+        "4945000375",
+        "4945000376",
+        "4945000377",
+        "4945000378",
+        "4945000379",
+        "4945000380",
+        "192399290"
+      ],
+      "tags": {
+        "expressway": "yes",
+        "highway": "motorway",
+        "lanes": "1",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329518",
+      "nodeIds": ["192399290", "192385678"],
+      "tags": {
+        "expressway": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329519",
+      "nodeIds": [
+        "192385678",
+        "4945000381",
+        "4945000382",
+        "4945000383",
+        "4945000384",
+        "4945000385"
+      ],
+      "tags": {
+        "expressway": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "old_ref": "MO E",
+        "oneway": "yes",
+        "ref": "MO %9"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329520",
+      "nodeIds": ["4945000385", "192404762"],
+      "tags": {
+        "expressway": "yes",
+        "highway": "motorway",
+        "lanes": "5",
+        "maxspeed": "55 %mph",
+        "name": "Northwest %River %Park %Drive",
+        "old_ref": "MO E",
+        "oneway": "yes",
+        "ref": "MO %9",
+        "turn:lanes:forward": "left|through|through|through|right"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329532",
+      "nodeIds": ["192404662", "4945000415"],
+      "tags": {
+        "expressway": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "name": "Northwest %River %Park %Drive",
+        "old_ref": "MO E",
+        "oneway": "yes",
+        "ref": "MO %9"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329533",
+      "nodeIds": ["4945000415", "192390432"],
+      "tags": {
+        "expressway": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "old_ref": "MO E",
+        "oneway": "yes",
+        "ref": "MO %9",
+        "turn:lanes:forward": "||slight_right"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329534",
+      "nodeIds": [
+        "192390432",
+        "4945000416",
+        "4945000417",
+        "4945000418",
+        "4945000419",
+        "4945000420",
+        "192400913"
+      ],
+      "tags": {
+        "expressway": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329535",
+      "nodeIds": [
+        "192400913",
+        "5555165660",
+        "5555165661",
+        "4945000621",
+        "5555165662",
+        "4945000622",
+        "192399463"
+      ],
+      "tags": {
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9",
+        "turn:lanes": "||slight_right"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329536",
+      "nodeIds": ["192399463", "4945000623", "192399730"],
+      "tags": {
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329537",
+      "nodeIds": ["192399730", "4945000624", "4945000625"],
+      "tags": {
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9;US i"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329538",
+      "nodeIds": ["4945000625", "4945000626"],
+      "tags": {
+        "bridge": "yes",
+        "highway": "motorway",
+        "lanes": "3",
+        "layer": "1",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9;US i"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329539",
+      "nodeIds": ["4945000626", "192392526"],
+      "tags": {
+        "destination:lanes": "North %Kansas %City|North %Kansas %City|Riverside",
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9;US i",
+        "turn:lanes": "||slight_right"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329540",
+      "nodeIds": ["192392526", "4945000627", "4945000628", "4945000629"],
+      "tags": {
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329541",
+      "nodeIds": ["4945000629", "4945000630"],
+      "tags": {
+        "bridge": "yes",
+        "highway": "motorway",
+        "lanes": "2",
+        "layer": "1",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9"
+      },
+      "type": "way"
+    },
+    {
+      "id": "504329542",
+      "nodeIds": ["4945000630", "4945000631", "4945000632", "11072513097"],
+      "tags": {
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9"
+      },
+      "type": "way"
+    },
+    {
+      "id": "1192810877",
+      "nodeIds": ["192405787", "4945000634", "4945000635", "4945000636"],
+      "tags": {
+        "highway": "motorway",
+        "lanes": "2",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9"
+      },
+      "type": "way"
+    },
+    {
+      "id": "1192810878",
+      "nodeIds": ["11072513097", "4945000633", "192405787"],
+      "tags": {
+        "highway": "motorway",
+        "lanes": "3",
+        "maxspeed": "55 %mph",
+        "oneway": "yes",
+        "ref": "MO %9",
+        "turn:lanes": "||slight_right"
+      },
+      "type": "way"
+    }
+  ],
+  "nodes": [
+    [
+      "192385678",
+      {
+        "coordinate": [-94.6268134, 39.1731334],
+        "tags": {}
+      }
+    ],
+    [
+      "192390432",
+      {
+        "coordinate": [-94.628967, 39.172734],
+        "tags": {
+          "highway": "motorway_junction",
+          "noref": "yes"
+        }
+      }
+    ],
+    [
+      "192392526",
+      {
+        "coordinate": [-94.616, 39.167663],
+        "tags": {
+          "highway": "motorway_junction",
+          "noref": "yes"
+        }
+      }
+    ],
+    [
+      "192399290",
+      {
+        "coordinate": [-94.6256123, 39.1732745],
+        "tags": {}
+      }
+    ],
+    [
+      "192399291",
+      {
+        "coordinate": [-94.6210122, 39.1717305],
+        "tags": {
+          "highway": "motorway_junction",
+          "noref": "yes"
+        }
+      }
+    ],
+    [
+      "192399463",
+      {
+        "coordinate": [-94.6223601, 39.1713384],
+        "tags": {
+          "highway": "motorway_junction",
+          "noref": "yes"
+        }
+      }
+    ],
+    [
+      "192399730",
+      {
+        "coordinate": [-94.6194132, 39.1696463],
+        "tags": {}
+      }
+    ],
+    [
+      "192400913",
+      {
+        "coordinate": [-94.6250236, 39.1724407],
+        "tags": {}
+      }
+    ],
+    [
+      "192404662",
+      {
+        "coordinate": [-94.6312182, 39.1733985],
+        "tags": {
+          "highway": "traffic_signals",
+          "traffic_signals": "signal"
+        }
+      }
+    ],
+    [
+      "192404762",
+      {
+        "coordinate": [-94.6311332, 39.1735744],
+        "tags": {
+          "highway": "traffic_signals",
+          "traffic_signals": "signal"
+        }
+      }
+    ],
+    [
+      "192405682",
+      {
+        "coordinate": [-94.6203108, 39.171051],
+        "tags": {
+          "highway": "motorway_junction",
+          "noref": "yes"
+        }
+      }
+    ],
+    [
+      "192405741",
+      {
+        "coordinate": [-94.6017182, 39.1663471],
+        "tags": {}
+      }
+    ],
+    [
+      "192405779",
+      {
+        "coordinate": [-94.616223, 39.168033],
+        "tags": {}
+      }
+    ],
+    [
+      "192405787",
+      {
+        "coordinate": [-94.60187, 39.166169],
+        "tags": {
+          "highway": "motorway_junction",
+          "noref": "yes"
+        }
+      }
+    ],
+    [
+      "4945000357",
+      {
+        "coordinate": [-94.5990485, 39.1655597],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000358",
+      {
+        "coordinate": [-94.6005694, 39.1660588],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000359",
+      {
+        "coordinate": [-94.6012533, 39.1662356],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000360",
+      {
+        "coordinate": [-94.6025381, 39.1664622],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000361",
+      {
+        "coordinate": [-94.6035412, 39.166535],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000362",
+      {
+        "coordinate": [-94.6119582, 39.1666189],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000363",
+      {
+        "coordinate": [-94.6123702, 39.1666391],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000364",
+      {
+        "coordinate": [-94.6128709, 39.1667125],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000365",
+      {
+        "coordinate": [-94.6133942, 39.1668139],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000366",
+      {
+        "coordinate": [-94.6139821, 39.1669541],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000367",
+      {
+        "coordinate": [-94.6144488, 39.1671121],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000368",
+      {
+        "coordinate": [-94.615409, 39.1675696],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000369",
+      {
+        "coordinate": [-94.6165009, 39.1681889],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000370",
+      {
+        "coordinate": [-94.6172655, 39.1686506],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000371",
+      {
+        "coordinate": [-94.6178646, 39.1690028],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000372",
+      {
+        "coordinate": [-94.6183045, 39.1693022],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000373",
+      {
+        "coordinate": [-94.6188168, 39.1697036],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000374",
+      {
+        "coordinate": [-94.6223599, 39.1728828],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000375",
+      {
+        "coordinate": [-94.622617, 39.1730402],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000376",
+      {
+        "coordinate": [-94.6231222, 39.1732465],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000377",
+      {
+        "coordinate": [-94.6235643, 39.1733479],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000378",
+      {
+        "coordinate": [-94.6241056, 39.1733899],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000379",
+      {
+        "coordinate": [-94.6245612, 39.1733724],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000380",
+      {
+        "coordinate": [-94.625089, 39.1733164],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000381",
+      {
+        "coordinate": [-94.6276543, 39.1730449],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000382",
+      {
+        "coordinate": [-94.6283838, 39.1730262],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000383",
+      {
+        "coordinate": [-94.6292636, 39.1730906],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000384",
+      {
+        "coordinate": [-94.6296364, 39.1731551],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000385",
+      {
+        "coordinate": [-94.6299905, 39.1732362],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000415",
+      {
+        "coordinate": [-94.6302621, 39.1731084],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000416",
+      {
+        "coordinate": [-94.6284565, 39.1726703],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000417",
+      {
+        "coordinate": [-94.6277548, 39.1725762],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000418",
+      {
+        "coordinate": [-94.6271061, 39.1725644],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000419",
+      {
+        "coordinate": [-94.6263171, 39.1725644],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000420",
+      {
+        "coordinate": [-94.6256837, 39.1725409],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000621",
+      {
+        "coordinate": [-94.6237563, 39.1720606],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000622",
+      {
+        "coordinate": [-94.6228653, 39.1716322],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000623",
+      {
+        "coordinate": [-94.6210554, 39.170608],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000624",
+      {
+        "coordinate": [-94.6177715, 39.1686705],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000625",
+      {
+        "coordinate": [-94.6172775, 39.1683767],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000626",
+      {
+        "coordinate": [-94.6165823, 39.1680001],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000627",
+      {
+        "coordinate": [-94.6149133, 39.1671002],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000628",
+      {
+        "coordinate": [-94.6144012, 39.1668943],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000629",
+      {
+        "coordinate": [-94.613396, 39.1666267],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000630",
+      {
+        "coordinate": [-94.6128422, 39.1665179],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000631",
+      {
+        "coordinate": [-94.6123491, 39.166459],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000632",
+      {
+        "coordinate": [-94.6035147, 39.1663502],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000633",
+      {
+        "coordinate": [-94.6028584, 39.1663032],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000634",
+      {
+        "coordinate": [-94.6010566, 39.1660091],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000635",
+      {
+        "coordinate": [-94.6002032, 39.1657679],
+        "tags": {}
+      }
+    ],
+    [
+      "4945000636",
+      {
+        "coordinate": [-94.5991562, 39.1654091],
+        "tags": {}
+      }
+    ],
+    [
+      "5555165660",
+      {
+        "coordinate": [-94.6244585, 39.1722959],
+        "tags": {}
+      }
+    ],
+    [
+      "5555165661",
+      {
+        "coordinate": [-94.6241339, 39.172202],
+        "tags": {}
+      }
+    ],
+    [
+      "5555165662",
+      {
+        "coordinate": [-94.6233734, 39.1718949],
+        "tags": {}
+      }
+    ],
+    [
+      "11072513097",
+      {
+        "coordinate": [-94.6031866, 39.1663267],
+        "tags": {}
+      }
+    ]
+  ]
+}
