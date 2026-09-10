@@ -38,6 +38,7 @@
     "build:data:timezone-automatic": "node --import tsx scripts/build-automatic-timezones.mjs",
     "build:data:circumference": "node --import tsx scripts/build-circumference-data.mjs",
     "build:data:highways": "node --expose-gc --max-old-space-size=12288 --import tsx scripts/build-osm-highway-circumference-data.mjs",
+    "build:tiles:highway-route": "node --import tsx scripts/build-highway-display-assets.mjs",
     "build:data": "npm run build:data:cdmx && npm run build:data:schedules && npm run build:data:nyc && npm run build:data:additional && npm run build:data:tracks && npm run build:data:timezone-skew && npm run build:data:timezone-countries && npm run build:tiles:timezone-skew && npm run build:data:circumference && npm run build:data:land-use",
     "build": "vite build",
     "verify:build": "node --import tsx scripts/verify-build.mjs",

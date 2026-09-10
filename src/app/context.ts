@@ -13,7 +13,6 @@ maplibregl.addProtocol('transit-roads', transitRoadTiles.load);
 export const heatmapRoadLayers = new Map<string, LineLayerSpecification>();
 export const roadTileTemplates: string[] = [];
 
-import { CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE } from '../circumference-map.js';
 import {
   expressionSpecificationSchema,
   filterSpecificationSchema,
@@ -592,24 +591,6 @@ export const runtime: AppRuntime = {
   pendingBasemapStyle: null,
   selectedStreetProperties: null,
   streetAccessStationIds: [],
-};
-
-function createCircumferenceCanvas(areaKey: AreaKey): HTMLCanvasElement {
-  const canvas = document.createElement('canvas');
-  canvas.id = `circumference-gradient-canvas-${areaKey}`;
-  canvas.width = CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE;
-  canvas.height = CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE;
-  canvas.hidden = true;
-  document.body.append(canvas);
-  return canvas;
-}
-
-export const circumferenceCanvases: Record<AreaKey, HTMLCanvasElement> = {
-  cdmx: createCircumferenceCanvas('cdmx'),
-  nyc: createCircumferenceCanvas('nyc'),
-  singapore: createCircumferenceCanvas('singapore'),
-  atlanta: createCircumferenceCanvas('atlanta'),
-  athens: createCircumferenceCanvas('athens'),
 };
 
 function createCircumferenceState(): CircumferenceState {

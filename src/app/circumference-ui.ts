@@ -22,11 +22,12 @@ import {
   combinedLandmassArea,
   type LandmassCoverage,
 } from '../circumference-landmass.js';
-import { circumferenceGradientCoordinates } from '../circumference-gradient-source.js';
+import { gradientRenderer } from './gradient-rendering.js';
 import {
   CIRCUMFERENCE_GRADIENT_COAST_LAYER_ID,
   circumferenceGradientBounds,
-  renderCircumferenceGradient,
+  CIRCUMFERENCE_GRADIENT_MAX_DISTANCE_METERS,
+  CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE,
 } from '../circumference-map.js';
 import type {
   CircumferenceCandidate,
@@ -39,7 +40,6 @@ import type { AreaKey } from './types.js';
 import {
   AREAS,
   AREA_KEYS,
-  circumferenceCanvases,
   circumferenceMetadataEl,
   circumferenceNameEl,
   circumferenceResultsEl,
@@ -53,7 +53,6 @@ import {
   formatArea,
   formatRouteLength,
   geoJsonSource,
-  imageSource,
   map,
   routeAreaToggle,
   routeAutoButton,
@@ -73,6 +72,7 @@ import {
 import {
   highwayCriterionActive,
   highwayDataLoaded,
+  refreshHighwayGradient,
   prepareHighwayCircumference,
   renderHighwayResults,
   syncCircumferenceCriterionControls,
@@ -115,7 +115,12 @@ export function syncCircumferenceVisibility(): void {
         routeVisible &&
         Boolean(circumferenceStates[areaKey].selected),
     );
+    const selected = circumferenceStates[areaKey].selected;
+    if (routeGradientToggle.checked && routeVisible && selected) {
+      updateCircumferenceGradient(areaKey, selected);
+    } else gradientRenderer.cancel(`circumference-gradient-${areaKey}`);
   }
+  refreshHighwayGradient();
   setLayerVisibility(
     'highway-circumference-gradient',
     highwayVisible && routeGradientToggle.checked,
@@ -823,18 +828,19 @@ function updateCircumferenceGradient(
 ): void {
   const landmassArea = runtime.circumferenceLandmasses?.areas[areaKey];
   if (!landmassArea) return;
-  const canvas = circumferenceCanvases[areaKey];
-  const gradientBounds = circumferenceGradientBounds(candidate.coordinates);
-  renderCircumferenceGradient(
-    canvas,
-    candidate.coordinates,
-    gradientBounds,
-    landmassArea.mask ??
+  const key = `circumference-gradient-${areaKey}`;
+  gradientRenderer.configure(key, {
+    coordinates: candidate.coordinates,
+    landmassPolygons:
+      landmassArea.mask ??
       landmassArea.landmasses.flatMap((landmass) => landmass.mask ?? []),
-  );
-  imageSource(`circumference-gradient-${areaKey}`)?.updateImage({
-    coordinates: circumferenceGradientCoordinates(gradientBounds),
-    url: canvas.toDataURL('image/png'),
+    maxDistanceMeters: CIRCUMFERENCE_GRADIENT_MAX_DISTANCE_METERS,
+    outsideOnly: false,
+  });
+  gradientRenderer.request(key, {
+    bounds: circumferenceGradientBounds(candidate.coordinates),
+    width: CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE,
+    height: CIRCUMFERENCE_GRADIENT_TEXTURE_SIZE,
   });
 }
 
@@ -850,7 +856,6 @@ export function renderCircumferenceCandidate(
   if (candidateChanged) resetCircumferenceItemDetails();
 
   updateCombinedCircumferenceSource();
-  updateCircumferenceGradient(runtime.activeAreaKey, candidate);
 
   const isManual = Boolean(circumferenceState.overrideId);
   const isSegmentEdited = !isManual && hasSegmentOverrides();

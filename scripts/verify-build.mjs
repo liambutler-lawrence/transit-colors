@@ -72,6 +72,19 @@ export async function verifyBuild(directory = 'dist') {
     'Mutable boundary URLs can mix old code with new hierarchy data.',
   );
 
+  const gradientWorkers = files.filter((file) =>
+    /^assets\/gradient-render\.worker-[\w-]+\.js$/.test(file),
+  );
+  assert.equal(
+    gradientWorkers.length,
+    1,
+    'Production needs the gradient rendering worker.',
+  );
+  assert.ok(
+    scripts.some((script) => script.includes(basename(gradientWorkers[0]))),
+    'The app must reference its versioned gradient worker.',
+  );
+
   let totalBytes = 0;
   for (const file of files) {
     const metadata = await stat(join(directory, file));

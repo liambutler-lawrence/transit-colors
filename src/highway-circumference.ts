@@ -9,6 +9,10 @@ import type {
 import { z } from 'zod';
 
 import { coordinateSchema, type Coordinate, type LandmassArea } from './domain.js';
+import {
+  circumferenceGradientBounds,
+  circumferenceGradientDistanceForArea,
+} from './circumference-map.js';
 
 export const highwayFeaturePropertiesSchema = z.object({
   class: z.string(),
@@ -97,6 +101,36 @@ export const highwayCircumferenceDataSchema = z.object({
 });
 
 export type HighwayCircumferenceData = z.infer<typeof highwayCircumferenceDataSchema>;
+export const highwayCircumferenceSummarySchema = highwayCircumferenceDataSchema
+  .omit({ landmass: true, route: true })
+  .extend({
+    landmass: highwayLandmassSchema.omit({ mask: true }),
+    route: highwayCircumferenceDataSchema.shape.route
+      .omit({ coordinates: true, segments: true })
+      .extend({
+        bounds: z.tuple([coordinateSchema, coordinateSchema]),
+        gradientBounds: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+      }),
+  });
+export type HighwayCircumferenceSummary = z.infer<
+  typeof highwayCircumferenceSummarySchema
+>;
+
+export function highwayCircumferenceSummary(
+  data: HighwayCircumferenceData,
+): HighwayCircumferenceSummary {
+  return highwayCircumferenceSummarySchema.parse({
+    ...data,
+    route: {
+      ...data.route,
+      bounds: highwayBounds(data.route.coordinates),
+      gradientBounds: circumferenceGradientBounds(
+        data.route.coordinates,
+        circumferenceGradientDistanceForArea(data.route.areaSquareMeters),
+      ),
+    },
+  });
+}
 export type HighwayFeatureProperties = z.infer<typeof highwayFeaturePropertiesSchema>;
 
 export const highwayMapFeaturePropertiesSchema = highwayFeaturePropertiesSchema.extend({

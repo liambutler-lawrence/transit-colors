@@ -1,3 +1,4 @@
+import { buildHighwayDisplayAssets } from './build-highway-display-assets.mjs';
 import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createWriteStream } from 'node:fs';
@@ -442,6 +443,10 @@ const output = {
   source_version: '2026-07-30',
 };
 await writeFile(outputPath, `${JSON.stringify(output)}\n`);
+await buildHighwayDisplayAssets(
+  outputPath,
+  tilesPath.replace(/\.pmtiles$/, '-route.pmtiles'),
+);
 console.log({
   outputPath,
   routeAreaSquareKilometers: output.route.areaSquareMeters / 1_000_000,

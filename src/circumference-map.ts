@@ -2,6 +2,7 @@ import type { Coordinate } from './domain.js';
 import { metersPerDegreeAtLatitude } from './geodesy.js';
 import type { BoundsTuple } from './circumference-gradient-source.js';
 import type { Point } from './routing/types.js';
+import type { GradientView } from './gradient-render-protocol.js';
 import { RouteDistanceIndex } from './route-distance-index.js';
 
 export const CIRCUMFERENCE_GRADIENT_COAST_LAYER_ID = 'water';
@@ -14,6 +15,29 @@ type Color = [number, number, number];
 const MERCATOR_RADIUS_METERS = 6_378_137;
 const MAX_MERCATOR_LATITUDE = 85.051129;
 const routeIndexes = new WeakMap<readonly Coordinate[], RouteDistanceIndex>();
+
+type GradientContext = Pick<
+  CanvasRenderingContext2D,
+  | 'createImageData'
+  | 'getImageData'
+  | 'putImageData'
+  | 'clearRect'
+  | 'fillRect'
+  | 'fillStyle'
+  | 'save'
+  | 'restore'
+  | 'globalCompositeOperation'
+  | 'beginPath'
+  | 'moveTo'
+  | 'lineTo'
+  | 'closePath'
+  | 'fill'
+>;
+interface GradientCanvas {
+  readonly width: number;
+  readonly height: number;
+  getContext(type: '2d', options: { readonly alpha: boolean }): GradientContext | null;
+}
 
 function mercatorY(latitude: number): number {
   const radians =
@@ -127,10 +151,11 @@ export function circumferenceGradientOpacity(
 export function circumferenceGradientViewportBounds(
   envelope: BoundsTuple,
   viewport: BoundsTuple,
+  padding = 0.2,
 ): BoundsTuple | null {
   const [west, south, east, north] = viewport;
-  const xPadding = (east - west) * 0.2;
-  const yPadding = (mercatorY(north) - mercatorY(south)) * 0.2;
+  const xPadding = (east - west) * padding;
+  const yPadding = (mercatorY(north) - mercatorY(south)) * padding;
   const bounds: BoundsTuple = [
     Math.max(envelope[0], west - xPadding),
     Math.max(envelope[1], latitudeFromMercatorY(mercatorY(south) - yPadding)),
@@ -145,14 +170,14 @@ export function circumferenceGradientViewportBounds(
  * distance uses the local latitude scale, including across continental bounds.
  * The optional outside-only mask leaves the full interior to the polygon fill.
  */
-export function renderCircumferenceGradient(
-  canvas: HTMLCanvasElement,
+function* circumferenceGradientSteps(
+  canvas: GradientCanvas,
   routeCoordinates: readonly Coordinate[],
   bounds: BoundsTuple,
   landmassPolygons: readonly Coordinate[][][],
   maxDistanceMeters = CIRCUMFERENCE_GRADIENT_MAX_DISTANCE_METERS,
   outsideOnly = false,
-): void {
+): Generator<void, void> {
   const context = canvas.getContext('2d', { alpha: true });
   if (!context) throw new Error('Canvas 2D rendering is unavailable.');
   const width = canvas.width;
@@ -166,6 +191,54 @@ export function renderCircumferenceGradient(
     routeIndexes.set(routeCoordinates, routeIndex);
   }
   const image = context.createImageData(width, height);
+  const masked = landmassPolygons.length > 0 || outsideOnly;
+  let mask: Uint8ClampedArray<ArrayBufferLike> | null = null;
+  if (masked) {
+    context.clearRect(0, 0, width, height);
+    context.fillStyle = '#fff';
+    context.fillRect(0, 0, width, height);
+    if (landmassPolygons.length > 0) {
+      context.save();
+      context.globalCompositeOperation = 'destination-in';
+      context.beginPath();
+      for (const polygon of landmassPolygons) {
+        for (const ring of polygon) {
+          for (const [index, coordinate] of ring.entries()) {
+            const [x, y] = circumferenceGradientCanvasCoordinate(
+              coordinate,
+              bounds,
+              width,
+              height,
+            );
+            if (index === 0) context.moveTo(x, y);
+            else context.lineTo(x, y);
+          }
+          context.closePath();
+        }
+      }
+      context.fill('evenodd');
+      context.restore();
+    }
+    if (outsideOnly) {
+      context.save();
+      context.globalCompositeOperation = 'destination-out';
+      context.beginPath();
+      for (const [index, coordinate] of routeCoordinates.entries()) {
+        const [x, y] = circumferenceGradientCanvasCoordinate(
+          coordinate,
+          bounds,
+          width,
+          height,
+        );
+        if (index === 0) context.moveTo(x, y);
+        else context.lineTo(x, y);
+      }
+      context.closePath();
+      context.fill('evenodd');
+      context.restore();
+    }
+    mask = context.getImageData(0, 0, width, height).data;
+  }
 
   for (let pixelY = 0; pixelY < height; pixelY += 1) {
     const y = northY - ((pixelY + 0.5) / height) * (northY - southY);
@@ -175,6 +248,9 @@ export function renderCircumferenceGradient(
       ((Math.PI / 180) * MERCATOR_RADIUS_METERS);
     const projectedLimit = maxDistanceMeters / groundScale;
     for (let pixelX = 0; pixelX < width; pixelX += 1) {
+      const offset = (pixelY * width + pixelX) * 4;
+      const maskAlpha = mask ? (mask[offset + 3] ?? 0) : 255;
+      if (maskAlpha === 0) continue;
       const longitude = west + ((pixelX + 0.5) / width) * (east - west);
       const point = { x: ((longitude * Math.PI) / 180) * MERCATOR_RADIUS_METERS, y };
       const projectedDistance = routeIndex.distance(point, projectedLimit);
@@ -185,55 +261,89 @@ export function renderCircumferenceGradient(
       if (opacity === 0) continue;
       const amount = Math.min(1, distance / maxDistanceMeters);
       const [red, green, blue] = gradientColor(amount);
-      const offset = (pixelY * width + pixelX) * 4;
       image.data[offset] = red;
       image.data[offset + 1] = green;
       image.data[offset + 2] = blue;
-      image.data[offset + 3] = opacity;
+      image.data[offset + 3] = Math.round((opacity * maskAlpha) / 255);
     }
+    if (pixelY % 8 === 7) yield;
   }
 
   context.clearRect(0, 0, width, height);
   context.putImageData(image, 0, 0);
+}
 
-  if (landmassPolygons.length > 0) {
-    context.save();
-    context.globalCompositeOperation = 'destination-in';
-    context.beginPath();
-    for (const polygon of landmassPolygons) {
-      for (const ring of polygon) {
-        for (const [index, coordinate] of ring.entries()) {
-          const [x, y] = circumferenceGradientCanvasCoordinate(
-            coordinate,
-            bounds,
-            width,
-            height,
-          );
-          if (index === 0) context.moveTo(x, y);
-          else context.lineTo(x, y);
-        }
-        context.closePath();
-      }
-    }
-    context.fill('evenodd');
-    context.restore();
+/** Reuse padded images only while they cover the view at adequate resolution. */
+export function circumferenceGradientViewReusable(
+  rendered: GradientView,
+  requested: GradientView,
+  visible: BoundsTuple,
+): boolean {
+  const [west, south, east, north] = rendered.bounds;
+  const epsilon = 1e-9;
+  return (
+    west <= visible[0] + epsilon &&
+    south <= visible[1] + epsilon &&
+    east >= visible[2] - epsilon &&
+    north >= visible[3] - epsilon &&
+    (east - west) / rendered.width <=
+      (1.25 * (requested.bounds[2] - requested.bounds[0])) / requested.width &&
+    (mercatorY(north) - mercatorY(south)) / rendered.height <=
+      (1.25 * (mercatorY(requested.bounds[3]) - mercatorY(requested.bounds[1]))) /
+        requested.height
+  );
+}
+
+/** Synchronous reference renderer used by offline checks. Browser code uses the worker. */
+export function renderCircumferenceGradient(
+  canvas: GradientCanvas,
+  routeCoordinates: readonly Coordinate[],
+  bounds: BoundsTuple,
+  landmassPolygons: readonly Coordinate[][][],
+  maxDistanceMeters = CIRCUMFERENCE_GRADIENT_MAX_DISTANCE_METERS,
+  outsideOnly = false,
+): void {
+  const steps = circumferenceGradientSteps(
+    canvas,
+    routeCoordinates,
+    bounds,
+    landmassPolygons,
+    maxDistanceMeters,
+    outsideOnly,
+  );
+  while (!steps.next().done) {
+    /* Complete the same pixels as the worker renderer. */
   }
-  if (outsideOnly) {
-    context.save();
-    context.globalCompositeOperation = 'destination-out';
-    context.beginPath();
-    for (const [index, coordinate] of routeCoordinates.entries()) {
-      const [x, y] = circumferenceGradientCanvasCoordinate(
-        coordinate,
-        bounds,
-        width,
-        height,
-      );
-      if (index === 0) context.moveTo(x, y);
-      else context.lineTo(x, y);
+}
+
+/** Yield in the worker so obsolete viewport requests can be cancelled promptly. */
+export async function renderCircumferenceGradientAsync(
+  canvas: GradientCanvas,
+  routeCoordinates: readonly Coordinate[],
+  bounds: BoundsTuple,
+  landmassPolygons: readonly Coordinate[][][],
+  maxDistanceMeters: number,
+  outsideOnly: boolean,
+  cancelled: () => boolean,
+): Promise<boolean> {
+  const steps = circumferenceGradientSteps(
+    canvas,
+    routeCoordinates,
+    bounds,
+    landmassPolygons,
+    maxDistanceMeters,
+    outsideOnly,
+  );
+  let deadline = performance.now() + 8;
+  while (!cancelled()) {
+    if (steps.next().done) return true;
+    if (performance.now() >= deadline) {
+      await new Promise<void>((resolve) => {
+        setTimeout(resolve, 0);
+      });
+      deadline = performance.now() + 8;
     }
-    context.closePath();
-    context.fill('evenodd');
-    context.restore();
   }
+  steps.return(undefined);
+  return false;
 }
