@@ -220,6 +220,44 @@ mixed-merge fixture retains the same source paths and parent mainlines; two curv
 updated for removed junction insertions, including a 9.2 m endpoint correction. These
 checks cover fully supported redundant pairings, not every possible merge defect.
 
+A subsequent direction audit traced all 5,246 published ramp pairs to their source
+junctions. It rejected 275 pairs without opposing carriageway evidence at one or both
+highway legs, including the southbound exit/entrance pair at I-435/MO-210 in Kansas
+City. The matcher previously penalized such candidates but could still select them when
+a valid return was absent. The same requirement now applies to established and inferred
+pairs before ranking. Direct source-carriageway pairs preserve valid returns through
+sharp bends; otherwise the local tangents must meet the mainline opposition threshold of
+0.62. Borderline cases and the newly selected alternatives were reviewed against
+source-road plots, including curved highways and ring roads where headings alone or
+global source-chain identity would be misleading.
+
+The rebuild retained all 4,971 other connector curves without changes and recovered 14
+valid alternatives, for 4,985 reciprocal connectors. All 4,985 pass the source direction
+audit and retain both mainline attachments. No changed mainline or new connector
+acquired a reversal or self-intersection; this comparison removes duplicate consecutive
+vertices before measuring bends. The eight earlier covered-merge removals remain in
+place.
+
+The existing source-topology ending rule trims three ramp-only tails farther after their
+false pairings are removed. It retains one previously trimmed terminal that now serves
+an unpaired exit. `scripts/fixtures/mainline-ending-audit.json` checks the six remaining
+trims and that retained terminal; the total trimmed distance agrees with the rebuilt
+source audit to within one millimetre.
+
+`scripts/fixtures/i435-mo210-nonreciprocal.json` exercises the reported junction from
+source roads. `scripts/fixtures/memphis-curved-carriageways.json` preserves a curved
+I-40 return and verifies that removing it does not substitute an I-240 ramp using the
+wrong travel side. `scripts/fixtures/nonreciprocal-ramp-audit.json` records the rejected
+source paths and travel directions, 208 isolated witness points where tile regressions
+can verify removal, all 14 recovered curves, and 12 retained curved returns with their
+parent mainlines. The other 67 removed curves overlap surviving connector geometry too
+closely for an isolated witness check; their exclusion is verified by source-path
+identity in the rebuild audit. Two formerly positive attachment fixtures were
+nonreciprocal and are now recorded in this rejection audit. The remaining attachment
+fixtures retain their original geometry and parent mainlines, with only generated
+connector IDs updated. These checks cover directional reciprocity, not every possible
+interchange geometry defect.
+
 The continental boundary is assembled directly on the detailed biconnected graph. A
 northeastern cycle is routed through Highway 407, Ottawa, Québec, and coastal New
 England; independent node-disjoint perimeter ears then add I-495 in southeastern

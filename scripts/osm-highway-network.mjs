@@ -1610,6 +1610,20 @@ function reciprocalDirectionPenalty(first, second) {
   );
 }
 
+function haveOpposingCarriageways(first, second, pairedChains, directionPenalty) {
+  const firstChains = first.carriagewayIds ?? [];
+  const secondChains = second.carriagewayIds ?? [];
+  // Source pairs remain opposed through a bend, even when their ramp joins
+  // are far apart and local headings alone cannot identify the return leg.
+  if (firstChains.some((a) => secondChains.some((b) => pairedChains.get(a)?.has(b))))
+    return true;
+  // A long source chain can curve around a ring and face the other way.
+  // Sharing a chain (or a partner elsewhere) does not determine the local
+  // travel side. Without a direct source pair, require the same opposing
+  // tangent alignment used to pair mainlines, not merely different headings.
+  return directionPenalty <= (1 - MIN_PAIRED_TANGENT_ALIGNMENT) * 0.5;
+}
+
 function mainlineGroupByPartIndex(parts) {
   const parent = new Map(
     parts
@@ -1718,7 +1732,7 @@ export function selectShortestReciprocalMovements(pairs, groupByPartIndex) {
   return pairs.filter((pair) => retained.has(pair));
 }
 
-function reciprocalPathPairs(paths, groupByPartIndex) {
+function reciprocalPathPairs(paths, groupByPartIndex, pairedChains) {
   const groups = new Map();
   for (const [pathIndex, path] of paths.entries()) {
     const firstPartIndex = path.firstAttachment.partIndex;
@@ -1770,6 +1784,23 @@ function reciprocalPathPairs(paths, groupByPartIndex) {
           first.path.secondAttachment,
           second.path.firstAttachment,
         );
+        // Reciprocity is required at both highway legs, before proximity or
+        // heading scores can select an exit/entrance using the same travel side.
+        if (
+          !haveOpposingCarriageways(
+            first.path.firstAttachment,
+            second.path.secondAttachment,
+            pairedChains,
+            firstDirectionPenalty,
+          ) ||
+          !haveOpposingCarriageways(
+            first.path.secondAttachment,
+            second.path.firstAttachment,
+            pairedChains,
+            secondDirectionPenalty,
+          )
+        )
+          continue;
         candidates.push({
           first,
           score:
@@ -3192,7 +3223,13 @@ function mixedMainlineReturn(path, osm, waysById, parts, graph, grid, sourcePart
   return null;
 }
 
-export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
+export function buildRampConnectors(
+  osm,
+  mainlineWays,
+  parts,
+  connectorWays,
+  chains = [],
+) {
   const partSegmentGrid = buildPartSegmentGrid(parts);
   const sourceWayIdToPartIndices = indexPartsBySourceWay(parts);
   const graph = connectorSegmentGraph(connectorWays);
@@ -3207,6 +3244,23 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
   const mainlinePartIndicesByNode = new Map();
   const mainlineDirectionsByNodeAndPart = new Map();
   const mainlineDirectionsByNode = new Map();
+  const carriagewaysByNode = new Map();
+  const carriagewaysByNodeAndPart = new Map();
+  const chainByWay = new Map(
+    chains.flatMap((chain) => chain.sourceWayIds.map((id) => [id, chain.id])),
+  );
+  const pairedChains = new Map();
+  for (const part of parts) {
+    if (!part.sourceChainId || !part.pairedChainId) continue;
+    for (const [a, b] of [
+      [part.sourceChainId, part.pairedChainId],
+      [part.pairedChainId, part.sourceChainId],
+    ]) {
+      const opposites = pairedChains.get(a) ?? new Set();
+      opposites.add(b);
+      pairedChains.set(a, opposites);
+    }
+  }
   for (const way of mainlineWays) {
     const partIndices = sourceWayIdToPartIndices.get(way.id) ?? [];
     const wayCoordinates =
@@ -3214,6 +3268,12 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
     for (const [nodeIndex, nodeId] of way.nodeIds.entries()) {
       if (!graph.incident.has(nodeId)) continue;
       const direction = travelDirectionAtNode(wayCoordinates, nodeIndex);
+      const chainId = chainByWay.get(way.id);
+      if (chainId) {
+        const ids = carriagewaysByNode.get(nodeId) ?? new Set();
+        ids.add(chainId);
+        carriagewaysByNode.set(nodeId, ids);
+      }
       const nodeDirections = mainlineDirectionsByNode.get(nodeId) ?? [];
       nodeDirections.push(direction);
       mainlineDirectionsByNode.set(nodeId, nodeDirections);
@@ -3221,6 +3281,11 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
       for (const partIndex of partIndices) {
         indices.add(partIndex);
         const key = `${nodeId}:${partIndex}`;
+        if (chainId) {
+          const ids = carriagewaysByNodeAndPart.get(key) ?? new Set();
+          ids.add(chainId);
+          carriagewaysByNodeAndPart.set(key, ids);
+        }
         const directions = mainlineDirectionsByNodeAndPart.get(key) ?? [];
         directions.push(direction);
         mainlineDirectionsByNodeAndPart.set(key, directions);
@@ -3236,6 +3301,11 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
   const describeAttachment = (attachment, nodeId) => ({
     ...attachment,
     nodeId,
+    carriagewayIds: [
+      ...((attachment.inferredCorridor
+        ? carriagewaysByNode.get(nodeId)
+        : carriagewaysByNodeAndPart.get(`${nodeId}:${attachment.partIndex}`)) ?? []),
+    ],
     travelDirections:
       (attachment.inferredCorridor
         ? mainlineDirectionsByNode.get(nodeId)
@@ -3287,7 +3357,11 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
     );
   }
   const groupByPartIndex = mainlineGroupByPartIndex(parts);
-  const established = reciprocalPathPairs(originalDirectedPaths, groupByPartIndex);
+  const established = reciprocalPathPairs(
+    originalDirectedPaths,
+    groupByPartIndex,
+    pairedChains,
+  );
   const usedByJunction = new Map();
   for (const path of established.pairs.flat()) {
     for (const nodeId of [path.firstAttachment.nodeId, path.secondAttachment.nodeId]) {
@@ -3306,7 +3380,7 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
         ),
       ),
   );
-  const inferred = reciprocalPathPairs(available, groupByPartIndex);
+  const inferred = reciprocalPathPairs(available, groupByPartIndex, pairedChains);
   const appliedNodes = new Set();
   const acceptedPathKeys = new Set();
   const pathIdentity = (path) =>
@@ -3544,6 +3618,7 @@ export function buildOsmHighwayCenterlines(osm, onProgress = () => {}) {
     prepared.mainlines,
     averaged.parts,
     prepared.connectors,
+    chains,
   );
   let coveredMerges = coveredMainlineMergePairs(
     originalParts,
@@ -3576,6 +3651,7 @@ export function buildOsmHighwayCenterlines(osm, onProgress = () => {}) {
       prepared.mainlines,
       averaged.parts,
       prepared.connectors,
+      chains,
     );
     const supported = coveredMerges.filter((merge) =>
       ramps.connectors.some(

@@ -134,19 +134,28 @@ source ways. An auxiliary carriageway omitted from the averaged part's source li
 reconnect to that same represented corridor in both travel directions within 2.5
 kilometres before its ramp endpoint can attach. Dead ends, ambiguous branches,
 coordinate-only crossings, and distant projections cannot supply that inference.
-Established reciprocal movements retain their original attachments and directional
-paths. Inferred attachments can supply an unmatched movement only when its new midpoint
-has neither backward turns nor self-intersections; they cannot consume a direction from
-an existing pair or create a duplicate of it. Reciprocal collector-road alternatives are
-consolidated to the pair with the shortest mean directional ramp distance only when both
-directions share a source junction and directed segment and connect the same mainline
-legs. Shared collector stems for distinct turns remain separate; proximity alone never
-merges connections. Ramp samples use the closest point on a tangent-aligned opposing
-segment and its WGS84 geodesic midpoint, as mainlines do. The shorter of the two
-oriented paths supplies the samples; endpoints are never warped to create correspondence
-and the midpoints are not smoothed afterward. If successive projections skip a source
-bend, nearby closest-tangent anchors bound a local, monotone Hermite interpolation of
-distance along each source path. Denser samples then trace that bend before the geodesic
+Reciprocal candidates must use opposing carriageways at both highway legs. Source chains
+already paired into a mainline remain opposite even when they bend between staggered
+ramp joins. Where that direct source relationship is unavailable, local travel tangents
+must be opposed with the same minimum alignment (0.62) used for mainlines. Long source
+chains can turn around a ring, so sharing a chain or a partner elsewhere does not alone
+establish the local travel side. Reversing highway names alone is insufficient: an exit
+and entrance using the same travel side cannot form a two-way connection, even when they
+are the only available pair. This requirement applies before ranking both established
+and inferred attachments; proximity cannot override it. Established reciprocal movements
+retain their original attachments and directional paths. Inferred attachments can supply
+an unmatched movement only when its new midpoint has neither backward turns nor
+self-intersections; they cannot consume a direction from an existing pair or create a
+duplicate of it. Reciprocal collector-road alternatives are consolidated to the pair
+with the shortest mean directional ramp distance only when both directions share a
+source junction and directed segment and connect the same mainline legs. Shared
+collector stems for distinct turns remain separate; proximity alone never merges
+connections. Ramp samples use the closest point on a tangent-aligned opposing segment
+and its WGS84 geodesic midpoint, as mainlines do. The shorter of the two oriented paths
+supplies the samples; endpoints are never warped to create correspondence and the
+midpoints are not smoothed afterward. If successive projections skip a source bend,
+nearby closest-tangent anchors bound a local, monotone Hermite interpolation of distance
+along each source path. Denser samples then trace that bend before the geodesic
 midpoints are computed. This does not normalize progress across the complete ramps or
 round off their output coordinates. The continuation is rejected if it traverses a
 reverse-facing loop or makes a sharper corner, including at its joins to the untouched

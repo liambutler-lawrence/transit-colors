@@ -41,10 +41,16 @@ test('ramp connectors use explicit OSM nodes and ignore coordinate-only crossing
     ['5', { coordinate: [0, 0.005], tags: {} }],
     ['6', { coordinate: [0, 0.005], tags: {} }],
     ['7', { coordinate: [0.0001, 0.005], tags: {} }],
+    ['1r', { coordinate: [0, 0.0001], tags: {} }],
+    ['2r', { coordinate: [0.01, 0.0001], tags: {} }],
+    ['3r', { coordinate: [0, 0.0101], tags: {} }],
+    ['4r', { coordinate: [0.01, 0.0101], tags: {} }],
   ]);
   const mainlineWays = [
     { id: '10', nodeIds: ['1', '2'] },
     { id: '11', nodeIds: ['3', '4'] },
+    { id: '10r', nodeIds: ['2r', '1r'] },
+    { id: '11r', nodeIds: ['4r', '3r'] },
   ];
   const parts = [
     {
@@ -52,7 +58,7 @@ test('ramp connectors use explicit OSM nodes and ignore coordinate-only crossing
         [0, 0],
         [0.01, 0],
       ],
-      sourceWayIds: ['10'],
+      sourceWayIds: ['10', '10r'],
       tokens: ['A'],
     },
     {
@@ -60,13 +66,13 @@ test('ramp connectors use explicit OSM nodes and ignore coordinate-only crossing
         [0, 0.01],
         [0.01, 0.01],
       ],
-      sourceWayIds: ['11'],
+      sourceWayIds: ['11', '11r'],
       tokens: ['B'],
     },
   ];
   const connectorWays = [
     { id: '20', nodeIds: ['1', '5', '3'] },
-    { id: '22', nodeIds: ['3', '7', '1'] },
+    { id: '22', nodeIds: ['3r', '7', '1r'] },
     // This node shares coordinates with node 5 but not its identity, so it
     // cannot jump onto the A-to-B connector.
     { id: '21', nodeIds: ['2', '6'] },
@@ -81,9 +87,9 @@ test('ramp connectors use explicit OSM nodes and ignore coordinate-only crossing
 test('classic T interchange produces two paired centerlines and a triangle', () => {
   const nodes = new Map(
     Object.entries({
-      stemWestOut: [-0.0003, -0.006],
-      stemWestIn: [0.0003, -0.0055],
-      stemEastOut: [0.0003, -0.006],
+      stemWestOut: [0.0003, -0.006],
+      stemWestIn: [-0.0003, -0.006],
+      stemEastOut: [0.0003, -0.0055],
       stemEastIn: [-0.0003, -0.0055],
       westIn: [-0.006, 0.0003],
       westOut: [-0.006, -0.0003],
@@ -311,6 +317,71 @@ test('reciprocal matcher uses directional legs instead of nearest ramp endpoints
     new Set(['forward', 'correct-reciprocal']),
   );
   assert.equal(result.statistics.unpairedConnectorPathCount, 1);
+
+  const withoutReturn = buildRampConnectors(
+    { nodes },
+    mainlineWays,
+    structuredClone(parts),
+    connectorWays.filter((way) => way.id !== 'correct-reciprocal'),
+  );
+  assert.equal(withoutReturn.connectors.length, 0);
+  assert.equal(withoutReturn.statistics.unpairedConnectorPathCount, 2);
+
+  for (const nodeIds of [
+    ['bCorrect', 'wrongMiddle', 'aWrong'],
+    ['bWrong', 'wrongMiddle', 'aCorrect'],
+  ]) {
+    const wrongAtOneEnd = buildRampConnectors(
+      { nodes },
+      mainlineWays,
+      structuredClone(parts),
+      [connectorWays[0], { id: 'wrong-at-one-end', nodeIds }],
+    );
+    assert.equal(wrongAtOneEnd.connectors.length, 0);
+    assert.equal(wrongAtOneEnd.statistics.unpairedConnectorPathCount, 2);
+  }
+});
+
+test('I-435 / MO-210 does not pair an exit and entrance using the same freeway direction', () => {
+  const fixture = JSON.parse(
+    readFileSync(new URL('./fixtures/i435-mo210-nonreciprocal.json', import.meta.url)),
+  );
+  const result = buildOsmHighwayCenterlines({
+    nodes: new Map(fixture.nodes),
+    ways: fixture.ways,
+  });
+  assert.equal(result.parts.filter((part) => part.role === 'mainline').length, 4);
+  assert.equal(result.parts.filter((part) => part.role === 'connector').length, 0);
+  assert.equal(result.statistics.directedConnectorPathCount, 2);
+  assert.equal(result.statistics.unpairedConnectorPathCount, 2);
+});
+
+test('curving paired carriageways preserve the I-40 return without pairing it to I-240', () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL('./fixtures/memphis-curved-carriageways.json', import.meta.url),
+    ),
+  );
+  const result = buildOsmHighwayCenterlines({
+    nodes: new Map(fixture.nodes),
+    ways: fixture.ways,
+  });
+  const connections = result.parts.filter(
+    (part) => part.role === 'connector' && part.sourceWayIds.includes('466222703'),
+  );
+  assert.equal(connections.length, 1);
+  assert.ok(connections[0].sourceWayIds.includes('49551624'));
+  assert.ok(!connections[0].sourceWayIds.includes('561368935'));
+
+  const withoutI40Return = buildOsmHighwayCenterlines({
+    nodes: new Map(fixture.nodes),
+    ways: fixture.ways.filter((way) => way.id !== '49551624'),
+  });
+  assert.ok(
+    !withoutI40Return.parts.some(
+      (part) => part.role === 'connector' && part.sourceWayIds.includes('466222703'),
+    ),
+  );
 });
 
 const metersCoordinate = ([x, y]) => [x / 111_320, y / 110_574];
