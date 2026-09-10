@@ -93,6 +93,40 @@ async function assertTrimmedMainlineEnd(archive, ending) {
   }
 }
 
+async function assertPublishedContinuation(archive, repair) {
+  for (const [index, point] of repair.points.entries()) {
+    const { x, y } = webMercatorTile(...point, 14);
+    const tile = await archive.getZxy(14, x, y);
+    assert.ok(tile, `${repair.partId} has a published tile`);
+    const layer = new VectorTile(new Pbf(tile.data)).layers['highways'];
+    const touchingIds = new Set();
+    for (let featureIndex = 0; featureIndex < layer.length; featureIndex += 1) {
+      const feature = layer.feature(featureIndex);
+      if (feature.properties['role'] !== 'mainline') continue;
+      const geometry = feature.toGeoJSON(x, y, 14).geometry;
+      const coordinates =
+        geometry.type === 'LineString'
+          ? geometry.coordinates
+          : geometry.coordinates.flat();
+      if (
+        coordinates.some((coordinate) => geodesicDistanceMeters(coordinate, point) < 2)
+      )
+        touchingIds.add(feature.properties['id']);
+    }
+    assert.ok(touchingIds.has(repair.partId), `${repair.partId} covers its gap`);
+    if (index === 0)
+      assert.ok(
+        touchingIds.has(repair.beforeId),
+        `${repair.partId} joins its approach`,
+      );
+    if (index === repair.points.length - 1)
+      assert.ok(
+        touchingIds.has(repair.afterId),
+        `${repair.partId} joins its departure`,
+      );
+  }
+}
+
 test('North America highway data publishes one validated maximum and full vector network', () => {
   assert.equal(data.methodology.optimizationStatus, 'validated-detailed');
   assert.equal(
@@ -214,6 +248,30 @@ test('regenerated tiles retain centered mainlines and separate ramps continent-w
     );
     for (const ending of endingAudit.trims) {
       await assertTrimmedMainlineEnd(archive, ending);
+    }
+    const gapAudit = JSON.parse(
+      await readFile(
+        new URL(
+          '../scripts/fixtures/ordered-carriageway-gap-audit.json',
+          import.meta.url,
+        ),
+        'utf8',
+      ),
+    );
+    assert.ok(
+      gapAudit.repairs.length > 10,
+      'wide gaps are repaired across the network',
+    );
+    assert.ok(
+      gapAudit.repairs.some(
+        (repair) =>
+          repair.sourceChainId === 'chain-1363' &&
+          repair.pairedChainId === 'chain-2107',
+      ),
+      'the published repairs include the Monteagle gap',
+    );
+    for (const repair of gapAudit.repairs) {
+      await assertPublishedContinuation(archive, repair);
     }
     const norwalk = await highwayPropertiesNear(archive, -73.4204, 41.109);
     assert.ok(

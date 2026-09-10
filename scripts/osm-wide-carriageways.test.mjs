@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import { hasProperSelfIntersection } from './highway-cycle.mjs';
 import {
   buildAveragedMainlines,
   buildOsmHighwayCenterlines,
@@ -153,9 +154,8 @@ test('wide continuation needs the same closest partner from both carriageways', 
   }
 });
 
-test('wide continuation rejects excessive separation and incompatible intermediate tangents', () => {
+test('wide continuation rejects incompatible intermediate tangents', () => {
   for (const points of [
-    widening(2400),
     [
       [0, 30],
       [500, 30],
@@ -173,6 +173,52 @@ test('wide continuation rejects excessive separation and incompatible intermedia
     ]);
     assert.equal(result.statistics.widePairContinuationCount, 0);
     assert.ok(result.parts.length >= 2);
+  }
+});
+
+test('confirmed carriageways can separate beyond two kilometers and remain continuous', () => {
+  const result = buildAveragedMainlines([
+    chain('chain-1', through),
+    chain('chain-2', widening(2400).toReversed()),
+  ]);
+  assert.equal(result.parts.length, 3);
+  assert.equal(result.parts.filter((part) => part.orderedContinuation).length, 1);
+  const line = continuousCoordinates(result.parts);
+  assert.ok(line.some((point) => point[1] > coordinate([0, 1100])[1]));
+  for (let index = 1; index < line.length; index += 1) {
+    assert.ok(geodesicDistanceMeters(line[index - 1], line[index]) < 120);
+  }
+});
+
+test('Monteagle remains continuous through its widely separated winding carriageways in either ordering', () => {
+  const fixture = JSON.parse(
+    readFileSync(new URL('./fixtures/monteagle-carriageways.json', import.meta.url)),
+  );
+  for (const ways of [fixture.ways, fixture.ways.toReversed()]) {
+    const result = buildOsmHighwayCenterlines({ nodes: new Map(fixture.nodes), ways });
+    assert.equal(result.parts.length, 3, 'only the missing mainline is added');
+    assert.equal(result.statistics.orderedPairContinuationCount, 1);
+    const line = continuousCoordinates(result.parts);
+    const gap = line.filter(([, latitude]) => latitude > 35.174 && latitude < 35.23);
+    assert.ok(gap.length > 250);
+    assert.ok(
+      gap.some(([longitude, latitude]) => longitude > -85.81 && latitude < 35.21),
+    );
+    for (let index = 1; index < line.length; index += 1) {
+      assert.ok(geodesicDistanceMeters(line[index - 1], line[index]) < 140);
+    }
+    for (const source of result.chains) {
+      const side =
+        geodesicDistanceMeters(source.coordinates[0], line[0]) <
+        geodesicDistanceMeters(source.coordinates.at(-1), line[0])
+          ? source.coordinates
+          : source.coordinates.toReversed();
+      assert.equal(
+        hasProperSelfIntersection([...side, ...line.toReversed(), side[0]]),
+        false,
+        'the continuous midpoint must stay between the two source carriageways',
+      );
+    }
   }
 });
 

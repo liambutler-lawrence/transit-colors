@@ -1,0 +1,353 @@
+{
+  "rejectionCounts": {
+    "competingSourceRoad": 57,
+    "missingDirectionalSupport": 5,
+    "reversedSourceBounds": 3,
+    "noContainedOrderedCorrespondence": 1,
+    "selfCrossingSourceCorridor": 1,
+    "finalEndpointAttachment": 1
+  },
+  "sourceDate": "2026-07-30",
+  "auditedCandidateGapCount": 89,
+  "orderedCandidateCount": 22,
+  "preservedMainlineCount": 6797,
+  "preservedConnectorCount": 5003,
+  "repairs": [
+    {
+      "partId": "osm-mainline-6807",
+      "beforeId": "osm-mainline-34",
+      "afterId": "osm-mainline-35",
+      "sourceChainId": "chain-14",
+      "pairedChainId": "chain-4842",
+      "sourceGapLengthMeters": 3699.91821312462,
+      "lengthMeters": 3634.1317568659856,
+      "points": [
+        [-122.3232627, 40.8054439],
+        [-122.3242529, 40.7974875],
+        [-122.3192411, 40.7903408],
+        [-122.3167648, 40.7832157],
+        [-122.3149114, 40.7765325]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6808",
+      "beforeId": "osm-mainline-43",
+      "afterId": "osm-mainline-44",
+      "sourceChainId": "chain-14",
+      "pairedChainId": "chain-2607",
+      "sourceGapLengthMeters": 2099.953580422094,
+      "lengthMeters": 2098.566463014374,
+      "points": [
+        [-118.9300659, 34.9385649],
+        [-118.9286477, 34.9339471],
+        [-118.9261985, 34.9295096],
+        [-118.9251288, 34.9249607],
+        [-118.9245565, 34.9204538]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6809",
+      "beforeId": "osm-mainline-44",
+      "afterId": "osm-mainline-45",
+      "sourceChainId": "chain-14",
+      "pairedChainId": "chain-2607",
+      "sourceGapLengthMeters": 6749.850794213824,
+      "lengthMeters": 6698.427123989155,
+      "points": [
+        [-118.6697626, 34.5523529],
+        [-118.656288, 34.5422327],
+        [-118.6467041, 34.529751],
+        [-118.6376455, 34.5168686],
+        [-118.6282951, 34.5039919]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6810",
+      "beforeId": "osm-mainline-75",
+      "afterId": "osm-mainline-76",
+      "sourceChainId": "chain-24",
+      "pairedChainId": "chain-316",
+      "sourceGapLengthMeters": 1699.9863458243199,
+      "lengthMeters": 1713.8240542245424,
+      "points": [
+        [-118.6515984, 45.6166367],
+        [-118.6485947, 45.6133557],
+        [-118.6480556, 45.6096673],
+        [-118.6483881, 45.605702],
+        [-118.6458061, 45.6026126]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6811",
+      "beforeId": "osm-mainline-76",
+      "afterId": "osm-mainline-77",
+      "sourceChainId": "chain-24",
+      "pairedChainId": "chain-316",
+      "sourceGapLengthMeters": 5449.956226319249,
+      "lengthMeters": 4903.023444169996,
+      "points": [
+        [-118.6391864, 45.6009495],
+        [-118.6251304, 45.5968692],
+        [-118.6342276, 45.5905625],
+        [-118.6309042, 45.5815774],
+        [-118.6186218, 45.58171]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6812",
+      "beforeId": "osm-mainline-77",
+      "afterId": "osm-mainline-78",
+      "sourceChainId": "chain-24",
+      "pairedChainId": "chain-316",
+      "sourceGapLengthMeters": 1899.9847394507378,
+      "lengthMeters": 1770.4766367923712,
+      "points": [
+        [-118.6076262, 45.5836682],
+        [-118.60231, 45.5838654],
+        [-118.5977937, 45.58209],
+        [-118.5923067, 45.581495],
+        [-118.5865365, 45.58133]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6814",
+      "beforeId": "osm-mainline-852",
+      "afterId": "osm-mainline-853",
+      "sourceChainId": "chain-292",
+      "pairedChainId": "chain-293",
+      "sourceGapLengthMeters": 795.5040287700958,
+      "lengthMeters": 902.8681017083527,
+      "points": [
+        [-72.2737377, 41.72251],
+        [-72.2713623, 41.7234079],
+        [-72.268564, 41.7236374],
+        [-72.266076, 41.7232533],
+        [-72.2633416, 41.7229421]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6815",
+      "beforeId": "osm-mainline-1185",
+      "afterId": "osm-mainline-1186",
+      "sourceChainId": "chain-437",
+      "pairedChainId": "chain-3696",
+      "sourceGapLengthMeters": 699.9315369344549,
+      "lengthMeters": 1350.8162991381907,
+      "points": [
+        [-97.2368725, 18.8181031],
+        [-97.2355925, 18.8156506],
+        [-97.2370497, 18.8127792],
+        [-97.2398754, 18.8118378],
+        [-97.2415579, 18.8140339]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6816",
+      "beforeId": "osm-mainline-1498",
+      "afterId": "osm-mainline-1499",
+      "sourceChainId": "chain-608",
+      "pairedChainId": "chain-706",
+      "sourceGapLengthMeters": 1799.954476836545,
+      "lengthMeters": 1615.3246873531918,
+      "points": [
+        [-75.943438, 41.1770739],
+        [-75.9469805, 41.174695],
+        [-75.950857, 41.1725105],
+        [-75.9548892, 41.1704352],
+        [-75.9560063, 41.1670456]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6817",
+      "beforeId": "osm-mainline-1917",
+      "afterId": "osm-mainline-1918",
+      "sourceChainId": "chain-809",
+      "pairedChainId": "chain-3897",
+      "sourceGapLengthMeters": 499.87020184746507,
+      "lengthMeters": 669.3579699138329,
+      "points": [
+        [-80.316681, 25.6843865],
+        [-80.3162471, 25.6829267],
+        [-80.3161514, 25.6813709],
+        [-80.3164706, 25.6798741],
+        [-80.3175929, 25.6788956]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6818",
+      "beforeId": "osm-mainline-2258",
+      "afterId": "osm-mainline-2259",
+      "sourceChainId": "chain-1013",
+      "pairedChainId": "chain-1543",
+      "sourceGapLengthMeters": 4799.9354427516955,
+      "lengthMeters": 5009.593423441874,
+      "points": [
+        [-117.4816875, 34.3361696],
+        [-117.4737192, 34.3440262],
+        [-117.4602178, 34.3422316],
+        [-117.4474838, 34.3462599],
+        [-117.4386576, 34.3545985]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6819",
+      "beforeId": "osm-mainline-2268",
+      "afterId": "osm-mainline-2269",
+      "sourceChainId": "chain-1013",
+      "pairedChainId": "chain-1543",
+      "sourceGapLengthMeters": 4599.938132637064,
+      "lengthMeters": 4511.238344042453,
+      "points": [
+        [-113.4214367, 35.1892652],
+        [-113.4097966, 35.1904757],
+        [-113.3977653, 35.1876151],
+        [-113.3850434, 35.1876118],
+        [-113.3732885, 35.1902425]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6820",
+      "beforeId": "osm-mainline-2845",
+      "afterId": "osm-mainline-2846",
+      "sourceChainId": "chain-1336",
+      "pairedChainId": "chain-1683",
+      "sourceGapLengthMeters": 2299.6892871977907,
+      "lengthMeters": 2813.5432428669005,
+      "points": [
+        [-111.5974708, 34.8030079],
+        [-111.5945766, 34.7974453],
+        [-111.5965802, 34.7910604],
+        [-111.6023947, 34.787514],
+        [-111.6091174, 34.7841452]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6821",
+      "beforeId": "osm-mainline-2856",
+      "afterId": "osm-mainline-2857",
+      "sourceChainId": "chain-1336",
+      "pairedChainId": "chain-1683",
+      "sourceGapLengthMeters": 4949.331292012634,
+      "lengthMeters": 5201.822101841529,
+      "points": [
+        [-112.0306186, 34.4603636],
+        [-112.0330329, 34.4487581],
+        [-112.0369582, 34.4374548],
+        [-112.0445155, 34.4276255],
+        [-112.0563777, 34.4223975]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6822",
+      "beforeId": "osm-mainline-2924",
+      "afterId": "osm-mainline-2925",
+      "sourceChainId": "chain-1363",
+      "pairedChainId": "chain-2107",
+      "sourceGapLengthMeters": 7448.949440796452,
+      "lengthMeters": 8152.4212370034365,
+      "points": [
+        [-85.8259619, 35.2305942],
+        [-85.812151, 35.2181257],
+        [-85.8009551, 35.2053918],
+        [-85.7984538, 35.1876699],
+        [-85.7960469, 35.1735119]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6823",
+      "beforeId": "osm-mainline-3085",
+      "afterId": "osm-mainline-3086",
+      "sourceChainId": "chain-1517",
+      "pairedChainId": "chain-1518",
+      "sourceGapLengthMeters": 1199.981786205055,
+      "lengthMeters": 1144.581897891518,
+      "points": [
+        [-114.3150815, 32.667981],
+        [-114.3168875, 32.6660934],
+        [-114.3185119, 32.6638535],
+        [-114.3197397, 32.661554],
+        [-114.3222742, 32.6602005]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6824",
+      "beforeId": "osm-mainline-3094",
+      "afterId": "osm-mainline-3095",
+      "sourceChainId": "chain-1518",
+      "pairedChainId": "chain-3156",
+      "sourceGapLengthMeters": 9499.197483143958,
+      "lengthMeters": 9371.305061571762,
+      "points": [
+        [-116.1007172, 32.6778253],
+        [-116.0817612, 32.6837264],
+        [-116.0665641, 32.699817],
+        [-116.0608678, 32.7183131],
+        [-116.039373, 32.7241892]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6825",
+      "beforeId": "osm-mainline-3791",
+      "afterId": "osm-mainline-3792",
+      "sourceChainId": "chain-1975",
+      "pairedChainId": "chain-2437",
+      "sourceGapLengthMeters": 5949.822783558306,
+      "lengthMeters": 6146.742718627293,
+      "points": [
+        [-99.2918188, 19.8553752],
+        [-99.305828, 19.8594529],
+        [-99.3197169, 19.8633813],
+        [-99.3333237, 19.8681545],
+        [-99.3417729, 19.8793699]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6826",
+      "beforeId": "osm-mainline-4484",
+      "afterId": "osm-mainline-4485",
+      "sourceChainId": "chain-2575",
+      "pairedChainId": "chain-4725",
+      "sourceGapLengthMeters": 849.9392069284804,
+      "lengthMeters": 857.7352552874,
+      "points": [
+        [-105.0389904, 21.6742109],
+        [-105.0374772, 21.673085],
+        [-105.037646, 21.670928],
+        [-105.0375493, 21.6689377],
+        [-105.0360824, 21.668125]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6827",
+      "beforeId": "osm-mainline-4553",
+      "afterId": "osm-mainline-4554",
+      "sourceChainId": "chain-2670",
+      "pairedChainId": "chain-6592",
+      "sourceGapLengthMeters": 149.9566856049969,
+      "lengthMeters": 364.0162936594729,
+      "points": [
+        [-100.7941596, 25.3862097],
+        [-100.7950377, 25.3862483],
+        [-100.7958593, 25.3865814],
+        [-100.7960235, 25.3873676],
+        [-100.7958861, 25.3881691]
+      ]
+    },
+    {
+      "partId": "osm-mainline-6828",
+      "beforeId": "osm-mainline-6219",
+      "afterId": "osm-mainline-6220",
+      "sourceChainId": "chain-4837",
+      "pairedChainId": "chain-4884",
+      "sourceGapLengthMeters": 2099.8011687342077,
+      "lengthMeters": 2211.438292521175,
+      "points": [
+        [-75.415203, 41.0720711],
+        [-75.4084878, 41.0715283],
+        [-75.4018442, 41.0718266],
+        [-75.3956446, 41.0711577],
+        [-75.390019, 41.0687265]
+      ]
+    }
+  ]
+}
