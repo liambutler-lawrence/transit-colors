@@ -86,5 +86,13 @@
     "url": "https://www12.statcan.gc.ca/census-recensement/2021/geo/sip-pis/boundary-limites/files-fichiers/lcd_000b21a_e.zip",
     "license": "Statistics Canada Open Licence",
     "sha256": "1b638cea73fbf8349ba908d86be678272b2abcc74240fb0dfd9daf7a28457ad0"
+  },
+  {
+    "id": "geoboundaries-MEX1",
+    "file": "MEX1.geojson",
+    "name": "INEGI Mexico states (2020), via geoBoundaries",
+    "url": "https://media.githubusercontent.com/media/wmgeolab/geoBoundaries/90a1d52/releaseData/gbOpen/MEX/ADM1/geoBoundaries-MEX-ADM1.geojson",
+    "license": "Creative Commons Attribution 3.0 Intergovernmental Organisations (CC BY 3.0 IGO)",
+    "sha256": "7cfdc0e6a3f1420ba57b12b971db9b3c9febda8e7b00565e159a25b6dd4f35e0"
   }
 ]

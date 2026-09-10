@@ -12,7 +12,7 @@ from pathlib import Path
 
 import shapefile
 from pyproj import CRS, Transformer
-from shapely import STRtree, make_valid
+from shapely import STRtree, coverage_is_valid, coverage_simplify, make_valid
 from shapely.geometry import MultiPolygon, mapping, shape
 from shapely.ops import transform, unary_union
 
@@ -47,15 +47,18 @@ def ranges(geometry):
     return merged
 
 
-def display(geometry, gap=False):
+def display(geometry, gap=False, simplify=True):
     # Subpixel coastal strips need no topology-preserving zigzags. Classification
     # still uses every original interval, including all small islands.
-    simplified = valid(geometry.simplify(0.012, preserve_topology=not gap))
-    visible = [p for p in polygons(simplified) if p.area >= 1e-5]
+    simplified = valid(geometry.simplify(0.001, preserve_topology=not gap)) if simplify else geometry
+    visible = [p for p in polygons(simplified) if not simplify or p.area >= 1e-7]
     if not visible:
-        visible = [max(polygons(geometry), key=lambda p: p.area).simplify(0.012, preserve_topology=True)]
+        visible = [max(polygons(geometry), key=lambda p: p.area).simplify(0.001, preserve_topology=True)]
     coordinates = mapping(MultiPolygon(visible))['coordinates']
-    return dict(type='MultiPolygon', coordinates=[[[[round(x, 5), round(y, 5)] for x, y in ring] for ring in polygon] for polygon in coordinates])
+    # Detailed island rings can collapse at five decimals. Six retains their
+    # topology while keeping the shared-state coordinates identical.
+    decimals = 5 if simplify else 6
+    return dict(type='MultiPolygon', coordinates=[[[[round(x, decimals), round(y, decimals)] for x, y in ring] for ring in polygon] for polygon in coordinates])
 
 
 nodes = []
@@ -75,12 +78,26 @@ def node(id, name, country, geometry, level, parent=None, iso='', source='natura
 
 iso = {item['code']: item for item in read('iso3166-2.json')['3166-2']}
 admin1 = read('admin1.geojson')['features']
+# INEGI's detailed states replace the generalized Natural Earth shapes. Build the
+# country from those same states: clipping them to the old country outline would
+# reintroduce the inaccurate boundary and manufacture coastal UTC+0 slivers.
+mexico = read('MEX1.geojson')['features']
+mexico_shapes = [shape(f['geometry']) for f in mexico]
+if not coverage_is_valid(mexico_shapes):
+    raise ValueError('INEGI states must form a non-overlapping shared-edge coverage')
+mexico_display = coverage_simplify(mexico_shapes, 0.0001)
+if not coverage_is_valid(mexico_display):
+    raise ValueError('Mexico display simplification broke shared state boundaries')
+detailed_display = {}
 roots = {}
 for feature in sorted(read('admin0.geojson')['features'], key=lambda f: f['properties']['NAME_EN']):
     p = feature['properties']
     country = dict(name=p['NAME_EN'], code=p['ADM0_A3'])
+    detailed = country['code'] == 'MEX'
     roots[country['code']] = node('country:' + country['code'], country['name'], country,
-                                   shape(feature['geometry']), 0, iso=p['ISO_A2_EH'])
+                                   unary_union(mexico_shapes) if detailed else shape(feature['geometry']),
+                                   0, iso=p['ISO_A2_EH'],
+                                   source='geoboundaries-MEX1' if detailed else 'natural-earth')
 
 # Ask the same TypeScript resolver used by the browser which countries need children.
 # The parent geometry can then be discarded from the runtime dataset.
@@ -98,7 +115,20 @@ for code, root in roots.items():
     if root['id'] not in wide_countries:
         continue
     country = dict(name=root['name'], code=code)
-    if code in ('GRL', 'KIR'):
+    if code == 'MEX':
+        grouped = []
+        for f, geometry, simplified in zip(mexico, mexico_shapes, mexico_display):
+            p = f['properties']
+            # The pinned source incorrectly labels Distrito Federal as MX-MEX,
+            # duplicating the State of Mexico. Correct that specific source ID.
+            is_capital = p['shapeID'] == '31927357B79016588373767'
+            iso_code = 'MX-CMX' if is_capital else p['shapeISO']
+            name = 'Ciudad de México' if is_capital else p['shapeName']
+            grouped.append((iso_code, name, iso_code, geometry, 'geoboundaries-MEX1'))
+            detailed_display['admin1:MEX:' + iso_code] = valid(simplified)
+        if len({g[0] for g in grouped}) != 32:
+            raise ValueError('Expected 32 uniquely identified Mexican states')
+    elif code in ('GRL', 'KIR'):
         features = read(code + '1.geojson')['features']
         grouped = [(f['properties']['shapeID'], f['properties']['shapeName'],
                     f['properties']['shapeISO'], shape(f['geometry']), 'geoboundaries-' + code + '1') for f in features]
@@ -209,6 +239,15 @@ for parent in list(nodes):
         node(parent['id'] + ':uncovered', parent['name'] + ' — boundary coverage gaps',
              country, remainder, parent['level'] + 1, parent=parent['id'],
              source=parent['source'], note='The child boundary sources do not cover this part of the parent. UTC+0 is a temporary data fallback.')
+
+# Keep the topology-preserving detailed coverage intact for all three consumers:
+# borders, color mesh, and point inspection. Do not independently simplify states.
+for item in nodes:
+    if item['id'] in detailed_display:
+        item['geometry'] = display(detailed_display[item['id']], simplify=False)
+rounded_mexico = [shape(n['geometry']) for n in nodes if n['id'] in detailed_display]
+if not all(g.is_valid for g in rounded_mexico) or not coverage_is_valid(rounded_mexico):
+    raise ValueError('Coordinate rounding broke the detailed Mexico coverage')
 
 output.write_text(json.dumps(nodes, ensure_ascii=False, separators=(',', ':')) + '\n')
 print('Prepared', len(nodes), 'regions', file=sys.stderr, flush=True)
