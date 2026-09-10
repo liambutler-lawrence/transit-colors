@@ -69,9 +69,9 @@ export interface AutomaticTimezoneAssignment {
 /** Minimize the worst skew across whole polygon longitude intervals.
  * Each interval can use a different world copy, preserving islands across ±180°.
  */
-export function optimizeAutomaticTimezone(
+function rankAutomaticTimezones(
   ranges: readonly LongitudeRange[],
-): AutomaticTimezoneFit {
+): AutomaticTimezoneFit[] {
   if (
     ranges.length === 0 ||
     ranges.some(
@@ -103,9 +103,39 @@ export function optimizeAutomaticTimezone(
       Math.abs(left.offsetHours) - Math.abs(right.offsetHours) ||
       left.offsetHours - right.offsetHours,
   );
-  const best = candidates[0];
+  return candidates;
+}
+
+export function optimizeAutomaticTimezone(
+  ranges: readonly LongitudeRange[],
+): AutomaticTimezoneFit {
+  const best = rankAutomaticTimezones(ranges)[0];
   if (!best) throw new Error('No automatic timezone candidates.');
   return best;
+}
+
+/** Custom choices are strictly below 45 minutes, unlike the inclusive split rule. */
+export function automaticTimezoneOptions(
+  ranges: readonly LongitudeRange[],
+): AutomaticTimezoneFit[] {
+  return rankAutomaticTimezones(ranges).filter(
+    ({ maximumSkewMinutes }) =>
+      maximumSkewMinutes < AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES,
+  );
+}
+
+/** Apply an offset to a resolved leaf without changing its geography or name. */
+export function customizeAutomaticTimezone(
+  assignment: AutomaticTimezoneAssignment,
+  offsetHours: number | null,
+): AutomaticTimezoneAssignment {
+  if (offsetHours === null || offsetHours === assignment.offsetHours) return assignment;
+  const fit = automaticTimezoneOptions(assignment.region.longitude_ranges).find(
+    (candidate) => candidate.offsetHours === offsetHours,
+  );
+  if (!fit || assignment.region.geometry.coordinates.length === 0)
+    throw new Error('This region has no eligible custom offset below 45 minutes.');
+  return { ...assignment, offsetHours, fit, fallback: null };
 }
 
 /** Keep a region whole at exactly 45 minutes; subdivide only above the limit. */
