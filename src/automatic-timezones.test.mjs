@@ -2,9 +2,11 @@ import assert from 'node:assert/strict';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
+  AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES,
   assignAutomaticTimezones,
   automaticTimezoneDataSchema,
   fitAutomaticTimezone,
+  optimizeAutomaticTimezone,
 } from './automatic-timezones.ts';
 import { PolygonHitIndex } from './polygon-hit-index.ts';
 
@@ -35,20 +37,39 @@ const region = (id, level, west, east, parent_id = null) => ({
   },
 });
 
-test('whole-hour meridians use strict 30-minute then strict 60-minute containment', () => {
-  assert.equal(fitAutomaticTimezone([[-7.499, 7.499]]).toleranceMinutes, 30);
-  assert.deepEqual(fitAutomaticTimezone([[-7.5, 7.5]]), {
+test('minimax skew accepts exactly 45 minutes and rejects any greater minimum', () => {
+  assert.equal(AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES, 45);
+  assert.deepEqual(fitAutomaticTimezone([[-11.25, 11.25]]), {
     offsetHours: 0,
-    maximumSkewMinutes: 30,
-    toleranceMinutes: 60,
+    maximumSkewMinutes: 45,
   });
-  assert.equal(fitAutomaticTimezone([[-14.999, 14.999]]).toleranceMinutes, 60);
-  assert.equal(fitAutomaticTimezone([[-15, 15]]), null);
-  assert.equal(fitAutomaticTimezone([[7.5, 7.5]]).toleranceMinutes, 60);
+  assert.ok(fitAutomaticTimezone([[-11.249999, 11.25]]));
+  assert.equal(fitAutomaticTimezone([[-11.250001, 11.25]]), null);
+  assert.equal(fitAutomaticTimezone([[-12, 12]]), null);
+  assert.deepEqual(optimizeAutomaticTimezone([[-12, 12]]), {
+    offsetHours: 0,
+    maximumSkewMinutes: 48,
+  });
+  assert.equal(fitAutomaticTimezone([[-7.5, 7.5]]).maximumSkewMinutes, 30);
+  assert.equal(fitAutomaticTimezone([[7.5, 7.5]]).maximumSkewMinutes, 30);
   assert.equal(fitAutomaticTimezone([[82, 88]]).offsetHours, 6);
 });
 
 test('the full interval and every offshore island must fit, including the date line', () => {
+  assert.deepEqual(
+    fitAutomaticTimezone([
+      [168.75, 179],
+      [-179, -168.75],
+    ]),
+    { offsetHours: 12, maximumSkewMinutes: 45 },
+  );
+  assert.equal(
+    fitAutomaticTimezone([
+      [168.749999, 179],
+      [-179, -168.75],
+    ]),
+    null,
+  );
   assert.equal(
     fitAutomaticTimezone([
       [174, 179],
@@ -81,15 +102,37 @@ test('ambiguous meridians minimize worst-case skew, then favor UTC+0', () => {
   assert.equal(fitAutomaticTimezone([[-9, -6]]).offsetHours, 0);
 });
 
-test('a country fitting the relaxed range stays whole even when children fit tighter', () => {
+test('a country at the 45-minute limit stays whole even when children fit tighter', () => {
   const results = assignAutomaticTimezones([
-    region('country', 0, -10, 10),
-    region('west', 1, -10, -5, 'country'),
-    region('east', 1, 5, 10, 'country'),
+    region('country', 0, -11.25, 11.25),
+    region('west', 1, -11.25, -5, 'country'),
+    region('east', 1, 5, 11.25, 'country'),
   ]);
   assert.equal(results.length, 1);
   assert.equal(results[0].region.id, 'country');
-  assert.equal(results[0].fit.toleranceMinutes, 60);
+  assert.equal(results[0].fit.maximumSkewMinutes, 45);
+});
+
+test('a previously acceptable 48-minute region now descends, at either parent level', () => {
+  const results = assignAutomaticTimezones([
+    region('country', 0, -12, 12),
+    region('west', 1, -12, -4, 'country'),
+    region('split', 1, -12, 12, 'country'),
+    region('west-child', 2, -12, -4, 'split'),
+    region('east-child', 2, 4, 12, 'split'),
+  ]);
+  assert.deepEqual(
+    results.map(({ region, offsetHours, fallback }) => [
+      region.id,
+      offsetHours,
+      fallback,
+    ]),
+    [
+      ['west', -1, null],
+      ['west-child', -1, null],
+      ['east-child', 1, null],
+    ],
+  );
 });
 
 test('only failing branches descend; second-level failures get a named UTC+0 fallback', () => {
@@ -98,7 +141,7 @@ test('only failing branches descend; second-level failures get a named UTC+0 fal
     region('fits', 1, -3, 3, 'country'),
     region('split', 1, -50, 50, 'country'),
     region('child-fit', 2, 25, 28, 'split'),
-    region('offender', 2, -50, 50, 'split'),
+    region('offender', 2, -12, 12, 'split'),
   ]);
   assert.deepEqual(
     results.map((r) => [r.region.id, r.offsetHours, r.fallback]),
@@ -141,9 +184,16 @@ test('committed world hierarchy resolves to drawable, source-backed, correctly n
     assert.ok(region.geometry.coordinates.length > 0, region.id);
     assert.ok(sources.has(region.source), region.source);
     assert.ok(Number.isInteger(offsetHours));
-    if (fit) assert.ok(fit.maximumSkewMinutes < fit.toleranceMinutes);
-    else assert.equal(offsetHours, 0);
-    if (fallback === 'too-wide') assert.equal(region.level, 2);
+    if (fit) {
+      assert.ok(fit.maximumSkewMinutes <= 45);
+      assert.deepEqual(fit, optimizeAutomaticTimezone(region.longitude_ranges));
+    } else assert.equal(offsetHours, 0);
+    if (fallback === 'too-wide') {
+      assert.equal(region.level, 2);
+      assert.ok(
+        optimizeAutomaticTimezone(region.longitude_ranges).maximumSkewMinutes > 45,
+      );
+    }
     if (region.parent_id) assert.ok(!leaves.has(region.parent_id), region.id);
   }
   const index = new PolygonHitIndex(
@@ -152,7 +202,12 @@ test('committed world hierarchy resolves to drawable, source-backed, correctly n
       value: assignment,
     })),
   );
-  assert.equal(index.find(-0.12, 51.5).offsetHours, 0); // London: keep the UK whole.
+  assert.equal(index.find(-0.12, 51.5).offsetHours, 0); // London's best offset stays UTC+0.
+  assert.equal(index.find(-0.12, 51.5).region.iso_code, 'GB-ENG'); // UK now exceeds 45 min.
+  assert.equal(index.find(-4.25, 55.86).region.iso_code, 'GB-GLG'); // Scotland descends to ISO councils.
+  assert.equal(index.find(153.03, -27.47).region.level, 2); // Queensland now descends to LGAs.
+  assert.equal(index.find(-97.14, 49.9).region.level, 2); // Manitoba now descends to census divisions.
+  assert.equal(index.find(109.33, -0.03).region.iso_code, 'ID-KB'); // Kalimantan descends to provinces.
   assert.equal(index.find(2.35, 48.85).region.level, 1); // France descends to regions.
   assert.equal(index.find(-99.13, 19.43).region.iso_code, 'MX-CMX');
   assert.equal(index.find(-149.9, 61.2).region.level, 2); // Anchorage, Alaska.
@@ -173,24 +228,24 @@ test('committed world hierarchy resolves to drawable, source-backed, correctly n
         a.fallback === 'too-wide',
     ),
   );
-  assert.deepEqual(
+  const tooWideNames = new Set(
     assignments
       .filter(({ fallback }) => fallback === 'too-wide')
-      .map(({ region }) => `${region.country_code} / ${region.name}`)
-      .sort(),
-    [
-      'CAN / Kitikmeot',
-      'CAN / Kivalliq',
-      'CAN / Qikiqtaaluk',
-      'CAN / Region 1',
-      'RUS / Bulunsky Ulus',
-      'RUS / Evenkiysky Rayon',
-      'RUS / Primorsky District',
-      'RUS / Taymyrsky Dolgano-Nenetsky District',
-      'RUS / Zapolyarny District',
-      'USA / North Slope',
-    ],
+      .map(({ region }) => `${region.country_code} / ${region.name}`),
   );
+  for (const name of [
+    'CAN / Kitikmeot',
+    'CAN / Kivalliq',
+    'CAN / Qikiqtaaluk',
+    'CAN / Region 1',
+    'RUS / Bulunsky Ulus',
+    'RUS / Evenkiysky Rayon',
+    'RUS / Primorsky District',
+    'RUS / Taymyrsky Dolgano-Nenetsky District',
+    'RUS / Zapolyarny District',
+    'USA / North Slope',
+  ])
+    assert.ok(tooWideNames.has(name), name);
 });
 
 test('Mexico follows detailed state boundaries, including the narrow Jalisco border corridors', async () => {

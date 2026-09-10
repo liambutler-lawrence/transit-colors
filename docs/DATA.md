@@ -291,16 +291,15 @@ selected. The browser runs `assignAutomaticTimezones` against the recorded hiera
 the offline builder uses the same TypeScript calculation to prune unnecessary child
 geometry. Official seasonal and historical settings do not affect these fixed offsets.
 
-Every polygon's original longitude interval is tested against whole-hour meridians (15
-degrees per hour). Every interval must fit **strictly** inside ±30 minutes; if none
-qualifies, try **strictly** inside ±60 minutes before subdividing. Exact boundary
-equality fails that test. A passing parent always remains whole, even when its children
-could achieve a tighter fit. Of multiple passing meridians, minimize the largest
-absolute skew, then minimize the absolute UTC offset, then choose the lower offset. The
-shared UTC−12/UTC+12 meridian is represented as UTC+12. Separate polygon intervals
-preserve islands on both sides of the date line without treating the country as a nearly
-worldwide bounding box. The full interval matters, including the polygon's interior, not
-only its vertices or centroid.
+Every polygon's original longitude interval is tested against all whole-hour UTC
+meridians (15 degrees per hour). Choose the meridian that minimizes the largest absolute
+skew across the entire region. **Subdivide only when this minimum maximum skew exceeds
+45 minutes.** Exactly 45 minutes remains whole, as does any qualifying parent even when
+its children could achieve a tighter fit. Ties minimize the absolute UTC offset, then
+choose the lower offset. The shared UTC−12/UTC+12 meridian is represented as UTC+12.
+Separate polygon intervals preserve islands on both sides of the date line without
+treating the country as a nearly worldwide bounding box. The full interval matters,
+including the polygon's interior, not only its vertices or centroid.
 
 Natural Earth **1:10 million** country and subdivision boundaries provide the baseline;
 these are generalized world-map outlines, not locally precise borders. Countries and
@@ -313,9 +312,13 @@ administrative equivalents in French Polynesia and the French Southern Territori
 retain source IDs because they have no individual ISO subdivision codes. Where
 second-level units do not have ISO codes, their actual source identifiers are retained
 without inventing ISO codes. Canada uses Statistics Canada's **2021 census divisions**,
-not geoBoundaries' economic regions. China uses geoBoundaries' humanitarian
-**prefectures**, not the county-level units in its open ADM2 dataset. Chile, Norway,
-Russia, and the United States use geoBoundaries' administrative children.
+not geoBoundaries' economic regions, including Manitoba when the 45-minute rule requires
+it. China uses geoBoundaries' humanitarian **prefectures**, not the county-level units
+in its open ADM2 dataset. Argentina, Australia, Brazil, Chile, Japan, Kazakhstan,
+Norway, Russia, South Africa, and the United States use geoBoundaries' administrative
+children. For principal ISO regions already assembled from smaller ISO units, those
+units provide the second level: Scotland uses council areas and Kalimantan uses
+provinces from the pinned Natural Earth/ISO snapshot. These retain their own ISO codes.
 
 Mexico uses INEGI's detailed **2020 state boundaries**, distributed by geoBoundaries.
 Its country footprint is the union of the same 32 states, so detailed borders and
@@ -328,22 +331,32 @@ builder corrects that pinned feature to `MX-CMX` / Ciudad de México, keeping it
 from the State of Mexico. Other countries still inherit their listed source's
 resolution; inspection explicitly identifies Natural Earth's generalized outlines.
 
-Second-level regions that still fail both tests receive UTC+0. Unavailable child
-boundaries and uncovered land between boundary datasets are **separate data fallbacks**,
-also temporarily UTC+0, and are named in the interface. No artificial subdivision is
-presented as an ISO unit. Antarctica, in particular, has no ISO subdivision hierarchy.
-Source polygons are intersected with their parent footprint for display, but their
-original, unsimplified extents determine eligibility. Overlapping longitude intervals
-are merged without changing their coverage. General display simplification is 0.001
-degrees, with five-decimal coordinates. Polygon pieces below 1e-7 square degrees are
-omitted from display, retaining the largest piece for tiny regions; every original
-island still participates in the calculation. Coverage-gap strips use non-topological
-display simplification. Numerical overlay dust below 1e-10 square degrees is discarded.
-Mexico uses the shared-edge processing described above instead. The same display
-polygons drive border lines, color triangulation, and hover selection. MapLibre's
-GeoJSON simplification uses a subpixel tolerance of 0.1 and the tile source refines
-through zoom 18, retaining detailed edges at local zooms while keeping world-view lines
-inexpensive to draw.
+Second-level regions whose optimized maximum skew still exceeds 45 minutes receive
+UTC+0. Unavailable child boundaries and uncovered land between boundary datasets are
+**separate data fallbacks**, also temporarily UTC+0, and are named in the interface. No
+artificial subdivision is presented as an ISO unit. Antarctica, in particular, has no
+ISO subdivision hierarchy. Source polygons are intersected with their parent footprint
+for display, but their original, unsimplified extents determine eligibility. Overlapping
+longitude intervals are merged without changing their coverage. General display
+simplification is 0.001 degrees, with five-decimal coordinates. Polygon pieces below
+1e-7 square degrees are omitted from display, retaining the largest piece for tiny
+regions; every original island still participates in the calculation. Coverage-gap
+strips use non-topological display simplification. Numerical overlay dust below 1e-10
+square degrees is discarded. Mexico uses the shared-edge processing described above
+instead. The same display polygons drive border lines, color triangulation, and hover
+selection. MapLibre's GeoJSON simplification uses a subpixel tolerance of 0.1 and the
+tile source refines through zoom 18, retaining detailed edges at local zooms while
+keeping world-view lines inexpensive to draw.
+
+The boundary source manifest lists every optional second-level file the preparer may
+use; unrelated files in the cache cannot affect the result. Some regions still have no
+usable next tier in these sources. In particular, geoBoundaries' open Algeria ADM2 file
+repeats the first-level provinces, while its ADM3 file and humanitarian ADM2 file
+contain communes. Neither supplies the intervening district tier needed for Tamanrasset,
+as distinguished in the
+[official commune/daïra/wilaya directory](https://www.interieur.gov.dz/index.php/fr/component/annuaires/annuairecommunes.html?start=340),
+so that region retains the explicit missing-subdivisions fallback. Greenland and the
+Tuamotu Archipelago also retain missing-tier fallbacks where required.
 
 The source manifest in `scripts/automatic-timezone-sources.json` pins download URLs,
 SHA-256 digests, source names, and licenses. Natural Earth is public domain; the other
@@ -411,4 +424,7 @@ AUTOMATIC_TIMEZONE_PYTHON=/tmp/automatic-timezones-venv/bin/python npm run build
 The builder downloads verified inputs to the ignored `data/.automatic-timezone-cache/`
 directory. Preparation can take several minutes for the detailed Canadian and Russian
 coastlines. Normal application builds use the committed runtime dataset and require
-neither Python nor boundary downloads.
+neither Python nor boundary downloads. Changes to the subdivision rule require full
+boundary preparation, because a previously passing parent may now need children that
+were omitted from the old prepared hierarchy. Do not use `--use-prepared` for a rule
+change.

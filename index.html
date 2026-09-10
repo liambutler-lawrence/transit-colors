@@ -458,10 +458,11 @@
                 </select>
                 <div id="timezone-automatic-info" hidden>
                   <p>
-                    Keep a country together if all of it is strictly within ±30 minutes
-                    of a whole-hour UTC meridian, then try ±60 minutes. Otherwise split
-                    into first-level subdivisions, then second-level subdivisions. These
-                    offsets stay fixed year-round.
+                    Choose the whole-hour UTC offset with the smallest maximum skew
+                    across the country. Subdivide only if that minimum exceeds 45
+                    minutes, first into first-level subdivisions, then second-level
+                    subdivisions. Exactly 45 minutes stays whole. These offsets stay
+                    fixed year-round.
                   </p>
                   <p id="timezone-automatic-summary" role="status"></p>
                   <p>
@@ -481,12 +482,12 @@
                     <ul id="timezone-automatic-exceptions-list"></ul>
                   </details>
                   <p class="timezone-automatic-method">
-                    If two zones fit, choose the smallest worst-case skew; ties favor
-                    the offset closest to UTC+0, then the lower offset. The date-line
-                    meridian uses UTC+12. ISO regions are split into named
-                    administrative children where ISO has no second-level codes. Named
-                    administrative equivalents are used where a territory has no ISO
-                    subdivision codes. Boundary snapshots may use historical ISO codes.
+                    Ties in the smallest maximum skew favor the offset closest to UTC+0,
+                    then the lower offset. The date-line meridian uses UTC+12. ISO
+                    regions are split into named administrative children where ISO has
+                    no second-level codes. Named administrative equivalents are used
+                    where a territory has no ISO subdivision codes. Boundary snapshots
+                    may use historical ISO codes.
                   </p>
                 </div>
               </fieldset>

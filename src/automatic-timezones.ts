@@ -41,9 +41,9 @@ export const automaticTimezoneDataSchema = z.object({
 export type AutomaticRegion = z.infer<typeof automaticRegionSchema>;
 export type AutomaticTimezoneData = z.infer<typeof automaticTimezoneDataSchema>;
 export type LongitudeRange = readonly [number, number];
+export const AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES = 45;
 export interface AutomaticTimezoneFit {
   readonly offsetHours: number;
-  readonly toleranceMinutes: 30 | 60;
   readonly maximumSkewMinutes: number;
 }
 export interface AutomaticTimezoneAssignment {
@@ -53,12 +53,12 @@ export interface AutomaticTimezoneAssignment {
   readonly fallback: 'too-wide' | 'missing-subdivisions' | 'uncovered-area' | null;
 }
 
-/** Whole polygon longitude intervals, not just centroids or endpoints of a country bbox.
+/** Minimize the worst skew across whole polygon longitude intervals.
  * Each interval can use a different world copy, preserving islands across ±180°.
  */
-export function fitAutomaticTimezone(
+export function optimizeAutomaticTimezone(
   ranges: readonly LongitudeRange[],
-): AutomaticTimezoneFit | null {
+): AutomaticTimezoneFit {
   if (
     ranges.length === 0 ||
     ranges.some(
@@ -90,13 +90,17 @@ export function fitAutomaticTimezone(
       Math.abs(left.offsetHours) - Math.abs(right.offsetHours) ||
       left.offsetHours - right.offsetHours,
   );
-  for (const toleranceMinutes of [30, 60] satisfies (30 | 60)[]) {
-    const candidate = candidates.find(
-      ({ maximumSkewMinutes }) => maximumSkewMinutes < toleranceMinutes,
-    );
-    if (candidate) return { ...candidate, toleranceMinutes };
-  }
-  return null;
+  const best = candidates[0];
+  if (!best) throw new Error('No automatic timezone candidates.');
+  return best;
+}
+
+/** Keep a region whole at exactly 45 minutes; subdivide only above the limit. */
+export function fitAutomaticTimezone(
+  ranges: readonly LongitudeRange[],
+): AutomaticTimezoneFit | null {
+  const best = optimizeAutomaticTimezone(ranges);
+  return best.maximumSkewMinutes <= AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES ? best : null;
 }
 
 /** Resolve a country before its children; stop after the second administrative level. */
