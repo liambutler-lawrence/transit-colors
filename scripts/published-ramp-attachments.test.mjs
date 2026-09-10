@@ -23,6 +23,15 @@ for (const [fixture, title, requiredWays] of [
     'published cleaned mainline merges',
     [['526019670'], ['26140794']],
   ],
+  [
+    'nonreciprocal-ramp-audit.json',
+    'published reciprocal alternatives and curved returns',
+    [
+      ['9942160', '9945757'],
+      ['85396208', '50714679'],
+      ['466222703', '49551624'],
+    ],
+  ],
 ]) {
   test(`${title} retain their curves and both mainline connections across the network`, async () => {
     const audit = JSON.parse(

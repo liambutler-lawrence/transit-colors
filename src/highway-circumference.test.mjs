@@ -179,7 +179,7 @@ test('North America highway data publishes one validated maximum and full vector
     'route should include the I-495 southeastern Massachusetts detour',
   );
   assert.equal(hasProperSelfIntersection(data.route.coordinates), false);
-  assert.ok(data.methodology.interchangeConnectorCount > 5_000);
+  assert.ok(data.methodology.interchangeConnectorCount > 4_500);
   assert.ok(data.methodology.directionalRampPathCount > 12_000);
   assert.equal(
     data.methodology.directionalRampPathCount -
@@ -248,6 +248,26 @@ test('regenerated tiles retain centered mainlines and separate ramps continent-w
     );
     for (const ending of endingAudit.trims) {
       await assertTrimmedMainlineEnd(archive, ending);
+    }
+    for (const ending of endingAudit.retainedEnds) {
+      const { x, y } = webMercatorTile(...ending.point, 14);
+      const tile = await archive.getZxy(14, x, y);
+      assert.ok(tile);
+      const layer = new VectorTile(new Pbf(tile.data)).layers['highways'];
+      let retained = false;
+      for (let index = 0; index < layer.length; index += 1) {
+        const feature = layer.feature(index);
+        if (feature.properties['id'] !== ending.partId) continue;
+        const geometry = feature.toGeoJSON(x, y, 14).geometry;
+        const coordinates =
+          geometry.type === 'LineString'
+            ? geometry.coordinates
+            : geometry.coordinates.flat();
+        retained ||= coordinates.some(
+          (point) => geodesicDistanceMeters(point, ending.point) < 2,
+        );
+      }
+      assert.ok(retained, `${ending.partId} still serves its unpaired terminal exit`);
     }
     const gapAudit = JSON.parse(
       await readFile(
