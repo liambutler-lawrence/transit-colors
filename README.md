@@ -42,6 +42,12 @@ rotatable globe used by the other map modes. Red locations reach solar noon late
 12:00 civil time; blue locations reach it earlier. Hovering or clicking reports
 longitude, UTC offset, calculated solar-noon time, and the zone's named places.
 
+The **Automatic “correct” time zones** option keeps each country together when its whole
+longitude extent fits strictly within ±30 minutes of a whole-hour UTC meridian, then
+tries ±60 minutes. Failing countries split into first-level subdivisions, then
+second-level subdivisions. Remaining oversized regions use UTC+0 and appear in a named
+exceptions list, alongside separately identified boundary-data gaps.
+
 Land Use colors each Jersey City tax parcel by its present assessment record and mapped
 context—for example vacant land in an industrial zone, active industrial property,
 auto-oriented retail, modern or historic mixed use, and towers without retail. Zoning,
