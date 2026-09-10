@@ -107,8 +107,20 @@ the continuing midpoint line. Existing endpoint keys carry that vertex across sp
 centerline parts. Terminal geometry is extended or trimmed in travel order; interior
 insertions are projected again after the shared coordinate is chosen. A merge adjustment
 cannot collapse a short loop, trim past a different junction, or add backward turns to
-an approach; those complex attachments retain their individual source topology. Ramp
-attachments preserve an existing source-way projection within 160 metres. A farther
+an approach; those complex attachments retain their individual source topology.
+
+A one-lane merge can also leave an unrelated pair between the branch's return roadway
+and the through road. The builder records each pair's complete source-chain intervals
+and removes such a pair only when an explicit reciprocal merge covers one entire side
+and the independently paired through mainline covers the other. Independent ramp
+attachments, continuation parents, and other mainline junctions prevent removal.
+Junctions and ramps are then rebuilt from the original averaged coordinates so the
+removed pair's old junction insertions cannot remain as zigzags. Every removed pair must
+still have the same supporting reciprocal movement between its surviving parent
+mainlines; a failed proposal is retained and the remaining proposals are retried from
+the original geometry.
+
+Ramp attachments preserve an existing source-way projection within 160 metres. A farther
 projection can use a nearby part of the same source corridor, identified by shared
 source ways. An auxiliary carriageway omitted from the averaged part's source list must
 reconnect to that same represented corridor in both travel directions within 2.5

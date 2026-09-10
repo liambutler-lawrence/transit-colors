@@ -204,6 +204,22 @@ checks every recorded location. `scripts/fixtures/morelia-interchange.json` exer
 the complete build from source roads. These checks cover terminal support and
 connectivity; they are not a visual certification of every interchange's ramp curves.
 
+A separate merge audit removed eight fully covered cross-pairings at seven junctions,
+including I-29/I-35 in Kansas City. It retained all 5,246 reciprocal connections and all
+independent mainline attachments. Of the surviving geometry, 6,801 mainlines and 5,242
+connector curves were unchanged; nine mainlines were rebuilt without the false junction
+insertions, and four connector curves were recomputed. No changed curve gained a
+reversal or self-intersection. The valid northern Kansas City ramp is exactly unchanged.
+Source-road comparisons were reviewed at all seven affected junctions.
+
+`scripts/fixtures/kansas-city-mainline-merge.json` exercises the source build and checks
+the continuing midpoint geometry, both reciprocal movements, and the unchanged north
+ramp. `scripts/fixtures/covered-mainline-merge-audit.json` records all eight removed
+pairs, surviving mainlines, and supporting connections for tile regressions. The older
+mixed-merge fixture retains the same source paths and parent mainlines; two curves are
+updated for removed junction insertions, including a 9.2 m endpoint correction. These
+checks cover fully supported redundant pairings, not every possible merge defect.
+
 The continental boundary is assembled directly on the detailed biconnected graph. A
 northeastern cycle is routed through Highway 407, Ottawa, Québec, and coastal New
 England; independent node-disjoint perimeter ears then add I-495 in southeastern
