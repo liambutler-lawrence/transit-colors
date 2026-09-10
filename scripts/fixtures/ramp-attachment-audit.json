@@ -527,7 +527,7 @@
       ]
     },
     {
-      "id": "osm-connector-353",
+      "id": "osm-connector-3139",
       "sourceWayIds": [
         "1522447054",
         "548658214",
@@ -550,7 +550,7 @@
       ]
     },
     {
-      "id": "osm-connector-433",
+      "id": "osm-connector-431",
       "sourceWayIds": [
         "5291103",
         "52118434",
@@ -576,7 +576,7 @@
       ]
     },
     {
-      "id": "osm-connector-483",
+      "id": "osm-connector-481",
       "sourceWayIds": [
         "182742804",
         "182742769",
@@ -596,7 +596,7 @@
       ]
     },
     {
-      "id": "osm-connector-484",
+      "id": "osm-connector-482",
       "sourceWayIds": [
         "182742829",
         "11827854",
@@ -618,7 +618,7 @@
       ]
     },
     {
-      "id": "osm-connector-502",
+      "id": "osm-connector-500",
       "sourceWayIds": [
         "38008208",
         "1466136083",
@@ -638,7 +638,7 @@
       ]
     },
     {
-      "id": "osm-connector-864",
+      "id": "osm-connector-862",
       "sourceWayIds": [
         "69201055",
         "6052818",
@@ -662,7 +662,7 @@
       ]
     },
     {
-      "id": "osm-connector-1004",
+      "id": "osm-connector-1002",
       "sourceWayIds": [
         "1228325313",
         "19307199",
@@ -687,7 +687,7 @@
       ]
     },
     {
-      "id": "osm-connector-1020",
+      "id": "osm-connector-1018",
       "sourceWayIds": [
         "51255580",
         "38847279",
@@ -712,7 +712,7 @@
       ]
     },
     {
-      "id": "osm-connector-1053",
+      "id": "osm-connector-1051",
       "sourceWayIds": [
         "9852465",
         "68668545",
@@ -739,7 +739,7 @@
       ]
     },
     {
-      "id": "osm-connector-1089",
+      "id": "osm-connector-1083",
       "sourceWayIds": [
         "8728006",
         "306164831",
@@ -764,7 +764,7 @@
       ]
     },
     {
-      "id": "osm-connector-1091",
+      "id": "osm-connector-1085",
       "sourceWayIds": [
         "8728006",
         "8728448",
@@ -806,7 +806,7 @@
       ]
     },
     {
-      "id": "osm-connector-1092",
+      "id": "osm-connector-1086",
       "sourceWayIds": [
         "8728006",
         "8728448",
@@ -851,7 +851,7 @@
       ]
     },
     {
-      "id": "osm-connector-1106",
+      "id": "osm-connector-1100",
       "sourceWayIds": [
         "8640564",
         "8647303",
@@ -883,7 +883,7 @@
       ]
     },
     {
-      "id": "osm-connector-1134",
+      "id": "osm-connector-1128",
       "sourceWayIds": [
         "517170967",
         "517170966",
@@ -903,7 +903,7 @@
       ]
     },
     {
-      "id": "osm-connector-1183",
+      "id": "osm-connector-1177",
       "sourceWayIds": [
         "9389625",
         "348686376",
@@ -926,7 +926,7 @@
       ]
     },
     {
-      "id": "osm-connector-1237",
+      "id": "osm-connector-1231",
       "sourceWayIds": ["8800126", "50072954", "50072953", "8799190"],
       "startMainlineId": "osm-mainline-172",
       "endMainlineId": "osm-mainline-4874",
@@ -939,7 +939,7 @@
       ]
     },
     {
-      "id": "osm-connector-1370",
+      "id": "osm-connector-1364",
       "sourceWayIds": [
         "9119542",
         "274716916",
@@ -969,7 +969,7 @@
       ]
     },
     {
-      "id": "osm-connector-1705",
+      "id": "osm-connector-1699",
       "sourceWayIds": ["10533925", "392468424"],
       "startMainlineId": "osm-mainline-38",
       "endMainlineId": "osm-mainline-4364",
@@ -982,7 +982,7 @@
       ]
     },
     {
-      "id": "osm-connector-1978",
+      "id": "osm-connector-1972",
       "sourceWayIds": [
         "11923014",
         "998265666",
@@ -1003,7 +1003,7 @@
       ]
     },
     {
-      "id": "osm-connector-1985",
+      "id": "osm-connector-1979",
       "sourceWayIds": [
         "144005215",
         "144005201",
@@ -1031,7 +1031,7 @@
       ]
     },
     {
-      "id": "osm-connector-2088",
+      "id": "osm-connector-2082",
       "sourceWayIds": [
         "12390998",
         "12392701",
@@ -1057,7 +1057,7 @@
       ]
     },
     {
-      "id": "osm-connector-2143",
+      "id": "osm-connector-2137",
       "sourceWayIds": [
         "12906289",
         "12905052",
@@ -1078,7 +1078,7 @@
       ]
     },
     {
-      "id": "osm-connector-2144",
+      "id": "osm-connector-2138",
       "sourceWayIds": [
         "12914444",
         "740028404",
@@ -1098,7 +1098,7 @@
       ]
     },
     {
-      "id": "osm-connector-2159",
+      "id": "osm-connector-2153",
       "sourceWayIds": [
         "840386197",
         "12957477",
@@ -1124,7 +1124,7 @@
       ]
     },
     {
-      "id": "osm-connector-2195",
+      "id": "osm-connector-2189",
       "sourceWayIds": [
         "61696656",
         "13242924",
@@ -1153,7 +1153,7 @@
       ]
     },
     {
-      "id": "osm-connector-2196",
+      "id": "osm-connector-2190",
       "sourceWayIds": ["61696656", "13263617", "385946699", "60863454", "385946698"],
       "startMainlineId": "osm-mainline-2392",
       "endMainlineId": "osm-mainline-6137",
@@ -1166,7 +1166,7 @@
       ]
     },
     {
-      "id": "osm-connector-2239",
+      "id": "osm-connector-2233",
       "sourceWayIds": [
         "161824517",
         "161824515",
@@ -1205,7 +1205,7 @@
       ]
     },
     {
-      "id": "osm-connector-2414",
+      "id": "osm-connector-2408",
       "sourceWayIds": [
         "15029638",
         "305373411",
@@ -1227,7 +1227,7 @@
       ]
     },
     {
-      "id": "osm-connector-2415",
+      "id": "osm-connector-2409",
       "sourceWayIds": [
         "15029718",
         "305373335",
@@ -1247,7 +1247,7 @@
       ]
     },
     {
-      "id": "osm-connector-2422",
+      "id": "osm-connector-2416",
       "sourceWayIds": [
         "15129302",
         "91193518",
@@ -1277,7 +1277,7 @@
       ]
     },
     {
-      "id": "osm-connector-2498",
+      "id": "osm-connector-2492",
       "sourceWayIds": [
         "62642495",
         "949942781",
@@ -1303,7 +1303,7 @@
       ]
     },
     {
-      "id": "osm-connector-2550",
+      "id": "osm-connector-2544",
       "sourceWayIds": ["150360083", "784366989", "784366990", "784366991"],
       "startMainlineId": "osm-mainline-4441",
       "endMainlineId": "osm-mainline-5675",
@@ -1316,7 +1316,7 @@
       ]
     },
     {
-      "id": "osm-connector-2583",
+      "id": "osm-connector-2577",
       "sourceWayIds": ["15819286", "15820336", "84513912", "84513902"],
       "startMainlineId": "osm-mainline-495",
       "endMainlineId": "osm-mainline-4749",
@@ -1329,7 +1329,7 @@
       ]
     },
     {
-      "id": "osm-connector-2590",
+      "id": "osm-connector-2584",
       "sourceWayIds": [
         "814279091",
         "814279090",
@@ -1353,7 +1353,7 @@
       ]
     },
     {
-      "id": "osm-connector-2649",
+      "id": "osm-connector-2643",
       "sourceWayIds": ["16121474", "30286122", "30286118", "16123587"],
       "startMainlineId": "osm-mainline-2153",
       "endMainlineId": "osm-mainline-3393",
@@ -1366,7 +1366,7 @@
       ]
     },
     {
-      "id": "osm-connector-2650",
+      "id": "osm-connector-2644",
       "sourceWayIds": ["16120821", "16123822", "529245382"],
       "startMainlineId": "osm-mainline-2154",
       "endMainlineId": "osm-mainline-3393",
@@ -1379,7 +1379,7 @@
       ]
     },
     {
-      "id": "osm-connector-2651",
+      "id": "osm-connector-2645",
       "sourceWayIds": ["16120773", "16121670", "529245367", "529245366"],
       "startMainlineId": "osm-mainline-2153",
       "endMainlineId": "osm-mainline-3391",
@@ -1392,7 +1392,7 @@
       ]
     },
     {
-      "id": "osm-connector-2680",
+      "id": "osm-connector-2677",
       "sourceWayIds": [
         "1520201568",
         "1296325322",
@@ -1411,7 +1411,7 @@
       ]
     },
     {
-      "id": "osm-connector-2738",
+      "id": "osm-connector-2737",
       "sourceWayIds": [
         "29204470",
         "32356398",
@@ -1434,7 +1434,7 @@
       ]
     },
     {
-      "id": "osm-connector-2739",
+      "id": "osm-connector-2738",
       "sourceWayIds": [
         "140433256",
         "44034407",
@@ -1461,7 +1461,7 @@
       ]
     },
     {
-      "id": "osm-connector-2740",
+      "id": "osm-connector-2739",
       "sourceWayIds": [
         "671410275",
         "832425549",
@@ -1489,7 +1489,7 @@
       ]
     },
     {
-      "id": "osm-connector-2788",
+      "id": "osm-connector-2787",
       "sourceWayIds": [
         "1193481523",
         "432385625",
@@ -1529,7 +1529,7 @@
       ]
     },
     {
-      "id": "osm-connector-2806",
+      "id": "osm-connector-2805",
       "sourceWayIds": [
         "766583685",
         "766583687",
@@ -1558,7 +1558,7 @@
       ]
     },
     {
-      "id": "osm-connector-2813",
+      "id": "osm-connector-2812",
       "sourceWayIds": [
         "16662543",
         "172483158",
@@ -1581,7 +1581,7 @@
       ]
     },
     {
-      "id": "osm-connector-2910",
+      "id": "osm-connector-2909",
       "sourceWayIds": [
         "28698767",
         "255353644",
@@ -1604,7 +1604,7 @@
       ]
     },
     {
-      "id": "osm-connector-2930",
+      "id": "osm-connector-2929",
       "sourceWayIds": [
         "1169520751",
         "42057360",
@@ -1632,7 +1632,7 @@
       ]
     },
     {
-      "id": "osm-connector-2931",
+      "id": "osm-connector-2930",
       "sourceWayIds": [
         "588478492",
         "148213421",
@@ -1654,7 +1654,7 @@
       ]
     },
     {
-      "id": "osm-connector-2941",
+      "id": "osm-connector-2940",
       "sourceWayIds": [
         "1187248980",
         "655421574",
@@ -1677,7 +1677,7 @@
       ]
     },
     {
-      "id": "osm-connector-2943",
+      "id": "osm-connector-2676",
       "sourceWayIds": [
         "590566799",
         "720325815",
@@ -1700,7 +1700,7 @@
       ]
     },
     {
-      "id": "osm-connector-2967",
+      "id": "osm-connector-2961",
       "sourceWayIds": ["17406976", "17406800"],
       "startMainlineId": "osm-mainline-2158",
       "endMainlineId": "osm-mainline-3195",
@@ -1713,7 +1713,7 @@
       ]
     },
     {
-      "id": "osm-connector-2982",
+      "id": "osm-connector-2976",
       "sourceWayIds": [
         "415500289",
         "617889973",
@@ -1735,7 +1735,7 @@
       ]
     },
     {
-      "id": "osm-connector-2993",
+      "id": "osm-connector-2987",
       "sourceWayIds": [
         "538812651",
         "620394497",
@@ -1790,7 +1790,7 @@
       ]
     },
     {
-      "id": "osm-connector-3067",
+      "id": "osm-connector-3061",
       "sourceWayIds": ["17953281", "17954783", "40477051", "40477052"],
       "startMainlineId": "osm-mainline-152",
       "endMainlineId": "osm-mainline-625",
@@ -1803,7 +1803,7 @@
       ]
     },
     {
-      "id": "osm-connector-3123",
+      "id": "osm-connector-3117",
       "sourceWayIds": ["18307619", "18304042"],
       "startMainlineId": "osm-mainline-328",
       "endMainlineId": "osm-mainline-3412",
@@ -1816,7 +1816,7 @@
       ]
     },
     {
-      "id": "osm-connector-3125",
+      "id": "osm-connector-3119",
       "sourceWayIds": ["32481941", "18311761", "18310542"],
       "startMainlineId": "osm-mainline-1321",
       "endMainlineId": "osm-mainline-3412",
@@ -1829,7 +1829,7 @@
       ]
     },
     {
-      "id": "osm-connector-3160",
+      "id": "osm-connector-3156",
       "sourceWayIds": [
         "18507838",
         "18507909",
@@ -1849,7 +1849,7 @@
       ]
     },
     {
-      "id": "osm-connector-3365",
+      "id": "osm-connector-3361",
       "sourceWayIds": [
         "184923862",
         "184923904",
@@ -1888,7 +1888,7 @@
       ]
     },
     {
-      "id": "osm-connector-3379",
+      "id": "osm-connector-3375",
       "sourceWayIds": [
         "19345467",
         "19346647",
@@ -1914,7 +1914,7 @@
       ]
     },
     {
-      "id": "osm-connector-3384",
+      "id": "osm-connector-3380",
       "sourceWayIds": ["19352241", "29356795", "148895656", "1163402230", "19350466"],
       "startMainlineId": "osm-mainline-1783",
       "endMainlineId": "osm-mainline-670",
@@ -1927,7 +1927,7 @@
       ]
     },
     {
-      "id": "osm-connector-3387",
+      "id": "osm-connector-3383",
       "sourceWayIds": [
         "549989908",
         "19351727",
@@ -1949,7 +1949,7 @@
       ]
     },
     {
-      "id": "osm-connector-3470",
+      "id": "osm-connector-3466",
       "sourceWayIds": ["19607440", "25843034"],
       "startMainlineId": "osm-mainline-3267",
       "endMainlineId": "osm-mainline-3299",
@@ -1962,7 +1962,7 @@
       ]
     },
     {
-      "id": "osm-connector-3498",
+      "id": "osm-connector-3494",
       "sourceWayIds": [
         "19840062",
         "172716871",
@@ -1987,7 +1987,7 @@
       ]
     },
     {
-      "id": "osm-connector-3514",
+      "id": "osm-connector-3510",
       "sourceWayIds": [
         "40691747",
         "102210992",
@@ -2011,7 +2011,7 @@
       ]
     },
     {
-      "id": "osm-connector-3526",
+      "id": "osm-connector-3522",
       "sourceWayIds": ["20110632", "38678418", "599945477", "20111378", "122189426"],
       "startMainlineId": "osm-mainline-1527",
       "endMainlineId": "osm-mainline-2674",
@@ -2024,7 +2024,7 @@
       ]
     },
     {
-      "id": "osm-connector-3543",
+      "id": "osm-connector-3539",
       "sourceWayIds": ["20117914", "43185760", "124370043", "902352602"],
       "startMainlineId": "osm-mainline-5964",
       "endMainlineId": "osm-mainline-707",
@@ -2037,7 +2037,7 @@
       ]
     },
     {
-      "id": "osm-connector-3550",
+      "id": "osm-connector-3546",
       "sourceWayIds": [
         "20123065",
         "155848595",
@@ -2069,7 +2069,7 @@
       ]
     },
     {
-      "id": "osm-connector-3602",
+      "id": "osm-connector-3598",
       "sourceWayIds": ["20566748", "545357702", "545357701", "51126776"],
       "startMainlineId": "osm-mainline-547",
       "endMainlineId": "osm-mainline-716",
@@ -2082,7 +2082,7 @@
       ]
     },
     {
-      "id": "osm-connector-3621",
+      "id": "osm-connector-3617",
       "sourceWayIds": [
         "20611011",
         "604592752",
@@ -2102,7 +2102,7 @@
       ]
     },
     {
-      "id": "osm-connector-3636",
+      "id": "osm-connector-3632",
       "sourceWayIds": ["20885748", "122888380"],
       "startMainlineId": "osm-mainline-1161",
       "endMainlineId": "osm-mainline-3371",
@@ -2115,7 +2115,7 @@
       ]
     },
     {
-      "id": "osm-connector-3676",
+      "id": "osm-connector-3672",
       "sourceWayIds": [
         "1094491759",
         "737692817",
@@ -2137,7 +2137,7 @@
       ]
     },
     {
-      "id": "osm-connector-3731",
+      "id": "osm-connector-3727",
       "sourceWayIds": [
         "176067994",
         "176067977",
@@ -2160,7 +2160,7 @@
       ]
     },
     {
-      "id": "osm-connector-3821",
+      "id": "osm-connector-3817",
       "sourceWayIds": [
         "22072354",
         "33124381",
@@ -2376,7 +2376,7 @@
       ]
     },
     {
-      "id": "osm-connector-4304",
+      "id": "osm-connector-4300",
       "sourceWayIds": [
         "107136703",
         "1450192533",
@@ -2587,7 +2587,7 @@
       ]
     },
     {
-      "id": "osm-connector-4850",
+      "id": "osm-connector-4847",
       "sourceWayIds": ["566497116", "566497120", "566497119", "566497122"],
       "startMainlineId": "osm-mainline-333",
       "endMainlineId": "osm-mainline-4863",
@@ -2600,7 +2600,7 @@
       ]
     },
     {
-      "id": "osm-connector-4851",
+      "id": "osm-connector-4848",
       "sourceWayIds": ["566497117", "566497123", "566497124", "566497125"],
       "startMainlineId": "osm-mainline-333",
       "endMainlineId": "osm-mainline-4863",

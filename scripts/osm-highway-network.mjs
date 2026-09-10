@@ -5,6 +5,7 @@ import readline from 'node:readline';
 
 import { hasProperSelfIntersection } from './highway-cycle.mjs';
 import { orderedCarriagewayMidpoints } from './highway-ordered-midpoint.mjs';
+import { coveredMainlineMergePairs } from './highway-mainline-merges.mjs';
 import {
   buildMainlineEndingIndex,
   trimRampOnlyMainlineTails,
@@ -655,6 +656,8 @@ export function buildAveragedMainlines(chains) {
     let runEndSampleIndex = null;
     let runStartMatchSampleIndex = null;
     let runEndMatchSampleIndex = null;
+    let minimumMatchPosition = Infinity;
+    let maximumMatchPosition = -Infinity;
     let priorRunEndTopologyKey = null;
     const finishPart = () => {
       if (
@@ -700,6 +703,26 @@ export function buildAveragedMainlines(chains) {
           startTopologyKeys,
           endTopologyKeys,
           pairedChainId: matchedChainId,
+          sourceRanges: [
+            {
+              chainId: chain.id,
+              positions: [runStartSampleIndex, runEndSampleIndex].map((index) => {
+                const sample = chain.samples[index];
+                return (
+                  sample.sourceSegmentIndex +
+                  coordinateProjectionFraction(
+                    sample.coordinate,
+                    chain.coordinates[sample.sourceSegmentIndex],
+                    chain.coordinates[sample.sourceSegmentIndex + 1],
+                  )
+                );
+              }),
+            },
+            {
+              chainId: matchedChainId,
+              positions: [minimumMatchPosition, maximumMatchPosition],
+            },
+          ],
           sourceWayIds: [
             ...new Set([...chain.sourceWayIds, ...pairedChain.sourceWayIds]),
           ],
@@ -727,6 +750,8 @@ export function buildAveragedMainlines(chains) {
       runEndSampleIndex = null;
       runStartMatchSampleIndex = null;
       runEndMatchSampleIndex = null;
+      minimumMatchPosition = Infinity;
+      maximumMatchPosition = -Infinity;
     };
     for (const [sampleIndex, sample] of chain.samples.entries()) {
       const match = matches[sampleIndex];
@@ -756,6 +781,8 @@ export function buildAveragedMainlines(chains) {
       }
       runEndSampleIndex = sampleIndex;
       runEndMatchSampleIndex = match.sampleIndex;
+      minimumMatchPosition = Math.min(minimumMatchPosition, match.sourcePosition);
+      maximumMatchPosition = Math.max(maximumMatchPosition, match.sourcePosition);
       matchedChainId = match.chainId;
       coordinates.push(coordinate);
     }
@@ -3495,11 +3522,12 @@ export function buildRampConnectors(osm, mainlineWays, parts, connectorWays) {
   };
 }
 
-export function buildOsmHighwayCenterlines(osm) {
+export function buildOsmHighwayCenterlines(osm, onProgress = () => {}) {
   const prepared = prepareWays(osm);
   const chains = traceMotorwayChains(prepared.mainlines);
   const averaged = buildAveragedMainlines(chains);
-  const mainlineTopology = connectMainlinePartsAtSourceNodes(
+  const originalParts = structuredClone(averaged.parts);
+  let mainlineTopology = connectMainlinePartsAtSourceNodes(
     osm,
     prepared.mainlines,
     averaged.parts,
@@ -3511,12 +3539,70 @@ export function buildOsmHighwayCenterlines(osm) {
     (part) => part.orderedContinuation,
   );
   averaged.parts = averaged.parts.filter((part) => !part.orderedContinuation);
-  const ramps = buildRampConnectors(
+  let ramps = buildRampConnectors(
     osm,
     prepared.mainlines,
     averaged.parts,
     prepared.connectors,
   );
+  let coveredMerges = coveredMainlineMergePairs(
+    originalParts,
+    ramps.connectors,
+    averaged.parts,
+    chains,
+  );
+  const initial = { parts: averaged.parts, ramps, mainlineTopology };
+  let rejectedMergeCount = 0;
+  while (coveredMerges.length > 0) {
+    onProgress({
+      mergeCandidates: coveredMerges.map((merge) => merge.partId),
+      rejectedMergeCount,
+    });
+    const removedIds = new Set(coveredMerges.map((merge) => merge.partId));
+    // Each attempt starts from the actual averaged carriageways. Junction
+    // insertions made for a rejected proposal must never leak into a retry.
+    averaged.parts = structuredClone(
+      originalParts.filter(
+        (part) => !removedIds.has(part.id) && !part.orderedContinuation,
+      ),
+    );
+    mainlineTopology = connectMainlinePartsAtSourceNodes(
+      osm,
+      prepared.mainlines,
+      averaged.parts,
+    );
+    ramps = buildRampConnectors(
+      osm,
+      prepared.mainlines,
+      averaged.parts,
+      prepared.connectors,
+    );
+    const supported = coveredMerges.filter((merge) =>
+      ramps.connectors.some(
+        (connector) =>
+          connector.mixedMainline &&
+          [connector.startMainlinePartIndex, connector.endMainlinePartIndex]
+            .map((index) => averaged.parts[index].id)
+            .sort()
+            .join() === [merge.branchId, merge.throughId].sort().join() &&
+          connector.sourceWayIds.toSorted().join() ===
+            merge.connectorSourceWayIds.toSorted().join(),
+      ),
+    );
+    if (supported.length === coveredMerges.length) break;
+    rejectedMergeCount += coveredMerges.length - supported.length;
+    onProgress({
+      retainedMergePairs: coveredMerges
+        .filter((merge) => !supported.includes(merge))
+        .map((merge) => merge.partId),
+    });
+    coveredMerges = supported;
+    if (coveredMerges.length === 0) {
+      averaged.parts = initial.parts;
+      ramps = initial.ramps;
+      mainlineTopology = initial.mainlineTopology;
+    }
+  }
   attachWidePairContinuations(averaged.parts, orderedContinuations);
   const endingAudit = trimRampOnlyMainlineTails(
     averaged.parts,
@@ -3537,6 +3623,8 @@ export function buildOsmHighwayCenterlines(osm) {
         0,
       ),
       mainlineJunctionCount: mainlineTopology.junctionCount,
+      coveredMainlineMergeCount: coveredMerges.length,
+      retainedMainlineMergeCount: rejectedMergeCount,
       orderedPairContinuationCount: averaged.parts.filter(
         (part) => part.orderedContinuation,
       ).length,
@@ -3546,5 +3634,6 @@ export function buildOsmHighwayCenterlines(osm) {
     connectorWays: prepared.connectors,
     mainlineWays: prepared.mainlines,
     rampAttachmentRepairs: ramps.attachmentRepairs,
+    coveredMainlineMerges: coveredMerges,
   };
 }

@@ -3,13 +3,191 @@ import test from 'node:test';
 import { readFileSync } from 'node:fs';
 
 import { geodesicDistanceMeters } from './wgs84-geodesy.mjs';
+import { coveredMainlineMergePairs } from './highway-mainline-merges.mjs';
 import {
   buildOsmHighwayCenterlines,
+  buildAveragedMainlines,
+  buildRampConnectors,
   connectMainlinePartsAtSourceNodes,
+  prepareWays,
+  traceMotorwayChains,
 } from './osm-highway-network.mjs';
 
 const metersCoordinate = ([x, y]) => [x / 111_320, y / 110_574];
 const coordinateMeters = ([x, y]) => [x * 111_320, y * 110_574];
+
+test('covered merge pairs require complete independent source support and no other attachments', () => {
+  const range = (chainId, start, end) => ({ chainId, positions: [start, end] });
+  const parts = [
+    { id: 'branch', sourceRanges: [range('in', 0, 10), range('return', 10, 5)] },
+    { id: 'through', sourceRanges: [range('out', 0, 10), range('trunk', 10, 0)] },
+    { id: 'crossed', sourceRanges: [range('return', 1, 4), range('trunk', 3, 7)] },
+  ];
+  const chains = ['return', 'trunk'].map((id) => ({
+    id,
+    nodeIds: Array.from({ length: 11 }, (_, i) => `${id}-${i}`),
+  }));
+  const connector = {
+    mixedMainline: true,
+    startMainlinePartIndex: 0,
+    endMainlinePartIndex: 1,
+    sourceNodeIds: chains[0].nodeIds.slice(0, 6),
+    sourceWayIds: ['actual-merge'],
+  };
+  const find = (roads = parts, ramps = [connector]) =>
+    coveredMainlineMergePairs(roads, ramps, roads, chains);
+  assert.deepEqual(
+    find().map((entry) => entry.partId),
+    ['crossed'],
+  );
+  const reversed = structuredClone(parts);
+  for (const part of reversed)
+    for (const range of part.sourceRanges) range.positions.reverse();
+  assert.deepEqual(
+    find(reversed).map((entry) => entry.partId),
+    ['crossed'],
+  );
+  assert.deepEqual(
+    find(parts, [
+      {
+        ...connector,
+        sourceNodeIds: connector.sourceNodeIds.filter((id) => id !== 'return-2'),
+      },
+    ]),
+    [],
+    'a break in the reciprocal source path cannot justify removal',
+  );
+  const partial = structuredClone(parts);
+  partial[2].sourceRanges[0].positions = [1, 5.1];
+  assert.deepEqual(find(partial), [], 'do not erase an uncovered source interval');
+  const truncated = structuredClone(parts);
+  truncated[1].sourceRanges[1].positions = [6, 0];
+  assert.deepEqual(
+    find(truncated),
+    [],
+    'the continuing mainline must cover the other side',
+  );
+  assert.deepEqual(find(parts, [{ ...connector, mixedMainline: false }]), []);
+  assert.deepEqual(
+    find(parts, [connector, { ...connector, startMainlinePartIndex: 2 }]),
+    [],
+    'keep a mainline with an independent ramp attachment',
+  );
+  assert.deepEqual(
+    find([
+      ...parts.slice(0, 2),
+      { ...parts[2], startTopologyKeys: ['independent-junction'] },
+      { id: 'side-road', endTopologyKeys: ['independent-junction'] },
+    ]),
+    [],
+    'keep a mainline with a separate source-proven branch connection',
+  );
+  assert.deepEqual(
+    find([
+      ...parts,
+      {
+        id: 'continuation',
+        continuationEndpoints: { beforeId: 'crossed', afterId: 'through' },
+      },
+    ]),
+    [],
+    'keep the parent of a source-proven wide-median continuation',
+  );
+});
+
+test('Kansas City keeps both reciprocal movements without a crossed mainline or jagged junctions', () => {
+  const fixture = JSON.parse(
+    readFileSync(
+      new URL('./fixtures/kansas-city-mainline-merge.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  const built = buildOsmHighwayCenterlines({
+    nodes: new Map(fixture.nodes),
+    ways: fixture.ways,
+  });
+  assert.equal(built.statistics.coveredMainlineMergeCount, 1);
+  const north = built.parts.find(
+    (part) => part.role === 'connector' && part.sourceWayIds.includes('26140794'),
+  );
+  const merge = built.parts.find(
+    (part) => part.mixedMainline && part.sourceWayIds.includes('526019670'),
+  );
+  assert.ok(north, 'preserve the northern reciprocal ramp');
+  const osm = { nodes: new Map(fixture.nodes), ways: fixture.ways };
+  const prepared = prepareWays(osm);
+  const original = buildAveragedMainlines(traceMotorwayChains(prepared.mainlines));
+  const originalThrough = structuredClone(
+    original.parts.find(
+      (part) =>
+        part.sourceWayIds.includes('527405565') &&
+        part.sourceWayIds.includes('527423798'),
+    ),
+  );
+  connectMainlinePartsAtSourceNodes(osm, prepared.mainlines, original.parts);
+  const originalRamps = buildRampConnectors(
+    osm,
+    prepared.mainlines,
+    original.parts,
+    prepared.connectors,
+  );
+  assert.deepEqual(
+    north.coordinates,
+    originalRamps.connectors.find((part) => part.sourceWayIds.includes('26140794'))
+      .coordinates,
+    'the valid northern ramp is unchanged by merge cleanup',
+  );
+  assert.ok(merge, 'preserve the real reciprocal merge through the one-lane section');
+  assert.equal(built.parts.filter((part) => part.role === 'connector').length, 2);
+  for (const connector of [north, merge]) {
+    for (const [index, endpoint] of [
+      [connector.startMainlinePartIndex, connector.coordinates[0]],
+      [connector.endMainlinePartIndex, connector.coordinates.at(-1)],
+    ]) {
+      assert.ok(
+        built.parts[index].coordinates.some(
+          (point) => geodesicDistanceMeters(point, endpoint) < 0.01,
+        ),
+      );
+    }
+  }
+  const through = built.parts[merge.endMainlinePartIndex];
+  const section = through.coordinates.filter(
+    (point) =>
+      point[0] > -94.56 && point[0] < -94.55 && point[1] > 39.166 && point[1] < 39.173,
+  );
+  assert.ok(section.length > 10);
+  for (const point of section) {
+    assert.ok(
+      originalThrough.coordinates.slice(1).some((end, index) => {
+        const start = originalThrough.coordinates[index];
+        return (
+          geodesicDistanceMeters(start, point) +
+            geodesicDistanceMeters(point, end) -
+            geodesicDistanceMeters(start, end) <
+          0.005
+        );
+      }),
+      'the through road stays on the original paired-carriageway midpoint',
+    );
+  }
+  const direction = Math.sign(section.at(-1)[1] - section[0][1]);
+  for (let i = 1; i < section.length; i += 1) {
+    assert.ok(
+      (section[i][1] - section[i - 1][1]) * direction > 0,
+      'the continuing mainline advances smoothly through the merge',
+    );
+  }
+  assert.ok(
+    built.parts.every(
+      (part) =>
+        !(part.topologyCoordinates ?? []).some(
+          (entry) => entry.key === 'osm-mainline-junction:189855418',
+        ),
+    ),
+    'an ordinary way split on the other roadway must not pull this mainline into a junction',
+  );
+});
 
 test('junction projections at a segment endpoint retain their order before the terminal', () => {
   const nodes = new Map(
