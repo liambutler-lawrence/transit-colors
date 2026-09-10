@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 import { gunzipSync } from 'node:zlib';
 import { nameAutomaticTimezoneRegions } from '../src/automatic-timezone-names.ts';
 import {
+  AUTOMATIC_TIMEZONE_ASSIGNMENT_RULES,
   automaticRegionSchema,
   automaticTimezoneDataSchema,
   assignAutomaticTimezones,
@@ -131,6 +132,7 @@ for (const { region } of assignments) {
 const leafIds = new Set(assignments.map(({ region }) => region.id));
 const data = automaticTimezoneDataSchema.parse({
   metadata: {
+    assignment_rules: AUTOMATIC_TIMEZONE_ASSIGNMENT_RULES,
     sources: [...sources, ...places.sources].map(
       ({ id, name, url, sha256, license }) => ({
         id,

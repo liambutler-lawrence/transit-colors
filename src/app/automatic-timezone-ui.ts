@@ -33,9 +33,16 @@ import {
 } from './map-ui-utils.js';
 import { TimezoneSkewLayer, triangulateTimezoneData } from './timezone-skew-layer.js';
 
+// Vite emits a content-hashed URL, binding the pruned hierarchy to this build.
+// A query string on an overwritten static path still let old tabs fetch new data.
+const automaticDataUrl = new URL(
+  '../../data/timezone-automatic-regions.json',
+  import.meta.url,
+).href;
 const rules = requiredElement('#timezone-rules', HTMLSelectElement);
 const info = requiredElement('#timezone-automatic-info', HTMLElement);
 const summary = requiredElement('#timezone-automatic-summary', HTMLElement);
+const reloadButton = requiredElement('#timezone-automatic-reload', HTMLButtonElement);
 const exceptions = requiredElement(
   '#timezone-automatic-exceptions',
   HTMLDetailsElement,
@@ -105,10 +112,7 @@ function renderSummary(assignments: readonly AutomaticTimezoneAssignment[]): voi
 
 async function loadAutomaticTimezones(): Promise<void> {
   if (layer) return;
-  const data = await fetchParsed(
-    'data/timezone-automatic-regions.json?v=20260910c',
-    automaticTimezoneDataSchema,
-  );
+  const data = await fetchParsed(automaticDataUrl, automaticTimezoneDataSchema);
   const assignments = assignAutomaticTimezones(data.regions);
   const features: TimezoneSkewCollection['features'] = assignments.map(
     ({ region, offsetHours }, id) => ({
@@ -193,6 +197,9 @@ export function installAutomaticTimezoneControl(onChange: () => void): void {
   if (installed) return;
   installed = true;
   rules.disabled = false;
+  reloadButton.addEventListener('click', () => {
+    window.location.reload();
+  });
   rules.addEventListener('change', () => {
     const active = automaticTimezoneActive();
     info.hidden = !active;
@@ -209,11 +216,13 @@ export function installAutomaticTimezoneControl(onChange: () => void): void {
     onChange();
     if (!active) return;
     if (!loading) {
+      reloadButton.hidden = true;
       summary.textContent = 'Loading boundaries and calculating automatic time zones…';
       loading = loadAutomaticTimezones().catch((error: unknown) => {
         loading = null;
         summary.textContent =
-          'Automatic boundaries could not be loaded. Choose Official time zones, then Automatic to retry.';
+          'Automatic regions could not be loaded. Reload the map to get the current version and try again.';
+        reloadButton.hidden = false;
         console.error('Automatic time zones failed to load', error);
       });
     }

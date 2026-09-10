@@ -3,6 +3,7 @@ import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 import {
   AUTOMATIC_TIMEZONE_MAX_SKEW_MINUTES,
+  AUTOMATIC_TIMEZONE_ASSIGNMENT_RULES,
   assignAutomaticTimezones,
   automaticTimezoneDataSchema,
   fitAutomaticTimezone,
@@ -167,6 +168,44 @@ test('missing children and unmatched boundary coverage are explicit data fallbac
   );
 });
 
+test('rejects a hierarchy prepared for different assignment rules', () => {
+  const data = {
+    metadata: {
+      sources: [],
+      notes: [],
+      assignment_rules: AUTOMATIC_TIMEZONE_ASSIGNMENT_RULES,
+    },
+    regions: [region('country', 0, -12, 12)],
+  };
+  assert.ok(automaticTimezoneDataSchema.safeParse(data).success);
+  for (const assignment_rules of [
+    undefined,
+    { ...AUTOMATIC_TIMEZONE_ASSIGNMENT_RULES, maximum_skew_minutes: 60 },
+    { ...AUTOMATIC_TIMEZONE_ASSIGNMENT_RULES, maximum_subdivision_level: 1 },
+  ]) {
+    assert.equal(
+      automaticTimezoneDataSchema.safeParse({
+        ...data,
+        metadata: { ...data.metadata, assignment_rules },
+      }).success,
+      false,
+    );
+  }
+});
+
+test('an accepted region without geometry cannot silently become an invisible zone', () => {
+  assert.throws(
+    () =>
+      assignAutomaticTimezones([
+        {
+          ...region('empty', 0, -2, 2),
+          geometry: { type: 'MultiPolygon', coordinates: [] },
+        },
+      ]),
+    /Automatic region has no geometry: empty/,
+  );
+});
+
 test('committed world hierarchy resolves to drawable, source-backed, correctly nested regions', async () => {
   const data = automaticTimezoneDataSchema.parse(
     JSON.parse(
@@ -180,6 +219,32 @@ test('committed world hierarchy resolves to drawable, source-backed, correctly n
   const sources = new Set(data.metadata.sources.map(({ id }) => id));
   assert.equal(data.regions.filter((r) => r.level === 0).length, 258);
   const leaves = new Set(assignments.map(({ region }) => region.id));
+  const byId = new Map(data.regions.map((region) => [region.id, region]));
+  const newlySplit = data.regions.filter((region) => {
+    const skew = optimizeAutomaticTimezone(region.longitude_ranges).maximumSkewMinutes;
+    return region.geometry.coordinates.length === 0 && skew > 45 && skew < 60;
+  });
+  // The old ±30/60-minute client selected 48 of these as empty leaves; four
+  // further branches were hidden inside those parents and must also subdivide.
+  assert.equal(newlySplit.length, 52);
+  for (const parent of newlySplit) {
+    assert.ok(!leaves.has(parent.id), `${parent.name} must subdivide`);
+    const descendants = assignments.filter(({ region }) => {
+      let ancestor = byId.get(region.parent_id);
+      while (ancestor) {
+        if (ancestor.id === parent.id) return true;
+        ancestor = byId.get(ancestor.parent_id);
+      }
+      return false;
+    });
+    assert.ok(descendants.length > 1, `${parent.name} has drawable subdivisions`);
+    assert.ok(
+      descendants.every(
+        ({ region }) =>
+          region.geometry.coordinates.length && region.naming?.timezone_name,
+      ),
+    );
+  }
   for (const { region, fit, fallback, offsetHours } of assignments) {
     assert.ok(region.geometry.coordinates.length > 0, region.id);
     assert.ok(sources.has(region.source), region.source);
@@ -212,6 +277,19 @@ test('committed world hierarchy resolves to drawable, source-backed, correctly n
   assert.equal(index.find(-99.13, 19.43).region.iso_code, 'MX-CMX');
   assert.equal(index.find(-149.9, 61.2).region.level, 2); // Anchorage, Alaska.
   assert.equal(index.find(116.4, 39.9).offsetHours, 8); // Beijing.
+  for (const [longitude, latitude, countryCode, level] of [
+    [32.86, 39.93, 'TUR', 1], // Ankara; Turkey was an empty country in the stale client.
+    [73.05, 33.68, 'PAK', 1], // Islamabad.
+    [7.49, 9.07, 'NGA', 1], // Abuja.
+    [69.2, 34.55, 'AFG', 1], // Kabul.
+    [36.82, -1.29, 'KEN', 0], // A country that still fits stays whole.
+    [-95.37, 29.76, 'USA', 2], // Houston; Texas now subdivides into counties.
+  ]) {
+    const assignment = index.find(longitude, latitude);
+    assert.equal(assignment?.region.country_code, countryCode);
+    assert.equal(assignment?.region.level, level);
+    assert.ok(assignment?.region.naming?.timezone_name);
+  }
   assert.ok(
     assignments.some(
       (a) =>

@@ -286,10 +286,20 @@ invariant failures before committing the snapshot. Never commit `.gtfs-cache` or
 
 ## Automatic time-zone regions
 
-Clock Skew's automatic option loads `data/timezone-automatic-regions.json` only when
-selected. The browser runs `assignAutomaticTimezones` against the recorded hierarchy;
-the offline builder uses the same TypeScript calculation to prune unnecessary child
-geometry. Official seasonal and historical settings do not affect these fixed offsets.
+Clock Skew's automatic option loads a content-hashed build asset generated from
+`data/timezone-automatic-regions.json` only when selected. The browser runs
+`assignAutomaticTimezones` against the recorded hierarchy; the offline builder uses the
+same TypeScript calculation to prune unnecessary child geometry. Official seasonal and
+historical settings do not affect these fixed offsets.
+
+The snapshot records its assignment method, skew limit, and subdivision depth; the
+browser validates them before resolving regions and rejects any selected region with
+empty geometry. The production build verifies that its script references the hashed
+asset and that its bytes match the checked snapshot. The unversioned data copy remains
+available for existing clients, but new builds never request it. Query-string versions
+were insufficient: an old ±30/60-minute page could fetch the new 45-minute hierarchy,
+select a pruned parent as a leaf, and silently leave it blank. An open tab whose hashed
+asset is no longer available offers **Reload map** instead of displaying a partial map.
 
 Every polygon's original longitude interval is tested against all whole-hour UTC
 meridians (15 degrees per hour). Choose the meridian that minimizes the largest absolute
