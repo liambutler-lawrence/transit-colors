@@ -125,9 +125,9 @@ const landmassBuffer = await readFile(landmassSourcePath);
 let derived;
 try {
   derived = deserialize(await readFile(derivedCachePath));
-  if (derived.displayTopologyVersion !== 25) {
+  if (derived.displayTopologyVersion !== 27) {
     throw new Error(
-      'The cached display topology predates ordered correspondence through wide carriageway bends.',
+      'The cached display topology predates source-connected auxiliary ramp attachments.',
     );
   }
   console.log(`Reused ${derivedCachePath}.`);
@@ -145,12 +145,13 @@ try {
   const detailed = {
     parts: built.parts,
     statistics: built.statistics,
+    rampAttachmentRepairs: built.rampAttachmentRepairs,
   };
   console.timeEnd('Average carriageways and build explicit ramp connections');
   console.log(detailed.statistics);
   derived = {
     detailed,
-    displayTopologyVersion: 25,
+    displayTopologyVersion: 27,
   };
   await writeFile(derivedCachePath, serialize(derived));
 
@@ -179,7 +180,7 @@ try {
   derived = {
     compressed,
     detailed,
-    displayTopologyVersion: 25,
+    displayTopologyVersion: 27,
     graphStatistics,
     sourceCompressed: compressed,
     sourceGraphParts: exactGraph.parts.map(({ id, role, tokens }) => ({
@@ -188,13 +189,13 @@ try {
       tokens,
     })),
     sourceGraphStatistics: graphStatistics,
-    sourceTopologyVersion: 26,
+    sourceTopologyVersion: 28,
   };
   await writeFile(derivedCachePath, serialize(derived));
 }
 globalThis.gc?.();
 const { detailed } = derived;
-if (derived.sourceTopologyVersion !== 26) {
+if (derived.sourceTopologyVersion !== 28) {
   console.time('Read OSM mainline continuity topology');
   const osm = await readOsmMotorwayPbf(sourcePath);
   console.timeEnd('Read OSM mainline continuity topology');
@@ -223,7 +224,7 @@ if (derived.sourceTopologyVersion !== 26) {
     exactEdges: sourceGraph.edges.length,
     exactNodes: sourceGraph.coordinateByNodeId.size,
   };
-  derived.sourceTopologyVersion = 26;
+  derived.sourceTopologyVersion = 28;
   console.timeEnd('Build explicit paired-centerline route graph');
   console.log(derived.sourceGraphStatistics);
   await writeFile(derivedCachePath, serialize(derived));

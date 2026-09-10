@@ -107,33 +107,46 @@ the continuing midpoint line. Existing endpoint keys carry that vertex across sp
 centerline parts. Terminal geometry is extended or trimmed in travel order; interior
 insertions are projected again after the shared coordinate is chosen. A merge adjustment
 cannot collapse a short loop, trim past a different junction, or add backward turns to
-an approach; those complex attachments retain their individual source topology.
-Reciprocal collector-road alternatives are consolidated to the pair with the shortest
-mean directional ramp distance only when both directions share a source junction and
-directed segment and connect the same mainline legs. Shared collector stems for distinct
-turns remain separate; proximity alone never merges connections. Ramp samples use the
-closest point on a tangent-aligned opposing segment and its WGS84 geodesic midpoint, as
-mainlines do. The shorter of the two oriented paths supplies the samples; endpoints are
-never warped to create correspondence and the midpoints are not smoothed afterward. If
-successive projections skip a source bend, nearby closest-tangent anchors bound a local,
-monotone Hermite interpolation of distance along each source path. Denser samples then
-trace that bend before the geodesic midpoints are computed. This does not normalize
-progress across the complete ramps or round off their output coordinates. The
-continuation is rejected if it traverses a reverse-facing loop or makes a sharper
-corner, including at its joins to the untouched correspondence. Where ramp joins are
-staggered, the path extends along its actual source mainline carriageway through
-explicit OSM nodes, from the earlier split to the later merge. Only then are the shared
-centerline endpoints attached to the mainline graph. Geometry crossings never create
-graph nodes; topology comes from explicit shared source nodes. The continental stages
-are largest-component selection, 2-core pruning, degree-two compression, a detailed
-northeastern perimeter cycle, and independent detailed node-disjoint ears for
-southeastern Massachusetts and the southern/western perimeter. The northeastern cycle is
-explicitly anchored through Highway 407, Ottawa, Québec, and coastal New England. Every
-ear uses explicit source junctions. A small hook where two consecutive averaged edges
-overshoot their shared junction is clipped only between those adjacent tails; any
-nonlocal geometric crossing forbids the responsible corridor and triggers another
-routing attempt. The accepted boundary is a simple cycle in both graph topology and
-rendered geometry.
+an approach; those complex attachments retain their individual source topology. Ramp
+attachments preserve an existing source-way projection within 160 metres. A farther
+projection can use a nearby part of the same source corridor, identified by shared
+source ways. An auxiliary carriageway omitted from the averaged part's source list must
+reconnect to that same represented corridor in both travel directions within 2.5
+kilometres before its ramp endpoint can attach. Dead ends, ambiguous branches,
+coordinate-only crossings, and distant projections cannot supply that inference.
+Established reciprocal movements retain their original attachments and directional
+paths. Inferred attachments can supply an unmatched movement only when its new midpoint
+has neither backward turns nor self-intersections; they cannot consume a direction from
+an existing pair or create a duplicate of it. Reciprocal collector-road alternatives are
+consolidated to the pair with the shortest mean directional ramp distance only when both
+directions share a source junction and directed segment and connect the same mainline
+legs. Shared collector stems for distinct turns remain separate; proximity alone never
+merges connections. Ramp samples use the closest point on a tangent-aligned opposing
+segment and its WGS84 geodesic midpoint, as mainlines do. The shorter of the two
+oriented paths supplies the samples; endpoints are never warped to create correspondence
+and the midpoints are not smoothed afterward. If successive projections skip a source
+bend, nearby closest-tangent anchors bound a local, monotone Hermite interpolation of
+distance along each source path. Denser samples then trace that bend before the geodesic
+midpoints are computed. This does not normalize progress across the complete ramps or
+round off their output coordinates. The continuation is rejected if it traverses a
+reverse-facing loop or makes a sharper corner, including at its joins to the untouched
+correspondence. If the resulting midpoint doubles back, the builder tries the ordered
+closest-tangent correspondence used for mainline bends across both source paths. It
+accepts this fallback only when the new midpoint stays between the source roads, removes
+backward turns, improves the maximum turn, and has no self-intersection after endpoint
+attachment. Where ramp joins are staggered, the path extends along its actual source
+mainline carriageway through explicit OSM nodes, from the earlier split to the later
+merge. Only then are the shared centerline endpoints attached to the mainline graph.
+Geometry crossings never create graph nodes; topology comes from explicit shared source
+nodes. The continental stages are largest-component selection, 2-core pruning,
+degree-two compression, a detailed northeastern perimeter cycle, and independent
+detailed node-disjoint ears for southeastern Massachusetts and the southern/western
+perimeter. The northeastern cycle is explicitly anchored through Highway 407, Ottawa,
+Québec, and coastal New England. Every ear uses explicit source junctions. A small hook
+where two consecutive averaged edges overshoot their shared junction is clipped only
+between those adjacent tails; any nonlocal geometric crossing forbids the responsible
+corridor and triggers another routing attempt. The accepted boundary is a simple cycle
+in both graph topology and rendered geometry.
 
 The circumference map keeps one independent route state and gradient image source per
 metro area. It merges all complete networks and selected boundaries into one GeoJSON
