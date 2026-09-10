@@ -161,6 +161,28 @@ geodesic midpoint is sampled every 50 meters. One-lane motorway branches and
 `motorway_link` ways remain separate connector edges; ordinary traffic signals
 invalidate a connector while ramp meters do not.
 
+Wide separations are continued only when the same opposing source chain is confirmed at
+both ends of the gap and remains the closest eligible partner from both sides. If local
+closest-point matching reverses along a bend or exceeds the original 2 km width bound,
+an ordered correspondence follows both complete source sections, each bounded to 25 km.
+Its allowed width derives from the shorter source span. A dynamic program minimizes
+integrated separation while advancing monotonically along both roads and respecting
+their travel tangents. Source matching uses 10 m samples; monotone interpolation removes
+sampling steps before taking WGS84 midpoints. Both the matches and the resulting curve
+must stay between the source roads, with no backtracking or self-crossings. Existing
+mainline and ramp geometry is resolved first, and each addition attaches to the final
+existing endpoints.
+
+The wide-gap audit examined 89 previously rejected gaps with the same source partner on
+both sides. The committed `scripts/fixtures/ordered-carriageway-gap-audit.json` records
+the retained repairs and their shared endpoints; the tile regression verifies each
+repair's interior and both connections. The Monteagle I-24 source fixture also checks
+continuity and containment in either input ordering. Gaps with competing roads, missing
+directional support, reversed source bounds, or no valid contained ordered
+correspondence remain rejected. All 6,797 existing mainline geometries and 5,003
+reciprocal ramps were preserved. This audit covers bounded gaps between established
+pairs; other types of source network discontinuity require separate checks.
+
 The route graph preserves every original OSM node identity. Mainline sides are mapped
 onto the sampled centerline, and a ramp may attach only through its exact source mapping
 to that mainline. The attachment search can span an early carriageway split, but only

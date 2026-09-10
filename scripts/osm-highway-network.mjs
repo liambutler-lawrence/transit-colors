@@ -4,6 +4,7 @@ import { spawn } from 'node:child_process';
 import readline from 'node:readline';
 
 import { hasProperSelfIntersection } from './highway-cycle.mjs';
+import { orderedCarriagewayMidpoints } from './highway-ordered-midpoint.mjs';
 import {
   buildMainlineEndingIndex,
   trimRampOnlyMainlineTails,
@@ -472,7 +473,53 @@ function midpoint(first, second) {
   return geodesicMidpoint(first, second).map((value) => Number(value.toFixed(7)));
 }
 
-function continueBoundedCarriagewayPairs(chain, matches, grid, chainById) {
+function sourceSection(chain, first, last) {
+  return [
+    first.coordinate,
+    ...chain.coordinates.slice(
+      first.sourceSegmentIndex + 1,
+      last.sourceSegmentIndex + 1,
+    ),
+    last.coordinate,
+  ].filter(
+    (point, index, points) =>
+      index === 0 || geodesicDistanceMeters(points[index - 1], point) > 0.01,
+  );
+}
+
+function orderedGapContinuation(chain, before, after, start, end, grid, chainById) {
+  const opposite = chainById.get(before.chainId);
+  const first = sourceSection(chain, chain.samples[start], chain.samples[end]);
+  const second = sourceSection(opposite, after, before);
+  const firstLength = lineLengthMeters(first);
+  const secondLength = lineLengthMeters(second);
+  if (Math.max(firstLength, secondLength) > MAX_PAIRED_CONTINUATION_LENGTH_METERS)
+    return null;
+  // Two confirmed narrow endpoints bound the entire excursion. Allow the
+  // separation supported by that source span instead of imposing a 2 km median.
+  const maximumWidth = Math.max(
+    MAX_PAIRED_CONTINUATION_WIDTH_METERS,
+    Math.min(firstLength, secondLength) / 2 + 2 * PAIR_SEARCH_METERS,
+  );
+  for (const [road, other, coordinates] of [
+    [chain, opposite, first],
+    [opposite, chain, second],
+  ]) {
+    for (const sample of resampleCoordinates(coordinates)) {
+      if (
+        nearestOpposingSample(sample, road, grid, chainById, maximumWidth)?.chainId !==
+        other.id
+      )
+        return null;
+    }
+  }
+  const paired = orderedCarriagewayMidpoints(first, second.toReversed(), maximumWidth);
+  return (
+    paired && { start, end, chainId: opposite.id, coordinates: paired.coordinates }
+  );
+}
+
+function continueBoundedCarriagewayPairs(chain, matches, grid, chainById, orderedGaps) {
   const continuations = [];
   for (let index = 1; index < matches.length - 1; index += 1) {
     if (matches[index] || !matches[index - 1]) continue;
@@ -544,7 +591,21 @@ function continueBoundedCarriagewayPairs(chain, matches, grid, chainById) {
     // order along the same continuous source chain. A closer competing road
     // on either side invalidates the continuation; never force the partner through
     // a junction with a different nearest opposing carriageway.
-    if (continuation.length !== index - start + 1) continue;
+    if (continuation.length !== index - start + 1) {
+      if (chain.id.localeCompare(before.chainId, undefined, { numeric: true }) < 0) {
+        const ordered = orderedGapContinuation(
+          chain,
+          before,
+          after,
+          start - 1,
+          index,
+          grid,
+          chainById,
+        );
+        if (ordered) orderedGaps.push(ordered);
+      }
+      continue;
+    }
     for (let offset = 0; offset < index - start; offset += 1) {
       matches[start + offset] = continuation[offset];
     }
@@ -568,6 +629,7 @@ export function buildAveragedMainlines(chains) {
   }
 
   const parts = [];
+  const pendingOrderedContinuations = [];
   let widePairContinuationCount = 0;
   let widePairSampleCount = 0;
   const endpointsByTopologyKey = new Map();
@@ -576,11 +638,13 @@ export function buildAveragedMainlines(chains) {
       nearestOpposingSample(sample, chain, grid, chainById),
     );
     const continuedMatches = [...matches];
+    const orderedGaps = [];
     const continuations = continueBoundedCarriagewayPairs(
       chain,
       continuedMatches,
       grid,
       chainById,
+      orderedGaps,
     );
     const partIndicesByStartSample = new Map();
     const partIndicesByEndSample = new Map();
@@ -742,7 +806,49 @@ export function buildAveragedMainlines(chains) {
       widePairContinuationCount += 1;
       widePairSampleCount += continuation.end - continuation.start - 1;
     }
+    for (const gap of orderedGaps) {
+      const beforeIndex = partIndicesByEndSample.get(gap.start);
+      const afterIndex = partIndicesByStartSample.get(gap.end);
+      if (beforeIndex === undefined || afterIndex === undefined) continue;
+      if (
+        parts[beforeIndex].pairedChainId !== gap.chainId ||
+        parts[afterIndex].pairedChainId !== gap.chainId
+      )
+        continue;
+      pendingOrderedContinuations.push({ gap, beforeIndex, afterIndex });
+    }
     chain.pairCoverage = matchCount / chain.samples.length;
+  }
+  // Append new continuations after the existing network so a newly supported
+  // gap cannot renumber established features or change their junction extents.
+  for (const { gap, beforeIndex, afterIndex } of pendingOrderedContinuations) {
+    const before = parts[beforeIndex];
+    const after = parts[afterIndex];
+    const startKey = `${before.sourceChainId}:ordered-pair:${gap.start}`;
+    const endKey = `${before.sourceChainId}:ordered-pair:${gap.end}`;
+    const partIndex = parts.length;
+    before.endTopologyKeys.push(startKey);
+    after.startTopologyKeys.push(endKey);
+    parts.push({
+      ...before,
+      id: `osm-mainline-${partIndex + 1}`,
+      coordinates: [
+        before.coordinates.at(-1),
+        ...gap.coordinates.slice(1, -1),
+        after.coordinates[0],
+      ],
+      startNodeId: null,
+      endNodeId: null,
+      startTopologyKeys: [startKey],
+      endTopologyKeys: [endKey],
+      continuationEndpoints: { beforeId: before.id, afterId: after.id },
+      continuationSampleCount: gap.coordinates.length - 2,
+      orderedContinuation: true,
+    });
+    endpointsByTopologyKey.set(startKey, [`${beforeIndex}:end`, `${partIndex}:start`]);
+    endpointsByTopologyKey.set(endKey, [`${partIndex}:end`, `${afterIndex}:start`]);
+    widePairContinuationCount += 1;
+    widePairSampleCount += gap.coordinates.length - 2;
   }
   const endpointParents = new Map(
     parts.flatMap((_, partIndex) => [
@@ -2789,12 +2895,20 @@ export function buildOsmHighwayCenterlines(osm) {
     prepared.mainlines,
     averaged.parts,
   );
+  // Resolve established ramp attachments before adding gap geometry, then
+  // anchor each addition to the final endpoints. A wider displayed median
+  // must not relocate an existing ramp to a different nearest feature.
+  const orderedContinuations = averaged.parts.filter(
+    (part) => part.orderedContinuation,
+  );
+  averaged.parts = averaged.parts.filter((part) => !part.orderedContinuation);
   const ramps = buildRampConnectors(
     osm,
     prepared.mainlines,
     averaged.parts,
     prepared.connectors,
   );
+  attachWidePairContinuations(averaged.parts, orderedContinuations);
   const endingAudit = trimRampOnlyMainlineTails(
     averaged.parts,
     ramps.connectors,
@@ -2814,6 +2928,9 @@ export function buildOsmHighwayCenterlines(osm) {
         0,
       ),
       mainlineJunctionCount: mainlineTopology.junctionCount,
+      orderedPairContinuationCount: averaged.parts.filter(
+        (part) => part.orderedContinuation,
+      ).length,
       ...ramps.statistics,
       ...endingAudit.statistics,
     },
