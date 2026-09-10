@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { automaticTimezoneNameSchema } from './automatic-timezone-names.js';
 
 const longitudeRangeSchema = z.tuple([z.number(), z.number()]);
 const pointSchema = z.tuple([z.number(), z.number()]);
@@ -17,6 +18,8 @@ export const automaticRegionSchema = z.object({
   // Empty for branches: only terminal regions need browser geometry.
   geometry: z.object({ type: z.literal('MultiPolygon'), coordinates: polygonsSchema }),
   coverage_note: z.string(),
+  // Filled after resolving the UTC hierarchy; branches need no display name.
+  naming: automaticTimezoneNameSchema.nullable().default(null),
 });
 
 export const automaticTimezoneDataSchema = z.object({

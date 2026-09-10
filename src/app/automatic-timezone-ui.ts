@@ -90,7 +90,7 @@ function renderSummary(assignments: readonly AutomaticTimezoneAssignment[]): voi
       .map((assignment) => {
         const li = document.createElement('li');
         const title = document.createElement('strong');
-        title.textContent = `${assignment.region.country_name} / ${assignment.region.name}`;
+        title.textContent = `${assignment.region.naming?.timezone_name ?? assignment.region.name} — ${assignment.region.country_name} / ${assignment.region.name}`;
         const reason = document.createElement('span');
         reason.className = 'timezone-country-change-regions';
         reason.textContent = fallbackDescription(assignment);
@@ -103,7 +103,7 @@ function renderSummary(assignments: readonly AutomaticTimezoneAssignment[]): voi
 async function loadAutomaticTimezones(): Promise<void> {
   if (layer) return;
   const data = await fetchParsed(
-    'data/timezone-automatic-regions.json?v=20260910a',
+    'data/timezone-automatic-regions.json?v=20260910b',
     automaticTimezoneDataSchema,
   );
   const assignments = assignAutomaticTimezones(data.regions);
@@ -114,7 +114,7 @@ async function loadAutomaticTimezones(): Promise<void> {
       geometry: region.geometry,
       properties: {
         id,
-        timezone_name: region.id,
+        timezone_name: region.naming?.timezone_name ?? region.id,
         offset_hours: offsetHours,
         offset_label: formatUtcOffset(offsetHours),
         places: region.name,
@@ -137,7 +137,7 @@ async function loadAutomaticTimezones(): Promise<void> {
     tolerance: 0.1,
     maxzoom: 18,
     attribution:
-      'Automatic regions: <a href="https://www.naturalearthdata.com/">Natural Earth</a> · <a href="https://www.geoboundaries.org/">geoBoundaries</a> / © OpenStreetMap contributors · <a href="https://www.inegi.org.mx/">INEGI</a> · <a href="https://www.statcan.gc.ca/">Statistics Canada</a>',
+      'Automatic regions: <a href="https://www.naturalearthdata.com/">Natural Earth</a> · <a href="https://www.geoboundaries.org/">geoBoundaries</a> / © OpenStreetMap contributors · <a href="https://www.inegi.org.mx/">INEGI</a> · <a href="https://www.statcan.gc.ca/">Statistics Canada</a> · Place names: <a href="https://www.geonames.org/">GeoNames</a>, CC BY 4.0',
   });
   layer = new TimezoneSkewLayer(mesh, FILL_ID);
   const before = map.getLayer('water') ? 'water' : firstSymbolLayerId();
@@ -222,9 +222,10 @@ export function inspectAutomaticTimezone(longitude: number, latitude: number): b
   timezoneSelectionTypeEl.textContent = assignment.fallback
     ? 'Automatic · UTC+0 fallback'
     : 'Automatic time zone';
-  timezoneNameEl.textContent = `${region.name} · ${formatUtcOffset(offsetHours)}`;
+  timezoneNameEl.textContent = `${region.naming?.timezone_name ?? region.name} · ${formatUtcOffset(offsetHours)}`;
   timezoneSummaryEl.textContent = `Solar noon here would fall near ${formatSolarNoon(skew)}—${describeSolarNoonSkew(skew)}.`;
   replaceMetadata(timezoneMetadataEl, [
+    { label: 'Geographic region', value: region.name },
     { label: 'Country or territory', value: region.country_name },
     {
       label: 'Region level',
@@ -234,6 +235,31 @@ export function inspectAutomaticTimezone(longitude: number, latitude: number): b
           : ['Country', 'First-level subdivision', 'Second-level subdivision'][
               region.level
             ],
+    },
+    { label: 'Named after', value: region.naming?.metro_name ?? undefined },
+    {
+      label: 'Naming basis',
+      value:
+        region.naming?.method === 'metro'
+          ? 'Largest metropolitan population estimate in the naming source'
+          : region.naming?.method === 'settlement'
+            ? 'Largest mapped settlement; metro estimate unavailable'
+            : 'No matching populated place; geographic region name used',
+    },
+    {
+      label: 'Naming population estimate',
+      value: region.naming?.population
+        ? region.naming.population.toLocaleString('en')
+        : undefined,
+    },
+    {
+      label: 'Naming source',
+      value:
+        region.naming?.source === 'natural-earth-populated-places'
+          ? 'Natural Earth'
+          : region.naming?.source === 'geonames-cities500'
+            ? 'GeoNames'
+            : undefined,
     },
     { label: 'ISO code (source)', value: region.iso_code },
     { label: 'Longitude', value: formatLongitude(longitude) },
