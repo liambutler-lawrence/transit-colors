@@ -2256,6 +2256,34 @@ export function outerReciprocalAttachment(first, second, parts, atStart) {
   return alongTravel >= 0 === atStart ? first : second;
 }
 
+export function rampAttachmentTravelDirection(part, attachment) {
+  const sourceDirection = attachment.travelDirections?.[0];
+  if (!sourceDirection) {
+    throw new Error('A ramp attachment requires source travel direction.');
+  }
+  let nearest = Infinity;
+  let alignment = 0;
+  // A source attachment can appear twice at a closed parent or shared merge.
+  // Check all coincident tangents, not just its original segment index.
+  for (let index = 1; index < part.coordinates.length; index += 1) {
+    const a = part.coordinates[index - 1];
+    const b = part.coordinates[index];
+    const meters = geodesicDistanceMeters(
+      attachment.coordinate,
+      projectCoordinateOntoSegment(attachment.coordinate, a, b),
+    );
+    const candidate = dot(vector(a, b), sourceDirection);
+    if (
+      meters < nearest - 0.25 ||
+      (meters <= nearest + 0.25 && Math.abs(candidate) > Math.abs(alignment))
+    ) {
+      nearest = meters;
+      alignment = candidate;
+    }
+  }
+  return Math.sign(alignment);
+}
+
 function mainlineContinuationGraph(osm, ways) {
   const forward = new Map();
   const backward = new Map();
@@ -2601,7 +2629,7 @@ export function buildPairedOsmSourceTopologyGraph(osm, averagedParts) {
     const existingIndex = edgeIndexByKey.get(key);
     if (existingIndex !== undefined) {
       edges[existingIndex].partIndices.add(partIndex);
-      return;
+      return existingIndex;
     }
     edgeIndexByKey.set(key, edges.length);
     edges.push({
@@ -2609,6 +2637,7 @@ export function buildPairedOsmSourceTopologyGraph(osm, averagedParts) {
       partIndices: new Set([partIndex]),
       toId,
     });
+    return edges.length - 1;
   };
 
   const mappedMainlineNodeByOsmNodeId = new Map();
@@ -2772,6 +2801,7 @@ export function buildPairedOsmSourceTopologyGraph(osm, averagedParts) {
         };
   };
 
+  const turnJunctions = new Map();
   const pairedConnectors = averagedParts.filter((part) => part.role === 'connector');
   for (const [connectorIndex, connector] of pairedConnectors.entries()) {
     const startNode = exactMappedMainlineNode(
@@ -2800,7 +2830,59 @@ export function buildPairedOsmSourceTopologyGraph(osm, averagedParts) {
       tokens: connector.tokens,
     });
     for (let index = 1; index < graphNodes.length; index += 1) {
-      addEdge(graphNodes[index - 1].id, graphNodes[index].id, partIndex);
+      const edgeIndex = addEdge(
+        graphNodes[index - 1].id,
+        graphNodes[index].id,
+        partIndex,
+      );
+      for (const [atEndpoint, node, mainlinePartIndex, direction] of [
+        [
+          index === 1,
+          startNode,
+          connector.startMainlinePartIndex,
+          connector.startMainlineDirection,
+        ],
+        [
+          index === graphNodes.length - 1,
+          endNode,
+          connector.endMainlinePartIndex,
+          connector.endMainlineDirection,
+        ],
+      ]) {
+        if (!atEndpoint || direction === undefined || edgeIndex === undefined) continue;
+        const port = { mainlineId: `mainline:${mainlinePartIndex}`, direction };
+        const edge = edges[edgeIndex];
+        edge[edge.fromId === node.id ? 'fromTurnPort' : 'toTurnPort'] = port;
+        turnJunctions.set(node.id, { mainlinePartIndex, coordinate: node.coordinate });
+      }
+    }
+  }
+
+  // At a paired-ramp endpoint, the mainline has two distinct legs. Preserve
+  // those ports when contracting the graph; an undirected junction alone
+  // would also permit entering a ramp by reversing across the median.
+  for (const edge of edges) {
+    for (const [nodeId, otherId, field] of [
+      [edge.fromId, edge.toId, 'fromTurnPort'],
+      [edge.toId, edge.fromId, 'toTurnPort'],
+    ]) {
+      const junction = turnJunctions.get(nodeId);
+      if (!junction || edge[field]) continue;
+      const part = averagedParts[junction.mainlinePartIndex];
+      const prefix = `center:${junction.mainlinePartIndex}:`;
+      const direction =
+        nodeId.startsWith(prefix) && otherId.startsWith(prefix)
+          ? Math.sign(
+              Number(otherId.slice(prefix.length)) -
+                Number(nodeId.slice(prefix.length)),
+            )
+          : rampAttachmentTravelDirection(part, {
+              coordinate: junction.coordinate,
+              travelDirections: [
+                vector(junction.coordinate, coordinateByNodeId.get(otherId)),
+              ],
+            });
+      edge[field] = { mainlineId: `mainline:${junction.mainlinePartIndex}`, direction };
     }
   }
 
@@ -4177,6 +4259,12 @@ export function buildRampConnectors(
     const endTopologyKey = `osm-ramp-pair:${connectorIndex}:end`;
     const connector = {
       coordinates,
+      startMainlineDirection:
+        rampAttachmentTravelDirection(parts[startPartIndex], startAttachment) *
+        (startAttachment === forward.firstAttachment ? 1 : -1),
+      endMainlineDirection:
+        rampAttachmentTravelDirection(parts[endPartIndex], endAttachment) *
+        (endAttachment === reverse.firstAttachment ? 1 : -1),
       endMainlinePartIndex: endPartIndex,
       endTopologyKeys: [endTopologyKey],
       id: `osm-connector-${connectorIndex}`,
