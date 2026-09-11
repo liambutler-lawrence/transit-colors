@@ -100,22 +100,26 @@ keeping large geometry parsing and indexing off the UI thread.
 The offline builder operates on a network-wide OpenStreetMap divided-road graph. It
 pairs lane-qualified one-way carriageways into a sampled centerline, classifies direct
 motorway-link paths as connector edges, and inserts their endpoints into the mainline
-geometry. Initial pairing searches within 160 metres. A missing run may continue an
-established pair through a wider median only when the same opposing source chain is
-confirmed at both ends. Every intervening sample must have a closest opposing tangent
-within 2 kilometres, progress monotonically along that chain, and keep consecutive
-midpoints within the normal sampling limit. Runs longer than 25 kilometres, unbounded
-gaps, and changes of opposing chain remain unmatched; there is no straight-line gap
-bridge. Mainline matching stops at the actual overlap of the carriageways: a nearest
-projection past an opposing chain's terminal rejects that chain, rather than clamping to
-its endpoint or using a farther interior vertex. Closest vertices at ordinary interior
-bends remain valid. At a mainline merge, directional source junctions that attach to the
-same branch terminal share one centerline vertex on the continuing midpoint line.
-Existing endpoint keys carry that vertex across split centerline parts. Terminal
-geometry is extended or trimmed in travel order; interior insertions are projected again
-after the shared coordinate is chosen. A merge adjustment cannot collapse a short loop,
-trim past a different junction, or add backward turns to an approach; those complex
-attachments retain their individual source topology.
+geometry. Open `highway=motorway_link` ramps remain eligible when `construction=*`
+describes minor works, widening, or a former construction road class.
+`highway=construction`, the legacy `construction=yes`, and explicit access closures
+remain excluded; mainline construction qualification is unchanged. Initial pairing
+searches within 160 metres. A missing run may continue an established pair through a
+wider median only when the same opposing source chain is confirmed at both ends. Every
+intervening sample must have a closest opposing tangent within 2 kilometres, progress
+monotonically along that chain, and keep consecutive midpoints within the normal
+sampling limit. Runs longer than 25 kilometres, unbounded gaps, and changes of opposing
+chain remain unmatched; there is no straight-line gap bridge. Mainline matching stops at
+the actual overlap of the carriageways: a nearest projection past an opposing chain's
+terminal rejects that chain, rather than clamping to its endpoint or using a farther
+interior vertex. Closest vertices at ordinary interior bends remain valid. At a mainline
+merge, directional source junctions that attach to the same branch terminal share one
+centerline vertex on the continuing midpoint line. Existing endpoint keys carry that
+vertex across split centerline parts. Terminal geometry is extended or trimmed in travel
+order; interior insertions are projected again after the shared coordinate is chosen. A
+merge adjustment cannot collapse a short loop, trim past a different junction, or add
+backward turns to an approach; those complex attachments retain their individual source
+topology.
 
 A one-lane merge can also leave an unrelated pair between the branch's return roadway
 and the through road. The builder records each pair's complete source-chain intervals
@@ -148,34 +152,41 @@ an unmatched movement only when its new midpoint has neither backward turns nor
 self-intersections; they cannot consume a direction from an existing pair or create a
 duplicate of it. Reciprocal collector-road alternatives are consolidated to the pair
 with the shortest mean directional ramp distance only when both directions share a
-source junction and directed segment and connect the same mainline legs. Shared
-collector stems for distinct turns remain separate; proximity alone never merges
-connections. Ramp samples use the closest point on a tangent-aligned opposing segment
-and its WGS84 geodesic midpoint, as mainlines do. The shorter of the two oriented paths
-supplies the samples; endpoints are never warped to create correspondence and the
-midpoints are not smoothed afterward. If successive projections skip a source bend,
-nearby closest-tangent anchors bound a local, monotone Hermite interpolation of distance
-along each source path. Denser samples then trace that bend before the geodesic
-midpoints are computed. This does not normalize progress across the complete ramps or
-round off their output coordinates. The continuation is rejected if it traverses a
-reverse-facing loop or makes a sharper corner, including at its joins to the untouched
-correspondence. If the resulting midpoint doubles back, the builder tries the ordered
-closest-tangent correspondence used for mainline bends across both source paths. It
-accepts this fallback only when the new midpoint stays between the source roads, removes
-backward turns, improves the maximum turn, and has no self-intersection after endpoint
-attachment. Where ramp joins are staggered, the path extends along its actual source
-mainline carriageway through explicit OSM nodes, from the earlier split to the later
-merge. Only then are the shared centerline endpoints attached to the mainline graph.
-Geometry crossings never create graph nodes; topology comes from explicit shared source
-nodes. The continental stages are largest-component selection, 2-core pruning,
-degree-two compression, a detailed northeastern perimeter cycle, and independent
-detailed node-disjoint ears for southeastern Massachusetts and the southern/western
-perimeter. The northeastern cycle is explicitly anchored through Highway 407, Ottawa,
-Québec, and coastal New England. Every ear uses explicit source junctions. A small hook
-where two consecutive averaged edges overshoot their shared junction is clipped only
-between those adjacent tails; any nonlocal geometric crossing forbids the responsible
-corridor and triggers another routing attempt. The accepted boundary is a simple cycle
-in both graph topology and rendered geometry.
+source junction and directed segment and connect the same mainline legs. Each matched
+movement is shortened against all compatible candidates, including alternatives sharing
+its own matched return, without consuming a direction assigned to another movement.
+Released paths remain available for further shortening until total distance stops
+decreasing. Shared collector stems for distinct turns remain separate; proximity alone
+never merges connections. Ramp samples use the closest point on a tangent-aligned
+opposing segment and its WGS84 geodesic midpoint, as mainlines do. The shorter of the
+two oriented paths supplies the samples; endpoints are never warped to create
+correspondence and the midpoints are not smoothed afterward. If successive projections
+skip a source bend, nearby closest-tangent anchors bound a local, monotone Hermite
+interpolation of distance along each source path. Denser samples then trace that bend
+before the geodesic midpoints are computed. This does not normalize progress across the
+complete ramps or round off their output coordinates. The continuation is rejected if it
+traverses a reverse-facing loop or makes a sharper corner, including at its joins to the
+untouched correspondence. If the resulting midpoint doubles back, the builder tries the
+ordered closest-tangent correspondence used for mainline bends across both source paths.
+It accepts this fallback only when the new midpoint stays between the source roads,
+removes backward turns, improves the maximum turn, and has no self-intersection after
+endpoint attachment. If that still leaves a reversal, a second closest-tangent search
+only advances along the opposite source path, preventing a return to an earlier loop.
+This retry must eliminate backward turns and self-intersections and reduce the maximum
+turn; the existing midpoint remains unchanged when it is already valid. Where ramp joins
+are staggered, the path extends along its actual source mainline carriageway through
+explicit OSM nodes, from the earlier split to the later merge. Only then are the shared
+centerline endpoints attached to the mainline graph. Geometry crossings never create
+graph nodes; topology comes from explicit shared source nodes. The continental stages
+are largest-component selection, 2-core pruning, degree-two compression, a detailed
+northeastern perimeter cycle, and independent detailed node-disjoint ears for
+southeastern Massachusetts and the southern/western perimeter. The northeastern cycle is
+explicitly anchored through Highway 407, Ottawa, Québec, and coastal New England. Every
+ear uses explicit source junctions. A small hook where two consecutive averaged edges
+overshoot their shared junction is clipped only between those adjacent tails; any
+nonlocal geometric crossing forbids the responsible corridor and triggers another
+routing attempt. The accepted boundary is a simple cycle in both graph topology and
+rendered geometry.
 
 The circumference map keeps one independent route state and gradient image source per
 metro area. It merges all complete networks and selected boundaries into one GeoJSON

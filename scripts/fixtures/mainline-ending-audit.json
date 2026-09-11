@@ -7,7 +7,7 @@
       "to": [-96.7143477, 40.8584938],
       "distanceMeters": 508.0793069762874,
       "sourceNodes": ["134928540", "134942035"],
-      "connectorIds": ["osm-connector-2173", "osm-connector-2174"]
+      "connectorIds": ["osm-connector-2189", "osm-connector-2190"]
     },
     {
       "partId": "osm-mainline-491",
@@ -16,7 +16,7 @@
       "to": [-90.5773981, 41.8255981],
       "distanceMeters": 655.3219019664404,
       "sourceNodes": ["611522714", "611522711"],
-      "connectorIds": ["osm-connector-2468", "osm-connector-2469"]
+      "connectorIds": ["osm-connector-2486", "osm-connector-2487"]
     },
     {
       "partId": "osm-mainline-500",
@@ -25,7 +25,7 @@
       "to": [-90.5238763, 41.591974],
       "distanceMeters": 469.97877461277744,
       "sourceNodes": ["9158607650", "8188204089"],
-      "connectorIds": ["osm-connector-2503", "osm-connector-2504"]
+      "connectorIds": ["osm-connector-2521", "osm-connector-2522"]
     },
     {
       "partId": "osm-mainline-5248",
@@ -34,7 +34,7 @@
       "to": [-101.2073167, 19.8784307],
       "distanceMeters": 443.4168822554469,
       "sourceNodes": ["6900982908", "4177543260"],
-      "connectorIds": ["osm-connector-4539", "osm-connector-4540"]
+      "connectorIds": ["osm-connector-4559", "osm-connector-4560"]
     },
     {
       "partId": "osm-mainline-5495",
@@ -43,7 +43,7 @@
       "to": [-97.4909602, 18.825468],
       "distanceMeters": 278.69087988354147,
       "sourceNodes": ["8784249344", "465627077"],
-      "connectorIds": ["osm-connector-3863", "osm-connector-3864"]
+      "connectorIds": ["osm-connector-3884", "osm-connector-3885"]
     },
     {
       "partId": "osm-mainline-5745",
@@ -52,7 +52,7 @@
       "to": [-81.5174851, 40.7656098],
       "distanceMeters": 578.455259355501,
       "sourceNodes": ["199898070", "199907031"],
-      "connectorIds": ["osm-connector-3198", "osm-connector-3199"]
+      "connectorIds": ["osm-connector-3218", "osm-connector-3219"]
     }
   ],
   "statistics": {
@@ -66,7 +66,7 @@
       "point": [-75.2926079, 43.0804269],
       "sourceNodes": ["212850500", "212859989"],
       "unpairedSourceNodeId": "212850500",
-      "connectorIds": ["osm-connector-3404"]
+      "connectorIds": ["osm-connector-3424"]
     }
   ]
 }

@@ -11008,7 +11008,7 @@
   ],
   "connectors": [
     {
-      "id": "osm-connector-1396",
+      "id": "osm-connector-1400",
       "sourceWayIds": ["29988005", "337620870", "29988916", "50597195", "50597188"],
       "startMainlineId": "osm-mainline-2084",
       "endMainlineId": "osm-mainline-5259",
@@ -11071,7 +11071,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-1397",
+      "id": "osm-connector-1401",
       "sourceWayIds": ["9506400", "931390503", "50597197", "34281505", "29988849"],
       "startMainlineId": "osm-mainline-2083",
       "endMainlineId": "osm-mainline-5259",
@@ -11127,7 +11127,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-4733",
+      "id": "osm-connector-4753",
       "sourceWayIds": [
         "18848439",
         "527816652",
@@ -11201,7 +11201,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-4738",
+      "id": "osm-connector-4759",
       "sourceWayIds": [
         "9942160",
         "498113792",
@@ -11243,7 +11243,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-4739",
+      "id": "osm-connector-4760",
       "sourceWayIds": [
         "498113805",
         "9942057",
@@ -11296,7 +11296,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-4740",
+      "id": "osm-connector-4761",
       "sourceWayIds": [
         "498113805",
         "9942057",
@@ -11344,7 +11344,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-4741",
+      "id": "osm-connector-4762",
       "sourceWayIds": [
         "498113789",
         "496510660",
@@ -11399,7 +11399,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-4742",
+      "id": "osm-connector-4763",
       "sourceWayIds": [
         "503404696",
         "1349743518",
@@ -11489,7 +11489,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-4743",
+      "id": "osm-connector-4764",
       "sourceWayIds": [
         "503268660",
         "495536471",
@@ -11582,7 +11582,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-4744",
+      "id": "osm-connector-4765",
       "sourceWayIds": [
         "503268660",
         "28178232",
@@ -11671,7 +11671,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-4745",
+      "id": "osm-connector-4766",
       "sourceWayIds": [
         "503404698",
         "9940399",
@@ -11772,7 +11772,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-4746",
+      "id": "osm-connector-4767",
       "sourceWayIds": [
         "537499396",
         "974639699",
@@ -11880,7 +11880,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-4803",
+      "id": "osm-connector-4827",
       "sourceWayIds": ["85396208", "50714679"],
       "startMainlineId": "osm-mainline-5810",
       "endMainlineId": "osm-mainline-2113",
@@ -11903,7 +11903,7 @@
       "carriagewayPenalties": [0.012493261888690377, 0.002823849278329349]
     },
     {
-      "id": "osm-connector-4826",
+      "id": "osm-connector-4850",
       "sourceWayIds": ["837858647", "754735346", "754735345", "754735343", "13281537"],
       "startMainlineId": "osm-mainline-6434",
       "endMainlineId": "osm-mainline-3612",
@@ -11956,7 +11956,7 @@
       "carriagewayPenalties": [0.000030488168227538193, 0.0179245662551909]
     },
     {
-      "id": "osm-connector-1289",
+      "id": "osm-connector-1293",
       "previousId": "osm-connector-1334",
       "sourceWayIds": ["29019369", "1023527322"],
       "startMainlineId": "osm-mainline-1629",
@@ -11978,7 +11978,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-1433",
+      "id": "osm-connector-1437",
       "previousId": "osm-connector-1487",
       "sourceWayIds": ["118924168", "118924106"],
       "startMainlineId": "osm-mainline-191",
@@ -12050,7 +12050,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-2444",
+      "id": "osm-connector-2462",
       "previousId": "osm-connector-2554",
       "sourceWayIds": ["32966083", "1474466908", "15544536"],
       "startMainlineId": "osm-mainline-489",
@@ -12069,7 +12069,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-3321",
+      "id": "osm-connector-3341",
       "previousId": "osm-connector-3469",
       "sourceWayIds": [
         "1155711660",
@@ -12140,7 +12140,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-3742",
+      "id": "osm-connector-3763",
       "previousId": "osm-connector-3910",
       "sourceWayIds": ["23469289", "23468673"],
       "startMainlineId": "osm-mainline-5686",
@@ -12202,7 +12202,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-3892",
+      "id": "osm-connector-3913",
       "previousId": "osm-connector-4075",
       "sourceWayIds": ["901245664", "27394093"],
       "startMainlineId": "osm-mainline-1092",
@@ -12229,7 +12229,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-4040",
+      "id": "osm-connector-4061",
       "previousId": "osm-connector-4236",
       "sourceWayIds": [
         "86291347",
@@ -12351,7 +12351,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-4203",
+      "id": "osm-connector-4225",
       "previousId": "osm-connector-4404",
       "sourceWayIds": ["48535653", "1514066320", "882564640", "1312775349", "48535652"],
       "startMainlineId": "osm-mainline-3126",
@@ -12379,7 +12379,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-4330",
+      "id": "osm-connector-4352",
       "previousId": "osm-connector-4543",
       "sourceWayIds": ["254887238", "254893365", "94057119", "94057190"],
       "startMainlineId": "osm-mainline-1089",
@@ -12414,7 +12414,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-4331",
+      "id": "osm-connector-4353",
       "previousId": "osm-connector-4544",
       "sourceWayIds": [
         "186463194",
@@ -12552,7 +12552,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-4332",
+      "id": "osm-connector-4354",
       "previousId": "osm-connector-4545",
       "sourceWayIds": [
         "549756028",
@@ -12624,7 +12624,7 @@
       "carriagewayPenalties": [0, 0]
     },
     {
-      "id": "osm-connector-4376",
+      "id": "osm-connector-4398",
       "previousId": "osm-connector-4595",
       "sourceWayIds": ["120610307", "120610300", "285602317", "285602361"],
       "startMainlineId": "osm-mainline-3593",

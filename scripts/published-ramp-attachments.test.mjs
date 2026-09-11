@@ -9,6 +9,16 @@ import { geodesicDistanceMeters } from './wgs84-geodesy.mjs';
 for (const [fixture, title, requiredWays] of [
   ['ramp-attachment-audit.json', 'published ramp repairs', [['9080553', '9080294']]],
   [
+    'collector-ramp-audit.json',
+    'published shortest collectors and restored ramp pairs',
+    [
+      ['943967900', '943967905'],
+      ['1314789904', '1314789905'],
+      ['1145600119', '1314789902'],
+      ['943967892'],
+    ],
+  ],
+  [
     'mixed-merge-audit.json',
     'published mixed motorway merges',
     [['100946830', '539942066'], ['562358000']],
