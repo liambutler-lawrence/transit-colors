@@ -7,7 +7,7 @@
       "to": [-96.7143477, 40.8584938],
       "distanceMeters": 508.0793069762874,
       "sourceNodes": ["134928540", "134942035"],
-      "connectorIds": ["osm-connector-2189", "osm-connector-2190"]
+      "connectorIds": ["osm-connector-2188", "osm-connector-2189"]
     },
     {
       "partId": "osm-mainline-491",
@@ -16,7 +16,7 @@
       "to": [-90.5773981, 41.8255981],
       "distanceMeters": 655.3219019664404,
       "sourceNodes": ["611522714", "611522711"],
-      "connectorIds": ["osm-connector-2486", "osm-connector-2487"]
+      "connectorIds": ["osm-connector-2485", "osm-connector-2486"]
     },
     {
       "partId": "osm-mainline-500",
@@ -25,7 +25,7 @@
       "to": [-90.5238763, 41.591974],
       "distanceMeters": 469.97877461277744,
       "sourceNodes": ["9158607650", "8188204089"],
-      "connectorIds": ["osm-connector-2521", "osm-connector-2522"]
+      "connectorIds": ["osm-connector-2520", "osm-connector-2521"]
     },
     {
       "partId": "osm-mainline-5248",
@@ -34,7 +34,7 @@
       "to": [-101.2073167, 19.8784307],
       "distanceMeters": 443.4168822554469,
       "sourceNodes": ["6900982908", "4177543260"],
-      "connectorIds": ["osm-connector-4559", "osm-connector-4560"]
+      "connectorIds": ["osm-connector-4561", "osm-connector-4562"]
     },
     {
       "partId": "osm-mainline-5495",
@@ -43,7 +43,7 @@
       "to": [-97.4909602, 18.825468],
       "distanceMeters": 278.69087988354147,
       "sourceNodes": ["8784249344", "465627077"],
-      "connectorIds": ["osm-connector-3884", "osm-connector-3885"]
+      "connectorIds": ["osm-connector-3885", "osm-connector-3886"]
     },
     {
       "partId": "osm-mainline-5745",
