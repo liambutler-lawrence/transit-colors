@@ -190,3 +190,46 @@ test('a one-lane branch can merge into a continuing mainline through its actual 
     'geographic proximity cannot replace the missing opposite source road',
   );
 });
+
+test('a shared opposite carriageway may return into an interior mainline point when the other leg terminates', () => {
+  const osm = fixture();
+  const built = buildOsmHighwayCenterlines(osm);
+  const original = built.parts.find((part) => part.throughMainline);
+  const prepared = prepareWays(osm);
+  for (const extendedEnds of [1, 2]) {
+    const parts = structuredClone(
+      built.parts.filter((part) => part.role === 'mainline'),
+    );
+    for (const [index, endpoint] of [
+      [original.endMainlinePartIndex, original.coordinates.at(-1)],
+      [original.startMainlinePartIndex, original.coordinates[0]],
+    ].slice(0, extendedEnds)) {
+      const points = parts[index].coordinates;
+      const start =
+        geodesicDistanceMeters(endpoint, points[0]) <
+        geodesicDistanceMeters(endpoint, points.at(-1));
+      if (start) points.reverse();
+      const b = points.at(-1);
+      const a = points
+        .toReversed()
+        .find((point) => geodesicDistanceMeters(point, b) > 1);
+      const scale = 300 / geodesicDistanceMeters(a, b);
+      points.push(b.map((value, axis) => value + scale * (value - a[axis])));
+      if (start) points.reverse();
+    }
+    const result = buildRampConnectors(
+      osm,
+      prepared.mainlines,
+      parts,
+      prepared.connectors,
+    );
+    assert.equal(result.connectors.length, extendedEnds === 1 ? 1 : 0);
+    if (extendedEnds === 1) {
+      assert.deepEqual(
+        result.connectors[0].sourceWayIds.toSorted(),
+        original.sourceWayIds.toSorted(),
+      );
+      assert.equal(hasProperSelfIntersection(result.connectors[0].coordinates), false);
+    }
+  }
+});

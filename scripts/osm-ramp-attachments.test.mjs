@@ -278,3 +278,100 @@ test('newly inferred ramp pairs cannot introduce a backward midpoint or a crossi
   assert.equal(result.connectors.length, 0);
   assert.equal(result.statistics.rejectedInferredConnectorCount, 1);
 });
+
+test('a missing ramp root follows directed pavement to its source-supported mainline instead of snapping beyond it', () => {
+  const nodes = new Map();
+  const way = (id, coordinates) => ({
+    id,
+    nodeIds: coordinates.map((coordinate, index) => {
+      const nodeId = `${id}-${index}`;
+      nodes.set(nodeId, { coordinate, tags: {} });
+      return nodeId;
+    }),
+  });
+  const a = way('a', [
+    [-0.02, 0],
+    [-0.01, 0],
+    [0, 0],
+    [0.002, 0],
+    [0.01, 0],
+  ]);
+  const back = way('back', [
+    [0.01, -0.0004],
+    [0.002, -0.0004],
+    [0, -0.0004],
+    [-0.01, -0.0004],
+    [-0.02, -0.0004],
+  ]);
+  const b = way('b', [
+    [-0.01, 0.02],
+    [0, 0.02],
+    [0.01, 0.02],
+  ]);
+  const bBack = way('b-back', [
+    [0.01, 0.0204],
+    [0, 0.0204],
+    [-0.01, 0.0204],
+  ]);
+  const mainlines = [a, back, b, bBack];
+  const chains = mainlines.map((w) => ({
+    ...w,
+    sourceWayIds: [w.id],
+    coordinates: w.nodeIds.map((id) => nodes.get(id).coordinate),
+  }));
+  const part = (id, coordinates, ranges) => ({
+    id,
+    role: 'mainline',
+    coordinates,
+    tokens: [id],
+    sourceWayIds: ['a', 'back'],
+    sourceChainId: 'a',
+    pairedChainId: 'back',
+    sourceRanges: ranges.map(([chainId, positions]) => ({ chainId, positions })),
+  });
+  const parts = [
+    part(
+      'before',
+      [
+        [-0.02, -0.0002],
+        [-0.01, -0.0002],
+      ],
+      [
+        ['a', [0, 1]],
+        ['back', [3, 4]],
+      ],
+    ),
+    part(
+      'after',
+      [
+        [0.002, -0.0002],
+        [0.01, -0.0002],
+      ],
+      [
+        ['a', [3, 4]],
+        ['back', [0, 1]],
+      ],
+    ),
+    {
+      id: 'target',
+      role: 'mainline',
+      coordinates: [
+        [-0.01, 0.0202],
+        [0.01, 0.0202],
+      ],
+      tokens: ['B'],
+      sourceWayIds: ['b', 'b-back'],
+    },
+  ];
+  const links = [
+    { id: 'exit', nodeIds: ['a-2', 'b-1'] },
+    { id: 'entry', nodeIds: ['b-back-1', 'back-2'] },
+  ];
+  const result = buildRampConnectors({ nodes }, mainlines, parts, links, chains);
+  assert.equal(result.connectors.length, 1);
+  const connector = result.connectors[0];
+  assert.equal(connector.startMainlinePartIndex, 0);
+  assert.deepEqual(connector.coordinates[0], [-0.01, -0.0002]);
+  assert.ok(connector.coordinates.every((p) => p[0] <= 0.0001));
+  assert.equal(hasProperSelfIntersection(connector.coordinates), false);
+});

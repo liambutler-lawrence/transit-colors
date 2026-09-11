@@ -283,10 +283,14 @@ test('regenerated tiles retain centered mainlines and separate ramps continent-w
       'wide gaps are repaired across the network',
     );
     assert.ok(
-      gapAudit.repairs.some(
-        (repair) =>
-          repair.sourceChainId === 'chain-1363' &&
-          repair.pairedChainId === 'chain-2107',
+      gapAudit.repairs.some((repair) =>
+        repair.points.some(
+          ([longitude, latitude]) =>
+            longitude > -85.83 &&
+            longitude < -85.79 &&
+            latitude > 35.17 &&
+            latitude < 35.24,
+        ),
       ),
       'the published repairs include the Monteagle gap',
     );

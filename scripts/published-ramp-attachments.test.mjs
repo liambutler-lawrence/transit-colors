@@ -7,6 +7,11 @@ import { PMTiles } from 'pmtiles';
 import { geodesicDistanceMeters } from './wgs84-geodesy.mjs';
 
 for (const [fixture, title, requiredWays] of [
+  [
+    'express-lane-audit.json',
+    'published express-lane classification and retained general-purpose connections',
+    [],
+  ],
   ['ramp-attachment-audit.json', 'published ramp repairs', [['9080553', '9080294']]],
   [
     'collector-ramp-audit.json',
@@ -82,7 +87,7 @@ for (const [fixture, title, requiredWays] of [
         },
       });
       const layers = new Map();
-      for (const connector of audit.connectors) {
+      for (const connector of [...audit.connectors, ...(audit.mainlines ?? [])]) {
         for (const [index, point] of connector.points.entries()) {
           const dimension = 2 ** 14;
           const x = Math.floor(((point[0] + 180) / 360) * dimension);
@@ -116,12 +121,12 @@ for (const [fixture, title, requiredWays] of [
             touching.has(connector.id),
             `${connector.id} retains its corrected curve`,
           );
-          if (index === 0)
+          if (index === 0 && connector.startMainlineId)
             assert.ok(
               touching.has(connector.startMainlineId),
               `${connector.id} connects to its first mainline`,
             );
-          if (index === connector.points.length - 1)
+          if (index === connector.points.length - 1 && connector.endMainlineId)
             assert.ok(
               touching.has(connector.endMainlineId),
               `${connector.id} connects to its second mainline`,

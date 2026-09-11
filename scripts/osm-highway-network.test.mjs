@@ -20,7 +20,7 @@ import {
 test('OPL parser preserves explicit node identities and motorway tags', () => {
   const node = parseOplLine('n42 v1 dV c0 t x-73.4 y41.1');
   const way = parseOplLine(
-    'w9 v1 dV c0 t Thighway=motorway,lanes=3,oneway=yes,ref=I%2095 Nn1,n42,n3',
+    'w9 v1 dV c0 t Thighway=motorway,lanes=3,oneway=yes,ref=I%20%95 Nn1,n42,n3',
   );
   assert.deepEqual(node, {
     coordinate: [-73.4, 41.1],

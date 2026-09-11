@@ -50,9 +50,9 @@ import {
 } from './context.js';
 
 const HIGHWAY_DATA_URL =
-  'data/north-america-highway-circumference-summary.json?v=20260910d';
+  'data/north-america-highway-circumference-summary.json?v=20260910e';
 const HIGHWAY_GEOMETRY_URL =
-  'data/north-america-highway-circumference.json?v=20260910d';
+  'data/north-america-highway-circumference.json?v=20260910e';
 let highwayData: HighwayCircumferenceSummary | null = null;
 let highwayPromise: Promise<HighwayCircumferenceSummary> | null = null;
 const HIGHWAY_GRADIENT_SOURCE_ID = 'highway-circumference-gradient';
@@ -145,7 +145,7 @@ export function syncCircumferenceCriterionControls(): void {
     ? 'Highway details'
     : 'Line or transfer details';
   circumferenceMethodNoteEl.textContent = highwayMode
-    ? 'Solid lines are separated 2+ lane controlled-access mainlines; dashed lines join closest-tangent midpoints of opposing ramps, continuing along the mainline where their joins are staggered. One-way-only ramps are excluded. Only explicit paired endpoints form graph junctions—grade-separated crossings do not. The thick route is the largest validated detailed simple boundary.'
+    ? 'Solid lines are separated 2+ lane general-purpose mainlines; dashed lines join closest-tangent midpoints of opposing ramps, continuing along the mainline where their joins are staggered. Separated express lanes and collector/distributor roads use the same two-way ramp rules. One-way-only ramps are excluded. Only explicit paired endpoints form graph junctions—grade-separated crossings do not. The thick route is the largest validated detailed simple boundary.'
     : 'All metro networks stay visible, including metros without a circle. Each result card is the largest circle that does not reuse another result’s rail segments and focuses it on the map; clicking any visible line, platform, transfer, street, or station updates this final section directly.';
 }
 
