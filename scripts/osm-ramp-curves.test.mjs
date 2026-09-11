@@ -99,3 +99,24 @@ test('a repaired bend cannot cross another section of the complete ramp', () => 
   assert.equal(hasProperSelfIntersection(coordinates), false);
   assert.deepEqual(coordinates, fixture.beforeCoordinates);
 });
+
+test('projected mainline attachments do not retain a midpoint behind the ramp start', () => {
+  const fixtures = JSON.parse(
+    readFileSync(
+      new URL('./fixtures/ramp-attachment-overhangs.json', import.meta.url),
+      'utf8',
+    ),
+  ).cases;
+  for (const fixture of fixtures) {
+    const coordinates = average(fixture);
+    assert.deepEqual(coordinates[0], fixture.startCoordinate);
+    assert.deepEqual(coordinates.at(-1), fixture.endCoordinate);
+    assert.equal(hasProperSelfIntersection(coordinates), false);
+    assert.ok(maximumTurnDegrees(coordinates.slice(0, 3)) < 90, fixture.name);
+    assert.ok(
+      maximumTurnDegrees(coordinates) <
+        maximumTurnDegrees(fixture.beforeCoordinates) - 40,
+      `${fixture.name} improves the complete curve, including its attachment`,
+    );
+  }
+});

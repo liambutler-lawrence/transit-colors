@@ -10,6 +10,7 @@ import polygonClipping from 'polygon-clipping';
 import { calculateLandmassCoverage } from '../src/circumference-landmass.ts';
 import { geodesicLineLengthMeters } from '../src/geodesy.ts';
 import { compressHighwayCore, highwayTwoCore } from './highway-graph.mjs';
+import { hasProperSelfIntersection } from './highway-cycle.mjs';
 import {
   NORTH_AMERICAN_HIGHWAY_ENVELOPE_COORDINATES,
   northAmericanHighwayEnvelopeSupportNodeIds,
@@ -48,7 +49,7 @@ function boundarySegments(detailedSegments, graphParts) {
       ? 'connector'
       : 'mainline';
     return {
-      coordinates: segment.coordinates.map((coordinate) => roundCoordinate(coordinate)),
+      coordinates: segment.coordinates,
       id: `${role}-boundary-${index + 1}`,
       role,
     };
@@ -126,9 +127,9 @@ const landmassBuffer = await readFile(landmassSourcePath);
 let derived;
 try {
   derived = deserialize(await readFile(derivedCachePath));
-  if (derived.displayTopologyVersion !== 38) {
+  if (derived.displayTopologyVersion !== 43) {
     throw new Error(
-      'The cached display topology predates shortest collector matching and open-road classification.',
+      'The cached display topology predates source-interval junction and routing support.',
     );
   }
   console.log(`Reused ${derivedCachePath}.`);
@@ -153,7 +154,7 @@ try {
   console.log(detailed.statistics);
   derived = {
     detailed,
-    displayTopologyVersion: 38,
+    displayTopologyVersion: 43,
   };
   await writeFile(derivedCachePath, serialize(derived));
 
@@ -182,7 +183,7 @@ try {
   derived = {
     compressed,
     detailed,
-    displayTopologyVersion: 38,
+    displayTopologyVersion: 43,
     graphStatistics,
     sourceCompressed: compressed,
     sourceGraphParts: exactGraph.parts.map(({ id, role, tokens }) => ({
@@ -191,13 +192,13 @@ try {
       tokens,
     })),
     sourceGraphStatistics: graphStatistics,
-    sourceTopologyVersion: 37,
+    sourceTopologyVersion: 42,
   };
   await writeFile(derivedCachePath, serialize(derived));
 }
 globalThis.gc?.();
 const { detailed } = derived;
-if (derived.sourceTopologyVersion !== 37) {
+if (derived.sourceTopologyVersion !== 42) {
   console.time('Read OSM mainline continuity topology');
   const osm = await readOsmMotorwayPbf(sourcePath);
   console.timeEnd('Read OSM mainline continuity topology');
@@ -226,7 +227,7 @@ if (derived.sourceTopologyVersion !== 37) {
     exactEdges: sourceGraph.edges.length,
     exactNodes: sourceGraph.coordinateByNodeId.size,
   };
-  derived.sourceTopologyVersion = 37;
+  derived.sourceTopologyVersion = 42;
   console.timeEnd('Build explicit paired-centerline route graph');
   console.log(derived.sourceGraphStatistics);
   await writeFile(derivedCachePath, serialize(derived));
@@ -291,9 +292,12 @@ if (exact.areaSquareMeters < 6_000_000_000_000) {
   throw new Error('Detailed outer-envelope cycle is below the continental area floor.');
 }
 
-const routeCoordinates = exact.coordinates.map((coordinate) =>
-  roundCoordinate(coordinate),
-);
+// Preserve the validated centerline precision. A second rounding pass can
+// turn closely spaced source vertices into a crossing in the exported ring.
+const routeCoordinates = exact.coordinates;
+if (hasProperSelfIntersection(routeCoordinates)) {
+  throw new Error('The exported highway boundary must remain a simple cycle.');
+}
 if (
   !routeCoordinates.some(([longitude, latitude]) => longitude > -74 && latitude > 45) ||
   !routeCoordinates.some(([longitude, latitude]) => longitude > -71 && latitude > 42)

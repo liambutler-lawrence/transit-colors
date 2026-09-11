@@ -146,3 +146,47 @@ test('overlapping mainline terminals do not get another through connection', () 
   );
   assert.equal(ramps.statistics.directConnectorCount, 0);
 });
+
+test('a one-lane branch can merge into a continuing mainline through its actual opposite carriageway', () => {
+  const data = JSON.parse(
+    readFileSync(
+      new URL('./fixtures/phoenix-continuing-mainline-merge.json', import.meta.url),
+    ),
+  );
+  const osm = { nodes: new Map(data.nodes), ways: data.ways };
+  const prepared = prepareWays(osm);
+  const parts = structuredClone(data.parts);
+  const ramps = buildRampConnectors(
+    osm,
+    prepared.mainlines,
+    parts,
+    prepared.connectors,
+  );
+  assert.equal(ramps.connectors.length, 1);
+  const connector = ramps.connectors[0];
+  assert.ok(connector.sourceWayIds.includes('404631326'));
+  assert.ok(connector.sourceWayIds.includes('30024248'));
+  assert.equal(parts[connector.startMainlinePartIndex].id, 'osm-mainline-877');
+  assert.equal(parts[connector.endMainlinePartIndex].id, 'osm-mainline-1214');
+  assert.equal(hasProperSelfIntersection(connector.coordinates), false);
+  for (let index = 1; index < connector.coordinates.length; index += 1)
+    assert.ok(
+      connector.coordinates[index][1] < connector.coordinates[index - 1][1],
+      'the restored merge advances smoothly southward',
+    );
+  const withoutReturn = {
+    ...osm,
+    ways: osm.ways.filter((way) => way.id !== '30024248'),
+  };
+  const unpaired = prepareWays(withoutReturn);
+  assert.equal(
+    buildRampConnectors(
+      withoutReturn,
+      unpaired.mainlines,
+      structuredClone(data.parts),
+      unpaired.connectors,
+    ).connectors.length,
+    0,
+    'geographic proximity cannot replace the missing opposite source road',
+  );
+});

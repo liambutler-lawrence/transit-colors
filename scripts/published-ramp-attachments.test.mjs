@@ -29,6 +29,16 @@ for (const [fixture, title, requiredWays] of [
     [['504329517']],
   ],
   [
+    'mainline-continuation-audit.json',
+    'published ramps across split mainline segments',
+    [
+      ['3992897', '3979888'],
+      ['991052689', '39334268'],
+      ['463308895', '10164288'],
+      ['1027305702', '30047422'],
+    ],
+  ],
+  [
     'covered-mainline-merge-audit.json',
     'published cleaned mainline merges',
     [['526019670'], ['26140794']],
@@ -40,6 +50,9 @@ for (const [fixture, title, requiredWays] of [
       ['9942160', '9945757'],
       ['85396208', '50714679'],
       ['466222703', '49551624'],
+      ['3992902', '3979889'],
+      ['16540098', '16540282'],
+      ['1217211235', '879450749'],
     ],
   ],
 ]) {
