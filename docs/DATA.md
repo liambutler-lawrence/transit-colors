@@ -258,6 +258,47 @@ fixtures retain their original geometry and parent mainlines, with only generate
 connector IDs updated. These checks cover directional reciprocity, not every possible
 interchange geometry defect.
 
+The Jacksonville I-95/I-295 north interchange exposed a collector-selection gap: the
+shorter north-to-east path and the longer collector path use the same return. The
+initial matching pass consumed that return for the longer option, hiding the shorter
+candidate from the later comparison. Matched movements now compare against all
+compatible alternatives, including their own assigned return, without consuming paths
+assigned to another movement. Each replacement strictly reduces mean ramp distance;
+released paths can support further improvements. Disjoint reciprocal alternatives are
+then consolidated as before.
+
+The missing northwest return crossed two open `motorway_link` ways with residual
+`construction=motorway_link` tags. The source edit history shows that the construction
+highway class and access closure were removed when the ramp reopened
+([source history](https://www.openstreetmap.org/way/943967900/history)). The ramp filter
+now follows the active link class while still excluding explicit closures and the legacy
+`construction=yes`. Mainline construction qualification is unchanged.
+`scripts/fixtures/jacksonville-collector-interchange.json` preserves the source
+junctions and tests all four movements in both source-way orders, the earlier northeast
+join, and the absence of the northwest pair when its return is actually closed. The
+selected northeast pair reduces mean directional ramp distance by approximately 619
+metres.
+
+The network audit also tests shortened collectors whose nearest projections can jump
+back into an earlier loop. A forward-only closest-tangent retry must remove all backward
+turns, improve the largest turn, and have no self-intersection. The four source-path
+cases in `scripts/fixtures/short-collector-midpoints.json` preserve the directed ramps,
+their mainline continuations, and exact attachments for those regression checks.
+
+The rebuilt network contains 6,810 mainlines and 5,009 reciprocal connectors. Its audit
+finds 57 shorter replacements sharing directed source segments in both directions; an
+additional I-495/Dulles inferred pair uses a shorter return on the same two mainline
+groups. There are 24 additional valid pairs. Of the retained source pairs, 355 midpoint
+curves lose their backward projections, including 74 that previously self-intersected.
+All 355 corrected curves have neither backward turns nor self-intersections. The 45
+mainlines touched by attachment changes retain their source roadways and introduce no
+new reversals or self-intersections. All 275 earlier nonreciprocal rejections remain
+excluded, and the same six unsupported mainline tails remain trimmed.
+`scripts/fixtures/collector-ramp-audit.json` checks the published curves and both
+mainline attachments for 438 changed or relevant connectors, including all four
+Jacksonville movements. The existing positive fixtures retain their curves except for
+six source-verified shorter replacements; generated connector IDs are updated.
+
 The continental boundary is assembled directly on the detailed biconnected graph. A
 northeastern cycle is routed through Highway 407, Ottawa, Québec, and coastal New
 England; independent node-disjoint perimeter ears then add I-495 in southeastern

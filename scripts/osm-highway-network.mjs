@@ -122,7 +122,11 @@ function laneCount(tags) {
 
 function forbiddenHighway(tags) {
   return (
-    tags.construction ||
+    // Open ramp links can retain a construction road class after reopening,
+    // or describe ongoing minor works. Do not sever those explicit paths.
+    // Keep the existing construction qualification for mainline pairing.
+    (tags.construction &&
+      (tags.highway !== 'motorway_link' || tags.construction === 'yes')) ||
     tags.access === 'no' ||
     tags.motor_vehicle === 'no' ||
     tags.highway === 'construction'
@@ -1478,11 +1482,12 @@ function repairReversingRamp(coordinates, first, second, start, end) {
  * carriageways through that bend before taking their WGS84 midpoints. Both
  * inputs run in the same direction; endpoints and final midpoints are never warped.
  */
-export function averageReciprocalPathCoordinates(
+function reciprocalPathMidpoints(
   firstCoordinates,
   secondCoordinates,
   startCoordinate,
   endCoordinate,
+  monotone = false,
 ) {
   const [reference, opposite] =
     lineLengthMeters(firstCoordinates) <= lineLengthMeters(secondCoordinates)
@@ -1507,12 +1512,19 @@ export function averageReciprocalPathCoordinates(
         segment.start,
         segment.end,
       );
+      const oppositeDistance =
+        segment.distanceAlong + geodesicDistanceMeters(segment.start, projected);
+      if (
+        monotone &&
+        matches.length &&
+        oppositeDistance < matches.at(-1).oppositeDistance - 0.01
+      )
+        continue;
       const distanceMeters = geodesicDistanceMeters(sample.coordinate, projected);
       if (!best || distanceMeters < best.distanceMeters) {
         best = {
           opposite: projected,
-          oppositeDistance:
-            segment.distanceAlong + geodesicDistanceMeters(segment.start, projected),
+          oppositeDistance,
           distanceMeters,
         };
       }
@@ -1587,6 +1599,24 @@ export function averageReciprocalPathCoordinates(
     startCoordinate,
     endCoordinate,
   );
+}
+
+export function averageReciprocalPathCoordinates(first, second, start, end) {
+  const coordinates = reciprocalPathMidpoints(first, second, start, end);
+  const before = rampBendMetrics(coordinates);
+  if (!before.backwards) return coordinates;
+  // A shorter collector can expose an earlier loop to independent nearest
+  // projections. Search only forward along the opposite source path on retry.
+  // This keeps tangent-qualified source midpoints instead of smoothing the line.
+  const candidate = reciprocalPathMidpoints(first, second, start, end, true);
+  const after = rampBendMetrics(candidate);
+  if (
+    after.backwards ||
+    after.maximum >= before.maximum ||
+    hasProperSelfIntersection(candidate)
+  )
+    return coordinates;
+  return candidate;
 }
 
 function travelDirectionAtNode(coordinates, nodeIndex) {
@@ -1732,6 +1762,38 @@ export function selectShortestReciprocalMovements(pairs, groupByPartIndex) {
   return pairs.filter((pair) => retained.has(pair));
 }
 
+export function shortenReciprocalMatches(matches, candidates, groupByPartIndex) {
+  const pairs = [...matches];
+  const used = new Set(pairs.flat());
+  const length = (pair) => pair[0].distanceMeters + pair[1].distanceMeters;
+  const ordered = [...candidates].sort(
+    (first, second) => length(first) - length(second),
+  );
+  let changed;
+  do {
+    changed = false;
+    for (const [index, pair] of pairs.entries()) {
+      const shorter = ordered.find(
+        (candidate) =>
+          length(candidate) < length(pair) - 0.001 &&
+          candidate.every(
+            (path, direction) =>
+              (path === pair[direction] || !used.has(path)) &&
+              sameDirectedRampMovement(path, pair[direction], groupByPartIndex),
+          ),
+      );
+      if (!shorter) continue;
+      for (const path of pair) used.delete(path);
+      for (const path of shorter) used.add(path);
+      pairs[index] = shorter;
+      changed = true;
+    }
+    // A replacement can free a direction for a different matched movement.
+    // Every change strictly reduces total ramp distance, so this converges.
+  } while (changed);
+  return pairs;
+}
+
 function reciprocalPathPairs(paths, groupByPartIndex, pairedChains) {
   const groups = new Map();
   for (const [pathIndex, path] of paths.entries()) {
@@ -1758,6 +1820,7 @@ function reciprocalPathPairs(paths, groupByPartIndex, pairedChains) {
 
   const used = new Set();
   const pairs = [];
+  const alternativeCandidates = [];
   for (const group of groups.values()) {
     const candidates = [];
     for (const first of group.forward) {
@@ -1803,6 +1866,7 @@ function reciprocalPathPairs(paths, groupByPartIndex, pairedChains) {
           continue;
         candidates.push({
           first,
+          pair: [first.path, second.path],
           score:
             firstEndpointGapMeters +
             secondEndpointGapMeters +
@@ -1828,22 +1892,38 @@ function reciprocalPathPairs(paths, groupByPartIndex, pairedChains) {
         first.first.pathIndex - second.first.pathIndex ||
         first.second.pathIndex - second.second.pathIndex,
     );
+    const matches = [];
     for (const candidate of candidates) {
       if (used.has(candidate.first.pathIndex) || used.has(candidate.second.pathIndex)) {
         continue;
       }
       used.add(candidate.first.pathIndex);
       used.add(candidate.second.pathIndex);
-      pairs.push([candidate.first.path, candidate.second.path]);
+      matches.push(candidate.pair);
     }
+    // Keep the reciprocal assignments, then compare ALL paths for each
+    // movement, including alternatives that share its already-matched return.
+    // A shorter collector must not steal a path from a different movement.
+    const shorter = shortenReciprocalMatches(
+      matches,
+      candidates.map((candidate) => candidate.pair),
+      groupByPartIndex,
+    );
+    pairs.push(...shorter);
+    alternativeCandidates.push(...matches);
   }
   const distinctPairs = selectShortestReciprocalMovements(pairs, groupByPartIndex);
   const retained = new Set(distinctPairs);
+  alternativeCandidates.push(...pairs.filter((pair) => !retained.has(pair)));
+  const selectedPaths = new Set(distinctPairs.flat());
+  const alternativePaths = [...new Set(alternativeCandidates.flat())].filter(
+    (path) => !selectedPaths.has(path),
+  );
   return {
-    alternativePaths: pairs.filter((pair) => !retained.has(pair)).flat(),
-    alternativePathCount: (pairs.length - distinctPairs.length) * 2,
+    alternativePaths,
+    alternativePathCount: alternativePaths.length,
     pairs: distinctPairs,
-    unpairedPathCount: paths.length - used.size,
+    unpairedPathCount: paths.length - selectedPaths.size - alternativePaths.length,
   };
 }
 

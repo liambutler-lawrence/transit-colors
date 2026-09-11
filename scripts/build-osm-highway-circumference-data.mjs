@@ -126,9 +126,9 @@ const landmassBuffer = await readFile(landmassSourcePath);
 let derived;
 try {
   derived = deserialize(await readFile(derivedCachePath));
-  if (derived.displayTopologyVersion !== 34) {
+  if (derived.displayTopologyVersion !== 38) {
     throw new Error(
-      'The cached display topology predates reciprocal ramp direction validation.',
+      'The cached display topology predates shortest collector matching and open-road classification.',
     );
   }
   console.log(`Reused ${derivedCachePath}.`);
@@ -153,7 +153,7 @@ try {
   console.log(detailed.statistics);
   derived = {
     detailed,
-    displayTopologyVersion: 34,
+    displayTopologyVersion: 38,
   };
   await writeFile(derivedCachePath, serialize(derived));
 
@@ -182,7 +182,7 @@ try {
   derived = {
     compressed,
     detailed,
-    displayTopologyVersion: 34,
+    displayTopologyVersion: 38,
     graphStatistics,
     sourceCompressed: compressed,
     sourceGraphParts: exactGraph.parts.map(({ id, role, tokens }) => ({
@@ -191,13 +191,13 @@ try {
       tokens,
     })),
     sourceGraphStatistics: graphStatistics,
-    sourceTopologyVersion: 35,
+    sourceTopologyVersion: 37,
   };
   await writeFile(derivedCachePath, serialize(derived));
 }
 globalThis.gc?.();
 const { detailed } = derived;
-if (derived.sourceTopologyVersion !== 35) {
+if (derived.sourceTopologyVersion !== 37) {
   console.time('Read OSM mainline continuity topology');
   const osm = await readOsmMotorwayPbf(sourcePath);
   console.timeEnd('Read OSM mainline continuity topology');
@@ -226,7 +226,7 @@ if (derived.sourceTopologyVersion !== 35) {
     exactEdges: sourceGraph.edges.length,
     exactNodes: sourceGraph.coordinateByNodeId.size,
   };
-  derived.sourceTopologyVersion = 35;
+  derived.sourceTopologyVersion = 37;
   console.timeEnd('Build explicit paired-centerline route graph');
   console.log(derived.sourceGraphStatistics);
   await writeFile(derivedCachePath, serialize(derived));

@@ -50,9 +50,9 @@ import {
 } from './context.js';
 
 const HIGHWAY_DATA_URL =
-  'data/north-america-highway-circumference-summary.json?v=20260910b';
+  'data/north-america-highway-circumference-summary.json?v=20260910c';
 const HIGHWAY_GEOMETRY_URL =
-  'data/north-america-highway-circumference.json?v=20260910b';
+  'data/north-america-highway-circumference.json?v=20260910c';
 let highwayData: HighwayCircumferenceSummary | null = null;
 let highwayPromise: Promise<HighwayCircumferenceSummary> | null = null;
 const HIGHWAY_GRADIENT_SOURCE_ID = 'highway-circumference-gradient';
