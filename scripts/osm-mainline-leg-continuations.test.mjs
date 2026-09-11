@@ -103,3 +103,112 @@ test('a ramp attachment on a junction vertex uses the continuing mainline tangen
     'reversing the pair retains the same outer mainline attachment',
   );
 });
+
+test('the same two carriageways can support staggered joins across a longer split, with actual road continuity', () => {
+  const nodes = new Map();
+  const way = (id, xs, y) => ({
+    id,
+    tags: { highway: 'motorway', oneway: 'yes', lanes: '2' },
+    nodeIds: xs.map((x, i) => {
+      const key = `${id}-${i}`;
+      nodes.set(key, { coordinate: [x, y], tags: {} });
+      return key;
+    }),
+  });
+  const ways = [
+    way('a', [0, 0.008, 0.01, 0.012, 0.016, 0.02], 0.0002),
+    way('back', [0.02, 0.016, 0.012, 0.01, 0.008, 0], -0.0002),
+  ];
+  const chains = ways.map((w) => ({
+    ...w,
+    sourceWayIds: [w.id],
+    coordinates: w.nodeIds.map((id) => nodes.get(id).coordinate),
+  }));
+  const part = (id, coordinates, ranges) => ({
+    id,
+    role: 'mainline',
+    coordinates,
+    sourceWayIds: ['a', 'back'],
+    sourceChainId: 'a',
+    pairedChainId: 'back',
+    sourceRanges: ranges.map(([chainId, positions]) => ({ chainId, positions })),
+  });
+  const parts = [
+    part(
+      'left',
+      [
+        [0, 0],
+        [0.01, 0],
+      ],
+      [
+        ['a', [0, 1, 2]],
+        ['back', [3, 4, 5]],
+      ],
+    ),
+    part(
+      'right',
+      [
+        [0.012, 0],
+        [0.02, 0],
+      ],
+      [
+        ['a', [3, 4, 5]],
+        ['back', [0, 1, 2]],
+      ],
+    ),
+    {
+      id: 'target',
+      role: 'mainline',
+      coordinates: [
+        [0, 0.01],
+        [0.02, 0.01],
+      ],
+      sourceWayIds: ['target'],
+    },
+  ];
+  const attachment = (
+    nodeId,
+    partIndex,
+    coordinate,
+    direction,
+    carriagewayIds = [],
+  ) => ({
+    nodeId,
+    partIndex,
+    coordinate,
+    travelDirections: [direction],
+    carriagewayIds,
+  });
+  const paths = [
+    {
+      firstAttachment: attachment('a-1', 0, [0.008, 0], [1, 0], ['a']),
+      secondAttachment: attachment('target-east', 2, [0.008, 0.01], [1, 0]),
+      nodeIds: ['a-1', 'target-east'],
+      edgeIndices: [0],
+      sourceWayIds: ['exit'],
+      distanceMeters: 1200,
+    },
+    {
+      firstAttachment: attachment('target-west', 2, [0.016, 0.01], [-1, 0]),
+      secondAttachment: attachment('back-1', 1, [0.016, 0], [-1, 0], ['back']),
+      nodeIds: ['target-west', 'back-1'],
+      edgeIndices: [1],
+      sourceWayIds: ['entry'],
+      distanceMeters: 1200,
+    },
+  ];
+  const input = {
+    osm: { nodes, ways },
+    mainlineWays: ways,
+    parts,
+    chains,
+    paths,
+    establishedPairs: [],
+  };
+  assert.equal(findReciprocalMainlineContinuations(input).length, 1);
+  assert.equal(
+    findReciprocalMainlineContinuations({ ...input, mainlineWays: [] }).length,
+    0,
+    'matching chain ids cannot replace the actual road between the joins',
+  );
+});

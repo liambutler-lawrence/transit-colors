@@ -120,3 +120,26 @@ test('projected mainline attachments do not retain a midpoint behind the ramp st
     );
   }
 });
+
+test('closest-tangent retry checks both travel orientations around an asymmetric loop', () => {
+  const { first, second, start, end } = JSON.parse(
+    readFileSync(
+      new URL('./fixtures/brewster-ramp-midpoints.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  const coordinates = averageReciprocalPathCoordinates(first, second, start, end);
+  assert.deepEqual(coordinates[0], start);
+  assert.deepEqual(coordinates.at(-1), end);
+  assert.equal(hasProperSelfIntersection(coordinates), false);
+  assert.ok(maximumTurnDegrees(coordinates) < 90);
+  assert.deepEqual(
+    averageReciprocalPathCoordinates(
+      first.toReversed(),
+      second.toReversed(),
+      end,
+      start,
+    ).reverse(),
+    coordinates,
+  );
+});

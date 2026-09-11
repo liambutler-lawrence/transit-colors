@@ -2,12 +2,12 @@
   "source": "OpenStreetMap North America motorway snapshot 2026-07-30",
   "connectors": [
     {
-      "id": "osm-connector-4869",
+      "id": "osm-connector-5005",
       "sourceWayIds": ["214571658", "10740123"],
-      "startMainlineId": "osm-mainline-845",
-      "endMainlineId": "osm-mainline-4131",
+      "startMainlineId": "osm-mainline-285",
+      "endMainlineId": "osm-mainline-4015",
       "points": [
-        [-79.5490584, 43.6145871],
+        [-79.5490582, 43.6145868],
         [-79.54899, 43.6143669],
         [-79.5489378, 43.6141563],
         [-79.548914, 43.6139329],
@@ -21,10 +21,10 @@
       ]
     },
     {
-      "id": "osm-connector-4871",
+      "id": "osm-connector-5010",
       "sourceWayIds": ["417325197", "1225360640", "138307364", "392023006"],
-      "startMainlineId": "osm-mainline-57",
-      "endMainlineId": "osm-mainline-3603",
+      "startMainlineId": "osm-mainline-48",
+      "endMainlineId": "osm-mainline-3518",
       "points": [
         [-122.3362969, 37.5077775],
         [-122.3360608, 37.5078897],
@@ -42,7 +42,7 @@
       ]
     },
     {
-      "id": "osm-connector-4872",
+      "id": "osm-connector-5011",
       "sourceWayIds": [
         "624636989",
         "35152410",
@@ -53,8 +53,8 @@
         "759755106",
         "4961137"
       ],
-      "startMainlineId": "osm-mainline-6253",
-      "endMainlineId": "osm-mainline-5284",
+      "startMainlineId": "osm-mainline-5967",
+      "endMainlineId": "osm-mainline-5120",
       "points": [
         [-66.6554186, 45.9365755],
         [-66.6551749, 45.9364343],
@@ -87,10 +87,10 @@
       ]
     },
     {
-      "id": "osm-connector-4873",
+      "id": "osm-connector-5013",
       "sourceWayIds": ["124272520", "5022908", "23215255"],
-      "startMainlineId": "osm-mainline-3492",
-      "endMainlineId": "osm-mainline-3491",
+      "startMainlineId": "osm-mainline-3417",
+      "endMainlineId": "osm-mainline-3416",
       "points": [
         [-122.4344233, 47.2428186],
         [-122.4345111, 47.2430299],
@@ -114,7 +114,7 @@
       ]
     },
     {
-      "id": "osm-connector-4874",
+      "id": "osm-connector-5014",
       "sourceWayIds": [
         "109812629",
         "115239921",
@@ -124,8 +124,8 @@
         "187916277",
         "109812617"
       ],
-      "startMainlineId": "osm-mainline-5604",
-      "endMainlineId": "osm-mainline-2502",
+      "startMainlineId": "osm-mainline-5399",
+      "endMainlineId": "osm-mainline-2399",
       "points": [
         [-76.9399294, 39.2068219],
         [-76.9401744, 39.2069382],
@@ -167,10 +167,10 @@
       ]
     },
     {
-      "id": "osm-connector-4875",
+      "id": "osm-connector-5015",
       "sourceWayIds": ["304024424", "1008862480"],
-      "startMainlineId": "osm-mainline-5591",
-      "endMainlineId": "osm-mainline-5588",
+      "startMainlineId": "osm-mainline-5386",
+      "endMainlineId": "osm-mainline-5383",
       "points": [
         [-122.7485076, 45.4239789],
         [-122.7486826, 45.4241698],
@@ -188,10 +188,10 @@
       ]
     },
     {
-      "id": "osm-connector-4876",
+      "id": "osm-connector-5016",
       "sourceWayIds": ["237166999", "25235409"],
-      "startMainlineId": "osm-mainline-1773",
-      "endMainlineId": "osm-mainline-1772",
+      "startMainlineId": "osm-mainline-1686",
+      "endMainlineId": "osm-mainline-1685",
       "points": [
         [-73.7745564, 42.6326531],
         [-73.7742808, 42.6326395],
@@ -205,10 +205,10 @@
       ]
     },
     {
-      "id": "osm-connector-4878",
+      "id": "osm-connector-5019",
       "sourceWayIds": ["118807822", "25862885", "25862945"],
-      "startMainlineId": "osm-mainline-3100",
-      "endMainlineId": "osm-mainline-3090",
+      "startMainlineId": "osm-mainline-2981",
+      "endMainlineId": "osm-mainline-2971",
       "points": [
         [-117.2031165, 32.7594182],
         [-117.2028528, 32.7594369],
@@ -223,10 +223,10 @@
       ]
     },
     {
-      "id": "osm-connector-4879",
+      "id": "osm-connector-5020",
       "sourceWayIds": ["121743585", "185218254"],
-      "startMainlineId": "osm-mainline-3427",
-      "endMainlineId": "osm-mainline-5142",
+      "startMainlineId": "osm-mainline-3355",
+      "endMainlineId": "osm-mainline-4988",
       "points": [
         [-117.1559813, 32.7265377],
         [-117.1559823, 32.7267603],
@@ -244,10 +244,10 @@
       ]
     },
     {
-      "id": "osm-connector-4880",
+      "id": "osm-connector-5022",
       "sourceWayIds": ["178547021", "661570247", "1060247961"],
-      "startMainlineId": "osm-mainline-4319",
-      "endMainlineId": "osm-mainline-5233",
+      "startMainlineId": "osm-mainline-4196",
+      "endMainlineId": "osm-mainline-5069",
       "points": [
         [-93.5531663, 45.2014151],
         [-93.5532031, 45.2016381],
@@ -265,10 +265,10 @@
       ]
     },
     {
-      "id": "osm-connector-4881",
+      "id": "osm-connector-5023",
       "sourceWayIds": ["364961821", "601098879", "121205856", "103342605"],
-      "startMainlineId": "osm-mainline-1607",
-      "endMainlineId": "osm-mainline-1606",
+      "startMainlineId": "osm-mainline-1471",
+      "endMainlineId": "osm-mainline-1470",
       "points": [
         [-77.4311827, 37.5491353],
         [-77.4308739, 37.5492155],
@@ -288,10 +288,10 @@
       ]
     },
     {
-      "id": "osm-connector-4882",
+      "id": "osm-connector-5025",
       "sourceWayIds": ["121980240", "121980246"],
-      "startMainlineId": "osm-mainline-2121",
-      "endMainlineId": "osm-mainline-2120",
+      "startMainlineId": "osm-mainline-2036",
+      "endMainlineId": "osm-mainline-2035",
       "points": [
         [-77.0130492, 38.8829526],
         [-77.012878, 38.8830987],
@@ -308,10 +308,10 @@
       ]
     },
     {
-      "id": "osm-connector-4883",
+      "id": "osm-connector-5026",
       "sourceWayIds": ["243297808", "290090730", "37419346"],
-      "startMainlineId": "osm-mainline-1068",
-      "endMainlineId": "osm-mainline-2316",
+      "startMainlineId": "osm-mainline-953",
+      "endMainlineId": "osm-mainline-2222",
       "points": [
         [-122.2100544, 47.920645],
         [-122.210299, 47.9207781],
@@ -331,10 +331,10 @@
       ]
     },
     {
-      "id": "osm-connector-4884",
+      "id": "osm-connector-5027",
       "sourceWayIds": ["119112503", "62235889", "62235908", "257006603"],
-      "startMainlineId": "osm-mainline-1173",
-      "endMainlineId": "osm-mainline-1172",
+      "startMainlineId": "osm-mainline-1054",
+      "endMainlineId": "osm-mainline-1053",
       "points": [
         [-122.1364111, 47.9749665],
         [-122.1365227, 47.9751806],
@@ -364,10 +364,10 @@
       ]
     },
     {
-      "id": "osm-connector-4885",
+      "id": "osm-connector-5028",
       "sourceWayIds": ["118936963", "333095450", "1383837704"],
-      "startMainlineId": "osm-mainline-4392",
-      "endMainlineId": "osm-mainline-2658",
+      "startMainlineId": "osm-mainline-4265",
+      "endMainlineId": "osm-mainline-2546",
       "points": [
         [-89.2807216, 43.0465497],
         [-89.2812363, 43.0466334],
@@ -392,10 +392,10 @@
       ]
     },
     {
-      "id": "osm-connector-4886",
+      "id": "osm-connector-5029",
       "sourceWayIds": ["394283585", "48696787"],
-      "startMainlineId": "osm-mainline-109",
-      "endMainlineId": "osm-mainline-108",
+      "startMainlineId": "osm-mainline-100",
+      "endMainlineId": "osm-mainline-99",
       "points": [
         [-86.7869022, 33.4857409],
         [-86.7868942, 33.4859666],
@@ -413,10 +413,10 @@
       ]
     },
     {
-      "id": "osm-connector-4887",
+      "id": "osm-connector-5030",
       "sourceWayIds": ["7849006", "123306952"],
-      "startMainlineId": "osm-mainline-3707",
-      "endMainlineId": "osm-mainline-3397",
+      "startMainlineId": "osm-mainline-3619",
+      "endMainlineId": "osm-mainline-3327",
       "points": [
         [-99.739675, 32.3873081],
         [-99.7394123, 32.3873135],
@@ -446,10 +446,10 @@
       ]
     },
     {
-      "id": "osm-connector-4888",
+      "id": "osm-connector-5031",
       "sourceWayIds": ["38765978", "1347335878", "193420160", "1347458490"],
-      "startMainlineId": "osm-mainline-2934",
-      "endMainlineId": "osm-mainline-3962",
+      "startMainlineId": "osm-mainline-2816",
+      "endMainlineId": "osm-mainline-3860",
       "points": [
         [-73.5986214, 41.38938],
         [-73.5987151, 41.3891708],
@@ -473,10 +473,10 @@
       ]
     },
     {
-      "id": "osm-connector-4889",
+      "id": "osm-connector-5032",
       "sourceWayIds": ["236579263", "8651953"],
-      "startMainlineId": "osm-mainline-134",
-      "endMainlineId": "osm-mainline-4302",
+      "startMainlineId": "osm-mainline-124",
+      "endMainlineId": "osm-mainline-4179",
       "points": [
         [-71.0384778, 42.3466856],
         [-71.0387726, 42.3466926],
@@ -490,7 +490,7 @@
       ]
     },
     {
-      "id": "osm-connector-4890",
+      "id": "osm-connector-5033",
       "sourceWayIds": [
         "124433681",
         "39364671",
@@ -505,8 +505,8 @@
         "38357773",
         "38357774"
       ],
-      "startMainlineId": "osm-mainline-170",
-      "endMainlineId": "osm-mainline-1237",
+      "startMainlineId": "osm-mainline-160",
+      "endMainlineId": "osm-mainline-1118",
       "points": [
         [-83.0413316, 42.3443514],
         [-83.0415955, 42.3442558],
@@ -531,10 +531,10 @@
       ]
     },
     {
-      "id": "osm-connector-4891",
+      "id": "osm-connector-5034",
       "sourceWayIds": ["121980237", "986672442"],
-      "startMainlineId": "osm-mainline-1063",
-      "endMainlineId": "osm-mainline-3300",
+      "startMainlineId": "osm-mainline-948",
+      "endMainlineId": "osm-mainline-3223",
       "points": [
         [-77.1336728, 38.9385795],
         [-77.1337711, 38.9383687],
@@ -552,10 +552,10 @@
       ]
     },
     {
-      "id": "osm-connector-4893",
+      "id": "osm-connector-5036",
       "sourceWayIds": ["74463630", "75207733"],
-      "startMainlineId": "osm-mainline-5252",
-      "endMainlineId": "osm-mainline-4498",
+      "startMainlineId": "osm-mainline-5088",
+      "endMainlineId": "osm-mainline-4369",
       "points": [
         [-122.4020263, 37.6268164],
         [-122.4020836, 37.6270527],
@@ -567,7 +567,7 @@
       ]
     },
     {
-      "id": "osm-connector-4894",
+      "id": "osm-connector-5037",
       "sourceWayIds": [
         "188054698",
         "53861953",
@@ -581,8 +581,8 @@
         "94160204",
         "94160202"
       ],
-      "startMainlineId": "osm-mainline-3174",
-      "endMainlineId": "osm-mainline-1899",
+      "startMainlineId": "osm-mainline-3081",
+      "endMainlineId": "osm-mainline-1822",
       "points": [
         [-72.5915291, 42.0830595],
         [-72.5914978, 42.082835],
@@ -613,10 +613,10 @@
       ]
     },
     {
-      "id": "osm-connector-4897",
+      "id": "osm-connector-5043",
       "sourceWayIds": ["28247427", "504915961", "28247377", "504915965", "49329018"],
-      "startMainlineId": "osm-mainline-1134",
-      "endMainlineId": "osm-mainline-1979",
+      "startMainlineId": "osm-mainline-1019",
+      "endMainlineId": "osm-mainline-1900",
       "points": [
         [-96.9467189, 32.6735821],
         [-96.9466893, 32.6738021],
@@ -640,7 +640,7 @@
       ]
     },
     {
-      "id": "osm-connector-4898",
+      "id": "osm-connector-5047",
       "sourceWayIds": [
         "87553361",
         "39090724",
@@ -655,8 +655,8 @@
         "439021527",
         "39034636"
       ],
-      "startMainlineId": "osm-mainline-1572",
-      "endMainlineId": "osm-mainline-1571",
+      "startMainlineId": "osm-mainline-1436",
+      "endMainlineId": "osm-mainline-1435",
       "points": [
         [-80.2037749, 25.812069],
         [-80.2035364, 25.8120257],
@@ -687,7 +687,7 @@
       ]
     },
     {
-      "id": "osm-connector-4899",
+      "id": "osm-connector-5048",
       "sourceWayIds": [
         "87553404",
         "39090766",
@@ -696,8 +696,8 @@
         "39090762",
         "87553348"
       ],
-      "startMainlineId": "osm-mainline-1572",
-      "endMainlineId": "osm-mainline-2632",
+      "startMainlineId": "osm-mainline-1436",
+      "endMainlineId": "osm-mainline-2520",
       "points": [
         [-80.2086765, 25.812684],
         [-80.2089192, 25.8126815],
@@ -728,10 +728,10 @@
       ]
     },
     {
-      "id": "osm-connector-4900",
+      "id": "osm-connector-5049",
       "sourceWayIds": ["470030267", "48606296", "470030274", "470030273"],
-      "startMainlineId": "osm-mainline-4788",
-      "endMainlineId": "osm-mainline-4648",
+      "startMainlineId": "osm-mainline-4650",
+      "endMainlineId": "osm-mainline-4517",
       "points": [
         [-81.0836711, 29.1519999],
         [-81.0834456, 29.1520777],
@@ -762,10 +762,10 @@
       ]
     },
     {
-      "id": "osm-connector-4902",
+      "id": "osm-connector-5051",
       "sourceWayIds": ["954559155", "656753966"],
-      "startMainlineId": "osm-mainline-4767",
-      "endMainlineId": "osm-mainline-5144",
+      "startMainlineId": "osm-mainline-4630",
+      "endMainlineId": "osm-mainline-4990",
       "points": [
         [-74.1351579, 40.6536814],
         [-74.1353794, 40.6535374],
@@ -783,10 +783,10 @@
       ]
     },
     {
-      "id": "osm-connector-4903",
+      "id": "osm-connector-5052",
       "sourceWayIds": ["116570307", "531897973", "55316113", "55316111", "116570310"],
-      "startMainlineId": "osm-mainline-4615",
-      "endMainlineId": "osm-mainline-2359",
+      "startMainlineId": "osm-mainline-4485",
+      "endMainlineId": "osm-mainline-2265",
       "points": [
         [-74.0456371, 40.7777055],
         [-74.0457083, 40.7779138],
@@ -807,43 +807,41 @@
       ]
     },
     {
-      "id": "osm-connector-4904",
+      "id": "osm-connector-5053",
       "sourceWayIds": ["993878940", "229073370", "1448700545", "60256704"],
-      "startMainlineId": "osm-mainline-2379",
-      "endMainlineId": "osm-mainline-2378",
+      "startMainlineId": "osm-mainline-1773",
+      "endMainlineId": "osm-mainline-1772",
       "points": [
-        [-74.097877, 40.208237],
-        [-74.0978819, 40.2084438],
-        [-74.0978874, 40.2086671],
-        [-74.0978937, 40.2088919],
-        [-74.0979001, 40.2091213],
-        [-74.0979081, 40.209346],
-        [-74.0979173, 40.2095708],
-        [-74.0979299, 40.2097984],
-        [-74.0979429, 40.2100239],
-        [-74.0979567, 40.2102484],
-        [-74.0979744, 40.2104794],
-        [-74.0979908, 40.2107045],
-        [-74.0980076, 40.2109321],
-        [-74.0980263, 40.2111564],
-        [-74.0980456, 40.2113847],
-        [-74.098065, 40.2116088],
-        [-74.0980843, 40.2118332],
-        [-74.0981036, 40.2120576],
-        [-74.0981229, 40.2122821],
-        [-74.0981422, 40.2125065],
-        [-74.0981603, 40.212731],
-        [-74.0981787, 40.2129555],
-        [-74.0981976, 40.21318],
-        [-74.0982144, 40.2134035],
-        [-74.098232, 40.2136463]
+        [-74.0978798, 40.2083539],
+        [-74.0978846, 40.2085605],
+        [-74.0978907, 40.2087849],
+        [-74.0978969, 40.2090138],
+        [-74.0979039, 40.2092384],
+        [-74.0979127, 40.2094627],
+        [-74.0979238, 40.2096899],
+        [-74.0979365, 40.2099141],
+        [-74.0979497, 40.2101392],
+        [-74.0979658, 40.2103698],
+        [-74.0979829, 40.2105945],
+        [-74.0979989, 40.2108186],
+        [-74.098017, 40.2110457],
+        [-74.0980359, 40.2112735],
+        [-74.0980554, 40.2114975],
+        [-74.0980747, 40.2117212],
+        [-74.098094, 40.2119452],
+        [-74.0981132, 40.2121692],
+        [-74.0981325, 40.2123932],
+        [-74.0981511, 40.2126173],
+        [-74.0981691, 40.2128414],
+        [-74.098188, 40.2130655],
+        [-74.0982074, 40.2133101]
       ]
     },
     {
-      "id": "osm-connector-4905",
+      "id": "osm-connector-5056",
       "sourceWayIds": ["234353727", "234353726", "49605216"],
-      "startMainlineId": "osm-mainline-63",
-      "endMainlineId": "osm-mainline-62",
+      "startMainlineId": "osm-mainline-54",
+      "endMainlineId": "osm-mainline-53",
       "points": [
         [-80.1224346, 42.10674],
         [-80.1224162, 42.1065153],
@@ -865,7 +863,7 @@
       ]
     },
     {
-      "id": "osm-connector-4906",
+      "id": "osm-connector-5057",
       "sourceWayIds": [
         "476104429",
         "64794402",
@@ -874,8 +872,8 @@
         "1015995501",
         "64794403"
       ],
-      "startMainlineId": "osm-mainline-4665",
-      "endMainlineId": "osm-mainline-2439",
+      "startMainlineId": "osm-mainline-4531",
+      "endMainlineId": "osm-mainline-2337",
       "points": [
         [-77.0312443, 40.3872549],
         [-77.0311341, 40.3870547],
@@ -895,10 +893,10 @@
       ]
     },
     {
-      "id": "osm-connector-4908",
+      "id": "osm-connector-5059",
       "sourceWayIds": ["124272542", "124272543", "124272537"],
-      "startMainlineId": "osm-mainline-1007",
-      "endMainlineId": "osm-mainline-1006",
+      "startMainlineId": "osm-mainline-893",
+      "endMainlineId": "osm-mainline-892",
       "points": [
         [-122.2803653, 47.2027005],
         [-122.2800417, 47.2026556],
@@ -936,10 +934,10 @@
       ]
     },
     {
-      "id": "osm-connector-4909",
+      "id": "osm-connector-5063",
       "sourceWayIds": ["125419827", "521708603", "13257148"],
-      "startMainlineId": "osm-mainline-4769",
-      "endMainlineId": "osm-mainline-5882",
+      "startMainlineId": "osm-mainline-4632",
+      "endMainlineId": "osm-mainline-5635",
       "points": [
         [-95.6966362, 38.9967858],
         [-95.6963644, 38.9967595],
@@ -961,10 +959,10 @@
       ]
     },
     {
-      "id": "osm-connector-4910",
+      "id": "osm-connector-5064",
       "sourceWayIds": ["1203303945", "13257031", "1203303943", "125419828"],
-      "startMainlineId": "osm-mainline-1926",
-      "endMainlineId": "osm-mainline-4769",
+      "startMainlineId": "osm-mainline-1846",
+      "endMainlineId": "osm-mainline-4632",
       "points": [
         [-95.7060519, 38.9978648],
         [-95.7057805, 38.9977951],
@@ -996,10 +994,10 @@
       ]
     },
     {
-      "id": "osm-connector-4911",
+      "id": "osm-connector-5066",
       "sourceWayIds": ["124540930", "82228717", "82228700", "82228714"],
-      "startMainlineId": "osm-mainline-5750",
-      "endMainlineId": "osm-mainline-4341",
+      "startMainlineId": "osm-mainline-5507",
+      "endMainlineId": "osm-mainline-4218",
       "points": [
         [-96.0440326, 36.0889838],
         [-96.0437595, 36.0889841],
@@ -1018,10 +1016,10 @@
       ]
     },
     {
-      "id": "osm-connector-4914",
+      "id": "osm-connector-5071",
       "sourceWayIds": ["34444314", "48208378"],
-      "startMainlineId": "osm-mainline-3564",
-      "endMainlineId": "osm-mainline-3563",
+      "startMainlineId": "osm-mainline-3479",
+      "endMainlineId": "osm-mainline-3478",
       "points": [
         [-75.6542219, 39.6736754],
         [-75.6541832, 39.6734496],
@@ -1037,10 +1035,10 @@
       ]
     },
     {
-      "id": "osm-connector-4915",
+      "id": "osm-connector-5072",
       "sourceWayIds": ["434296628", "120813423", "44075477", "17232533"],
-      "startMainlineId": "osm-mainline-3565",
-      "endMainlineId": "osm-mainline-3564",
+      "startMainlineId": "osm-mainline-3480",
+      "endMainlineId": "osm-mainline-3479",
       "points": [
         [-75.6552925, 39.6871726],
         [-75.655368, 39.6869556],
@@ -1074,10 +1072,10 @@
       ]
     },
     {
-      "id": "osm-connector-4916",
+      "id": "osm-connector-5073",
       "sourceWayIds": ["427394187", "357007047", "463015301"],
-      "startMainlineId": "osm-mainline-4630",
-      "endMainlineId": "osm-mainline-4629",
+      "startMainlineId": "osm-mainline-4500",
+      "endMainlineId": "osm-mainline-4499",
       "points": [
         [-86.1579627, 39.9355682],
         [-86.1579465, 39.9357932],
@@ -1099,10 +1097,10 @@
       ]
     },
     {
-      "id": "osm-connector-4917",
+      "id": "osm-connector-5074",
       "sourceWayIds": ["1153433040", "121998346", "39843539", "39843540", "222826264"],
-      "startMainlineId": "osm-mainline-1763",
-      "endMainlineId": "osm-mainline-1762",
+      "startMainlineId": "osm-mainline-1676",
+      "endMainlineId": "osm-mainline-1675",
       "points": [
         [-82.4392472, 42.9981422],
         [-82.4395593, 42.9981015],
@@ -1123,7 +1121,7 @@
       ]
     },
     {
-      "id": "osm-connector-4918",
+      "id": "osm-connector-5075",
       "sourceWayIds": [
         "548658201",
         "548658205",
@@ -1135,8 +1133,8 @@
         "1186042791",
         "1522382485"
       ],
-      "startMainlineId": "osm-mainline-6754",
-      "endMainlineId": "osm-mainline-4813",
+      "startMainlineId": "osm-mainline-6447",
+      "endMainlineId": "osm-mainline-4673",
       "points": [
         [-94.5898924, 39.0962449],
         [-94.5896285, 39.0962492],
@@ -1162,10 +1160,10 @@
       ]
     },
     {
-      "id": "osm-connector-4919",
+      "id": "osm-connector-5076",
       "sourceWayIds": ["504329517", "504329535", "504329534"],
-      "startMainlineId": "osm-mainline-4725",
-      "endMainlineId": "osm-mainline-4724",
+      "startMainlineId": "osm-mainline-4589",
+      "endMainlineId": "osm-mainline-4588",
       "points": [
         [-94.621203, 39.1712126],
         [-94.6212935, 39.171279],
@@ -1188,10 +1186,10 @@
       ]
     },
     {
-      "id": "osm-connector-4924",
+      "id": "osm-connector-5084",
       "sourceWayIds": ["37284718", "40839344"],
-      "startMainlineId": "osm-mainline-1208",
-      "endMainlineId": "osm-mainline-1207",
+      "startMainlineId": "osm-mainline-1089",
+      "endMainlineId": "osm-mainline-1088",
       "points": [
         [-82.4173324, 40.059565],
         [-82.4170379, 40.0595802],
@@ -1207,10 +1205,10 @@
       ]
     },
     {
-      "id": "osm-connector-4925",
+      "id": "osm-connector-5087",
       "sourceWayIds": ["121481625", "19243731", "171686111"],
-      "startMainlineId": "osm-mainline-3250",
-      "endMainlineId": "osm-mainline-2105",
+      "startMainlineId": "osm-mainline-3173",
+      "endMainlineId": "osm-mainline-2020",
       "points": [
         [-83.1598514, 41.3685808],
         [-83.1596026, 41.3685631],
@@ -1236,10 +1234,10 @@
       ]
     },
     {
-      "id": "osm-connector-4926",
+      "id": "osm-connector-5088",
       "sourceWayIds": ["1113244350", "42887998", "42887983", "1113244367", "42887956"],
-      "startMainlineId": "osm-mainline-2706",
-      "endMainlineId": "osm-mainline-1717",
+      "startMainlineId": "osm-mainline-2591",
+      "endMainlineId": "osm-mainline-1631",
       "points": [
         [-71.4764485, 41.7564675],
         [-71.4767274, 41.756427],
@@ -1258,7 +1256,7 @@
       ]
     },
     {
-      "id": "osm-connector-4928",
+      "id": "osm-connector-5092",
       "sourceWayIds": [
         "229379155",
         "20155512",
@@ -1267,8 +1265,8 @@
         "22729125",
         "20151710"
       ],
-      "startMainlineId": "osm-mainline-2386",
-      "endMainlineId": "osm-mainline-4163",
+      "startMainlineId": "osm-mainline-2284",
+      "endMainlineId": "osm-mainline-4040",
       "points": [
         [-75.6857759, 41.4864851],
         [-75.6855362, 41.4866184],
@@ -1306,10 +1304,10 @@
       ]
     },
     {
-      "id": "osm-connector-4929",
+      "id": "osm-connector-5093",
       "sourceWayIds": ["116555356", "965079484", "51277076"],
-      "startMainlineId": "osm-mainline-5535",
-      "endMainlineId": "osm-mainline-2150",
+      "startMainlineId": "osm-mainline-5336",
+      "endMainlineId": "osm-mainline-2064",
       "points": [
         [-80.3713883, 37.1308258],
         [-80.3714975, 37.1309692],
@@ -1329,10 +1327,10 @@
       ]
     },
     {
-      "id": "osm-connector-4930",
+      "id": "osm-connector-5094",
       "sourceWayIds": ["123061019", "123061018", "48541524"],
-      "startMainlineId": "osm-mainline-1956",
-      "endMainlineId": "osm-mainline-2071",
+      "startMainlineId": "osm-mainline-1877",
+      "endMainlineId": "osm-mainline-1985",
       "points": [
         [-76.2671874, 36.7581015],
         [-76.2671787, 36.7583356],
@@ -1350,10 +1348,10 @@
       ]
     },
     {
-      "id": "osm-connector-4931",
+      "id": "osm-connector-5095",
       "sourceWayIds": ["123306907", "49402616"],
-      "startMainlineId": "osm-mainline-1996",
-      "endMainlineId": "osm-mainline-1995",
+      "startMainlineId": "osm-mainline-1916",
+      "endMainlineId": "osm-mainline-1915",
       "points": [
         [-96.5620809, 33.7202583],
         [-96.5618134, 33.7202492],
@@ -1381,10 +1379,10 @@
       ]
     },
     {
-      "id": "osm-connector-4932",
+      "id": "osm-connector-5096",
       "sourceWayIds": ["122767537", "122767473", "119633140"],
-      "startMainlineId": "osm-mainline-5261",
-      "endMainlineId": "osm-mainline-3367",
+      "startMainlineId": "osm-mainline-5097",
+      "endMainlineId": "osm-mainline-3290",
       "points": [
         [-97.4272189, 27.7425316],
         [-97.4270994, 27.742715],
@@ -1403,10 +1401,10 @@
       ]
     },
     {
-      "id": "osm-connector-4934",
+      "id": "osm-connector-5098",
       "sourceWayIds": ["122615274", "122615278", "1302906891", "21399249"],
-      "startMainlineId": "osm-mainline-642",
-      "endMainlineId": "osm-mainline-641",
+      "startMainlineId": "osm-mainline-536",
+      "endMainlineId": "osm-mainline-535",
       "points": [
         [-83.0355911, 40.1100082],
         [-83.0356244, 40.1097825],
@@ -1430,10 +1428,10 @@
       ]
     },
     {
-      "id": "osm-connector-4935",
+      "id": "osm-connector-5099",
       "sourceWayIds": ["122753215", "122753216"],
-      "startMainlineId": "osm-mainline-811",
-      "endMainlineId": "osm-mainline-3366",
+      "startMainlineId": "osm-mainline-704",
+      "endMainlineId": "osm-mainline-3289",
       "points": [
         [-88.0743526, 44.481819],
         [-88.0746136, 44.4818995],
@@ -1446,10 +1444,10 @@
       ]
     },
     {
-      "id": "osm-connector-4936",
+      "id": "osm-connector-5100",
       "sourceWayIds": ["118760433", "52289820", "148771164"],
-      "startMainlineId": "osm-mainline-825",
-      "endMainlineId": "osm-mainline-5293",
+      "startMainlineId": "osm-mainline-718",
+      "endMainlineId": "osm-mainline-5129",
       "points": [
         [-97.1008339, 31.5604638],
         [-97.1009877, 31.5605901],
@@ -1469,10 +1467,10 @@
       ]
     },
     {
-      "id": "osm-connector-4937",
+      "id": "osm-connector-5021",
       "sourceWayIds": ["125425896", "45584856", "45584855", "52429496"],
-      "startMainlineId": "osm-mainline-1829",
-      "endMainlineId": "osm-mainline-2201",
+      "startMainlineId": "osm-mainline-1742",
+      "endMainlineId": "osm-mainline-2115",
       "points": [
         [-93.2893739, 44.9749052],
         [-93.2896842, 44.9748802],
@@ -1494,10 +1492,10 @@
       ]
     },
     {
-      "id": "osm-connector-4939",
+      "id": "osm-connector-5104",
       "sourceWayIds": ["124391484", "23122696", "124391470", "637977011"],
-      "startMainlineId": "osm-mainline-99",
-      "endMainlineId": "osm-mainline-3500",
+      "startMainlineId": "osm-mainline-90",
+      "endMainlineId": "osm-mainline-3424",
       "points": [
         [-93.2532445, 44.9673515],
         [-93.2530936, 44.9671547],
@@ -1515,10 +1513,10 @@
       ]
     },
     {
-      "id": "osm-connector-4940",
+      "id": "osm-connector-5105",
       "sourceWayIds": ["98726609", "56204426", "93556317"],
-      "startMainlineId": "osm-mainline-2755",
-      "endMainlineId": "osm-mainline-2204",
+      "startMainlineId": "osm-mainline-2638",
+      "endMainlineId": "osm-mainline-2118",
       "points": [
         [-84.1242164, 35.9165356],
         [-84.1243442, 35.9167299],
@@ -1552,7 +1550,7 @@
       ]
     },
     {
-      "id": "osm-connector-4944",
+      "id": "osm-connector-5114",
       "sourceWayIds": [
         "24989784",
         "24989831",
@@ -1562,8 +1560,8 @@
         "24989815",
         "277946312"
       ],
-      "startMainlineId": "osm-mainline-4278",
-      "endMainlineId": "osm-mainline-3989",
+      "startMainlineId": "osm-mainline-4155",
+      "endMainlineId": "osm-mainline-3887",
       "points": [
         [-90.3019622, 38.7198599],
         [-90.3020034, 38.7198737],
@@ -1596,10 +1594,10 @@
       ]
     },
     {
-      "id": "osm-connector-4945",
+      "id": "osm-connector-5115",
       "sourceWayIds": ["152285884", "119725763"],
-      "startMainlineId": "osm-mainline-3177",
-      "endMainlineId": "osm-mainline-2191",
+      "startMainlineId": "osm-mainline-3084",
+      "endMainlineId": "osm-mainline-2105",
       "points": [
         [-90.2065903, 32.2755562],
         [-90.2067964, 32.2753664],
@@ -1623,10 +1621,10 @@
       ]
     },
     {
-      "id": "osm-connector-4947",
+      "id": "osm-connector-5118",
       "sourceWayIds": ["1525043899", "834819206"],
-      "startMainlineId": "osm-mainline-5673",
-      "endMainlineId": "osm-mainline-1934",
+      "startMainlineId": "osm-mainline-5446",
+      "endMainlineId": "osm-mainline-1854",
       "points": [
         [-76.3249119, 36.8523677],
         [-76.3246461, 36.8523867],
@@ -1638,10 +1636,10 @@
       ]
     },
     {
-      "id": "osm-connector-4948",
+      "id": "osm-connector-5119",
       "sourceWayIds": ["26952082", "5939527"],
-      "startMainlineId": "osm-mainline-3167",
-      "endMainlineId": "osm-mainline-3166",
+      "startMainlineId": "osm-mainline-3074",
+      "endMainlineId": "osm-mainline-3073",
       "points": [
         [-116.9619997, 32.8081035],
         [-116.9619935, 32.8083463],
@@ -1655,10 +1653,10 @@
       ]
     },
     {
-      "id": "osm-connector-4949",
+      "id": "osm-connector-5120",
       "sourceWayIds": ["1117754372", "548650451"],
-      "startMainlineId": "osm-mainline-2413",
-      "endMainlineId": "osm-mainline-2412",
+      "startMainlineId": "osm-mainline-2311",
+      "endMainlineId": "osm-mainline-2310",
       "points": [
         [-74.7832842, 40.0985025],
         [-74.7835107, 40.0985889],
@@ -1671,7 +1669,7 @@
       ]
     },
     {
-      "id": "osm-connector-4950",
+      "id": "osm-connector-5121",
       "sourceWayIds": [
         "702157008",
         "702160477",
@@ -1688,8 +1686,8 @@
         "702160495",
         "702157012"
       ],
-      "startMainlineId": "osm-mainline-95",
-      "endMainlineId": "osm-mainline-94",
+      "startMainlineId": "osm-mainline-86",
+      "endMainlineId": "osm-mainline-85",
       "points": [
         [-119.138448, 46.2163308],
         [-119.1382877, 46.2165107],
@@ -1713,29 +1711,10 @@
       ]
     },
     {
-      "id": "osm-connector-4951",
-      "sourceWayIds": ["123987956", "34361994", "10740124"],
-      "startMainlineId": "osm-mainline-845",
-      "endMainlineId": "osm-mainline-844",
-      "points": [
-        [-79.5492291, 43.615026],
-        [-79.5493533, 43.6152463],
-        [-79.549491, 43.6154406],
-        [-79.5496399, 43.6156273],
-        [-79.5497982, 43.6158098],
-        [-79.5499851, 43.6160041],
-        [-79.5501704, 43.6161734],
-        [-79.550362, 43.6163307],
-        [-79.5505609, 43.6164862],
-        [-79.5507622, 43.6166381],
-        [-79.5510283, 43.6168354]
-      ]
-    },
-    {
-      "id": "osm-connector-4952",
+      "id": "osm-connector-5123",
       "sourceWayIds": ["123461843", "27815365", "173375845"],
-      "startMainlineId": "osm-mainline-3722",
-      "endMainlineId": "osm-mainline-3721",
+      "startMainlineId": "osm-mainline-3632",
+      "endMainlineId": "osm-mainline-3631",
       "points": [
         [-118.2186352, 34.2043351],
         [-118.2186735, 34.2041206],
@@ -1754,10 +1733,10 @@
       ]
     },
     {
-      "id": "osm-connector-4953",
+      "id": "osm-connector-5124",
       "sourceWayIds": ["1409409938", "1079157590"],
-      "startMainlineId": "osm-mainline-3368",
-      "endMainlineId": "osm-mainline-3367",
+      "startMainlineId": "osm-mainline-3291",
+      "endMainlineId": "osm-mainline-3290",
       "points": [
         [-97.4091336, 27.7923864],
         [-97.409139, 27.7921628],
@@ -1777,10 +1756,10 @@
       ]
     },
     {
-      "id": "osm-connector-4954",
+      "id": "osm-connector-5125",
       "sourceWayIds": ["30168711", "30168712", "1132392282"],
-      "startMainlineId": "osm-mainline-1215",
-      "endMainlineId": "osm-mainline-1213",
+      "startMainlineId": "osm-mainline-1096",
+      "endMainlineId": "osm-mainline-1094",
       "points": [
         [-112.0302232, 33.4376477],
         [-112.0304856, 33.4376481],
@@ -1802,33 +1781,10 @@
       ]
     },
     {
-      "id": "osm-connector-4956",
-      "sourceWayIds": ["125083422", "32018794"],
-      "startMainlineId": "osm-mainline-4938",
-      "endMainlineId": "osm-mainline-3511",
-      "points": [
-        [-118.1026254, 33.9142952],
-        [-118.1028836, 33.9142674],
-        [-118.1031469, 33.9142387],
-        [-118.1034101, 33.9142095],
-        [-118.1036706, 33.9141784],
-        [-118.1039332, 33.9141457],
-        [-118.1041959, 33.914113],
-        [-118.1044586, 33.9140803],
-        [-118.1047188, 33.9140468],
-        [-118.1049812, 33.9140129],
-        [-118.1052436, 33.9139789],
-        [-118.1055171, 33.9139483],
-        [-118.1057809, 33.9139242],
-        [-118.1060509, 33.9139026],
-        [-118.1063167, 33.9138847]
-      ]
-    },
-    {
-      "id": "osm-connector-4957",
+      "id": "osm-connector-5132",
       "sourceWayIds": ["33211518", "33225888", "33223351"],
-      "startMainlineId": "osm-mainline-6010",
-      "endMainlineId": "osm-mainline-1350",
+      "startMainlineId": "osm-mainline-5747",
+      "endMainlineId": "osm-mainline-1212",
       "points": [
         [-69.4982108, 47.8050082],
         [-69.4984423, 47.8051635],
@@ -1880,10 +1836,10 @@
       ]
     },
     {
-      "id": "osm-connector-4958",
+      "id": "osm-connector-5133",
       "sourceWayIds": ["33220814", "1381836448", "690051545", "1316204234"],
-      "startMainlineId": "osm-mainline-6010",
-      "endMainlineId": "osm-mainline-5910",
+      "startMainlineId": "osm-mainline-5747",
+      "endMainlineId": "osm-mainline-5661",
       "points": [
         [-69.1099491, 47.691608],
         [-69.1096457, 47.6915653],
@@ -1953,7 +1909,7 @@
       ]
     },
     {
-      "id": "osm-connector-4959",
+      "id": "osm-connector-5134",
       "sourceWayIds": [
         "400314618",
         "400314617",
@@ -1962,8 +1918,8 @@
         "156751313",
         "156751314"
       ],
-      "startMainlineId": "osm-mainline-3762",
-      "endMainlineId": "osm-mainline-4510",
+      "startMainlineId": "osm-mainline-3672",
+      "endMainlineId": "osm-mainline-4381",
       "points": [
         [-98.5277198, 33.9452282],
         [-98.527492, 33.9451818],
@@ -1981,10 +1937,10 @@
       ]
     },
     {
-      "id": "osm-connector-4960",
+      "id": "osm-connector-5136",
       "sourceWayIds": ["118575748", "37535911", "560924610", "560927909", "505951925"],
-      "startMainlineId": "osm-mainline-5811",
-      "endMainlineId": "osm-mainline-4849",
+      "startMainlineId": "osm-mainline-5564",
+      "endMainlineId": "osm-mainline-4707",
       "points": [
         [-94.5720964, 39.0962745],
         [-94.5721289, 39.0963674],
@@ -2006,10 +1962,10 @@
       ]
     },
     {
-      "id": "osm-connector-4961",
+      "id": "osm-connector-5138",
       "sourceWayIds": ["1388401525", "1312163932"],
-      "startMainlineId": "osm-mainline-6012",
-      "endMainlineId": "osm-mainline-5958",
+      "startMainlineId": "osm-mainline-5749",
+      "endMainlineId": "osm-mainline-5698",
       "points": [
         [-78.5632056, 35.6033272],
         [-78.563223, 35.6035674],
@@ -2053,7 +2009,7 @@
       ]
     },
     {
-      "id": "osm-connector-4962",
+      "id": "osm-connector-5141",
       "sourceWayIds": [
         "96024371",
         "96024370",
@@ -2066,41 +2022,40 @@
         "1163543771",
         "38983358"
       ],
-      "startMainlineId": "osm-mainline-1163",
-      "endMainlineId": "osm-mainline-1570",
+      "startMainlineId": "osm-mainline-1044",
+      "endMainlineId": "osm-mainline-1432",
       "points": [
         [-84.3592851, 33.8208392],
-        [-84.3594297, 33.8206557],
-        [-84.3595642, 33.8204717],
-        [-84.3596969, 33.8202829],
-        [-84.3598284, 33.8200923],
-        [-84.3599598, 33.8199017],
-        [-84.3600908, 33.8197108],
-        [-84.3602213, 33.8195197],
-        [-84.360349, 33.8193286],
-        [-84.3604768, 33.8191363],
-        [-84.3606071, 33.8189441],
-        [-84.3607382, 33.8187533],
-        [-84.3608692, 33.8185625],
-        [-84.3610003, 33.8183717],
-        [-84.3611321, 33.8181811],
-        [-84.3612652, 33.8179913],
-        [-84.361398, 33.8178014],
-        [-84.3615303, 33.8176112],
-        [-84.361669, 33.8174227],
-        [-84.3618096, 33.8172366],
-        [-84.3619551, 33.817051],
-        [-84.3621022, 33.8168685],
-        [-84.3622564, 33.8166881],
-        [-84.3624166, 33.8165102],
-        [-84.3625801, 33.816339]
+        [-84.3594329, 33.8206514],
+        [-84.3595703, 33.820463],
+        [-84.359706, 33.8202697],
+        [-84.3598405, 33.8200747],
+        [-84.359975, 33.8198797],
+        [-84.3601089, 33.8196843],
+        [-84.3602423, 33.8194889],
+        [-84.3603726, 33.8192931],
+        [-84.3605033, 33.8190964],
+        [-84.3606374, 33.8189],
+        [-84.3607714, 33.8187049],
+        [-84.3609055, 33.8185097],
+        [-84.3610397, 33.8183144],
+        [-84.3611751, 33.8181198],
+        [-84.3613112, 33.8179256],
+        [-84.3614468, 33.8177311],
+        [-84.3615836, 33.8175357],
+        [-84.3617274, 33.8173454],
+        [-84.3618713, 33.8171552],
+        [-84.3620229, 33.8169668],
+        [-84.3621742, 33.8167806],
+        [-84.3623364, 33.8165987],
+        [-84.3626285, 33.8165015]
       ]
     },
     {
-      "id": "osm-connector-4963",
+      "id": "osm-connector-5142",
       "sourceWayIds": ["123105803", "39317371"],
-      "startMainlineId": "osm-mainline-3388",
-      "endMainlineId": "osm-mainline-1584",
+      "startMainlineId": "osm-mainline-3319",
+      "endMainlineId": "osm-mainline-1448",
       "points": [
         [-93.6344309, 32.5511669],
         [-93.6343448, 32.550962],
@@ -2122,7 +2077,7 @@
       ]
     },
     {
-      "id": "osm-connector-4964",
+      "id": "osm-connector-5143",
       "sourceWayIds": [
         "317470694",
         "317470693",
@@ -2130,8 +2085,8 @@
         "1510712965",
         "1510712964"
       ],
-      "startMainlineId": "osm-mainline-5827",
-      "endMainlineId": "osm-mainline-5826",
+      "startMainlineId": "osm-mainline-5580",
+      "endMainlineId": "osm-mainline-5579",
       "points": [
         [-72.5815305, 46.3190505],
         [-72.5817787, 46.3191954],
@@ -2163,10 +2118,10 @@
       ]
     },
     {
-      "id": "osm-connector-4965",
+      "id": "osm-connector-5144",
       "sourceWayIds": ["41740433", "41740386"],
-      "startMainlineId": "osm-mainline-3575",
-      "endMainlineId": "osm-mainline-3574",
+      "startMainlineId": "osm-mainline-3490",
+      "endMainlineId": "osm-mainline-3489",
       "points": [
         [-80.6150085, 40.3757748],
         [-80.6147985, 40.3756058],
@@ -2180,7 +2135,7 @@
       ]
     },
     {
-      "id": "osm-connector-4967",
+      "id": "osm-connector-5146",
       "sourceWayIds": [
         "44756538",
         "44756625",
@@ -2189,8 +2144,8 @@
         "44756584",
         "625182987"
       ],
-      "startMainlineId": "osm-mainline-3231",
-      "endMainlineId": "osm-mainline-3230",
+      "startMainlineId": "osm-mainline-3154",
+      "endMainlineId": "osm-mainline-3153",
       "points": [
         [-117.359209, 47.7353098],
         [-117.3590425, 47.7351226],
@@ -2236,10 +2191,10 @@
       ]
     },
     {
-      "id": "osm-connector-4968",
+      "id": "osm-connector-5147",
       "sourceWayIds": ["977592078", "48925995", "205176387", "977592079", "645894958"],
-      "startMainlineId": "osm-mainline-5146",
-      "endMainlineId": "osm-mainline-5145",
+      "startMainlineId": "osm-mainline-4992",
+      "endMainlineId": "osm-mainline-4991",
       "points": [
         [-90.7716599, 38.7710652],
         [-90.7719499, 38.7710394],
@@ -2263,10 +2218,10 @@
       ]
     },
     {
-      "id": "osm-connector-4969",
+      "id": "osm-connector-5148",
       "sourceWayIds": ["123105994", "45140221", "45140220", "573007801"],
-      "startMainlineId": "osm-mainline-1206",
-      "endMainlineId": "osm-mainline-2246",
+      "startMainlineId": "osm-mainline-1087",
+      "endMainlineId": "osm-mainline-2160",
       "points": [
         [-93.1634887, 44.877878],
         [-93.1634415, 44.8780734],
@@ -2308,10 +2263,10 @@
       ]
     },
     {
-      "id": "osm-connector-4971",
+      "id": "osm-connector-5150",
       "sourceWayIds": ["1118228731", "1118228728"],
-      "startMainlineId": "osm-mainline-5494",
-      "endMainlineId": "osm-mainline-5493",
+      "startMainlineId": "osm-mainline-5312",
+      "endMainlineId": "osm-mainline-5311",
       "points": [
         [-75.4511019, 39.6850394],
         [-75.4509134, 39.6850803],
@@ -2328,10 +2283,10 @@
       ]
     },
     {
-      "id": "osm-connector-4973",
+      "id": "osm-connector-5152",
       "sourceWayIds": ["46967356", "46967353"],
-      "startMainlineId": "osm-mainline-3859",
-      "endMainlineId": "osm-mainline-1880",
+      "startMainlineId": "osm-mainline-3756",
+      "endMainlineId": "osm-mainline-1803",
       "points": [
         [-81.9825633, 30.2889767],
         [-81.9823172, 30.2889936],
@@ -2347,10 +2302,10 @@
       ]
     },
     {
-      "id": "osm-connector-4974",
+      "id": "osm-connector-5154",
       "sourceWayIds": ["1095368565", "1095368566", "203792288"],
-      "startMainlineId": "osm-mainline-375",
-      "endMainlineId": "osm-mainline-374",
+      "startMainlineId": "osm-mainline-292",
+      "endMainlineId": "osm-mainline-291",
       "points": [
         [-81.6336188, 30.3206621],
         [-81.6333651, 30.3206437],
@@ -2374,10 +2329,10 @@
       ]
     },
     {
-      "id": "osm-connector-4975",
+      "id": "osm-connector-5155",
       "sourceWayIds": ["83304846", "1469893930", "47016471"],
-      "startMainlineId": "osm-mainline-3665",
-      "endMainlineId": "osm-mainline-1882",
+      "startMainlineId": "osm-mainline-3579",
+      "endMainlineId": "osm-mainline-1805",
       "points": [
         [-81.527913, 28.6810686],
         [-81.5279884, 28.6808615],
@@ -2397,10 +2352,10 @@
       ]
     },
     {
-      "id": "osm-connector-4977",
+      "id": "osm-connector-5158",
       "sourceWayIds": ["184547414", "140082961"],
-      "startMainlineId": "osm-mainline-2294",
-      "endMainlineId": "osm-mainline-3616",
+      "startMainlineId": "osm-mainline-2200",
+      "endMainlineId": "osm-mainline-3530",
       "points": [
         [-79.9946181, 40.4544203],
         [-79.9948233, 40.4542669],
@@ -2413,10 +2368,10 @@
       ]
     },
     {
-      "id": "osm-connector-4979",
+      "id": "osm-connector-5162",
       "sourceWayIds": ["71069894", "368707349"],
-      "startMainlineId": "osm-mainline-4664",
-      "endMainlineId": "osm-mainline-5090",
+      "startMainlineId": "osm-mainline-4530",
+      "endMainlineId": "osm-mainline-4939",
       "points": [
         [-64.8254891, 46.0795537],
         [-64.8252915, 46.0793855],
@@ -2435,10 +2390,10 @@
       ]
     },
     {
-      "id": "osm-connector-4980",
+      "id": "osm-connector-5163",
       "sourceWayIds": ["1415750334", "977398441", "1214216852"],
-      "startMainlineId": "osm-mainline-2499",
-      "endMainlineId": "osm-mainline-2500",
+      "startMainlineId": "osm-mainline-2396",
+      "endMainlineId": "osm-mainline-2397",
       "points": [
         [-63.5713743, 44.7253923],
         [-63.5717486, 44.7252434],
@@ -2454,7 +2409,7 @@
       ]
     },
     {
-      "id": "osm-connector-4981",
+      "id": "osm-connector-5164",
       "sourceWayIds": [
         "86035931",
         "86035934",
@@ -2464,8 +2419,8 @@
         "979197357",
         "979197356"
       ],
-      "startMainlineId": "osm-mainline-1895",
-      "endMainlineId": "osm-mainline-4024",
+      "startMainlineId": "osm-mainline-1818",
+      "endMainlineId": "osm-mainline-3922",
       "points": [
         [-81.8403363, 28.1359362],
         [-81.8402661, 28.1357202],
@@ -2530,10 +2485,10 @@
       ]
     },
     {
-      "id": "osm-connector-4982",
+      "id": "osm-connector-5165",
       "sourceWayIds": ["1433929865", "123445138", "86291304", "86291334", "1000454803"],
-      "startMainlineId": "osm-mainline-1386",
-      "endMainlineId": "osm-mainline-1384",
+      "startMainlineId": "osm-mainline-1247",
+      "endMainlineId": "osm-mainline-1245",
       "points": [
         [-93.278297, 44.8903237],
         [-93.2780375, 44.8903231],
@@ -2570,10 +2525,10 @@
       ]
     },
     {
-      "id": "osm-connector-4984",
+      "id": "osm-connector-5167",
       "sourceWayIds": ["91041207", "1229231500", "50110275"],
-      "startMainlineId": "osm-mainline-3516",
-      "endMainlineId": "osm-mainline-3515",
+      "startMainlineId": "osm-mainline-3433",
+      "endMainlineId": "osm-mainline-3432",
       "points": [
         [-75.1549536, 39.9096041],
         [-75.1552489, 39.9096813],
@@ -2588,7 +2543,7 @@
       ]
     },
     {
-      "id": "osm-connector-4985",
+      "id": "osm-connector-5168",
       "sourceWayIds": [
         "97971866",
         "97971833",
@@ -2597,8 +2552,8 @@
         "97971864",
         "97971846"
       ],
-      "startMainlineId": "osm-mainline-2756",
-      "endMainlineId": "osm-mainline-2757",
+      "startMainlineId": "osm-mainline-2639",
+      "endMainlineId": "osm-mainline-2640",
       "points": [
         [-85.7109913, 38.34419],
         [-85.7107045, 38.3441813],
@@ -2622,10 +2577,10 @@
       ]
     },
     {
-      "id": "osm-connector-4986",
+      "id": "osm-connector-5169",
       "sourceWayIds": ["349690360", "183429926", "1139036216"],
-      "startMainlineId": "osm-mainline-2944",
-      "endMainlineId": "osm-mainline-2943",
+      "startMainlineId": "osm-mainline-2826",
+      "endMainlineId": "osm-mainline-2825",
       "points": [
         [-88.9931621, 36.408139],
         [-88.9929809, 36.4079667],
@@ -2647,10 +2602,10 @@
       ]
     },
     {
-      "id": "osm-connector-4987",
+      "id": "osm-connector-5171",
       "sourceWayIds": ["783767232", "691547327", "691547326", "91817412"],
-      "startMainlineId": "osm-mainline-4492",
-      "endMainlineId": "osm-mainline-4128",
+      "startMainlineId": "osm-mainline-4363",
+      "endMainlineId": "osm-mainline-4012",
       "points": [
         [-119.7628955, 39.1215806],
         [-119.7626214, 39.1215863],
@@ -2677,10 +2632,10 @@
       ]
     },
     {
-      "id": "osm-connector-4988",
+      "id": "osm-connector-5172",
       "sourceWayIds": ["116069322", "27023102", "27023099", "180104258", "857265186"],
-      "startMainlineId": "osm-mainline-4985",
-      "endMainlineId": "osm-mainline-3990",
+      "startMainlineId": "osm-mainline-4839",
+      "endMainlineId": "osm-mainline-3888",
       "points": [
         [-76.8259449, 39.2949606],
         [-76.8259582, 39.2947804],
@@ -2712,10 +2667,10 @@
       ]
     },
     {
-      "id": "osm-connector-4989",
+      "id": "osm-connector-5175",
       "sourceWayIds": ["230300843", "167577320", "167577318"],
-      "startMainlineId": "osm-mainline-3748",
-      "endMainlineId": "osm-mainline-3747",
+      "startMainlineId": "osm-mainline-3658",
+      "endMainlineId": "osm-mainline-3657",
       "points": [
         [-121.5414519, 39.0926823],
         [-121.5415922, 39.0929498],
@@ -2737,10 +2692,10 @@
       ]
     },
     {
-      "id": "osm-connector-4990",
+      "id": "osm-connector-5179",
       "sourceWayIds": ["121865160", "41872547"],
-      "startMainlineId": "osm-mainline-5056",
-      "endMainlineId": "osm-mainline-4436",
+      "startMainlineId": "osm-mainline-4905",
+      "endMainlineId": "osm-mainline-4308",
       "points": [
         [-73.2861297, 43.591399],
         [-73.2862885, 43.591206],
@@ -2771,10 +2726,10 @@
       ]
     },
     {
-      "id": "osm-connector-4991",
+      "id": "osm-connector-5180",
       "sourceWayIds": ["122088782", "43751488", "611908746", "611908747"],
-      "startMainlineId": "osm-mainline-3302",
-      "endMainlineId": "osm-mainline-3301",
+      "startMainlineId": "osm-mainline-3225",
+      "endMainlineId": "osm-mainline-3224",
       "points": [
         [-76.788476, 40.2212514],
         [-76.7886084, 40.2214575],
@@ -2800,10 +2755,10 @@
       ]
     },
     {
-      "id": "osm-connector-4994",
+      "id": "osm-connector-5186",
       "sourceWayIds": ["123106106", "27143848", "285170325"],
-      "startMainlineId": "osm-mainline-4235",
-      "endMainlineId": "osm-mainline-4234",
+      "startMainlineId": "osm-mainline-4112",
+      "endMainlineId": "osm-mainline-4111",
       "points": [
         [-97.4272743, 35.5998949],
         [-97.4270157, 35.5998079],
@@ -2821,10 +2776,10 @@
       ]
     },
     {
-      "id": "osm-connector-4995",
+      "id": "osm-connector-5190",
       "sourceWayIds": ["124068732", "97971857"],
-      "startMainlineId": "osm-mainline-5338",
-      "endMainlineId": "osm-mainline-2756",
+      "startMainlineId": "osm-mainline-5174",
+      "endMainlineId": "osm-mainline-2639",
       "points": [
         [-85.7219788, 38.3462594],
         [-85.7217286, 38.3461838],
@@ -2841,10 +2796,10 @@
       ]
     },
     {
-      "id": "osm-connector-4998",
+      "id": "osm-connector-5192",
       "sourceWayIds": ["1084963564", "958181252"],
-      "startMainlineId": "osm-mainline-5610",
-      "endMainlineId": "osm-mainline-5358",
+      "startMainlineId": "osm-mainline-5405",
+      "endMainlineId": "osm-mainline-5185",
       "points": [
         [-73.8969403, 40.6797851],
         [-73.8968574, 40.6799897],
@@ -2861,10 +2816,10 @@
       ]
     },
     {
-      "id": "osm-connector-4999",
+      "id": "osm-connector-5193",
       "sourceWayIds": ["128254159", "615643125", "123263326", "615643127", "330362142"],
-      "startMainlineId": "osm-mainline-3947",
-      "endMainlineId": "osm-mainline-4903",
+      "startMainlineId": "osm-mainline-3836",
+      "endMainlineId": "osm-mainline-4759",
       "points": [
         [-86.0033543, 39.963248],
         [-86.0033998, 39.9630521],
@@ -2882,10 +2837,10 @@
       ]
     },
     {
-      "id": "osm-connector-5000",
+      "id": "osm-connector-5195",
       "sourceWayIds": ["759680873", "609535709", "61697641"],
-      "startMainlineId": "osm-mainline-2429",
-      "endMainlineId": "osm-mainline-2428",
+      "startMainlineId": "osm-mainline-2327",
+      "endMainlineId": "osm-mainline-2326",
       "points": [
         [-66.0762408, 45.2613239],
         [-66.0760318, 45.2614864],
@@ -2901,10 +2856,10 @@
       ]
     },
     {
-      "id": "osm-connector-5005",
+      "id": "osm-connector-5201",
       "sourceWayIds": ["1395787981", "1415477958"],
-      "startMainlineId": "osm-mainline-4390",
-      "endMainlineId": "osm-mainline-4389",
+      "startMainlineId": "osm-mainline-4263",
+      "endMainlineId": "osm-mainline-4262",
       "points": [
         [-83.1437023, 40.0990971],
         [-83.1434087, 40.0990973],
@@ -2920,10 +2875,10 @@
       ]
     },
     {
-      "id": "osm-connector-5007",
+      "id": "osm-connector-5203",
       "sourceWayIds": ["847930724", "680310291"],
-      "startMainlineId": "osm-mainline-2380",
-      "endMainlineId": "osm-mainline-4710",
+      "startMainlineId": "osm-mainline-1774",
+      "endMainlineId": "osm-mainline-4574",
       "points": [
         [-74.2452893, 39.7728508],
         [-74.2453333, 39.7726744],
@@ -2940,10 +2895,10 @@
       ]
     },
     {
-      "id": "osm-connector-5009",
+      "id": "osm-connector-5206",
       "sourceWayIds": ["204179505", "174481352"],
-      "startMainlineId": "osm-mainline-4112",
-      "endMainlineId": "osm-mainline-4111",
+      "startMainlineId": "osm-mainline-3996",
+      "endMainlineId": "osm-mainline-3995",
       "points": [
         [-95.0110265, 30.4729425],
         [-95.0107853, 30.4730171],
@@ -2982,10 +2937,10 @@
       ]
     },
     {
-      "id": "osm-connector-5011",
+      "id": "osm-connector-5209",
       "sourceWayIds": ["301796725", "851613262"],
-      "startMainlineId": "osm-mainline-2585",
-      "endMainlineId": "osm-mainline-4765",
+      "startMainlineId": "osm-mainline-2482",
+      "endMainlineId": "osm-mainline-4628",
       "points": [
         [-99.2533064, 19.3464205],
         [-99.2530863, 19.3463966],
@@ -3004,10 +2959,10 @@
       ]
     },
     {
-      "id": "osm-connector-5012",
+      "id": "osm-connector-5210",
       "sourceWayIds": ["858650158", "216696534"],
-      "startMainlineId": "osm-mainline-857",
-      "endMainlineId": "osm-mainline-4135",
+      "startMainlineId": "osm-mainline-749",
+      "endMainlineId": "osm-mainline-4019",
       "points": [
         [-79.350645, 43.6551031],
         [-79.3508299, 43.6552673],
@@ -3019,10 +2974,10 @@
       ]
     },
     {
-      "id": "osm-connector-5014",
+      "id": "osm-connector-5212",
       "sourceWayIds": ["235443197", "235443198"],
-      "startMainlineId": "osm-mainline-5473",
-      "endMainlineId": "osm-mainline-4185",
+      "startMainlineId": "osm-mainline-5291",
+      "endMainlineId": "osm-mainline-4062",
       "points": [
         [-80.7654729, 46.2065627],
         [-80.7652889, 46.2063986],
@@ -3058,10 +3013,10 @@
       ]
     },
     {
-      "id": "osm-connector-5015",
+      "id": "osm-connector-5213",
       "sourceWayIds": ["261107732", "71936309", "1384774768", "584389483"],
-      "startMainlineId": "osm-mainline-1533",
-      "endMainlineId": "osm-mainline-1532",
+      "startMainlineId": "osm-mainline-1395",
+      "endMainlineId": "osm-mainline-1394",
       "points": [
         [-115.4052772, 51.1327121],
         [-115.4054015, 51.132858],
@@ -3082,10 +3037,10 @@
       ]
     },
     {
-      "id": "osm-connector-5019",
+      "id": "osm-connector-5220",
       "sourceWayIds": ["326489191", "326489194", "326489200", "326489195"],
-      "startMainlineId": "osm-mainline-2430",
-      "endMainlineId": "osm-mainline-2429",
+      "startMainlineId": "osm-mainline-2328",
+      "endMainlineId": "osm-mainline-2327",
       "points": [
         [-67.3056843, 45.1610605],
         [-67.3058321, 45.161082],
@@ -3107,10 +3062,10 @@
       ]
     },
     {
-      "id": "osm-connector-5020",
+      "id": "osm-connector-5221",
       "sourceWayIds": ["374568365", "246363582"],
-      "startMainlineId": "osm-mainline-2680",
-      "endMainlineId": "osm-mainline-4304",
+      "startMainlineId": "osm-mainline-2565",
+      "endMainlineId": "osm-mainline-4181",
       "points": [
         [-73.5042288, 42.3977407],
         [-73.5040267, 42.3975721],
@@ -3122,22 +3077,23 @@
       ]
     },
     {
-      "id": "osm-connector-5022",
+      "id": "osm-connector-5227",
       "sourceWayIds": ["1161256832", "36005161"],
-      "startMainlineId": "osm-mainline-5384",
-      "endMainlineId": "osm-mainline-4708",
+      "startMainlineId": "osm-mainline-5206",
+      "endMainlineId": "osm-mainline-4572",
       "points": [
         [-74.9012457, 38.9640676],
         [-74.9011051, 38.9642564],
+        [-74.9009712, 38.9644372],
         [-74.9009712, 38.9644372],
         [-74.9008433, 38.96461]
       ]
     },
     {
-      "id": "osm-connector-5024",
+      "id": "osm-connector-5229",
       "sourceWayIds": ["671948941", "634226263", "913621056"],
-      "startMainlineId": "osm-mainline-4569",
-      "endMainlineId": "osm-mainline-4568",
+      "startMainlineId": "osm-mainline-4439",
+      "endMainlineId": "osm-mainline-4438",
       "points": [
         [-92.8857306, 18.0578673],
         [-92.8858807, 18.0580403],
@@ -3153,10 +3109,10 @@
       ]
     },
     {
-      "id": "osm-connector-5025",
+      "id": "osm-connector-5232",
       "sourceWayIds": ["521688855", "49114443"],
-      "startMainlineId": "osm-mainline-1971",
-      "endMainlineId": "osm-mainline-1970",
+      "startMainlineId": "osm-mainline-1892",
+      "endMainlineId": "osm-mainline-1891",
       "points": [
         [-97.3424027, 38.0264156],
         [-97.3421193, 38.0264159],
@@ -3176,26 +3132,10 @@
       ]
     },
     {
-      "id": "osm-connector-5026",
-      "sourceWayIds": ["1363867570", "46691493"],
-      "startMainlineId": "osm-mainline-2382",
-      "endMainlineId": "osm-mainline-4772",
-      "points": [
-        [-74.0810302, 40.2536104],
-        [-74.0810073, 40.2537041],
-        [-74.080952, 40.2539217],
-        [-74.0808979, 40.2541381],
-        [-74.0808457, 40.2543534],
-        [-74.0807959, 40.2545703],
-        [-74.080761, 40.2547912],
-        [-74.0807331, 40.2550405]
-      ]
-    },
-    {
-      "id": "osm-connector-5031",
+      "id": "osm-connector-5237",
       "sourceWayIds": ["553433118", "28811273"],
-      "startMainlineId": "osm-mainline-1170",
-      "endMainlineId": "osm-mainline-1169",
+      "startMainlineId": "osm-mainline-1051",
+      "endMainlineId": "osm-mainline-1050",
       "points": [
         [-106.4139232, 23.2973073],
         [-106.4137508, 23.2971482],
@@ -3221,10 +3161,10 @@
       ]
     },
     {
-      "id": "osm-connector-5032",
+      "id": "osm-connector-5238",
       "sourceWayIds": ["562940380", "562940381", "591248010", "562946627", "562946639"],
-      "startMainlineId": "osm-mainline-3690",
-      "endMainlineId": "osm-mainline-4857",
+      "startMainlineId": "osm-mainline-3604",
+      "endMainlineId": "osm-mainline-4715",
       "points": [
         [-94.6196375, 39.1100719],
         [-94.6194946, 39.1102702],
@@ -3254,10 +3194,10 @@
       ]
     },
     {
-      "id": "osm-connector-5033",
+      "id": "osm-connector-5241",
       "sourceWayIds": ["626591602", "626590988"],
-      "startMainlineId": "osm-mainline-1064",
-      "endMainlineId": "osm-mainline-3803",
+      "startMainlineId": "osm-mainline-949",
+      "endMainlineId": "osm-mainline-3705",
       "points": [
         [-64.1732532, 45.01794],
         [-64.1732815, 45.0181555],
@@ -3274,10 +3214,10 @@
       ]
     },
     {
-      "id": "osm-connector-5034",
+      "id": "osm-connector-5244",
       "sourceWayIds": ["702149030", "567815826"],
-      "startMainlineId": "osm-mainline-1865",
-      "endMainlineId": "osm-mainline-1864",
+      "startMainlineId": "osm-mainline-1788",
+      "endMainlineId": "osm-mainline-1787",
       "points": [
         [-73.0853857, 45.0128683],
         [-73.0854249, 45.0127153],
@@ -3288,10 +3228,10 @@
       ]
     },
     {
-      "id": "osm-connector-5035",
+      "id": "osm-connector-5245",
       "sourceWayIds": ["759272326", "640115461"],
-      "startMainlineId": "osm-mainline-5132",
-      "endMainlineId": "osm-mainline-5131",
+      "startMainlineId": "osm-mainline-4978",
+      "endMainlineId": "osm-mainline-4977",
       "points": [
         [-93.4742175, 45.1376085],
         [-93.4745347, 45.1376084],
@@ -3349,10 +3289,10 @@
       ]
     },
     {
-      "id": "osm-connector-5037",
+      "id": "osm-connector-5247",
       "sourceWayIds": ["791885461", "793250330"],
-      "startMainlineId": "osm-mainline-4728",
-      "endMainlineId": "osm-mainline-5241",
+      "startMainlineId": "osm-mainline-4592",
+      "endMainlineId": "osm-mainline-5077",
       "points": [
         [-81.6619703, 35.2966215],
         [-81.6622361, 35.2966197],
@@ -3376,10 +3316,10 @@
       ]
     },
     {
-      "id": "osm-connector-5038",
+      "id": "osm-connector-5248",
       "sourceWayIds": ["783761957", "445380354"],
-      "startMainlineId": "osm-mainline-4728",
-      "endMainlineId": "osm-mainline-4727",
+      "startMainlineId": "osm-mainline-4592",
+      "endMainlineId": "osm-mainline-4591",
       "points": [
         [-81.6592283, 35.2966259],
         [-81.6589743, 35.2966286],
@@ -3400,63 +3340,369 @@
       ]
     },
     {
-      "id": "osm-connector-5039",
+      "id": "osm-connector-5252",
       "sourceWayIds": ["971201232", "807701919", "971201265", "971201270", "675761305"],
-      "startMainlineId": "osm-mainline-5525",
-      "endMainlineId": "osm-mainline-5341",
+      "startMainlineId": "osm-mainline-2176",
+      "endMainlineId": "osm-mainline-2175",
       "points": [
-        [-115.430113, 35.5176162],
-        [-115.4301989, 35.5174139],
-        [-115.4302861, 35.5172088],
-        [-115.4303732, 35.5170036],
-        [-115.4304603, 35.5167985],
-        [-115.4305474, 35.5165934],
-        [-115.4306355, 35.5163885],
-        [-115.4307242, 35.5161839],
-        [-115.4308144, 35.5159766]
+        [-115.4300153, 35.5178437],
+        [-115.4301051, 35.5176346],
+        [-115.4301953, 35.5174224],
+        [-115.4302854, 35.5172103],
+        [-115.4303755, 35.5169981],
+        [-115.4304657, 35.5167859],
+        [-115.4305558, 35.5165738],
+        [-115.430647, 35.5163619],
+        [-115.4307387, 35.5161502],
+        [-115.4308309, 35.5159387],
+        [-115.4309255, 35.5157208]
       ]
     },
     {
-      "id": "osm-connector-5040",
-      "sourceWayIds": ["816069566", "916252683"],
-      "startMainlineId": "osm-mainline-4490",
-      "endMainlineId": "osm-mainline-4488",
+      "id": "osm-connector-1464",
+      "sourceWayIds": [
+        "1227293481",
+        "39438127",
+        "39438142",
+        "1498100935",
+        "10065668",
+        "1343429045",
+        "1343429047",
+        "816069566",
+        "816069565",
+        "816069564",
+        "816069563",
+        "816069562",
+        "471091067",
+        "749649930",
+        "749649931",
+        "508892778",
+        "508892776",
+        "505631721",
+        "505631723",
+        "917808263",
+        "561261470",
+        "927683559",
+        "499574770",
+        "499574769",
+        "997448178",
+        "997448179",
+        "997448177",
+        "1149348305",
+        "1339394881",
+        "1149348304",
+        "1052511593",
+        "499351737",
+        "927736419",
+        "499574757",
+        "10031564",
+        "751193208",
+        "751193207",
+        "1026684710",
+        "499574742",
+        "816069558",
+        "505631724",
+        "816069560",
+        "816069559",
+        "505631722",
+        "508892782",
+        "508892780",
+        "471091052",
+        "751193211",
+        "751193212",
+        "978131754",
+        "751193218",
+        "816069567",
+        "1021052156",
+        "916252683",
+        "751193220",
+        "1033752463",
+        "603518125",
+        "603518137",
+        "39438134",
+        "39438133",
+        "1227293470"
+      ],
+      "startMainlineId": "osm-mainline-1169",
+      "endMainlineId": "osm-mainline-6073",
       "points": [
-        [-97.3172707, 32.8959105],
-        [-97.3172237, 32.8956853],
-        [-97.3172249, 32.8954603],
-        [-97.3172256, 32.8952353],
-        [-97.3172261, 32.8950102],
-        [-97.3172266, 32.8947852],
-        [-97.3172271, 32.8945602],
-        [-97.3172275, 32.8943352],
-        [-97.3172748, 32.8941103]
+        [-97.3136608, 32.9391755],
+        [-97.3138287, 32.9387498],
+        [-97.3139358, 32.9383195],
+        [-97.3140644, 32.9378855],
+        [-97.3141917, 32.9374504],
+        [-97.3143238, 32.9370149],
+        [-97.3144665, 32.936584],
+        [-97.3146138, 32.9361522],
+        [-97.3147619, 32.9357266],
+        [-97.314897, 32.9353002],
+        [-97.315034, 32.9348676],
+        [-97.315171, 32.9344351],
+        [-97.3153081, 32.9340025],
+        [-97.3154444, 32.9335707],
+        [-97.3155801, 32.933138],
+        [-97.31572, 32.9327038],
+        [-97.315851, 32.9322721],
+        [-97.3159792, 32.9318376],
+        [-97.3161047, 32.9314042],
+        [-97.3162127, 32.9309659],
+        [-97.3163184, 32.9305275],
+        [-97.3164198, 32.9300892],
+        [-97.3165139, 32.9296492],
+        [-97.3165965, 32.9292077],
+        [-97.3166763, 32.928765],
+        [-97.3167479, 32.9283225],
+        [-97.3168091, 32.9278789],
+        [-97.3168662, 32.9274332],
+        [-97.316921, 32.9269901],
+        [-97.3169593, 32.9265435],
+        [-97.3169964, 32.9260968],
+        [-97.3170255, 32.9256508],
+        [-97.3170435, 32.9252047],
+        [-97.3170518, 32.924757],
+        [-97.3170543, 32.9243102],
+        [-97.3170565, 32.9238625],
+        [-97.3170584, 32.9234148],
+        [-97.3170604, 32.9229671],
+        [-97.3170623, 32.9225193],
+        [-97.3170643, 32.9220716],
+        [-97.3170662, 32.9216239],
+        [-97.3170679, 32.9211763],
+        [-97.3170692, 32.9207283],
+        [-97.3170741, 32.9202806],
+        [-97.3170865, 32.9198317],
+        [-97.3171066, 32.9193843],
+        [-97.3171292, 32.918937],
+        [-97.3171546, 32.9184896],
+        [-97.317171, 32.9180423],
+        [-97.317175, 32.9175963],
+        [-97.3171784, 32.9171486],
+        [-97.3171796, 32.916701],
+        [-97.3171807, 32.9162533],
+        [-97.3171818, 32.9158056],
+        [-97.3171829, 32.9153578],
+        [-97.3171841, 32.9149101],
+        [-97.3171852, 32.9144624],
+        [-97.3171863, 32.9140147],
+        [-97.3171875, 32.9135669],
+        [-97.3171882, 32.9131192],
+        [-97.317189, 32.9126715],
+        [-97.3171898, 32.9122238],
+        [-97.3171906, 32.9117761],
+        [-97.3171913, 32.9113283],
+        [-97.3171921, 32.9108806],
+        [-97.3171929, 32.9104329],
+        [-97.3171937, 32.9099851],
+        [-97.3171945, 32.9095374],
+        [-97.3171952, 32.9090897],
+        [-97.317196, 32.908642],
+        [-97.3171968, 32.9081942],
+        [-97.3171976, 32.9077465],
+        [-97.3171982, 32.9072989],
+        [-97.317199, 32.9068511],
+        [-97.3171997, 32.9064034],
+        [-97.3172005, 32.9059557],
+        [-97.3172012, 32.905508],
+        [-97.3172019, 32.9050602],
+        [-97.3172027, 32.9046124],
+        [-97.3172035, 32.9041647],
+        [-97.3172043, 32.903717],
+        [-97.3172051, 32.9032693],
+        [-97.3172065, 32.9028213],
+        [-97.3172083, 32.9023736],
+        [-97.3172101, 32.9019261],
+        [-97.3172135, 32.9014784],
+        [-97.3172162, 32.9010312],
+        [-97.3172158, 32.9005835],
+        [-97.3172134, 32.9001359],
+        [-97.3172108, 32.8996882],
+        [-97.3172128, 32.8992412],
+        [-97.3172067, 32.8987936],
+        [-97.3172079, 32.8983439],
+        [-97.3172102, 32.8978962],
+        [-97.3172128, 32.8974483],
+        [-97.3172158, 32.8970006],
+        [-97.3172188, 32.8965529],
+        [-97.3172217, 32.8961052],
+        [-97.3172239, 32.8956579],
+        [-97.3172257, 32.8952102],
+        [-97.3172266, 32.8947624],
+        [-97.3172276, 32.8943147],
+        [-97.317229, 32.893867],
+        [-97.3172305, 32.8934193],
+        [-97.317232, 32.8929716],
+        [-97.3172331, 32.8925239],
+        [-97.3172342, 32.8920762],
+        [-97.3172352, 32.8916284],
+        [-97.3172363, 32.8911807],
+        [-97.3172371, 32.8907333],
+        [-97.3172361, 32.8902856],
+        [-97.3172346, 32.8898379],
+        [-97.3172337, 32.8893897],
+        [-97.3172342, 32.888942],
+        [-97.3172347, 32.8884943],
+        [-97.3172352, 32.8880465],
+        [-97.3172357, 32.8875988],
+        [-97.3172393, 32.8871516],
+        [-97.317237, 32.8867039],
+        [-97.3172347, 32.8862562],
+        [-97.3172349, 32.8858079],
+        [-97.317237, 32.8853602],
+        [-97.317239, 32.8849125],
+        [-97.3172411, 32.8844648],
+        [-97.3172431, 32.884017],
+        [-97.3172451, 32.8835693],
+        [-97.3172471, 32.8831216],
+        [-97.3172491, 32.8826739],
+        [-97.317251, 32.8822263],
+        [-97.3172519, 32.8817786],
+        [-97.3172528, 32.8813309],
+        [-97.3172537, 32.8808832],
+        [-97.3172563, 32.8804352],
+        [-97.31726, 32.8799875],
+        [-97.3172636, 32.8795398],
+        [-97.3172639, 32.8790921],
+        [-97.3172632, 32.8786445],
+        [-97.3172619, 32.8781968],
+        [-97.3172606, 32.8777492],
+        [-97.3172586, 32.8773015],
+        [-97.317256, 32.8768549],
+        [-97.3172469, 32.8764073],
+        [-97.3172263, 32.8759608],
+        [-97.3172017, 32.8755145],
+        [-97.317169, 32.8750686],
+        [-97.3171258, 32.8746224],
+        [-97.3170795, 32.8741764],
+        [-97.3170222, 32.873733],
+        [-97.3169539, 32.87329],
+        [-97.3168828, 32.8728467],
+        [-97.3168092, 32.8724042],
+        [-97.3167237, 32.8719624],
+        [-97.3166305, 32.8715224],
+        [-97.3165362, 32.8710819],
+        [-97.3164399, 32.8706416],
+        [-97.3163463, 32.8702009],
+        [-97.3162549, 32.8697599],
+        [-97.3161636, 32.8693189],
+        [-97.3160723, 32.8688778],
+        [-97.315981, 32.8684368],
+        [-97.3158899, 32.8679957],
+        [-97.3157988, 32.8675546],
+        [-97.3157077, 32.8671135],
+        [-97.3156166, 32.8666724],
+        [-97.3155255, 32.8662313],
+        [-97.3154343, 32.8657904],
+        [-97.3153415, 32.8653496],
+        [-97.3152486, 32.8649088],
+        [-97.3151557, 32.8644679],
+        [-97.3150628, 32.8640271],
+        [-97.31497, 32.8635863],
+        [-97.3148771, 32.8631455],
+        [-97.3147864, 32.8627044],
+        [-97.3146979, 32.862263],
+        [-97.3146042, 32.8618224],
+        [-97.3145103, 32.8613818],
+        [-97.3144124, 32.8609426],
+        [-97.314314, 32.8605013],
+        [-97.3142228, 32.8600602],
+        [-97.3141315, 32.8596192],
+        [-97.3140401, 32.8591784],
+        [-97.3139479, 32.8587374],
+        [-97.3138557, 32.8582965],
+        [-97.3137638, 32.8578555],
+        [-97.3136759, 32.857413],
+        [-97.3135883, 32.8569715],
+        [-97.3135004, 32.8565304],
+        [-97.3134134, 32.8560887],
+        [-97.3133265, 32.855647],
+        [-97.3132395, 32.8552054],
+        [-97.3131564, 32.8547618],
+        [-97.3130853, 32.8543181],
+        [-97.3130218, 32.8538728],
+        [-97.3129642, 32.8534263],
+        [-97.312917, 32.8529804],
+        [-97.3128803, 32.8525328],
+        [-97.3128478, 32.8520851],
+        [-97.3128234, 32.851637],
+        [-97.3128064, 32.8511895],
+        [-97.3127979, 32.8507408],
+        [-97.3127935, 32.8502931],
+        [-97.3127891, 32.8498454],
+        [-97.3127865, 32.8493977],
+        [-97.3127845, 32.84895],
+        [-97.3127825, 32.8485023],
+        [-97.3127811, 32.8480546],
+        [-97.3127795, 32.8476069],
+        [-97.3127802, 32.8471585],
+        [-97.3127828, 32.8467223],
+        [-97.3127841, 32.8462751],
+        [-97.3127854, 32.8458279],
+        [-97.3127826, 32.8453757],
+        [-97.3127813, 32.8449281],
+        [-97.3127749, 32.8444872],
+        [-97.3127779, 32.844042],
+        [-97.3128185, 32.8435997],
+        [-97.3128101, 32.8431543],
+        [-97.3128012, 32.8427115],
+        [-97.3128298, 32.8422875],
+        [-97.3128406, 32.8422068],
+        [-97.3128525, 32.8421219],
+        [-97.312866, 32.8420333],
+        [-97.3128815, 32.8419416],
+        [-97.3128978, 32.8418466],
+        [-97.3129158, 32.8417497],
+        [-97.3129342, 32.8416502],
+        [-97.312953, 32.8415481],
+        [-97.3129713, 32.8414432],
+        [-97.3129943, 32.8413352],
+        [-97.3130255, 32.8412247],
+        [-97.313071, 32.841113],
+        [-97.3131223, 32.8410004],
+        [-97.3131837, 32.8408889],
+        [-97.3132592, 32.8407809],
+        [-97.3133459, 32.8406776],
+        [-97.3134402, 32.8405777],
+        [-97.3135403, 32.8404816],
+        [-97.313649, 32.840392],
+        [-97.3137603, 32.8403051],
+        [-97.3138776, 32.8402253],
+        [-97.3139993, 32.8401521],
+        [-97.3141243, 32.8400847],
+        [-97.3142508, 32.8400224],
+        [-97.3143815, 32.8399691],
+        [-97.3145136, 32.8399235],
+        [-97.3146457, 32.8398844],
+        [-97.3147771, 32.839852],
+        [-97.3149065, 32.8398238],
+        [-97.3150338, 32.8398035],
+        [-97.3151586, 32.839789],
+        [-97.3152801, 32.8397783],
+        [-97.3153976, 32.8397694],
+        [-97.3155107, 32.8397614],
+        [-97.315619, 32.8397545],
+        [-97.3157225, 32.8397493],
+        [-97.3158202, 32.8397441],
+        [-97.3163209, 32.8397125],
+        [-97.3168413, 32.8396745],
+        [-97.317359, 32.8396311],
+        [-97.3178592, 32.8395793],
+        [-97.3183788, 32.8395288],
+        [-97.3189077, 32.8395055],
+        [-97.319438, 32.8394778],
+        [-97.319968, 32.8394634],
+        [-97.3205062, 32.839459],
+        [-97.321044, 32.8394629],
+        [-97.3215958, 32.8394717],
+        [-97.3221232, 32.8394968],
+        [-97.3226472, 32.8395202],
+        [-97.3231632, 32.8395666]
       ]
     },
     {
-      "id": "osm-connector-5041",
-      "sourceWayIds": ["847547640", "159236703"],
-      "startMainlineId": "osm-mainline-3777",
-      "endMainlineId": "osm-mainline-3776",
-      "points": [
-        [-96.7555308, 32.9231754],
-        [-96.7552813, 32.9230967],
-        [-96.7550348, 32.9230152],
-        [-96.7547908, 32.9229302],
-        [-96.7545472, 32.9228411],
-        [-96.7543051, 32.9227505],
-        [-96.7540635, 32.9226576],
-        [-96.7538256, 32.9225599],
-        [-96.753588, 32.9224602],
-        [-96.753353, 32.9223605],
-        [-96.7531187, 32.9222529]
-      ]
-    },
-    {
-      "id": "osm-connector-5042",
+      "id": "osm-connector-5253",
       "sourceWayIds": ["1112439131", "771917164"],
-      "startMainlineId": "osm-mainline-5324",
-      "endMainlineId": "osm-mainline-5317",
+      "startMainlineId": "osm-mainline-5160",
+      "endMainlineId": "osm-mainline-5153",
       "points": [
         [-99.2066555, 19.5162537],
         [-99.2068822, 19.5161922],
@@ -3472,10 +3718,10 @@
       ]
     },
     {
-      "id": "osm-connector-5043",
+      "id": "osm-connector-5255",
       "sourceWayIds": ["870002594", "870002593"],
-      "startMainlineId": "osm-mainline-5415",
-      "endMainlineId": "osm-mainline-5416",
+      "startMainlineId": "osm-mainline-5233",
+      "endMainlineId": "osm-mainline-5234",
       "points": [
         [-99.523318, 19.3223678],
         [-99.5231076, 19.3224693],
@@ -3508,10 +3754,10 @@
       ]
     },
     {
-      "id": "osm-connector-5044",
+      "id": "osm-connector-5256",
       "sourceWayIds": ["882126722", "882126720"],
-      "startMainlineId": "osm-mainline-4753",
-      "endMainlineId": "osm-mainline-4752",
+      "startMainlineId": "osm-mainline-4617",
+      "endMainlineId": "osm-mainline-4616",
       "points": [
         [-104.9775667, 21.1372511],
         [-104.9773892, 21.137096],
@@ -3535,10 +3781,10 @@
       ]
     },
     {
-      "id": "osm-connector-5045",
+      "id": "osm-connector-5260",
       "sourceWayIds": ["1242988657", "1242988655"],
-      "startMainlineId": "osm-mainline-1317",
-      "endMainlineId": "osm-mainline-2510",
+      "startMainlineId": "osm-mainline-1179",
+      "endMainlineId": "osm-mainline-2407",
       "points": [
         [-81.3488844, 28.7968877],
         [-81.3491188, 28.7969561],
@@ -3559,10 +3805,10 @@
       ]
     },
     {
-      "id": "osm-connector-5046",
+      "id": "osm-connector-5261",
       "sourceWayIds": ["934505132", "934505134", "934505133", "259081369"],
-      "startMainlineId": "osm-mainline-3877",
-      "endMainlineId": "osm-mainline-3876",
+      "startMainlineId": "osm-mainline-3772",
+      "endMainlineId": "osm-mainline-3771",
       "points": [
         [-104.0619035, 20.9467034],
         [-104.0620878, 20.9468203],
@@ -3581,7 +3827,7 @@
       ]
     },
     {
-      "id": "osm-connector-5048",
+      "id": "osm-connector-5264",
       "sourceWayIds": [
         "928698824",
         "928698836",
@@ -3592,51 +3838,51 @@
         "928698832",
         "928698839"
       ],
-      "startMainlineId": "osm-mainline-4937",
-      "endMainlineId": "osm-mainline-4936",
+      "startMainlineId": "osm-mainline-1859",
+      "endMainlineId": "osm-mainline-4791",
       "points": [
-        [-95.6165246, 29.784828],
-        [-95.6162673, 29.7848283],
-        [-95.6160093, 29.7848289],
-        [-95.6157511, 29.7848298],
-        [-95.6154928, 29.7848306],
-        [-95.6152346, 29.7848315],
-        [-95.6149764, 29.7848323],
-        [-95.6147182, 29.7848332],
-        [-95.61446, 29.7848341],
-        [-95.6142017, 29.7848349],
-        [-95.6139427, 29.7848351],
-        [-95.6136844, 29.7848347],
-        [-95.6134262, 29.7848344],
-        [-95.6131679, 29.7848341],
-        [-95.6129092, 29.7848332],
-        [-95.6126509, 29.7848322],
-        [-95.6123922, 29.7848312],
-        [-95.612134, 29.7848296],
-        [-95.6118758, 29.7848279],
-        [-95.6116175, 29.7848263],
-        [-95.6113593, 29.7848247],
-        [-95.6111011, 29.7848231],
-        [-95.610842, 29.7848211],
-        [-95.6105838, 29.7848184],
-        [-95.6103256, 29.7848156],
-        [-95.6100673, 29.7848131],
-        [-95.6098092, 29.7848107],
-        [-95.6095509, 29.7848079],
-        [-95.6092927, 29.7848048],
-        [-95.6090345, 29.7848006],
-        [-95.6087763, 29.7847963],
-        [-95.6085181, 29.784792],
-        [-95.6082605, 29.7847881],
-        [-95.6080023, 29.784785],
-        [-95.6077444, 29.7847827]
+        [-95.6164858, 29.784828],
+        [-95.6162288, 29.7848284],
+        [-95.6159711, 29.784829],
+        [-95.6157132, 29.7848299],
+        [-95.6154552, 29.7848307],
+        [-95.6151973, 29.7848316],
+        [-95.6149394, 29.7848325],
+        [-95.6146815, 29.7848333],
+        [-95.6144235, 29.7848342],
+        [-95.6141656, 29.7848351],
+        [-95.6139068, 29.784835],
+        [-95.6136489, 29.7848347],
+        [-95.6133909, 29.7848344],
+        [-95.613133, 29.7848341],
+        [-95.6128746, 29.7848331],
+        [-95.6126166, 29.7848321],
+        [-95.6123582, 29.784831],
+        [-95.6121003, 29.7848294],
+        [-95.6118423, 29.7848277],
+        [-95.6115844, 29.7848261],
+        [-95.6113264, 29.7848245],
+        [-95.6110685, 29.7848229],
+        [-95.6108098, 29.7848208],
+        [-95.6105519, 29.784818],
+        [-95.6102939, 29.7848153],
+        [-95.610036, 29.7848128],
+        [-95.6097781, 29.7848104],
+        [-95.6095201, 29.7848075],
+        [-95.6092623, 29.7848043],
+        [-95.6090044, 29.7848001],
+        [-95.6087465, 29.7847958],
+        [-95.6084886, 29.7847915],
+        [-95.6082312, 29.7847878],
+        [-95.6079733, 29.7847847],
+        [-95.6077157, 29.7847825]
       ]
     },
     {
-      "id": "osm-connector-5049",
+      "id": "osm-connector-5266",
       "sourceWayIds": ["957801163", "957801162", "934505141", "29557093"],
-      "startMainlineId": "osm-mainline-5446",
-      "endMainlineId": "osm-mainline-3876",
+      "startMainlineId": "osm-mainline-5264",
+      "endMainlineId": "osm-mainline-3771",
       "points": [
         [-104.1450105, 21.0064084],
         [-104.1448599, 21.0062506],
@@ -3651,10 +3897,10 @@
       ]
     },
     {
-      "id": "osm-connector-5051",
+      "id": "osm-connector-5270",
       "sourceWayIds": ["1012017622", "116563656"],
-      "startMainlineId": "osm-mainline-4429",
-      "endMainlineId": "osm-mainline-4428",
+      "startMainlineId": "osm-mainline-4301",
+      "endMainlineId": "osm-mainline-4300",
       "points": [
         [-74.260261, 40.2397684],
         [-74.2600122, 40.2396553],
@@ -3678,10 +3924,10 @@
       ]
     },
     {
-      "id": "osm-connector-5052",
+      "id": "osm-connector-5272",
       "sourceWayIds": ["1029110463", "977108230"],
-      "startMainlineId": "osm-mainline-5147",
-      "endMainlineId": "osm-mainline-5363",
+      "startMainlineId": "osm-mainline-4993",
+      "endMainlineId": "osm-mainline-5190",
       "points": [
         [-83.1425514, 37.7417414],
         [-83.1422942, 37.741672],
@@ -3701,10 +3947,10 @@
       ]
     },
     {
-      "id": "osm-connector-5054",
+      "id": "osm-connector-5274",
       "sourceWayIds": ["1057899444", "832543278"],
-      "startMainlineId": "osm-mainline-829",
-      "endMainlineId": "osm-mainline-3314",
+      "startMainlineId": "osm-mainline-722",
+      "endMainlineId": "osm-mainline-3237",
       "points": [
         [-75.9818981, 44.345525],
         [-75.9816988, 44.3453664],
@@ -3719,10 +3965,10 @@
       ]
     },
     {
-      "id": "osm-connector-5057",
+      "id": "osm-connector-5275",
       "sourceWayIds": ["1305005602", "119633164"],
-      "startMainlineId": "osm-mainline-5540",
-      "endMainlineId": "osm-mainline-5539",
+      "startMainlineId": "osm-mainline-5341",
+      "endMainlineId": "osm-mainline-5340",
       "points": [
         [-97.4146758, 27.7980965],
         [-97.4149287, 27.7981006],
@@ -3738,10 +3984,10 @@
       ]
     },
     {
-      "id": "osm-connector-5059",
+      "id": "osm-connector-5280",
       "sourceWayIds": ["1128095553", "1128095554"],
-      "startMainlineId": "osm-mainline-4755",
-      "endMainlineId": "osm-mainline-4754",
+      "startMainlineId": "osm-mainline-4619",
+      "endMainlineId": "osm-mainline-4618",
       "points": [
         [-105.398402, 20.8584262],
         [-105.3983264, 20.8586359],
@@ -3759,10 +4005,10 @@
       ]
     },
     {
-      "id": "osm-connector-5061",
+      "id": "osm-connector-5282",
       "sourceWayIds": ["1144558246", "1144558245"],
-      "startMainlineId": "osm-mainline-6005",
-      "endMainlineId": "osm-mainline-5824",
+      "startMainlineId": "osm-mainline-5742",
+      "endMainlineId": "osm-mainline-5577",
       "points": [
         [-94.589602, 39.1107945],
         [-94.5895413, 39.1105913],
@@ -3778,33 +4024,33 @@
       ]
     },
     {
-      "id": "osm-connector-5063",
+      "id": "osm-connector-5284",
       "sourceWayIds": ["1153706313", "333872695"],
-      "startMainlineId": "osm-mainline-1221",
-      "endMainlineId": "osm-mainline-1220",
+      "startMainlineId": "osm-mainline-1102",
+      "endMainlineId": "osm-mainline-1101",
       "points": [
-        [-82.3691931, 42.9868455],
-        [-82.3694985, 42.9868591],
-        [-82.3698034, 42.9868739],
-        [-82.3701087, 42.9868885],
-        [-82.3704143, 42.9869008],
-        [-82.3707201, 42.9869122],
-        [-82.3710258, 42.9869237],
-        [-82.3713315, 42.9869352],
-        [-82.3716372, 42.9869461],
-        [-82.3719429, 42.9869564],
-        [-82.3722487, 42.9869667],
-        [-82.3725544, 42.9869781],
-        [-82.3728598, 42.9869918],
-        [-82.3731653, 42.9870054],
-        [-82.3734744, 42.9870197]
+        [-82.3691934, 42.9868455],
+        [-82.3694988, 42.9868591],
+        [-82.3698037, 42.9868739],
+        [-82.370109, 42.9868885],
+        [-82.3704145, 42.9869008],
+        [-82.3707204, 42.9869122],
+        [-82.371026, 42.9869237],
+        [-82.3713317, 42.9869352],
+        [-82.3716374, 42.9869462],
+        [-82.3719432, 42.9869564],
+        [-82.3722489, 42.9869667],
+        [-82.3725546, 42.9869782],
+        [-82.37286, 42.9869918],
+        [-82.3731655, 42.9870054],
+        [-82.3734746, 42.9870197]
       ]
     },
     {
-      "id": "osm-connector-5067",
+      "id": "osm-connector-5289",
       "sourceWayIds": ["1432455474", "1249349822"],
-      "startMainlineId": "osm-mainline-5923",
-      "endMainlineId": "osm-mainline-5817",
+      "startMainlineId": "osm-mainline-5668",
+      "endMainlineId": "osm-mainline-5570",
       "points": [
         [-105.3760533, 20.7731136],
         [-105.375895, 20.7732647],
@@ -3821,21 +4067,23 @@
       ]
     },
     {
-      "id": "osm-connector-5068",
+      "id": "osm-connector-5293",
       "sourceWayIds": ["1341660379", "42502902"],
-      "startMainlineId": "osm-mainline-3318",
-      "endMainlineId": "osm-mainline-5390",
+      "startMainlineId": "osm-mainline-3241",
+      "endMainlineId": "osm-mainline-5212",
       "points": [
         [-73.9682516, 40.8544749],
         [-73.9679943, 40.85442],
+        [-73.9679943, 40.85442],
+        [-73.9677168, 40.8543668],
         [-73.9677168, 40.8543668]
       ]
     },
     {
-      "id": "osm-connector-5069",
+      "id": "osm-connector-5294",
       "sourceWayIds": ["1361060223", "1456622873"],
-      "startMainlineId": "osm-mainline-5995",
-      "endMainlineId": "osm-mainline-5986",
+      "startMainlineId": "osm-mainline-5734",
+      "endMainlineId": "osm-mainline-5725",
       "points": [
         [-95.5638784, 29.8645853],
         [-95.5638769, 29.8643792],
@@ -3847,10 +4095,10 @@
       ]
     },
     {
-      "id": "osm-connector-5071",
+      "id": "osm-connector-5296",
       "sourceWayIds": ["1535657300", "606387587"],
-      "startMainlineId": "osm-mainline-4685",
-      "endMainlineId": "osm-mainline-4986",
+      "startMainlineId": "osm-mainline-4551",
+      "endMainlineId": "osm-mainline-4840",
       "points": [
         [-72.4956425, 46.4360461],
         [-72.4953603, 46.4361155],

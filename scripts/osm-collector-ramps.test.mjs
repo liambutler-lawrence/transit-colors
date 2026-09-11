@@ -9,6 +9,7 @@ import {
   averageReciprocalPathCoordinates,
   classifyOsmMotorwayWay,
   shortenReciprocalMatches,
+  selectShortestReciprocalMovements,
 } from './osm-highway-network.mjs';
 
 test('short collector alternatives keep source correspondence moving forward around loops', () => {
@@ -192,4 +193,91 @@ test('Jacksonville restores NW reciprocity and chooses the shorter NE collector 
   });
   assert.equal(built.statistics.directConnectorCount, 3);
   assert.equal(built.statistics.unpairedConnectorPathCount, 1);
+});
+
+test('a reciprocal pair cannot share one-way source edges internally, even when a shorter route does', () => {
+  const start = {
+    nodeId: 'start',
+    partIndex: 0,
+    coordinate: [0, 0],
+    travelDirections: [[1, 0]],
+  };
+  const end = {
+    nodeId: 'end',
+    partIndex: 1,
+    coordinate: [0.01, 0.01],
+    travelDirections: [[1, 0]],
+  };
+  const path = (nodeIds, edgeIndices, distanceMeters) => ({
+    nodeIds,
+    edgeIndices,
+    distanceMeters,
+    firstAttachment: start,
+    secondAttachment: end,
+  });
+  const outward = path(['a', 'collector-a', 'collector-b', 'b'], [1, 2, 3], 1000);
+  const falseReturn = path(['c', 'collector-a', 'collector-b', 'd'], [4, 2, 5], 1000);
+  const actualReturn = path(['c', 'return-a', 'return-b', 'd'], [4, 6, 5], 1200);
+  const invalid = [outward, falseReturn],
+    valid = [outward, actualReturn];
+  assert.deepEqual(
+    selectShortestReciprocalMovements(
+      [invalid, valid],
+      new Map([
+        [0, 0],
+        [1, 1],
+      ]),
+    ),
+    [valid],
+  );
+  // Shared junction nodes alone do not mean shared one-way pavement.
+  const crossing = [
+    outward,
+    path(['c', 'collector-a', 'return-b', 'd'], [4, 7, 5], 1100),
+  ];
+  assert.deepEqual(selectShortestReciprocalMovements([crossing], new Map()), [
+    crossing,
+  ]);
+});
+
+test('a separate shorter collector can replace one side of an identical reciprocal movement', () => {
+  const attachment = (nodeId, partIndex, coordinate, chain) => ({
+    nodeId,
+    partIndex,
+    coordinate,
+    carriagewayIds: [chain],
+    travelDirections: [[1, 0]],
+  });
+  const long = {
+    firstAttachment: attachment('old-exit', 0, [0, 0], 'eastbound'),
+    secondAttachment: attachment('old-merge', 1, [0.01, 0.01], 'northbound'),
+    distanceMeters: 4000,
+    edgeIndices: [1, 2],
+  };
+  const short = {
+    firstAttachment: attachment('later-exit', 0, [0.001, 0], 'eastbound'),
+    secondAttachment: attachment('earlier-merge', 1, [0.011, 0.01], 'northbound'),
+    distanceMeters: 2000,
+    edgeIndices: [3, 4],
+  };
+  const returning = { ...long, edgeIndices: [5, 6], distanceMeters: 1500 };
+  const groups = new Map([
+    [0, 0],
+    [1, 1],
+  ]);
+  assert.deepEqual(
+    shortenReciprocalMatches([[long, returning]], [[short, returning]], groups),
+    [[short, returning]],
+  );
+  const wrongSide = structuredClone(short);
+  wrongSide.secondAttachment.carriagewayIds = ['southbound'];
+  assert.deepEqual(
+    shortenReciprocalMatches([[long, returning]], [[wrongSide, returning]], groups),
+    [[long, returning]],
+  );
+  assert.deepEqual(
+    shortenReciprocalMatches([[long, returning]], [[short, { ...returning }]], groups),
+    [[long, returning]],
+    'nearby independent movements need their own evidence',
+  );
 });

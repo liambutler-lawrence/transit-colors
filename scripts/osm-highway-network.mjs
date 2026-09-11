@@ -25,8 +25,11 @@ const RAMP_CORRESPONDENCE_SPACING_METERS = 25;
 const MIN_PAIRED_TANGENT_ALIGNMENT = 0.62;
 
 function decodeOplString(value) {
-  return value.replace(/%([0-9a-fA-F]{2})/g, (_, hexadecimal) =>
-    String.fromCharCode(Number.parseInt(hexadecimal, 16)),
+  // OPL escapes Unicode code points between TWO percent signs; these are
+  // not URL escapes. Consuming only the first delimiter corrupts I 295,
+  // for example, by decoding the closing percent sign plus "29" again.
+  return value.replace(/%([0-9a-fA-F]{1,6})%/g, (_, hexadecimal) =>
+    String.fromCodePoint(Number.parseInt(hexadecimal, 16)),
   );
 }
 
@@ -138,13 +141,32 @@ export function classifyOsmMotorwayWay(way) {
   if (way.tags.highway === 'motorway') {
     const lanes = laneCount(way.tags);
     if (way.tags.oneway === 'no') return null;
-    return lanes !== null && lanes < 2 ? 'connector' : 'mainline';
+    return (lanes !== null && lanes < 2) || isAuxiliaryCarriageway(way.tags)
+      ? 'connector'
+      : 'mainline';
   }
   if (way.tags.highway === 'motorway_link') {
     if (way.tags.oneway === 'no') return null;
     return 'connector';
   }
   return null;
+}
+
+function isAuxiliaryCarriageway(tags) {
+  // Classify the separately mapped carriageway, never its destinations or
+  // individual lane guidance. A normal freeway advertising an express-lane
+  // exit (or containing one HOV lane) still supplies the mainline midpoint.
+  const name = [tags.name, tags.official_name, tags.alt_name].filter(Boolean).join(';');
+  return (
+    /\bexpress\s*(?:toll\s+)?lanes?\b|\bTEXpress\b|\bcollector(?:[\s/-]+distributor)?\b|\bdistributor\b|\bHOV(?:\s*\/\s*HOT)?(?:\s+lanes?)?\b/i.test(
+      name,
+    ) ||
+    (tags.toll === 'yes' && /\bexpress\b\s*$/i.test(name)) ||
+    tags.express_lanes === 'yes' ||
+    tags.express_lane === 'yes' ||
+    tags.managed_lane === 'yes' ||
+    (tags.hov === 'designated' && !tags['hov:lanes'])
+  );
 }
 
 function routeTokens(tags) {
@@ -1625,7 +1647,7 @@ function trimRampAttachmentOverhangs(coordinates) {
   return result;
 }
 
-export function averageReciprocalPathCoordinates(first, second, start, end) {
+function directionalReciprocalPathCoordinates(first, second, start, end) {
   const coordinates = trimRampAttachmentOverhangs(
     reciprocalPathMidpoints(first, second, start, end),
   );
@@ -1645,6 +1667,27 @@ export function averageReciprocalPathCoordinates(first, second, start, end) {
   )
     return coordinates;
   return candidate;
+}
+
+export function averageReciprocalPathCoordinates(first, second, start, end) {
+  const coordinates = directionalReciprocalPathCoordinates(first, second, start, end);
+  const before = rampBendMetrics(coordinates);
+  if (!before.backwards) return coordinates;
+  // A cutoff around a loop can give the forward correspondence a different
+  // set of closest tangent anchors. Try the same source calculation from the
+  // other end; retain it only when the complete attached curve improves.
+  const candidate = directionalReciprocalPathCoordinates(
+    first.toReversed(),
+    second.toReversed(),
+    end,
+    start,
+  ).reverse();
+  const after = rampBendMetrics(candidate);
+  return after.backwards < before.backwards &&
+    after.maximum < before.maximum &&
+    !hasProperSelfIntersection(candidate)
+    ? candidate
+    : coordinates;
 }
 
 function travelDirectionAtNode(coordinates, nodeIndex) {
@@ -1751,6 +1794,15 @@ function sameDirectedRampMovement(first, second, groupByPartIndex) {
   );
 }
 
+function shareDirectedSourceEdges(first, second) {
+  const edges = new Set(
+    (first.nodeIds ?? []).slice(1).map((id, index) => `${first.nodeIds[index]}:${id}`),
+  );
+  return (second.nodeIds ?? []).some(
+    (id, index) => index > 0 && edges.has(`${second.nodeIds[index - 1]}:${id}`),
+  );
+}
+
 export function selectShortestReciprocalMovements(pairs, groupByPartIndex) {
   const accepted = [];
   const pairsByJunction = new Map();
@@ -1764,6 +1816,9 @@ export function selectShortestReciprocalMovements(pairs, groupByPartIndex) {
       (second[0].distanceMeters + second[1].distanceMeters),
   );
   for (const pair of ordered) {
+    // A return may share collectors with another movement, but the two sides
+    // of one reciprocal pair cannot travel along the same one-way pavement.
+    if (shareDirectedSourceEdges(...pair)) continue;
     const keys = [
       `start:${pair[0].firstAttachment.nodeId}`,
       `end:${pair[0].secondAttachment.nodeId}`,
@@ -1794,6 +1849,14 @@ export function shortenReciprocalMatches(matches, candidates, groupByPartIndex) 
   const pairs = [...matches];
   const used = new Set(pairs.flat());
   const length = (pair) => pair[0].distanceMeters + pair[1].distanceMeters;
+  const sameSourceLegs = (first, second) =>
+    ['firstAttachment', 'secondAttachment'].every(
+      (end) =>
+        sameMainlineLeg(first[end], second[end], groupByPartIndex) &&
+        first[end].carriagewayIds?.some((id) =>
+          second[end].carriagewayIds?.includes(id),
+        ),
+    );
   const ordered = [...candidates].sort(
     (first, second) => length(first) - length(second),
   );
@@ -1807,7 +1870,12 @@ export function shortenReciprocalMatches(matches, candidates, groupByPartIndex) 
           candidate.every(
             (path, direction) =>
               (path === pair[direction] || !used.has(path)) &&
-              sameDirectedRampMovement(path, pair[direction], groupByPartIndex),
+              (sameDirectedRampMovement(path, pair[direction], groupByPartIndex) ||
+                // Separate collectors need not share pavement. An identical
+                // opposite path fixes the movement; source carriageways at
+                // both ends then prove that the shorter side serves it too.
+                (candidate[1 - direction] === pair[1 - direction] &&
+                  sameSourceLegs(path, pair[direction]))),
           ),
       );
       if (!shorter) continue;
@@ -1894,7 +1962,12 @@ function mainlineLegContinuation(osm, parts, chains, graph) {
         ),
       ),
     );
-    if (nearestEnds > PAIR_SEARCH_METERS) return false;
+    const sameSourcePair =
+      firstPart.sourceChainId &&
+      firstPart.pairedChainId &&
+      [firstPart.sourceChainId, firstPart.pairedChainId].sort().join(':') ===
+        [secondPart.sourceChainId, secondPart.pairedChainId].sort().join(':');
+    if (!sameSourcePair && nearestEnds > PAIR_SEARCH_METERS) return false;
     const nearTerminal = [
       [first, firstPart],
       [second, secondPart],
@@ -1905,7 +1978,7 @@ function mainlineLegContinuation(osm, parts, chains, graph) {
           geodesicDistanceMeters(attachment.coordinate, part.coordinates.at(-1)),
         ) <= SAMPLE_SPACING_METERS,
     );
-    if (!nearTerminal) return false;
+    if (!sameSourcePair && !nearTerminal) return false;
     const maximumMeters = Math.min(
       MAX_RECIPROCAL_ENDPOINT_GAP_METERS,
       Math.ceil((gap + 2 * PAIR_SEARCH_METERS) / SAMPLE_SPACING_METERS) *
@@ -2045,6 +2118,7 @@ function reciprocalPathPairs(paths, groupByPartIndex, pairedChains) {
     const candidates = [];
     for (const first of group.forward) {
       for (const second of group.reverse) {
+        if (shareDirectedSourceEdges(first.path, second.path)) continue;
         const firstEndpointGapMeters = geodesicDistanceMeters(
           first.path.firstAttachment.coordinate,
           second.path.secondAttachment.coordinate,
@@ -3305,7 +3379,15 @@ export function connectMainlinePartsAtSourceNodes(
   return { junctionCount: junctions.length };
 }
 
-function rampAttachmentResolver(osm, parts, sourceParts, grid, continuationGraph) {
+function rampAttachmentResolver(
+  osm,
+  parts,
+  sourceParts,
+  grid,
+  continuationGraph,
+  sourceNodes,
+  rampGraph,
+) {
   const groups = mainlineGroupByPartIndex(parts);
   const partsByGroup = new Map();
   for (const [partIndex] of parts.entries()) {
@@ -3332,7 +3414,14 @@ function rampAttachmentResolver(osm, parts, sourceParts, grid, continuationGraph
       const edges = graph.get(current.nodeId) ?? [];
       if (edges.length === 0) return null;
       for (const edge of edges) {
-        const mapped = sourceParts.get(edge.wayId) ?? [];
+        const mapped = [
+          ...supportedPartsAtNode(
+            parts,
+            new Set(sourceParts.get(edge.wayId) ?? []),
+            sourceNodes,
+            current.nodeId,
+          ),
+        ];
         if (mapped.length > 0) {
           for (const index of mapped) reachedParts.add(index);
           if (singleGroup(reachedParts) === null) return null;
@@ -3370,6 +3459,60 @@ function rampAttachmentResolver(osm, parts, sourceParts, grid, continuationGraph
     if ([...distances.keys()].some((id) => !exits.has(id))) return null;
     return singleGroup(reachedParts);
   };
+  // Where a represented pair ends before a ramp root, follow real motorway
+  // edges upstream of an exit or downstream of an entrance. A distant point
+  // on the same source chain is not sufficient evidence for a direct snap.
+  const recover = (nodeId, group) => {
+    const outgoing = (rampGraph.outgoing.get(nodeId) ?? []).length > 0;
+    const incoming = (rampGraph.incident.get(nodeId) ?? []).some(
+      (i) => rampGraph.edges[i].toId === nodeId,
+    );
+    if (outgoing === incoming) return null;
+    const graph = outgoing ? continuationGraph.backward : continuationGraph.forward;
+    const queue = new MinimumDistanceHeap();
+    const distances = new Map([[nodeId, 0]]);
+    queue.push({ nodeId, distanceMeters: 0 });
+    while (queue.size) {
+      const current = queue.pop();
+      if (current.distanceMeters !== distances.get(current.nodeId)) continue;
+      if (current.nodeId !== nodeId) {
+        const indices = new Set(
+          [...(sourceNodes.get(current.nodeId) ?? [])].filter(
+            (index) => group === null || groups.get(index) === group,
+          ),
+        );
+        if (indices.size) {
+          const attachment = attachmentForNode({
+            grid,
+            mainlinePartIndices: indices,
+            nodeCoordinate: osm.nodes.get(current.nodeId).coordinate,
+          });
+          if (attachment)
+            return {
+              ...attachment,
+              inferredCorridor: true,
+              recoveredAtNode: current.nodeId,
+            };
+        }
+      }
+      for (const edge of graph.get(current.nodeId) ?? []) {
+        const distanceMeters =
+          current.distanceMeters +
+          geodesicDistanceMeters(
+            osm.nodes.get(current.nodeId).coordinate,
+            edge.coordinate,
+          );
+        if (
+          distanceMeters > MAX_RECIPROCAL_ENDPOINT_GAP_METERS ||
+          distanceMeters >= (distances.get(edge.nextNodeId) ?? Infinity)
+        )
+          continue;
+        distances.set(edge.nextNodeId, distanceMeters);
+        queue.push({ nodeId: edge.nextNodeId, distanceMeters });
+      }
+    }
+    return null;
+  };
   const repairs = [];
   const originalByNode = new Map();
   const resolve = (nodeId, directParts) => {
@@ -3394,13 +3537,20 @@ function rampAttachmentResolver(osm, parts, sourceParts, grid, continuationGraph
       const after = reachableGroup(nodeId, continuationGraph.forward);
       group = before !== null && before === after ? before : null;
     }
-    if (group === null) return direct;
-    const attachment = attachmentForNode({
-      grid,
-      mainlinePartIndices: partsByGroup.get(group),
-      nodeCoordinate,
-    });
-    if (!attachment) return direct;
+    const attachment =
+      group === null
+        ? null
+        : attachmentForNode({
+            grid,
+            mainlinePartIndices: partsByGroup.get(group),
+            nodeCoordinate,
+          });
+    if (!attachment) {
+      const recovered = recover(nodeId, group);
+      if (!recovered) return direct;
+      originalByNode.set(nodeId, null);
+      return recovered;
+    }
     repairs.push({
       nodeId,
       sourceCoordinate: nodeCoordinate,
@@ -3440,23 +3590,24 @@ function throughConnectionExtendsMainline(coordinates, firstPart, secondPart) {
 }
 
 function throughMainlineReturn(path, osm, waysById, parts, graph) {
-  // A one-lane through section can split one carriageway into two mainline
-  // parts while their opposite carriageway remains continuous. Both ends
-  // must terminate at those parts and share that actual opposite source road.
+  // At least one terminal must extend into a gap. The other endpoint may
+  // join a continuing mainline, provided both ends share an actual opposing
+  // source road and that road connects them in the correct travel direction.
   const firstPart = parts[path.firstAttachment.partIndex];
   const secondPart = parts[path.secondAttachment.partIndex];
-  for (const [attachment, part] of [
-    [path.firstAttachment, firstPart],
-    [path.secondAttachment, secondPart],
-  ]) {
-    if (
-      Math.min(
-        geodesicDistanceMeters(attachment.coordinate, part.coordinates[0]),
-        geodesicDistanceMeters(attachment.coordinate, part.coordinates.at(-1)),
-      ) > SAMPLE_SPACING_METERS
+  if (
+    ![
+      [path.firstAttachment, firstPart],
+      [path.secondAttachment, secondPart],
+    ].some(
+      ([attachment, part]) =>
+        Math.min(
+          geodesicDistanceMeters(attachment.coordinate, part.coordinates[0]),
+          geodesicDistanceMeters(attachment.coordinate, part.coordinates.at(-1)),
+        ) <= SAMPLE_SPACING_METERS,
     )
-      return null;
-  }
+  )
+    return null;
   const sharedWays = new Set(
     firstPart.sourceWayIds.filter((id) => secondPart.sourceWayIds.includes(id)),
   );
@@ -3719,12 +3870,15 @@ export function buildRampConnectors(
   const sourceWayIdToPartIndices = indexPartsBySourceWay(parts);
   const graph = connectorSegmentGraph(connectorWays);
   const continuationGraph = mainlineContinuationGraph(osm, mainlineWays);
+  const sourceNodes = indexPartsBySourceNode(parts, chains);
   const resolver = rampAttachmentResolver(
     osm,
     parts,
     sourceWayIdToPartIndices,
     partSegmentGrid,
     continuationGraph,
+    sourceNodes,
+    graph,
   );
   const mainlinePartIndicesByNode = new Map();
   const mainlineDirectionsByNodeAndPart = new Map();
@@ -3955,6 +4109,7 @@ export function buildRampConnectors(
   let mixedMainlineConnectorCount = 0;
   let throughMainlineConnectorCount = 0;
   for (const [pairIndex, [forward, reverse]] of pairs.entries()) {
+    if (shareDirectedSourceEdges(forward, reverse)) continue;
     const isInferred = pairIndex >= established.pairs.length;
     const startAttachment = outerReciprocalAttachment(
       forward.firstAttachment,
