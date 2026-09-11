@@ -6,6 +6,11 @@ import {
   biconnectedEdgeBlocks,
   properSelfIntersectionSegments,
 } from './highway-cycle.mjs';
+import {
+  highwayCycleTurnViolation,
+  highwayTurnAllowed,
+  highwayEdgeUsable,
+} from './highway-turns.mjs';
 
 class MinimumDistanceHeap {
   constructor() {
@@ -180,9 +185,11 @@ function normalizedCycleSteps(edges, segments) {
   return steps;
 }
 
-function highwayAdjacency(nodes, edges) {
+export function highwayAdjacency(nodes, edges) {
   const adjacency = new Map(nodes.map((node) => [node.id, []]));
   for (const [edgeIndex, edge] of edges.entries()) {
+    // A self-loop would repeat a junction in the required simple cycle.
+    if (!highwayEdgeUsable(edge)) continue;
     const distanceMeters =
       geodesicLineLengthMeters(edge.coordinates) + (edge.routingPenaltyMeters ?? 0);
     adjacency.get(edge.fromId)?.push({
@@ -199,51 +206,103 @@ function highwayAdjacency(nodes, edges) {
   return adjacency;
 }
 
-function shortestPath(
+export function shortestHighwayPath(
   startId,
   isTarget,
   adjacency,
   edges,
   forbiddenEdgeIndices,
   forbiddenNodeIds,
+  incomingEdgeIndex = null,
+  { viaNodeIds = [], closingEdgeIndex = null } = {},
 ) {
-  const distances = new Map([[startId, 0]]);
+  // Arrivals on different highways are different routing states. Keeping
+  // only one distance per node discards a longer but legally usable arrival.
+  const viaSet = new Set(viaNodeIds);
+  const startStage = viaNodeIds[0] === startId ? 1 : 0;
+  const stateKey = (nodeId, edgeIndex, stage) =>
+    `${stage}\u0000${nodeId}\u0000${edgeIndex ?? ''}`;
+  const startKey = stateKey(startId, incomingEdgeIndex, startStage);
+  const distances = new Map([[startKey, 0]]);
   const previous = new Map();
   const pending = new MinimumDistanceHeap();
-  pending.push({ distanceMeters: 0, nodeId: startId });
+  pending.push({
+    distanceMeters: 0,
+    nodeId: startId,
+    edgeIndex: incomingEdgeIndex,
+    key: startKey,
+    stage: startStage,
+  });
   let targetId = null;
+  let targetKey = null;
 
   while (pending.size > 0) {
     const current = pending.pop();
-    if (current.distanceMeters !== distances.get(current.nodeId)) continue;
-    if (current.nodeId !== startId && isTarget(current.nodeId)) {
+    if (current.distanceMeters !== distances.get(current.key)) continue;
+    if (
+      current.nodeId !== startId &&
+      current.stage === viaNodeIds.length &&
+      isTarget(current.nodeId)
+    ) {
       targetId = current.nodeId;
+      targetKey = current.key;
       break;
     }
     for (const incident of adjacency.get(current.nodeId) ?? []) {
       if (forbiddenEdgeIndices.has(incident.edgeIndex)) continue;
+      if (
+        current.edgeIndex !== null &&
+        !highwayTurnAllowed(
+          edges[current.edgeIndex],
+          edges[incident.edgeIndex],
+          current.nodeId,
+        )
+      )
+        continue;
       if (forbiddenNodeIds.has(incident.toId) && !isTarget(incident.toId)) {
         continue;
       }
+      let stage = current.stage;
+      if (viaSet.has(incident.toId)) {
+        if (viaNodeIds[stage] !== incident.toId) continue;
+        stage += 1;
+      }
+      if (isTarget(incident.toId)) {
+        if (stage !== viaNodeIds.length) continue;
+        if (
+          closingEdgeIndex !== null &&
+          !highwayTurnAllowed(
+            edges[incident.edgeIndex],
+            edges[closingEdgeIndex],
+            incident.toId,
+          )
+        )
+          continue;
+      }
       const nextDistance = current.distanceMeters + incident.distanceMeters;
-      if (nextDistance >= (distances.get(incident.toId) ?? Infinity)) continue;
-      distances.set(incident.toId, nextDistance);
-      previous.set(incident.toId, {
+      const nextKey = stateKey(incident.toId, incident.edgeIndex, stage);
+      if (nextDistance >= (distances.get(nextKey) ?? Infinity)) continue;
+      distances.set(nextKey, nextDistance);
+      previous.set(nextKey, {
         edgeIndex: incident.edgeIndex,
         fromId: current.nodeId,
+        key: current.key,
       });
       pending.push({
         distanceMeters: nextDistance,
         nodeId: incident.toId,
+        edgeIndex: incident.edgeIndex,
+        key: nextKey,
+        stage,
       });
     }
   }
 
   if (targetId === null) return null;
   const steps = [];
-  let currentId = targetId;
-  while (currentId !== startId) {
-    const previousStep = previous.get(currentId);
+  let currentKey = targetKey;
+  while (currentKey !== startKey) {
+    const previousStep = previous.get(currentKey);
     if (!previousStep) return null;
     steps.unshift(
       orientedStep(
@@ -253,9 +312,9 @@ function shortestPath(
         'ear',
       ),
     );
-    currentId = previousStep.fromId;
+    currentKey = previousStep.key;
   }
-  return { steps, targetId };
+  return { steps, targetId, distanceMeters: distances.get(targetKey) };
 }
 
 function reverseSteps(steps) {
@@ -381,25 +440,38 @@ function cycleArc(steps, fromIndex, toIndex) {
   return result;
 }
 
-function simpleCandidate(steps) {
+function simpleCandidate(steps, edges) {
   if (steps.length < 3) return null;
   for (let index = 0; index < steps.length; index += 1) {
     if (steps[index].toId !== steps[(index + 1) % steps.length].fromId) {
       return null;
     }
   }
-  if (new Set(steps.map((step) => step.fromId)).size !== steps.length) {
-    return null;
+  const firstVisit = new Map();
+  let repeatedNode = null;
+  for (const [index, step] of steps.entries()) {
+    if (firstVisit.has(step.fromId)) {
+      repeatedNode = [firstVisit.get(step.fromId), index];
+      break;
+    }
+    firstVisit.set(step.fromId, index);
   }
   const built = buildCoordinates(steps);
   const intersection = properSelfIntersectionSegments(built.coordinates);
+  const turnViolation = highwayCycleTurnViolation(steps, edges);
   return {
     ...built,
-    areaSquareMeters: intersection
-      ? 0
-      : geodesicPolygonAreaSquareMeters(built.coordinates),
+    areaSquareMeters:
+      intersection || turnViolation || repeatedNode
+        ? 0
+        : geodesicPolygonAreaSquareMeters(built.coordinates),
     intersection,
-    lengthMeters: intersection ? Infinity : geodesicLineLengthMeters(built.coordinates),
+    turnViolation,
+    repeatedNode,
+    lengthMeters:
+      intersection || turnViolation || repeatedNode
+        ? Infinity
+        : geodesicLineLengthMeters(built.coordinates),
     steps,
   };
 }
@@ -433,7 +505,7 @@ function buildEar(
   const firstForbiddenNodes = new Set(
     [...blockedCycleNodeIds].filter((nodeId) => nodeId !== firstWaypointId),
   );
-  const firstPath = shortestPath(
+  const firstPath = shortestHighwayPath(
     firstWaypointId,
     (nodeId) => (requiredFromId ? nodeId === requiredFromId : cycleNodeIds.has(nodeId)),
     adjacency,
@@ -451,13 +523,14 @@ function buildEar(
     const forbiddenNodeIds = new Set([...blockedCycleNodeIds, ...usedInternalNodeIds]);
     forbiddenNodeIds.delete(currentId);
     forbiddenNodeIds.delete(waypointId);
-    const path = shortestPath(
+    const path = shortestHighwayPath(
       currentId,
       (nodeId) => nodeId === waypointId,
       adjacency,
       edges,
       forbiddenEdgeIndices,
       forbiddenNodeIds,
+      forwardSteps.at(-1)?.edgeIndex ?? null,
     );
     if (!path) return { failure: `support-${currentId}-${waypointId}` };
     forwardSteps.push(...path.steps);
@@ -470,7 +543,7 @@ function buildEar(
   const lastForbiddenNodes = new Set([...blockedCycleNodeIds, ...usedInternalNodeIds]);
   lastForbiddenNodes.delete(lastWaypointId);
   lastForbiddenNodes.add(firstPath.targetId);
-  const lastPath = shortestPath(
+  const lastPath = shortestHighwayPath(
     lastWaypointId,
     (nodeId) =>
       requiredToId
@@ -480,6 +553,7 @@ function buildEar(
     edges,
     forbiddenEdgeIndices,
     lastForbiddenNodes,
+    forwardSteps.at(-1)?.edgeIndex ?? null,
   );
   if (!lastPath) return { failure: 'last-attachment' };
   forwardSteps.push(...lastPath.steps);
@@ -490,23 +564,26 @@ function buildEar(
   };
 }
 
-function candidateCycles(cycleSteps, ear) {
+function candidateCycles(cycleSteps, ear, edges) {
   const fromIndex = cycleSteps.findIndex((step) => step.fromId === ear.fromId);
   const toIndex = cycleSteps.findIndex((step) => step.fromId === ear.toId);
   if (fromIndex < 0 || toIndex < 0 || fromIndex === toIndex) return [];
   return [
-    simpleCandidate([...ear.steps, ...cycleArc(cycleSteps, toIndex, fromIndex)]),
-    simpleCandidate([
-      ...reverseSteps(ear.steps),
-      ...cycleArc(cycleSteps, fromIndex, toIndex),
-    ]),
+    simpleCandidate([...ear.steps, ...cycleArc(cycleSteps, toIndex, fromIndex)], edges),
+    simpleCandidate(
+      [...reverseSteps(ear.steps), ...cycleArc(cycleSteps, fromIndex, toIndex)],
+      edges,
+    ),
   ].filter(Boolean);
 }
 
 function crossingEarEdges(candidate) {
-  if (!candidate?.intersection) return [];
-  const [firstIndex, secondIndex] = candidate.intersection;
-  return [candidate.owners[firstIndex], candidate.owners[secondIndex]]
+  if (!candidate) return [];
+  const stepViolation = candidate.turnViolation ?? candidate.repeatedNode;
+  const owners = stepViolation
+    ? stepViolation.map((index) => candidate.steps[index])
+    : (candidate.intersection ?? []).map((index) => candidate.owners[index]);
+  return owners
     .filter((owner) => owner?.kind === 'ear')
     .sort(
       (first, second) =>
@@ -518,7 +595,7 @@ function crossingEarEdges(candidate) {
 /**
  * Replaces one arc of a detailed seed cycle with a node-disjoint network ear
  * through the supplied outer support nodes. Every accepted result remains an
- * explicit graph cycle; geometric crossings cause the offending ear corridor
+ * explicit graph cycle; crossings and illegal turns cause the offending ear corridor
  * to be forbidden and rerouted.
  */
 export function refineHighwayCycleThroughWaypoints(
@@ -533,8 +610,8 @@ export function refineHighwayCycleThroughWaypoints(
   } = {},
 ) {
   const cycleSteps = normalizedCycleSteps(edges, seedSegments);
-  const seed = simpleCandidate(cycleSteps);
-  if (!seed || seed.intersection) {
+  const seed = simpleCandidate(cycleSteps, edges);
+  if (!seed || seed.intersection || seed.turnViolation || seed.repeatedNode) {
     throw new Error('The detailed highway seed is not a simple graph cycle.');
   }
   const coordinateByNodeId = new Map(nodes.map((node) => [node.id, node.coordinate]));
@@ -579,9 +656,14 @@ export function refineHighwayCycleThroughWaypoints(
       onAttempt({ attempt, failure: ear.failure, outcome: 'no-ear' });
       continue;
     }
-    const candidates = candidateCycles(cycleSteps, ear);
+    const candidates = candidateCycles(cycleSteps, ear, routingEdges);
     const valid = candidates
-      .filter((candidate) => !candidate.intersection)
+      .filter(
+        (candidate) =>
+          !candidate.intersection &&
+          !candidate.turnViolation &&
+          !candidate.repeatedNode,
+      )
       .sort(
         (first, second) =>
           second.areaSquareMeters - first.areaSquareMeters ||
@@ -593,6 +675,8 @@ export function refineHighwayCycleThroughWaypoints(
       forbiddenEdgeCount: forbiddenEdgeIndices.size,
       fromId: ear.fromId,
       intersections: candidates.map((candidate) => candidate.intersection),
+      turnViolations: candidates.map((candidate) => candidate.turnViolation),
+      repeatedNodes: candidates.map((candidate) => candidate.repeatedNode),
       intersectingEdges: candidates.map((candidate) =>
         candidate.intersection?.map((coordinateIndex) => {
           const owner = candidate.owners[coordinateIndex];
@@ -655,18 +739,17 @@ function waypointCycle(waypointIds, adjacency, edges, forbiddenEdgeIndices) {
     ]);
     forbiddenNodeIds.delete(startId);
     forbiddenNodeIds.delete(targetId);
-    const path = shortestPath(
+    const path = shortestHighwayPath(
       startId,
       (nodeId) => nodeId === targetId,
       adjacency,
       edges,
       forbiddenEdgeIndices,
       forbiddenNodeIds,
+      steps.at(-1)?.edgeIndex ?? null,
     );
     if (!path) {
-      return {
-        failure: `support-${startId}-${targetId}`,
-      };
+      return jointWaypointCycle(waypointIds, adjacency, edges, forbiddenEdgeIndices);
     }
     steps.push(...path.steps);
     for (const step of path.steps) {
@@ -674,13 +757,55 @@ function waypointCycle(waypointIds, adjacency, edges, forbiddenEdgeIndices) {
       usedNodeIds.add(step.toId);
     }
   }
-  return { candidate: simpleCandidate(steps) };
+  return { candidate: simpleCandidate(steps, edges) };
+}
+
+function jointWaypointCycle(waypointIds, adjacency, edges, forbiddenEdgeIndices) {
+  const startId = waypointIds[0];
+  const candidates = [];
+  // Search the ordered perimeter as one route. Choosing each waypoint's
+  // arrival greedily can force a later leg to loop around to change direction.
+  for (const first of adjacency.get(startId) ?? []) {
+    if (forbiddenEdgeIndices.has(first.edgeIndex)) continue;
+    const path = shortestHighwayPath(
+      first.toId,
+      (nodeId) => nodeId === startId,
+      adjacency,
+      edges,
+      forbiddenEdgeIndices,
+      new Set(),
+      first.edgeIndex,
+      { viaNodeIds: waypointIds.slice(1), closingEdgeIndex: first.edgeIndex },
+    );
+    if (!path) continue;
+    const steps = [
+      orientedStep(edges[first.edgeIndex], first.edgeIndex, startId, 'ear'),
+      ...path.steps,
+    ];
+    const candidate = simpleCandidate(steps, edges);
+    if (candidate)
+      candidates.push({
+        ...candidate,
+        searchDistanceMeters: path.distanceMeters + first.distanceMeters,
+      });
+  }
+  if (!candidates.length) return { failure: 'no-direction-compatible-perimeter' };
+  candidates.sort((a, b) => {
+    const valid = (c) => !c.intersection && !c.turnViolation && !c.repeatedNode;
+    return (
+      Number(valid(b)) - Number(valid(a)) ||
+      (valid(a)
+        ? b.areaSquareMeters - a.areaSquareMeters
+        : a.searchDistanceMeters - b.searchDistanceMeters)
+    );
+  });
+  return { candidate: candidates[0] };
 }
 
 /**
  * Builds the continental boundary itself on the detailed biconnected graph.
  * Consecutive perimeter supports are joined by node-disjoint source paths.
- * Geometric crossings branch on both possible offending corridors until a
+ * Crossings and illegal turns branch on both offending corridors until a
  * valid simple graph cycle is found.
  */
 export function solveHighwayEnvelopeCycleThroughWaypoints(
@@ -727,6 +852,8 @@ export function solveHighwayEnvelopeCycleThroughWaypoints(
         attempt,
         forbiddenEdgeCount: forbiddenEdgeIndices.size,
         intersection: candidate?.intersection ?? null,
+        turnViolation: candidate?.turnViolation ?? null,
+        repeatedNode: candidate?.repeatedNode ?? null,
         intersectingCoordinates: candidate?.intersection?.map((coordinateIndex) => [
           candidate.coordinates[coordinateIndex],
           candidate.coordinates[coordinateIndex + 1],
@@ -735,9 +862,20 @@ export function solveHighwayEnvelopeCycleThroughWaypoints(
           const owner = candidate.owners[coordinateIndex];
           return owner ? { edgeIndex: owner.edgeIndex, kind: owner.kind } : null;
         }),
-        outcome: candidate && !candidate.intersection ? 'accepted' : 'retry',
+        outcome:
+          candidate &&
+          !candidate.intersection &&
+          !candidate.turnViolation &&
+          !candidate.repeatedNode
+            ? 'accepted'
+            : 'retry',
       });
-      if (candidate && !candidate.intersection) {
+      if (
+        candidate &&
+        !candidate.intersection &&
+        !candidate.turnViolation &&
+        !candidate.repeatedNode
+      ) {
         validCandidates.push(candidate);
         break;
       }
@@ -778,7 +916,7 @@ export function solveHighwayEnvelopeCycleThroughWaypoints(
 
 export const NORTH_AMERICAN_HIGHWAY_ENVELOPE_COORDINATES = [
   [-87.74, 41.96], // Chicago
-  [-79.54, 43.79], // Highway 407 north of Toronto
+  [-79.55, 43.78], // Highway 407 itself, west of the Highway 400 ramp junction
   [-75.7, 45.42], // Highway 416 / 417 through Ottawa
   [-73.6, 45.5], // Montréal
   [-70.9, 42.86], // coastal New England
@@ -801,6 +939,7 @@ export function northAmericanHighwayEnvelopeSupportNodeIds(
   edges,
   { supportCoordinates = NORTH_AMERICAN_HIGHWAY_ENVELOPE_COORDINATES } = {},
 ) {
+  edges = edges.filter(highwayEdgeUsable);
   const largestBlock = biconnectedEdgeBlocks(nodes, edges).sort(
     (first, second) => second.length - first.length,
   )[0];

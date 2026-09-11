@@ -11,6 +11,7 @@ import { calculateLandmassCoverage } from '../src/circumference-landmass.ts';
 import { geodesicLineLengthMeters } from '../src/geodesy.ts';
 import { compressHighwayCore, highwayTwoCore } from './highway-graph.mjs';
 import { hasProperSelfIntersection } from './highway-cycle.mjs';
+import { highwayCycleTurnViolation } from './highway-turns.mjs';
 import {
   NORTH_AMERICAN_HIGHWAY_ENVELOPE_COORDINATES,
   northAmericanHighwayEnvelopeSupportNodeIds,
@@ -127,10 +128,8 @@ const landmassBuffer = await readFile(landmassSourcePath);
 let derived;
 try {
   derived = deserialize(await readFile(derivedCachePath));
-  if (derived.displayTopologyVersion !== 47) {
-    throw new Error(
-      'The cached display topology predates auxiliary-carriageway classification and correct OPL decoding.',
-    );
+  if (derived.displayTopologyVersion !== 48) {
+    throw new Error('The cached topology predates source-directed ramp junctions.');
   }
   console.log(`Reused ${derivedCachePath}.`);
 } catch {
@@ -154,7 +153,7 @@ try {
   console.log(detailed.statistics);
   derived = {
     detailed,
-    displayTopologyVersion: 47,
+    displayTopologyVersion: 48,
   };
   await writeFile(derivedCachePath, serialize(derived));
 
@@ -183,7 +182,7 @@ try {
   derived = {
     compressed,
     detailed,
-    displayTopologyVersion: 47,
+    displayTopologyVersion: 48,
     graphStatistics,
     sourceCompressed: compressed,
     sourceGraphParts: exactGraph.parts.map(({ id, role, tokens }) => ({
@@ -192,13 +191,23 @@ try {
       tokens,
     })),
     sourceGraphStatistics: graphStatistics,
-    sourceTopologyVersion: 46,
+    sourceTopologyVersion: 47,
   };
   await writeFile(derivedCachePath, serialize(derived));
 }
 globalThis.gc?.();
 const { detailed } = derived;
-if (derived.sourceTopologyVersion !== 46) {
+// Zero is an explicit unusable port on a collapsed parent; it forbids all turns.
+for (const part of detailed.parts) {
+  if (
+    part.role === 'connector' &&
+    (![-1, 0, 1].includes(part.startMainlineDirection) ||
+      ![-1, 0, 1].includes(part.endMainlineDirection))
+  ) {
+    throw new Error(`Paired ramp ${part.id} is missing source carriageway directions.`);
+  }
+}
+if (derived.sourceTopologyVersion !== 47) {
   console.time('Read OSM mainline continuity topology');
   const osm = await readOsmMotorwayPbf(sourcePath);
   console.timeEnd('Read OSM mainline continuity topology');
@@ -227,7 +236,7 @@ if (derived.sourceTopologyVersion !== 46) {
     exactEdges: sourceGraph.edges.length,
     exactNodes: sourceGraph.coordinateByNodeId.size,
   };
-  derived.sourceTopologyVersion = 46;
+  derived.sourceTopologyVersion = 47;
   console.timeEnd('Build explicit paired-centerline route graph');
   console.log(derived.sourceGraphStatistics);
   await writeFile(derivedCachePath, serialize(derived));
@@ -284,6 +293,12 @@ exact = refineHighwayCycleThroughWaypoints(
   },
 );
 console.timeEnd('Expand boundary through southern and western perimeter');
+const forbiddenTurn = highwayCycleTurnViolation(exact.segments, routeGraphEdges);
+if (forbiddenTurn) {
+  throw new Error(
+    `The highway boundary contains an illegal ramp turn at segments ${forbiddenTurn.join(', ')}.`,
+  );
+}
 console.log({
   areaSquareKilometers: exact.areaSquareMeters / 1_000_000,
   supportNodeIds: exact.supportNodeIds,

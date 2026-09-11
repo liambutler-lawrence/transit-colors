@@ -310,6 +310,19 @@ and triggers another detailed routing attempt. Absolute-area and explicit
 407/Ottawa/I-495 coverage thresholds reject both self-intersecting and silently
 truncated output; the previous output file is not used as its own regression guide.
 
+Ramp-pair availability and ramp-turn legality are validated separately. Both endpoints
+retain the source carriageway direction, and the route solver preserves that constraint
+through graph compression, shortest-path search, and cycle closure. A missing legal ramp
+does not authorize reversing through another pair. The source fixture
+`scripts/fixtures/miami-i95-i395-turns.json` contains the I-95 / I-395 / SR 836
+interchange from the same July 2026 OSM extract. Its regression routes between the
+northern and western highway legs in both directions, requires the NW pair, and requires
+no path when that pair is removed; the old unrestricted graph still finds the invalid
+alternative in that negative test. The network audit checked all 10,752 endpoints of
+5,376 ramp pairs. Five endpoints on three collapsed parent geometries carry an explicit
+zero direction and are excluded from route selection. The rebuilt 1,520-segment
+continental boundary has no forbidden turns.
+
 The committed JSON contains the segmented thick winning route, source attributes, and
 WGS84 land-contained and coastward areas. The complete thin network is stored separately
 as PMTiles so the browser can stream only the visible zoom tiles.

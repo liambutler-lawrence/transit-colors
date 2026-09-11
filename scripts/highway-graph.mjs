@@ -1,3 +1,5 @@
+import { highwayTurnAllowed, highwayTurnPort } from './highway-turns.mjs';
+
 function coordinateKey([longitude, latitude]) {
   return `${longitude.toFixed(7)},${latitude.toFixed(7)}`;
 }
@@ -150,6 +152,9 @@ export function compressHighwayCore(coordinateByNodeId, edges, core) {
       }
       const coordinates = [coordinateByNodeId.get(startId)];
       const partIndices = new Set();
+      const fromTurnPort = highwayTurnPort(edges[startingEdgeIndex], startId);
+      let toTurnPort;
+      let invalidTurn = false;
       let currentId = startId;
       let edgeIndex = startingEdgeIndex;
       while (true) {
@@ -159,7 +164,10 @@ export function compressHighwayCore(coordinateByNodeId, edges, core) {
         const nextId = edge.fromId === currentId ? edge.toId : edge.fromId;
         coordinates.push(coordinateByNodeId.get(nextId));
         currentId = nextId;
-        if (junctions.has(currentId)) break;
+        if (junctions.has(currentId)) {
+          toTurnPort = highwayTurnPort(edge, currentId);
+          break;
+        }
         const nextEdgeIndex = [...(core.incident.get(currentId) ?? [])].find(
           (candidateIndex) =>
             candidateIndex !== edgeIndex && core.activeEdges.has(candidateIndex),
@@ -169,6 +177,8 @@ export function compressHighwayCore(coordinateByNodeId, edges, core) {
             `Detailed highway corridor ends unexpectedly at ${currentId}.`,
           );
         }
+        if (!highwayTurnAllowed(edge, edges[nextEdgeIndex], currentId))
+          invalidTurn = true;
         edgeIndex = nextEdgeIndex;
       }
       corridors.push({
@@ -176,6 +186,9 @@ export function compressHighwayCore(coordinateByNodeId, edges, core) {
         fromId: startId,
         partIndices,
         toId: currentId,
+        ...(fromTurnPort ? { fromTurnPort } : {}),
+        ...(toTurnPort ? { toTurnPort } : {}),
+        ...(invalidTurn ? { invalidTurn: true } : {}),
       });
     }
   }

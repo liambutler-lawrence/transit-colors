@@ -177,16 +177,31 @@ turn; the existing midpoint remains unchanged when it is already valid. Where ra
 are staggered, the path extends along its actual source mainline carriageway through
 explicit OSM nodes, from the earlier split to the later merge. Only then are the shared
 centerline endpoints attached to the mainline graph. Geometry crossings never create
-graph nodes; topology comes from explicit shared source nodes. The continental stages
-are largest-component selection, 2-core pruning, degree-two compression, a detailed
-northeastern perimeter cycle, and independent detailed node-disjoint ears for
-southeastern Massachusetts and the southern/western perimeter. The northeastern cycle is
-explicitly anchored through Highway 407, Ottawa, Québec, and coastal New England. Every
-ear uses explicit source junctions. A small hook where two consecutive averaged edges
-overshoot their shared junction is clipped only between those adjacent tails; any
-nonlocal geometric crossing forbids the responsible corridor and triggers another
-routing attempt. The accepted boundary is a simple cycle in both graph topology and
-rendered geometry.
+graph nodes; topology comes from explicit shared source nodes. A reciprocal ramp's
+attachment also retains the source carriageway's travel direction relative to its
+ordered mainline. Each incident edge records its permitted side of that junction.
+Incoming and outgoing edges must use opposite sides; a ramp pair cannot be entered by
+reversing across the median. Degree-two compression preserves endpoint directions and
+rejects corridors containing an illegal internal turn. Route search distinguishes
+arrivals by incoming edge, so a longer legal approach is not discarded in favor of an
+unusable shorter arrival. If separately routed waypoint legs are incompatible, a
+combined search tracks progress through the ordered supports and the closing edge. Cycle
+validation checks every transition, including support points, ear attachments, and the
+closing turn. Geometric hook clipping cannot make an illegal turn acceptable. These
+restrictions apply to all reciprocal connectors, including collector and express-lane
+paths, even when the correct alternative ramp is missing.
+
+The continental stages are largest-component selection, 2-core pruning, degree-two
+compression, a detailed northeastern perimeter cycle, and independent detailed
+node-disjoint ears for southeastern Massachusetts and the southern/western perimeter.
+The northeastern cycle is explicitly anchored through Highway 407, Ottawa, Québec, and
+coastal New England. The Toronto guide point is on Highway 407 itself, west of its
+Highway 400 interchange; the former point on the northern Highway 400 leg required a
+reversal to continue east. Every ear uses explicit source junctions. A small hook where
+two consecutive averaged edges overshoot their shared junction is clipped only between
+those adjacent tails; any nonlocal geometric crossing forbids the responsible corridor
+and triggers another routing attempt. The accepted boundary is a simple cycle in both
+graph topology and rendered geometry.
 
 The circumference map keeps one independent route state and gradient image source per
 metro area. It merges all complete networks and selected boundaries into one GeoJSON
