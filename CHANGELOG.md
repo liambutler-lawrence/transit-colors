@@ -7,6 +7,10 @@ All notable changes to this project will be documented here. The format follows
 
 ### Added
 
+- Added a North America Watersheds mode with HydroBASINS boundaries at three levels,
+  optional terrain shading and basin colors, basin inspection, and shareable detail
+  links. Includes Central America, Arctic Canada, and Greenland.
+
 - Added a Jersey City Land Use mode that distinguishes vacant industrial land, active
   industry, auto-oriented retail, modern and historic mixed use, non-retail towers,
   housing, civic land, and other parcels, with zoning and historic overlays.

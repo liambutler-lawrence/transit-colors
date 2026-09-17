@@ -1,3 +1,8 @@
+import {
+  focusWatersheds,
+  positionWatershedLayers,
+  syncWatershedVisibility,
+} from './watershed-ui.js';
 import type {
   ExpressionSpecification,
   FilterSpecification,
@@ -87,6 +92,8 @@ import {
   legendLabelsEl,
   landUseProductButton,
   landUseProductEl,
+  watershedProductButton,
+  watershedProductEl,
   map,
   mapEl,
   mapLoadingEl,
@@ -131,6 +138,11 @@ export function setActiveProduct(
   const circumferenceActive = runtime.activeProduct === 'circumference';
   const timezoneActive = runtime.activeProduct === 'timezone';
   const landUseActive = runtime.activeProduct === 'landuse';
+  const watershedActive = runtime.activeProduct === 'watersheds';
+  appShellEl.classList.toggle('watershed-active', watershedActive);
+  watershedProductButton.setAttribute('aria-selected', String(watershedActive));
+  watershedProductButton.tabIndex = watershedActive ? 0 : -1;
+  watershedProductEl.hidden = !watershedActive;
   appShellEl.classList.toggle('circumference-active', circumferenceActive);
   appShellEl.classList.toggle('timezone-active', timezoneActive);
   appShellEl.classList.toggle('land-use-active', landUseActive);
@@ -147,7 +159,7 @@ export function setActiveProduct(
   timezoneProductEl.hidden = !timezoneActive;
   landUseProductEl.hidden = !landUseActive;
 
-  if (map.isStyleLoaded()) {
+  if (window.__transitPerformance.styleLoadedMs !== null) {
     if (landUseActive) map.setProjection({ type: 'mercator' });
     else map.setProjection({ type: 'globe' });
   }
@@ -157,7 +169,8 @@ export function setActiveProduct(
   syncCircumferenceVisibility();
   syncTimezoneSkewVisibility();
   syncLandUseVisibility();
-  if (updateUrl) updateAreaChrome(runtime.activeAreaKey);
+  syncWatershedVisibility();
+  updateAreaChrome(runtime.activeAreaKey, { updateUrl });
 
   if (timezoneActive) {
     if (fit) focusTimezoneWorld();
@@ -168,6 +181,9 @@ export function setActiveProduct(
         isLoading: true,
       });
     }
+  } else if (watershedActive) {
+    if (fit) focusWatersheds();
+    updateStatus('Watershed map');
   } else if (landUseActive) {
     if (fit) focusJerseyCityLandUse();
     updateStatus(
@@ -212,9 +228,38 @@ circumferenceProductButton.addEventListener('click', () => {
 timezoneProductButton.addEventListener('click', () => {
   setActiveProduct('timezone');
 });
+watershedProductButton.addEventListener('click', () => {
+  setActiveProduct('watersheds');
+});
 landUseProductButton.addEventListener('click', () => {
   setActiveProduct('landuse');
 });
+const productTabs: readonly [HTMLButtonElement, Product][] = [
+  [accessProductButton, 'access'],
+  [circumferenceProductButton, 'circumference'],
+  [timezoneProductButton, 'timezone'],
+  [landUseProductButton, 'landuse'],
+  [watershedProductButton, 'watersheds'],
+];
+for (const [index, [button]] of productTabs.entries()) {
+  button.addEventListener('keydown', (event) => {
+    const next =
+      event.key === 'Home'
+        ? 0
+        : event.key === 'End'
+          ? productTabs.length - 1
+          : event.key === 'ArrowRight'
+            ? (index + 1) % productTabs.length
+            : event.key === 'ArrowLeft'
+              ? (index + productTabs.length - 1) % productTabs.length
+              : -1;
+    const target = productTabs[next];
+    if (!target) return;
+    event.preventDefault();
+    setActiveProduct(target[1]);
+    target[0].focus();
+  });
+}
 for (const toggle of [timezoneColorsToggle, timezoneBoundariesToggle]) {
   toggle.addEventListener('change', syncTimezoneSkewVisibility);
 }
@@ -560,11 +605,13 @@ export function finishLoading(): void {
   runtime.loadingOperation = null;
   runtime.loadingCanFinish = false;
   updateStatus(
-    runtime.activeProduct === 'timezone'
-      ? 'Clock skew ready'
-      : runtime.activeProduct === 'landuse'
-        ? 'Land use ready'
-        : 'Ready',
+    runtime.activeProduct === 'watersheds'
+      ? 'Watershed map'
+      : runtime.activeProduct === 'timezone'
+        ? 'Clock skew ready'
+        : runtime.activeProduct === 'landuse'
+          ? 'Land use ready'
+          : 'Ready',
   );
   mapLoadingEl.hidden = true;
   mapEl.setAttribute('aria-busy', 'false');
@@ -611,6 +658,7 @@ export function installBasemap(): void {
     positionCircumferenceGradient();
     positionTimezoneSkewLayers();
     positionJerseyCityLandUseLayers();
+    positionWatershedLayers();
     if (AREAS[runtime.activeAreaKey].liveRoads) {
       requestLiveStreetRefresh();
       syncStreetVisibility();
@@ -945,39 +993,51 @@ export function resetSelection(): void {
   routeBreakdownEl.hidden = true;
 }
 
-export function updateAreaChrome(areaKey: AreaKey): void {
+export function updateAreaChrome(
+  areaKey: AreaKey,
+  { updateUrl = true }: { readonly updateUrl?: boolean } = {},
+): void {
   const area = AREAS[areaKey];
   areaSelect.value = areaKey;
   accessResultAreaEl.textContent = `Destination metro: ${area.label}`;
   document.title =
-    runtime.activeProduct === 'timezone'
-      ? 'Clock Skew Map — Transit Colors'
-      : runtime.activeProduct === 'landuse'
-        ? 'Jersey City Land Use — Transit Colors'
-        : runtime.activeProduct === 'circumference'
-          ? `Circumference Lab — ${area.label}`
-          : `Transit Colors — ${area.label}`;
+    runtime.activeProduct === 'watersheds'
+      ? 'North America Watersheds — Transit Colors'
+      : runtime.activeProduct === 'timezone'
+        ? 'Clock Skew Map — Transit Colors'
+        : runtime.activeProduct === 'landuse'
+          ? 'Jersey City Land Use — Transit Colors'
+          : runtime.activeProduct === 'circumference'
+            ? `Circumference Lab — ${area.label}`
+            : `Transit Colors — ${area.label}`;
   mapEl.setAttribute(
     'aria-label',
-    runtime.activeProduct === 'timezone'
-      ? 'Interactive world map of clock time compared with mean solar time'
-      : runtime.activeProduct === 'landuse'
-        ? 'Interactive Jersey City parcel map of land use, status, zoning, and historic districts'
-        : runtime.activeProduct === 'circumference'
-          ? `All maximum-area circumferential routes map, focused on ${area.label}`
-          : `All metro networks transit access map, destination metro ${area.label}`,
+    runtime.activeProduct === 'watersheds'
+      ? 'Interactive North America watershed boundaries and terrain map'
+      : runtime.activeProduct === 'timezone'
+        ? 'Interactive world map of clock time compared with mean solar time'
+        : runtime.activeProduct === 'landuse'
+          ? 'Interactive Jersey City parcel map of land use, status, zoning, and historic districts'
+          : runtime.activeProduct === 'circumference'
+            ? `All maximum-area circumferential routes map, focused on ${area.label}`
+            : `All metro networks transit access map, destination metro ${area.label}`,
   );
   destinationControlEl.hidden = !area.supportsDestination;
   departureControlEl.hidden = !area.supportsDestination;
   timeScaleControlEl.hidden = !area.supportsDestination;
 
+  if (!updateUrl) return;
   const url = new URL(window.location.href);
   if (areaKey === 'cdmx') {
     url.searchParams.delete('area');
   } else {
     url.searchParams.set('area', areaKey);
   }
-  if (runtime.activeProduct === 'timezone') {
+  if (runtime.activeProduct === 'watersheds') {
+    url.searchParams.set('product', 'watersheds');
+    url.searchParams.delete('area');
+    url.searchParams.delete('criterion');
+  } else if (runtime.activeProduct === 'timezone') {
     url.searchParams.set('product', 'timezone');
     url.searchParams.delete('criterion');
   } else if (runtime.activeProduct === 'landuse') {

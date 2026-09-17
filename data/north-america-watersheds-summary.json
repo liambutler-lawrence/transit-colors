@@ -1,0 +1,73 @@
+{
+  "dataset": "HydroBASINS v1c, standard polygons",
+  "source": "https://www.hydrosheds.org/products/hydrobasins",
+  "citation": "Lehner, B., Grill G. (2013), Hydrological Processes 27(15): 2171\u20132186",
+  "resolution_arc_seconds": 15,
+  "regions": [
+    "na",
+    "ar",
+    "gr"
+  ],
+  "levels": {
+    "4": {
+      "count": 290,
+      "area_km2": 24375432.4,
+      "archives": [
+        {
+          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_na_lev04_v1c.zip",
+          "sha256": "071aaed3095c3459bf95dbf77f299d3ea42c811cf222e3c72413dc293a8fbe57"
+        },
+        {
+          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_ar_lev04_v1c.zip",
+          "sha256": "b2e1c46b1391ed7acf9b1b3ad448c6334548df6d13ca0e860c34a39dead16878"
+        },
+        {
+          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_gr_lev04_v1c.zip",
+          "sha256": "e5d1ea6b1e499556b9d49f89cd6612074ceab236769662073d922708ef4afb9e"
+        }
+      ],
+      "file": "north-america-watersheds-4.pmtiles",
+      "bytes": 15440178
+    },
+    "6": {
+      "count": 3194,
+      "area_km2": 24375431.5,
+      "archives": [
+        {
+          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_na_lev06_v1c.zip",
+          "sha256": "6d8e7d8820f5db7c42b4bae5af832265f757b224bce0f705212887b1c12e6d5f"
+        },
+        {
+          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_ar_lev06_v1c.zip",
+          "sha256": "969e25aa2a62cdf3121badcdfcb04701b755a5d79d69fa07b1ebc5e5e01d1358"
+        },
+        {
+          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_gr_lev06_v1c.zip",
+          "sha256": "4c8119b4a1135df6f9a4a7bfe2a569497c249cb51fd3bec256105b7114f53f34"
+        }
+      ],
+      "file": "north-america-watersheds-6.pmtiles",
+      "bytes": 32421253
+    },
+    "8": {
+      "count": 37800,
+      "area_km2": 24375433.0,
+      "archives": [
+        {
+          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_na_lev08_v1c.zip",
+          "sha256": "3f8a2135b98e271245d82e02ab66e48a54fcfd7d826e2e6249c78c1cc38b1886"
+        },
+        {
+          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_ar_lev08_v1c.zip",
+          "sha256": "28613fd7e9c00d950d3d3cf1217a392dc7ae98220c825227a96ff1296e77f60b"
+        },
+        {
+          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_gr_lev08_v1c.zip",
+          "sha256": "a85562f544283b7fe01279532c866b16d129034f689a5da62efda6f00fa1925a"
+        }
+      ],
+      "file": "north-america-watersheds-8.pmtiles",
+      "bytes": 90397965
+    }
+  }
+}

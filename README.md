@@ -9,7 +9,11 @@ York City, Singapore, Atlanta, and Athens. It includes:
   measures the land they enclose; and
 - a Clock Skew map comparing official UTC offsets with longitude-based solar time; and
 - a Jersey City Land Use map combining parcel status, assessed use, zoning,
-  redevelopment plans, building age, and historic districts.
+  redevelopment plans, building age, and historic districts; and
+- a
+  [North America Watersheds map](https://maps.liambutlerlawrence.com/?product=watersheds)
+  with elevation-derived basin boundaries, three detail levels, terrain shading, and
+  click-to-inspect drainage information. See [data and methods](docs/watersheds.md).
 
 Circumference routes follow averaged centerlines from official GTFS track shapes by
 default where shape data is published, with an option to compare straight
