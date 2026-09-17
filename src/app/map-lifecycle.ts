@@ -1,3 +1,4 @@
+import { installWatersheds } from './watershed-ui.js';
 import { VectorTileSource } from 'maplibre-gl';
 import { ROAD_SOURCE } from '../transit-road-tiles.js';
 import { atlasStationMetadata, createTransitAtlasLoader } from '../transit-atlas.js';
@@ -517,7 +518,11 @@ export async function loadArea(
     syncStationVisibility();
     syncCircumferenceVisibility();
     updateViewportStatistics();
-    if (runtime.activeProduct !== 'timezone' && runtime.activeProduct !== 'landuse') {
+    if (
+      runtime.activeProduct !== 'timezone' &&
+      runtime.activeProduct !== 'landuse' &&
+      runtime.activeProduct !== 'watersheds'
+    ) {
       prepareCircumferenceRoute(sequence);
     }
     window.__transitPerformance.dataFetchedMs =
@@ -569,12 +574,17 @@ export async function initialize(): Promise<void> {
     runtime.circumferenceLandmasses = landmasses;
     installTimezoneSkew(timezoneMapData.zones, timezoneMapData.countries);
     installJerseyCityLandUse();
+    installWatersheds();
     for (const { areaKey, geometryVariants, schedules } of circumferenceEntries) {
       circumferenceStates[areaKey].geometryVariants = geometryVariants;
       runtime.circumferenceSchedules[areaKey] = schedules;
     }
     setActiveCircumferenceState(initialAreaKey);
-    if (runtime.activeProduct === 'timezone' || runtime.activeProduct === 'landuse') {
+    if (
+      runtime.activeProduct === 'timezone' ||
+      runtime.activeProduct === 'landuse' ||
+      runtime.activeProduct === 'watersheds'
+    ) {
       runtime.loadingCanFinish = true;
       requestAnimationFrame(() => requestAnimationFrame(finishLoading));
       return;

@@ -178,6 +178,71 @@ body {
   outline-offset: 2px;
 }
 
+.watershed-active .product-tabs button[aria-selected='true'] {
+  color: #24645f;
+}
+
+#product-watersheds {
+  grid-column: 1 / -1;
+}
+
+.watershed-intro {
+  margin: 0 0 16px;
+  color: var(--muted);
+  font-size: 0.84rem;
+  line-height: 1.55;
+}
+
+#watershed-level {
+  width: 100%;
+  margin-top: 6px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: inherit;
+  font: inherit;
+  font-size: 0.82rem;
+}
+
+#watershed-terrain-status:empty {
+  display: none;
+}
+
+.watershed-action {
+  margin-top: 12px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #fff;
+  color: #24645f;
+  font: inherit;
+  font-size: 0.78rem;
+  cursor: pointer;
+}
+
+.watershed-key {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 12px;
+  font-size: 0.73rem;
+  color: var(--muted);
+}
+
+.watershed-boundary-key,
+.watershed-selected-key {
+  display: inline-block;
+  width: 18px;
+  border-top: 2px solid #24645f;
+}
+
+.watershed-selected-key {
+  margin-left: 6px;
+  border-color: #d05b24;
+}
+
 .circumference-active .product-tabs button[aria-selected='true'] {
   color: #713b24;
 }

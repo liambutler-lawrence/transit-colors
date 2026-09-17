@@ -56,6 +56,15 @@
               >
                 Land use
               </button>
+              <button
+                id="product-watersheds"
+                type="button"
+                role="tab"
+                aria-selected="false"
+                aria-controls="watershed-product"
+              >
+                Watersheds
+              </button>
             </div>
           </div>
           <div class="panel-actions">
@@ -652,6 +661,136 @@
                 >, using OpenStreetMap data under ODbL. Seasonal and historical offsets
                 use pinned IANA 2026c rules; recurring daylight-saving changes are
                 excluded from official-history eras.
+              </p>
+            </section>
+          </div>
+
+          <div
+            id="watershed-product"
+            class="product-panel"
+            role="tabpanel"
+            aria-labelledby="product-watersheds"
+            hidden
+          >
+            <section class="sidebar-section mode-section">
+              <div class="section-heading">
+                <span class="section-index">2</span>
+                <div>
+                  <span class="section-eyebrow">North America</span>
+                  <h2>Where water divides</h2>
+                </div>
+              </div>
+              <p class="watershed-intro">
+                Trace the boundaries between drainage basins, from continental patterns
+                to smaller tributary catchments.
+              </p>
+              <div class="control-group">
+                <label class="control-label" for="watershed-level"
+                  >Boundary detail</label
+                >
+                <select id="watershed-level">
+                  <option value="4">Broad basins · Level 4</option>
+                  <option value="6" selected>Regional basins · Level 6</option>
+                  <option value="8">Local sub-basins · Level 8</option>
+                </select>
+              </div>
+              <div class="toggles" aria-label="Watershed layers">
+                <label
+                  ><input id="watershed-colors" type="checkbox" checked /><span
+                    >Basin colors</span
+                  ></label
+                >
+                <label
+                  ><input id="watershed-terrain" type="checkbox" checked /><span
+                    >Terrain shading</span
+                  ></label
+                >
+              </div>
+              <button id="watershed-reset" class="watershed-action" type="button">
+                View North America
+              </button>
+              <p id="watershed-status" class="method-note" role="status">
+                Loading boundaries…
+              </p>
+              <button
+                id="watershed-retry"
+                class="watershed-action"
+                type="button"
+                hidden
+              >
+                Retry boundaries
+              </button>
+              <p id="watershed-terrain-status" class="method-note" role="status"></p>
+              <div class="watershed-key">
+                <span class="watershed-boundary-key"></span>Basin boundary
+                <span class="watershed-selected-key"></span>Selected basin
+              </div>
+              <p class="method-note">
+                Colors help distinguish basins; they do not indicate elevation or water
+                quality. Outlines include coastlines.
+              </p>
+            </section>
+            <section class="sidebar-section selected-section">
+              <div class="section-heading">
+                <span class="section-index">3</span>
+                <div>
+                  <span class="section-eyebrow">Selected basin</span>
+                  <h2>Drainage details</h2>
+                </div>
+              </div>
+              <div class="selection" aria-live="polite">
+                <strong id="watershed-name">Click a basin on the map</strong>
+                <dl id="watershed-metadata" class="feature-metadata"></dl>
+              </div>
+              <button id="watershed-clear" class="watershed-action" type="button">
+                Clear selection
+              </button>
+            </section>
+            <section class="sidebar-section">
+              <div class="section-heading compact-heading">
+                <div>
+                  <span class="section-eyebrow">How it works</span>
+                  <h2>From terrain to catchments</h2>
+                </div>
+              </div>
+              <p class="method-note">
+                HydroBASINS uses elevation-derived flow directions to group land
+                draining toward shared outlets. Higher levels subdivide those areas into
+                tributary basins and intervening catchments.
+              </p>
+              <p class="method-note">
+                This first release uses precomputed HydroBASINS v1c boundaries at 15
+                arc-seconds (about 500 m at the equator), with coarser source terrain
+                north of 60°N. More detailed levels mean smaller basins, not finer
+                elevation data. Terrain shading is a separate visual reference;
+                boundaries are not recalculated from it.
+              </p>
+              <p class="method-note">
+                Includes North and Central America, the Caribbean, Arctic Canada, and
+                Greenland. Inland sinks and grouped coastal catchments are identified in
+                basin details. Small drainage features and boundaries within lakes may
+                be generalized.
+              </p>
+              <p class="method-note">
+                Source:
+                <a
+                  href="https://www.hydrosheds.org/products/hydrobasins"
+                  target="_blank"
+                  rel="noreferrer"
+                  >HydroBASINS / WWF</a
+                >, Lehner &amp; Grill (2013).
+                <a
+                  href="https://data.hydrosheds.org/file/technical-documentation/HydroBASINS_TechDoc_v1c.pdf"
+                  target="_blank"
+                  rel="noreferrer"
+                  >Methods and limitations</a
+                >. Terrain:
+                <a
+                  href="https://registry.opendata.aws/terrain-tiles/"
+                  target="_blank"
+                  rel="noreferrer"
+                  >Mapzen / Tilezen</a
+                >.
               </p>
             </section>
           </div>
