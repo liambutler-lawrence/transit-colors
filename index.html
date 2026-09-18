@@ -681,19 +681,9 @@
                 </div>
               </div>
               <p class="watershed-intro">
-                Trace the boundaries between drainage basins, from continental patterns
-                to smaller tributary catchments.
+                Follow each river system to its final outlet. The Mississippi, Missouri,
+                Ohio, and their tributaries form one primary watershed.
               </p>
-              <div class="control-group">
-                <label class="control-label" for="watershed-level"
-                  >Boundary detail</label
-                >
-                <select id="watershed-level">
-                  <option value="4">Broad basins · Level 4</option>
-                  <option value="6" selected>Regional basins · Level 6</option>
-                  <option value="8">Local sub-basins · Level 8</option>
-                </select>
-              </div>
               <div class="toggles" aria-label="Watershed layers">
                 <label
                   ><input id="watershed-colors" type="checkbox" checked /><span
@@ -724,10 +714,12 @@
               <div class="watershed-key">
                 <span class="watershed-boundary-key"></span>Basin boundary
                 <span class="watershed-selected-key"></span>Selected basin
+                <span class="watershed-outlet-key"></span>Terminal outlet
               </div>
               <p class="method-note">
                 Colors help distinguish basins; they do not indicate elevation or water
-                quality. Outlines include coastlines.
+                quality. Gray indicates inland or unverified drainage. Outlines include
+                coastlines.
               </p>
             </section>
             <section class="sidebar-section selected-section">
@@ -742,6 +734,14 @@
                 <strong id="watershed-name">Click a basin on the map</strong>
                 <dl id="watershed-metadata" class="feature-metadata"></dl>
               </div>
+              <button
+                id="watershed-outlet"
+                class="watershed-action"
+                type="button"
+                disabled
+              >
+                View terminal outlet
+              </button>
               <button id="watershed-clear" class="watershed-action" type="button">
                 Clear selection
               </button>
@@ -754,33 +754,31 @@
                 </div>
               </div>
               <p class="method-note">
-                HydroBASINS uses elevation-derived flow directions to group land
-                draining toward shared outlets. Higher levels subdivide those areas into
-                tributary basins and intervening catchments.
+                Catchments are joined by their final downstream outlet, removing
+                internal tributary boundaries. Each mapped basin has one modeled
+                terminal outlet; inland sinks are identified separately.
               </p>
               <p class="method-note">
-                This first release uses precomputed HydroBASINS v1c boundaries at 15
-                arc-seconds (about 500 m at the equator), with coarser source terrain
-                north of 60°N. More detailed levels mean smaller basins, not finer
-                elevation data. Terrain shading is a separate visual reference;
-                boundaries are not recalculated from it.
+                Boundaries use HydroSHEDS v2 BAS beta’s 1 arc-second grid (about 30 m).
+                Zoom in for full detail. Source resolution is not positional accuracy: a
+                boundary within 100 m of the true divide everywhere is not verified.
+                Terrain shading is a separate visual reference.
               </p>
               <p class="method-note">
-                Includes North and Central America, the Caribbean, Arctic Canada, and
-                Greenland. Inland sinks and grouped coastal catchments are identified in
-                basin details. Small drainage features and boundaries within lakes may
-                be generalized.
+                North and Central America and the Caribbean are covered. Greenland is
+                not included in this source release. Tiny coastal units that combine
+                multiple outlets are left uncolored rather than shown as one watershed.
               </p>
               <p class="method-note">
                 Source:
                 <a
-                  href="https://www.hydrosheds.org/products/hydrobasins"
+                  href="https://www.hydrosheds.org/hydrosheds-v2"
                   target="_blank"
                   rel="noreferrer"
-                  >HydroBASINS / WWF</a
-                >, Lehner &amp; Grill (2013).
+                  >HydroSHEDS v2 / WWF / DLR</a
+                >, Lehner et al. (2022), CC BY 4.0.
                 <a
-                  href="https://data.hydrosheds.org/file/technical-documentation/HydroBASINS_TechDoc_v1c.pdf"
+                  href="https://data.hydrosheds.org/file/technical-documentation/HydroSHEDS_TechDoc_v2_0_0.pdf"
                   target="_blank"
                   rel="noreferrer"
                   >Methods and limitations</a

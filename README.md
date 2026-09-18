@@ -12,8 +12,8 @@ York City, Singapore, Atlanta, and Athens. It includes:
   redevelopment plans, building age, and historic districts; and
 - a
   [North America Watersheds map](https://maps.liambutlerlawrence.com/?product=watersheds)
-  with elevation-derived basin boundaries, three detail levels, terrain shading, and
-  click-to-inspect drainage information. See [data and methods](docs/watersheds.md).
+  with complete primary drainage systems, roughly 30 m source geometry, terrain shading,
+  and terminal-outlet inspection. See [data and methods](docs/watersheds.md).
 
 Circumference routes follow averaged centerlines from official GTFS track shapes by
 default where shape data is published, with an option to compare straight

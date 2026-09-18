@@ -7,9 +7,8 @@ All notable changes to this project will be documented here. The format follows
 
 ### Added
 
-- Added a North America Watersheds mode with HydroBASINS boundaries at three levels,
-  optional terrain shading and basin colors, basin inspection, and shareable detail
-  links. Includes Central America, Arctic Canada, and Greenland.
+- Added a North America Watersheds mode with optional terrain shading, basin colors, and
+  basin inspection.
 
 - Added a Jersey City Land Use mode that distinguishes vacant industrial land, active
   industry, auto-oriented retail, modern and historic mixed use, non-retail towers,
@@ -23,6 +22,11 @@ All notable changes to this project will be documented here. The format follows
   Street Gradient or Circumference initialization.
 
 ### Changed
+
+- Replaced watershed sub-basins with whole drainage systems using HydroSHEDS v2’s
+  roughly 30 m source grid. Tributaries sharing a terminal outlet are dissolved, outlet
+  locations can be inspected, and ambiguous coastal units are left uncolored. Source
+  resolution is distinguished from an unverified 100 m accuracy target.
 
 - Moved production delivery to a checked, GitHub-Actions-only Vercel deployment for
   `maps.liambutlerlawrence.com`, with digest-based uploads for large map archives.

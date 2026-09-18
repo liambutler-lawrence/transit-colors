@@ -1,11 +1,15 @@
-import { VectorTileSource } from 'maplibre-gl';
+import { GeoJSONSource, VectorTileSource } from 'maplibre-gl';
+import { FetchSource, PMTiles } from 'pmtiles';
+import watershedData from '../../data/north-america-watersheds-summary.json';
+import { MultipartPMTilesSource } from '../multipart-pmtiles.js';
+import { watershedDrainageLabel, watershedPropertiesSchema } from '../watersheds.js';
 import {
-  WATERSHED_LEVELS,
-  watershedDrainageLabel,
-  watershedLevel,
-  watershedPropertiesSchema,
-} from '../watersheds.js';
-import { compactPanelQuery, map, requiredElement, runtime } from './context.js';
+  compactPanelQuery,
+  map,
+  pmtilesProtocol,
+  requiredElement,
+  runtime,
+} from './context.js';
 import {
   firstSymbolLayerId,
   replaceMetadata,
@@ -13,14 +17,27 @@ import {
 } from './map-ui-utils.js';
 
 let installed = false;
-let level = watershedLevel(
-  new URLSearchParams(window.location.search).get('watershed-level'),
-);
 let selectedId: number | null = null;
+let selectedOutlet: [number, number] | null = null;
 const failedSources = new Set<string>();
 
 function sourceId(): string {
-  return `watersheds-${level}`;
+  return 'watersheds-primary';
+}
+
+function boundaryURL(retry?: string): string {
+  const url = new URL(`data/${watershedData.file}`, window.location.href);
+  url.searchParams.set('v', watershedData.sha256);
+  if (retry) url.searchParams.set('retry', retry);
+  const parts = watershedData.parts.map((part) => {
+    const partURL = new URL(`data/${part.file}`, window.location.href);
+    if (retry) partURL.searchParams.set('retry', retry);
+    return { source: new FetchSource(partURL.href), bytes: part.bytes };
+  });
+  pmtilesProtocol.add(
+    new PMTiles(new MultipartPMTilesSource(url.href, parts, watershedData.sha256)),
+  );
+  return `pmtiles://${url.href}`;
 }
 
 function statusElement(): HTMLElement {
@@ -29,13 +46,16 @@ function statusElement(): HTMLElement {
 
 function resetSelection(): void {
   selectedId = null;
+  selectedOutlet = null;
+  requiredElement('#watershed-outlet', HTMLButtonElement).disabled = true;
+  const outletSource = map.getSource('watershed-outlet');
+  if (outletSource instanceof GeoJSONSource)
+    outletSource.setData({ type: 'FeatureCollection', features: [] });
   requiredElement('#watershed-name', HTMLElement).textContent =
     'Click a basin on the map';
   requiredElement('#watershed-metadata', HTMLElement).replaceChildren();
-  for (const item of WATERSHED_LEVELS) {
-    const layer = `watersheds-${item}-selected`;
-    if (map.getLayer(layer)) map.setFilter(layer, ['==', ['get', 'id'], -1]);
-  }
+  const layer = `${sourceId()}-selected`;
+  if (map.getLayer(layer)) map.setFilter(layer, ['==', ['get', 'id'], -1]);
 }
 
 function updateStatus(): void {
@@ -44,23 +64,19 @@ function updateStatus(): void {
   statusElement().textContent = failed
     ? 'Boundary tiles could not load. Retry or return to North America.'
     : map.getSource(sourceId()) && map.isSourceLoaded(sourceId())
-      ? `Level ${level} boundaries loaded · Click a basin to inspect it.`
-      : `Loading level ${level} boundaries…`;
+      ? 'Primary basins loaded · Click a basin to inspect its outlet.'
+      : 'Loading primary basin boundaries…';
   requiredElement('#watershed-retry', HTMLButtonElement).hidden = !failed;
 }
 
-function installLevel(): void {
+function installBasins(): void {
   const id = sourceId();
   if (map.getSource(id)) return;
-  const url = new URL(
-    `data/north-america-watersheds-${level}.pmtiles`,
-    window.location.href,
-  );
   map.addSource(id, {
     type: 'vector',
-    url: `pmtiles://${url.href}`,
+    url: boundaryURL(),
     attribution:
-      '<a href="https://www.hydrosheds.org/products/hydrobasins">HydroBASINS / WWF</a> · Lehner &amp; Grill (2013)',
+      '<a href="https://www.hydrosheds.org/hydrosheds-v2">HydroSHEDS v2 / WWF / DLR</a> · Lehner et al. (2022) · CC BY 4.0',
     promoteId: 'id',
   });
   const before = firstSymbolLayerId();
@@ -74,7 +90,9 @@ function installLevel(): void {
       paint: {
         'fill-color': [
           'match',
-          ['get', 'color'],
+          ['case', ['==', ['get', 'drainage'], 'ocean'], ['get', 'color'], -1],
+          -1,
+          '#8c9693',
           0,
           '#2c8b83',
           1,
@@ -129,22 +147,33 @@ function installLevel(): void {
     if (!parsed.success) return;
     const basin = parsed.data;
     selectedId = basin.id;
+    selectedOutlet = [basin.outlet_lon, basin.outlet_lat];
+    requiredElement('#watershed-outlet', HTMLButtonElement).disabled = false;
+    const outletSource = map.getSource('watershed-outlet');
+    if (outletSource instanceof GeoJSONSource)
+      outletSource.setData({
+        type: 'Feature',
+        properties: {},
+        geometry: { type: 'Point', coordinates: selectedOutlet },
+      });
     setLayerVisibility(`${id}-selected`, true);
+    setLayerVisibility('watershed-outlet', true);
     map.setFilter(`${id}-selected`, ['==', ['get', 'id'], selectedId]);
     requiredElement('#watershed-name', HTMLElement).textContent =
-      `Sub-basin ${basin.id}`;
+      basin.name || `Primary basin ${basin.id}`;
     const area = (value: number): string =>
       `${value.toLocaleString(undefined, { maximumFractionDigits: 1 })} km²`;
     replaceMetadata(requiredElement('#watershed-metadata', HTMLElement), [
-      { label: 'Boundary detail', value: `HydroBASINS level ${basin.level}` },
+      { label: 'Drainage', value: watershedDrainageLabel(basin.drainage) },
       { label: 'Basin area', value: area(basin.area_km2) },
-      { label: 'Upstream area', value: area(basin.upstream_km2) },
+      { label: 'Joined catchments', value: basin.catchments.toLocaleString() },
       {
-        label: 'Drainage',
-        value: watershedDrainageLabel(basin.endorheic, basin.coastal),
+        label: 'Terminal outlet',
+        value: `${basin.outlet_lat.toFixed(5)}°, ${basin.outlet_lon.toFixed(5)}°`,
       },
-      { label: 'Next downstream ID', value: basin.next_down || 'No downstream basin' },
-      { label: 'Main basin ID', value: basin.main_basin },
+      { label: 'Outlet stream ID', value: basin.outlet_stream },
+      { label: 'Boundary source', value: 'HydroSHEDS v2 · 1 arc-second (~30 m)' },
+      { label: 'Accuracy', value: '100 m everywhere is not verified' },
     ]);
   });
   map.on('mousemove', `${id}-fill`, () => {
@@ -161,38 +190,31 @@ export function positionWatershedLayers(): void {
   if (map.getLayer('watershed-hillshade')) {
     map.moveLayer('watershed-hillshade', map.getLayer('water') ? 'water' : before);
   }
-  for (const id of [
-    ...WATERSHED_LEVELS.flatMap((item) =>
-      ['fill', 'line', 'selected'].map((kind) => `watersheds-${item}-${kind}`),
-    ),
-  ]) {
+  for (const kind of ['fill', 'line', 'selected']) {
+    const id = `${sourceId()}-${kind}`;
     if (map.getLayer(id)) map.moveLayer(id, before);
   }
+  if (map.getLayer('watershed-outlet')) map.moveLayer('watershed-outlet');
 }
 
 export function syncWatershedVisibility(): void {
   if (!installed) return;
   const active = runtime.activeProduct === 'watersheds';
-  if (active) installLevel();
+  if (active) installBasins();
   const colors = requiredElement('#watershed-colors', HTMLInputElement).checked;
   setLayerVisibility(
     'watershed-hillshade',
     active && requiredElement('#watershed-terrain', HTMLInputElement).checked,
   );
-  for (const item of WATERSHED_LEVELS) {
-    const visible = active && item === level;
-    setLayerVisibility(`watersheds-${item}-fill`, visible);
-    if (map.getLayer(`watersheds-${item}-fill`)) {
-      // Keep an invisible hit surface when colors are off.
-      map.setPaintProperty(
-        `watersheds-${item}-fill`,
-        'fill-opacity',
-        colors ? 0.25 : 0,
-      );
-    }
-    setLayerVisibility(`watersheds-${item}-line`, visible);
-    setLayerVisibility(`watersheds-${item}-selected`, visible && selectedId !== null);
+  const id = sourceId();
+  setLayerVisibility(`${id}-fill`, active);
+  if (map.getLayer(`${id}-fill`)) {
+    // Keep an invisible hit surface when colors are off.
+    map.setPaintProperty(`${id}-fill`, 'fill-opacity', colors ? 0.25 : 0);
   }
+  setLayerVisibility(`${id}-line`, active);
+  setLayerVisibility(`${id}-selected`, active && selectedId !== null);
+  setLayerVisibility('watershed-outlet', active && selectedOutlet !== null);
   if (!active) map.getCanvas().style.cursor = '';
   updateStatus();
 }
@@ -235,16 +257,29 @@ export function installWatersheds(): void {
     },
     firstSymbolLayerId(),
   );
-  const select = requiredElement('#watershed-level', HTMLSelectElement);
-  select.value = String(level);
-  select.addEventListener('change', () => {
-    level = watershedLevel(select.value);
-    resetSelection();
-    const url = new URL(window.location.href);
-    url.searchParams.set('watershed-level', String(level));
-    window.history.replaceState({}, '', url);
-    syncWatershedVisibility();
+  map.addSource('watershed-outlet', {
+    type: 'geojson',
+    data: { type: 'FeatureCollection', features: [] },
   });
+  map.addLayer({
+    id: 'watershed-outlet',
+    type: 'circle',
+    source: 'watershed-outlet',
+    layout: { visibility: 'none' },
+    paint: {
+      'circle-radius': 6,
+      'circle-color': '#d05b24',
+      'circle-stroke-color': '#fff',
+      'circle-stroke-width': 2,
+    },
+  });
+  requiredElement('#watershed-outlet', HTMLButtonElement).addEventListener(
+    'click',
+    () => {
+      if (selectedOutlet)
+        map.flyTo({ center: selectedOutlet, zoom: 11, duration: 800 });
+    },
+  );
   for (const selector of ['#watershed-colors', '#watershed-terrain']) {
     requiredElement(selector, HTMLInputElement).addEventListener(
       'change',
@@ -265,12 +300,7 @@ export function installWatersheds(): void {
       const source = map.getSource(sourceId());
       if (source instanceof VectorTileSource) {
         failedSources.delete(sourceId());
-        const url = new URL(
-          `data/north-america-watersheds-${level}.pmtiles`,
-          window.location.href,
-        );
-        url.searchParams.set('retry', String(Date.now()));
-        source.setUrl(`pmtiles://${url.href}`);
+        source.setUrl(boundaryURL(String(Date.now())));
         updateStatus();
       }
     },
