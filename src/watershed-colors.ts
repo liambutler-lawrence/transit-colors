@@ -1,7 +1,13 @@
 import type { ExpressionSpecification } from 'maplibre-gl';
+import globalBodies from '../data/global-watersheds-exit-bodies.json';
 import exitBodies from '../data/north-america-watersheds-exit-bodies.json';
 
 export const watershedExitBodies = exitBodies.bodies;
+export const worldwideExitBodies = [
+  ...new Map(
+    [...watershedExitBodies, ...globalBodies].map((body) => [body.name, body]),
+  ).values(),
+];
 export const unresolvedWatershedColor = '#8c9693';
 const bodyByBasin = new Map<number, string>();
 for (const body of watershedExitBodies)
@@ -26,6 +32,8 @@ export function watershedFillColor(): ExpressionSpecification {
   ];
   return [
     'case',
+    ['has', 'fill_color'],
+    ['get', 'fill_color'],
     ['==', ['get', 'drainage'], 'ocean'],
     match,
     unresolvedWatershedColor,

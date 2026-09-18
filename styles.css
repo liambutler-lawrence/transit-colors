@@ -1895,6 +1895,17 @@ body {
   }
 }
 
+.watershed-legend {
+  margin: 14px 0;
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.watershed-legend summary {
+  cursor: pointer;
+  color: #24645f;
+}
+
 .watershed-exit-key {
   display: grid;
   grid-template-columns: 1fr 1fr;

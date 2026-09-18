@@ -1,13 +1,13 @@
-# North America primary watersheds
+# Worldwide primary watersheds
 
-Open `?product=watersheds`. Each polygon joins catchments sharing one terminal node,
-with reviewed groundwater connections applied afterward. The Mississippi, Missouri,
-Ohio, and their tributaries share one polygon; tributary boundaries are removed. Click a
-basin to inspect its area, the number of joined catchments, and its terminal stream.
-**View terminal outlet** takes you to the orange outlet marker. Selection also works
-with colors off.
+Open `?product=watersheds`. Catchments are grouped by modeled terminal outlet, with
+reviewed groundwater connections and confirmed closed-lake systems joined. The
+Mississippi, Missouri, Ohio, and their tributaries share one polygon; tributary
+boundaries are removed. Click a basin to inspect its area, the number of joined
+catchments, and its terminal stream. **View terminal outlet** takes you to the orange
+outlet marker. Selection also works with colors off.
 
-## Scope and accuracy
+## North America: scope and accuracy
 
 The source is **HydroSHEDS v2.0**, using its North America BAS beta catchment polygons
 and RIV network. It derives drainage from hydrologically conditioned terrain on a **1
@@ -206,3 +206,59 @@ group smaller bays, estuaries and channels into regional receiving bodies. Hudso
 includes James Bay, Foxe Basin and Hudson Strait; Gulf of St. Lawrence includes the St.
 Lawrence estuary. These are generalized cartographic categories, not surveyed marine
 limits or changes to hydrologic routing.
+
+## Worldwide extension: GRIT v1.0
+
+Outside the existing HydroSHEDS North America layer, the map uses the Africa, Asia,
+Europe, South America, Siberia, and South Pacific regions of
+[GRIT v1.0](https://zenodo.org/records/17435232) (Wortmann et al., 2025,
+[paper](https://doi.org/10.1029/2024WR038308)). Its terrain input is 30 m FABDEM, but
+the published vector catchments are simplified. Neither that pixel size nor our tile
+quantization establishes a 100 m positional-accuracy guarantee. Greenland's ice sheet
+and Antarctica are outside the source's coverage.
+
+We **do not dissolve by GRIT's connected component ID**: components can span multiple
+river mouths and seas through canals and natural bifurcations. Instead,
+`scripts/grit_routing.py` follows the source's `is_mainstem` branch at each bifurcation
+(width, then stable ID, break ties), resolves a terminal node, and unions the associated
+segment catchments. Each secondary outlet retains its own local contributing catchments.
+This is a main-route partition, not a claim that all water follows only one physical
+route. Cycles fail the build rather than being assigned invented outlets. Source
+terminal types without a coastal/sink classification stay unverified.
+
+Additional source sink polygons without a river-network outlet appear as gray surface
+depressions with no fabricated outlet marker. They are not assumed to be endorheic.
+Composite coastal polygons below GRIT's 50 km² stream-initiation threshold are omitted
+because they can encompass multiple outlets. A source coastal endpoint assigned to the
+Caspian Sea is labeled as a closed inland receiving body, not an ocean outlet.
+Generalized Natural Earth marine areas supply receiving-body colors; they do not
+determine divides.
+
+The North American archive, groundwater corrections, terminal-node joins, and
+receiving-body assignments remain independently versioned and unchanged.
+
+### Rebuild the global extension
+
+1. Install `numpy pyarrow pyogrio shapely pyproj rasterio` in a temporary Python
+   environment and install `tippecanoe`.
+2. Download `data/sources/grit-v1-files.json` into `/tmp/grit` (or `GRIT_CACHE`). Every
+   archive has a pinned URL, size, and publisher-provided MD5 checksum.
+3. Run `python scripts/global-watersheds.test.py` and
+   `python scripts/build-global-watersheds.py`. Optional region arguments build regional
+   checkpoints only. Remove `basins-*.json` checkpoints when changing routing or
+   classification rules.
+4. The script builds zoom 0–10 tiles with extent 16,384 at zoom 10, no additional
+   maximum-zoom simplification, and immutable parts smaller than 100 MiB.
+5. Run `npm run check` to verify routing fixtures, shipped tiles, and production asset
+   integrity.
+
+GRIT-derived `global-primary-watersheds-*.bin` files are **CC BY-NC 4.0**, not MIT. They
+adapt the source by main-route grouping, dissolving, receiving-body labeling,
+reprojection, and tiling. See `data/sources/GRIT-LICENSE.md`. Code retains the
+repository's MIT license; source datasets retain their respective licenses.
+
+`data/global-watersheds-outlet-reviews.json` records the Haringvliet terminal-type
+review: GRIT calls that terminal node an inlet despite its having no downstream segment.
+Rijkswaterstaat documents Rhine–Meuse discharge through those sluices to the North Sea.
+This changes only its receiving-body classification, with the source node coordinate
+checked; it does not alter routing or basin geometry.

@@ -1,0 +1,190 @@
+[
+  {
+    "name": "Andaman Sea",
+    "color": "#a27239"
+  },
+  {
+    "name": "Arabian Sea",
+    "color": "#6446be"
+  },
+  {
+    "name": "Arafura Sea",
+    "color": "#69c964"
+  },
+  {
+    "name": "Arctic Ocean",
+    "color": "#889caf"
+  },
+  {
+    "name": "Atlantic Ocean",
+    "color": "#487bb8"
+  },
+  {
+    "name": "Baffin Bay",
+    "color": "#bd8270"
+  },
+  {
+    "name": "Baltic Sea",
+    "color": "#a2395c"
+  },
+  {
+    "name": "Banda Sea",
+    "color": "#4691be"
+  },
+  {
+    "name": "Barents Sea",
+    "color": "#c1c964"
+  },
+  {
+    "name": "Bay of Bengal",
+    "color": "#8c39a2"
+  },
+  {
+    "name": "Beaufort Sea",
+    "color": "#bd7284"
+  },
+  {
+    "name": "Bering Sea",
+    "color": "#9e8860"
+  },
+  {
+    "name": "Black Sea",
+    "color": "#46be82"
+  },
+  {
+    "name": "Caribbean Sea",
+    "color": "#70a543"
+  },
+  {
+    "name": "Caspian Sea",
+    "color": "#c97964"
+  },
+  {
+    "name": "Celebes Sea",
+    "color": "#3942a2"
+  },
+  {
+    "name": "Chukchi Sea",
+    "color": "#8f99cd"
+  },
+  {
+    "name": "Coral Sea",
+    "color": "#73be46"
+  },
+  {
+    "name": "East China Sea",
+    "color": "#c964a7"
+  },
+  {
+    "name": "East Siberian Sea",
+    "color": "#399ea2"
+  },
+  {
+    "name": "Greenland Sea",
+    "color": "#bea046"
+  },
+  {
+    "name": "Gulf of Aden",
+    "color": "#9264c9"
+  },
+  {
+    "name": "Gulf of Alaska",
+    "color": "#b493cd"
+  },
+  {
+    "name": "Gulf of Guinea",
+    "color": "#39a24a"
+  },
+  {
+    "name": "Gulf of Mexico",
+    "color": "#d39b32"
+  },
+  {
+    "name": "Gulf of St. Lawrence",
+    "color": "#919b43"
+  },
+  {
+    "name": "Gulf of Thailand",
+    "color": "#be4656"
+  },
+  {
+    "name": "Hudson Bay",
+    "color": "#b47ac5"
+  },
+  {
+    "name": "Indian Ocean",
+    "color": "#648ec9"
+  },
+  {
+    "name": "Java Sea",
+    "color": "#84a239"
+  },
+  {
+    "name": "Kara Sea",
+    "color": "#be46be"
+  },
+  {
+    "name": "Labrador Sea",
+    "color": "#57a4bd"
+  },
+  {
+    "name": "Laptev Sea",
+    "color": "#64c9ab"
+  },
+  {
+    "name": "Mediterranean Sea",
+    "color": "#a26439"
+  },
+  {
+    "name": "North Sea",
+    "color": "#5546be"
+  },
+  {
+    "name": "Norwegian Sea",
+    "color": "#75c964"
+  },
+  {
+    "name": "Pacific Ocean",
+    "color": "#269e92"
+  },
+  {
+    "name": "Persian Gulf",
+    "color": "#a2396a"
+  },
+  {
+    "name": "Philippine Sea",
+    "color": "#46a1be"
+  },
+  {
+    "name": "Red Sea",
+    "color": "#c9c464"
+  },
+  {
+    "name": "Sea of Japan",
+    "color": "#7f39a2"
+  },
+  {
+    "name": "Sea of Okhotsk",
+    "color": "#46be72"
+  },
+  {
+    "name": "South China Sea",
+    "color": "#c96c64"
+  },
+  {
+    "name": "Sulu Sea",
+    "color": "#83be46"
+  },
+  {
+    "name": "Tasman Sea",
+    "color": "#c964b4"
+  },
+  {
+    "name": "Timor Sea",
+    "color": "#39a299"
+  },
+  {
+    "name": "Yellow Sea",
+    "color": "#be9046"
+  }
+]
