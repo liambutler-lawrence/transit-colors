@@ -73,6 +73,8 @@ def prepare(source, outlets, drainage, corrections, nodes=None):
         assert drainage[target] == 'ocean', 'Correction must reach a modeled ocean basin'
         assert link['source_url'] and link['evidence'] and link['downstream_route']
         for identifier in link['source_basins']:
+            if nodes is not None and 'terminal_node' in link:
+                assert nodes[identifier] == link['terminal_node'], 'Reviewed terminal node has changed'
             assert drainage[identifier] == 'inland', 'Reviewed source is no longer a surface sink'
             assert np.allclose(outlets[identifier], link['modeled_sink'], atol=1e-7, rtol=0), 'Source sink has moved; review the connection again'
             group = groups.get(destinations.get(identifier), [identifier])

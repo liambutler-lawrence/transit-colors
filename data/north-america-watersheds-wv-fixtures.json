@@ -1,0 +1,328 @@
+{
+  "target_basin": 72911,
+  "source_basins": 32,
+  "source_terminal_nodes": 17,
+  "catchments": 216,
+  "members": [
+    {
+      "source_basin": 86271,
+      "terminal_node": 8329892,
+      "coordinate": [
+        -80.2238888888889,
+        38.13902777777778
+      ],
+      "catchments": 9,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86296,
+      "terminal_node": 8329892,
+      "coordinate": [
+        -80.24847222222222,
+        38.140138888888885
+      ],
+      "catchments": 5,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86448,
+      "terminal_node": 8359544,
+      "coordinate": [
+        -80.48763888888888,
+        38.018055555555556
+      ],
+      "catchments": 3,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86493,
+      "terminal_node": 8367809,
+      "coordinate": [
+        -80.40694444444445,
+        37.98222222222222
+      ],
+      "catchments": 3,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86507,
+      "terminal_node": 8367809,
+      "coordinate": [
+        -80.40125,
+        37.958749999999995
+      ],
+      "catchments": 3,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86509,
+      "terminal_node": 8367809,
+      "coordinate": [
+        -80.42125,
+        37.95986111111111
+      ],
+      "catchments": 3,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86463,
+      "terminal_node": 8368624,
+      "coordinate": [
+        -80.50694444444444,
+        37.99180555555556
+      ],
+      "catchments": 27,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86502,
+      "terminal_node": 8368624,
+      "coordinate": [
+        -80.48625,
+        37.967638888888885
+      ],
+      "catchments": 1,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86524,
+      "terminal_node": 8375837,
+      "coordinate": [
+        -80.36930555555556,
+        37.94388888888889
+      ],
+      "catchments": 1,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86572,
+      "terminal_node": 8375837,
+      "coordinate": [
+        -80.36402777777778,
+        37.92472222222222
+      ],
+      "catchments": 1,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86409,
+      "terminal_node": 8376700,
+      "coordinate": [
+        -80.43694444444445,
+        38.00125
+      ],
+      "catchments": 41,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86528,
+      "terminal_node": 8376700,
+      "coordinate": [
+        -80.44208333333333,
+        37.93277777777777
+      ],
+      "catchments": 13,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86538,
+      "terminal_node": 8386049,
+      "coordinate": [
+        -80.39666666666668,
+        37.92208333333333
+      ],
+      "catchments": 13,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86581,
+      "terminal_node": 8386049,
+      "coordinate": [
+        -80.43694444444445,
+        37.89819444444444
+      ],
+      "catchments": 7,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86548,
+      "terminal_node": 8389798,
+      "coordinate": [
+        -80.49388888888889,
+        37.91513888888889
+      ],
+      "catchments": 3,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86597,
+      "terminal_node": 8389798,
+      "coordinate": [
+        -80.50958333333334,
+        37.888194444444444
+      ],
+      "catchments": 1,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86618,
+      "terminal_node": 8389798,
+      "coordinate": [
+        -80.53277777777777,
+        37.875138888888884
+      ],
+      "catchments": 1,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86592,
+      "terminal_node": 8390317,
+      "coordinate": [
+        -80.39500000000001,
+        37.876666666666665
+      ],
+      "catchments": 11,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86521,
+      "terminal_node": 8393908,
+      "coordinate": [
+        -80.55069444444445,
+        37.91763888888889
+      ],
+      "catchments": 27,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86629,
+      "terminal_node": 8393908,
+      "coordinate": [
+        -80.55763888888889,
+        37.863749999999996
+      ],
+      "catchments": 1,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86644,
+      "terminal_node": 8400813,
+      "coordinate": [
+        -80.43916666666667,
+        37.84986111111111
+      ],
+      "catchments": 1,
+      "evidence_kind": "documented_regional_drainage"
+    },
+    {
+      "source_basin": 86646,
+      "terminal_node": 8400813,
+      "coordinate": [
+        -80.44291666666666,
+        37.83958333333334
+      ],
+      "catchments": 1,
+      "evidence_kind": "documented_regional_drainage"
+    },
+    {
+      "source_basin": 86641,
+      "terminal_node": 8403223,
+      "coordinate": [
+        -80.40986111111111,
+        37.83958333333334
+      ],
+      "catchments": 9,
+      "evidence_kind": "documented_regional_drainage"
+    },
+    {
+      "source_basin": 86690,
+      "terminal_node": 8412671,
+      "coordinate": [
+        -80.4376388888889,
+        37.80819444444444
+      ],
+      "catchments": 1,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86694,
+      "terminal_node": 8412671,
+      "coordinate": [
+        -80.4673611111111,
+        37.78736111111111
+      ],
+      "catchments": 1,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86806,
+      "terminal_node": 8440158,
+      "coordinate": [
+        -80.51888888888888,
+        37.67777777777778
+      ],
+      "catchments": 1,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86817,
+      "terminal_node": 8440158,
+      "coordinate": [
+        -80.53138888888888,
+        37.67055555555555
+      ],
+      "catchments": 5,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86815,
+      "terminal_node": 8441994,
+      "coordinate": [
+        -80.49722222222222,
+        37.67541666666666
+      ],
+      "catchments": 3,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86834,
+      "terminal_node": 8447260,
+      "coordinate": [
+        -80.49180555555554,
+        37.64736111111111
+      ],
+      "catchments": 5,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86840,
+      "terminal_node": 8447260,
+      "coordinate": [
+        -80.54236111111112,
+        37.64819444444444
+      ],
+      "catchments": 7,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86849,
+      "terminal_node": 8447260,
+      "coordinate": [
+        -80.49638888888889,
+        37.630972222222226
+      ],
+      "catchments": 7,
+      "evidence_kind": "mapped_trace"
+    },
+    {
+      "source_basin": 86841,
+      "terminal_node": 8447918,
+      "coordinate": [
+        -80.47777777777777,
+        37.65222222222222
+      ],
+      "catchments": 1,
+      "evidence_kind": "mapped_trace"
+    }
+  ]
+}

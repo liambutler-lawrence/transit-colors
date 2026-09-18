@@ -1,7 +1,7 @@
 {
   "dataset": "HydroSHEDS v2.0, North America BAS beta and RIV",
   "resolution_arc_seconds": 1,
-  "count": 105574,
+  "count": 105558,
   "routed_catchments": 11558529,
   "unresolved_coastal_units": 349737,
   "source": "https://www.hydrosheds.org/hydrosheds-v2",
@@ -10,37 +10,714 @@
   "source_primary_basins": 108641,
   "source_terminal_nodes": 105575,
   "grouping": "Shared terminal node, followed by reviewed groundwater connections",
-  "unique_displayed_terminal_nodes": 105574,
+  "unique_displayed_terminal_nodes": 105558,
   "shared_terminal_groups": 2034,
   "groundwater_corrections": {
-    "version": 1,
+    "version": 2,
     "source_dataset": "HydroSHEDS v2.0 North America BAS beta / RIV v2r0",
+    "evidence_sources": [
+      {
+        "file": "wvdep-sunken-streams.geojson",
+        "sha256": "4d7ce6e50b4347080bfdeadb5f917079fce6b789c3a2db9e95b899fa5a9cb8e2"
+      },
+      {
+        "file": "wvdep-greenbrier-watershed.geojson",
+        "sha256": "63668dbd0c35190f4b99d5e8055b216a0ac70d9fdfbc0cc16a6bcf1259072cc2"
+      },
+      {
+        "file": "wvdep-milligan-watershed.geojson",
+        "sha256": "90bdf8eaddb598a37fbb11c403d3a67e77d08136c1709819e23fb499ca440e05"
+      }
+    ],
     "connections": [
       {
-        "name": "Culverson Creek karst drainage",
+        "source_basins": [
+          86271,
+          86296
+        ],
+        "target_basin": 72911,
+        "terminal_node": 8329892,
+        "modeled_sink": [
+          -80.23597222222219,
+          38.12819444444449
+        ],
+        "test_points": [
+          [
+            -80.2238888888889,
+            38.13902777777778
+          ],
+          [
+            -80.24847222222222,
+            38.140138888888885
+          ]
+        ],
+        "name": "Poor Farm Water Cave groundwater connection",
+        "evidence_kind": "mapped_trace",
+        "source_url": "https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/Groundwater/MapServer/3",
+        "trace_path": [
+          {
+            "feature_id": 255,
+            "source_basin": 86271,
+            "receiving_basin": 72911,
+            "sink": "Poor Farm Water Cave",
+            "resurgence": "McNeel's Mill Run Cave",
+            "reference": "Gary Storrick 1992",
+            "reference_location": "page 197",
+            "comment": ""
+          }
+        ],
+        "citation": "WVDEP WV Sunken Streams public GIS; original references recorded for each trace; Jones (1997), pp. 84\u201393, for regional drainage.",
+        "downstream_route": "Poor Farm Water Cave \u2192 McNeel's Mill Run Cave \u2192 Greenbrier drainage \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "evidence": "Mapped trace endpoints intersect the listed source and receiving polygons. Shared terminal-node groups are kept together. The reviewed regional routes reach the Greenbrier/Mississippi system; this does not assert one intermediate spring or a surveyed underground divide for every surface catchment.",
+        "regional_reference": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
+      },
+      {
+        "source_basins": [
+          86448
+        ],
+        "target_basin": 72911,
+        "terminal_node": 8359544,
+        "modeled_sink": [
+          -80.48597222222224,
+          38.00763888888889
+        ],
+        "test_points": [
+          [
+            -80.48763888888888,
+            38.018055555555556
+          ]
+        ],
+        "name": "Charley Run Sink groundwater connection",
+        "evidence_kind": "mapped_trace",
+        "source_url": "https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/Groundwater/MapServer/3",
+        "trace_path": [
+          {
+            "feature_id": 190,
+            "source_basin": 86448,
+            "receiving_basin": 86409,
+            "sink": "Charley Run Sink",
+            "resurgence": "Bransford Cave",
+            "reference": "Dasher-Boyer 2000",
+            "reference_location": "CR to BF",
+            "comment": ""
+          },
+          {
+            "feature_id": 31,
+            "source_basin": 86528,
+            "receiving_basin": 72911,
+            "sink": "Culverson Creek Cave",
+            "resurgence": "Matts Black Cave",
+            "reference": "Jones 1997",
+            "reference_location": "page 91 dye trace no 12",
+            "comment": "There are five resurgences at or near Matts"
+          }
+        ],
+        "citation": "WVDEP WV Sunken Streams public GIS; original references recorded for each trace; Jones (1997), pp. 84\u201393, for regional drainage.",
+        "downstream_route": "Charley Run Sink \u2192 Bransford Cave; Culverson Creek Cave \u2192 Matts Black Cave \u2192 Greenbrier drainage \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "evidence": "Mapped trace endpoints intersect the listed source and receiving polygons. Shared terminal-node groups are kept together. The reviewed regional routes reach the Greenbrier/Mississippi system; this does not assert one intermediate spring or a surveyed underground divide for every surface catchment.",
+        "regional_reference": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
+      },
+      {
+        "source_basins": [
+          86493,
+          86507,
+          86509
+        ],
+        "target_basin": 72911,
+        "terminal_node": 8367809,
+        "modeled_sink": [
+          -80.39986111111114,
+          37.97486111111118
+        ],
+        "test_points": [
+          [
+            -80.40694444444445,
+            37.98222222222222
+          ],
+          [
+            -80.40125,
+            37.958749999999995
+          ],
+          [
+            -80.42125,
+            37.95986111111111
+          ]
+        ],
+        "name": "Buckeye Creek Cave groundwater connection",
+        "evidence_kind": "mapped_trace",
+        "source_url": "https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/Groundwater/MapServer/3",
+        "trace_path": [
+          {
+            "feature_id": 36,
+            "source_basin": 86493,
+            "receiving_basin": 72911,
+            "sink": "Buckeye Creek Cave",
+            "resurgence": "Spencer Cave",
+            "reference": "Jones 1997",
+            "reference_location": "page 91 dye trace no 21",
+            "comment": "Buckeye is a walk-through cave"
+          }
+        ],
+        "citation": "WVDEP WV Sunken Streams public GIS; original references recorded for each trace; Jones (1997), pp. 84\u201393, for regional drainage.",
+        "downstream_route": "Buckeye Creek Cave \u2192 Spencer Cave \u2192 Greenbrier drainage \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "evidence": "Mapped trace endpoints intersect the listed source and receiving polygons. Shared terminal-node groups are kept together. The reviewed regional routes reach the Greenbrier/Mississippi system; this does not assert one intermediate spring or a surveyed underground divide for every surface catchment.",
+        "regional_reference": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
+      },
+      {
+        "source_basins": [
+          86463,
+          86502
+        ],
+        "target_basin": 72911,
+        "terminal_node": 8368624,
+        "modeled_sink": [
+          -80.49458333333337,
+          37.97152777777791
+        ],
+        "test_points": [
+          [
+            -80.50694444444444,
+            37.99180555555556
+          ],
+          [
+            -80.48625,
+            37.967638888888885
+          ]
+        ],
+        "name": "Vanishing Lake Water Sinks groundwater connection",
+        "evidence_kind": "mapped_trace",
+        "source_url": "https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/Groundwater/MapServer/3",
+        "trace_path": [
+          {
+            "feature_id": 189,
+            "source_basin": 86463,
+            "receiving_basin": 86409,
+            "sink": "Vanishing Lake Water Sinks",
+            "resurgence": "DePriest Box Spring",
+            "reference": "Dasher-Boyer 2000",
+            "reference_location": "VL to DB",
+            "comment": ""
+          },
+          {
+            "feature_id": 31,
+            "source_basin": 86528,
+            "receiving_basin": 72911,
+            "sink": "Culverson Creek Cave",
+            "resurgence": "Matts Black Cave",
+            "reference": "Jones 1997",
+            "reference_location": "page 91 dye trace no 12",
+            "comment": "There are five resurgences at or near Matts"
+          }
+        ],
+        "citation": "WVDEP WV Sunken Streams public GIS; original references recorded for each trace; Jones (1997), pp. 84\u201393, for regional drainage.",
+        "downstream_route": "Vanishing Lake Water Sinks \u2192 DePriest Box Spring; Culverson Creek Cave \u2192 Matts Black Cave \u2192 Greenbrier drainage \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "evidence": "Mapped trace endpoints intersect the listed source and receiving polygons. Shared terminal-node groups are kept together. The reviewed regional routes reach the Greenbrier/Mississippi system; this does not assert one intermediate spring or a surveyed underground divide for every surface catchment.",
+        "regional_reference": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
+      },
+      {
+        "source_basins": [
+          86524,
+          86572
+        ],
+        "target_basin": 72911,
+        "terminal_node": 8375837,
+        "modeled_sink": [
+          -80.35569444444451,
+          37.94597222222228
+        ],
+        "test_points": [
+          [
+            -80.36930555555556,
+            37.94388888888889
+          ],
+          [
+            -80.36402777777778,
+            37.92472222222222
+          ]
+        ],
+        "name": "The Hole (Boggs Hole) groundwater connection",
+        "evidence_kind": "mapped_trace",
+        "source_url": "https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/Groundwater/MapServer/3",
+        "trace_path": [
+          {
+            "feature_id": 32,
+            "source_basin": 86572,
+            "receiving_basin": 72911,
+            "sink": "The Hole (Boggs Hole)",
+            "resurgence": "Leggs Spring",
+            "reference": "Jones 1997",
+            "reference_location": "page 91 dye trace no 17",
+            "comment": ""
+          }
+        ],
+        "citation": "WVDEP WV Sunken Streams public GIS; original references recorded for each trace; Jones (1997), pp. 84\u201393, for regional drainage.",
+        "downstream_route": "The Hole (Boggs Hole) \u2192 Leggs Spring \u2192 Greenbrier drainage \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "evidence": "Mapped trace endpoints intersect the listed source and receiving polygons. Shared terminal-node groups are kept together. The reviewed regional routes reach the Greenbrier/Mississippi system; this does not assert one intermediate spring or a surveyed underground divide for every surface catchment.",
+        "regional_reference": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
+      },
+      {
         "source_basins": [
           86409,
           86528
         ],
         "target_basin": 72911,
+        "terminal_node": 8376700,
         "modeled_sink": [
-          -80.46319444444444,
-          37.93902777777778
+          -80.46319444444447,
+          37.93902777777794
         ],
-        "downstream_route": "Culverson Creek caves \u2192 springs on Spring Creek \u2192 Greenbrier \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
-        "source_url": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf",
-        "citation": "Jones, W. K. (1997), Karst Hydrology Atlas of West Virginia, Karst Waters Institute Special Publication 4, p. 90 and Greenbrier County tracer tables",
-        "evidence": "Dye traces connect Culverson Creek Cave to four resurgences on Spring Creek. Both source polygons terminate at the same modeled Culverson sink. This connection corrects ultimate basin membership; the surface polygons are not a surveyed groundwater divide.",
         "test_points": [
           [
-            -80.436944,
+            -80.43694444444445,
             38.00125
           ],
           [
-            -80.442083,
-            37.932778
+            -80.44208333333333,
+            37.93277777777777
           ]
-        ]
+        ],
+        "name": "Culverson Creek Cave groundwater connection",
+        "evidence_kind": "mapped_trace",
+        "source_url": "https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/Groundwater/MapServer/3",
+        "trace_path": [
+          {
+            "feature_id": 31,
+            "source_basin": 86528,
+            "receiving_basin": 72911,
+            "sink": "Culverson Creek Cave",
+            "resurgence": "Matts Black Cave",
+            "reference": "Jones 1997",
+            "reference_location": "page 91 dye trace no 12",
+            "comment": "There are five resurgences at or near Matts"
+          }
+        ],
+        "citation": "WVDEP WV Sunken Streams public GIS; original references recorded for each trace; Jones (1997), pp. 84\u201393, for regional drainage.",
+        "downstream_route": "Culverson Creek Cave \u2192 Matts Black Cave \u2192 Greenbrier drainage \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "evidence": "Mapped trace endpoints intersect the listed source and receiving polygons. Shared terminal-node groups are kept together. The reviewed regional routes reach the Greenbrier/Mississippi system; this does not assert one intermediate spring or a surveyed underground divide for every surface catchment.",
+        "regional_reference": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
+      },
+      {
+        "source_basins": [
+          86538,
+          86581
+        ],
+        "target_basin": 72911,
+        "terminal_node": 8386049,
+        "modeled_sink": [
+          -80.41624999999999,
+          37.90097222222238
+        ],
+        "test_points": [
+          [
+            -80.39666666666668,
+            37.92208333333333
+          ],
+          [
+            -80.43694444444445,
+            37.89819444444444
+          ]
+        ],
+        "name": "Higganbothams #4 Cave groundwater connection",
+        "evidence_kind": "mapped_trace",
+        "source_url": "https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/Groundwater/MapServer/3",
+        "trace_path": [
+          {
+            "feature_id": 54,
+            "source_basin": 86538,
+            "receiving_basin": 72911,
+            "sink": "Higganbothams #4 Cave",
+            "resurgence": "Davis Spring",
+            "reference": "Jones 1997",
+            "reference_location": "page 91 dye trace no 25",
+            "comment": ""
+          }
+        ],
+        "citation": "WVDEP WV Sunken Streams public GIS; original references recorded for each trace; Jones (1997), pp. 84\u201393, for regional drainage.",
+        "downstream_route": "Higganbothams #4 Cave \u2192 Davis Spring \u2192 Greenbrier drainage \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "evidence": "Mapped trace endpoints intersect the listed source and receiving polygons. Shared terminal-node groups are kept together. The reviewed regional routes reach the Greenbrier/Mississippi system; this does not assert one intermediate spring or a surveyed underground divide for every surface catchment.",
+        "regional_reference": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
+      },
+      {
+        "source_basins": [
+          86548,
+          86597,
+          86618
+        ],
+        "target_basin": 72911,
+        "terminal_node": 8389798,
+        "modeled_sink": [
+          -80.5193055555556,
+          37.885694444444596
+        ],
+        "test_points": [
+          [
+            -80.49388888888889,
+            37.91513888888889
+          ],
+          [
+            -80.50958333333334,
+            37.888194444444444
+          ],
+          [
+            -80.53277777777777,
+            37.875138888888884
+          ]
+        ],
+        "name": "Raders Valley groundwater connection",
+        "evidence_kind": "mapped_trace",
+        "source_url": "https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/Groundwater/MapServer/3",
+        "trace_path": [
+          {
+            "feature_id": 17,
+            "source_basin": 86597,
+            "receiving_basin": 72911,
+            "sink": "Raders Valley",
+            "resurgence": "Milligan Creek",
+            "reference": "Jones 1997",
+            "reference_location": "page 91 dye trace no 28",
+            "comment": ""
+          }
+        ],
+        "citation": "WVDEP WV Sunken Streams public GIS; original references recorded for each trace; Jones (1997), pp. 84\u201393, for regional drainage.",
+        "downstream_route": "Raders Valley \u2192 Milligan Creek \u2192 Greenbrier drainage \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "evidence": "Mapped trace endpoints intersect the listed source and receiving polygons. Shared terminal-node groups are kept together. The reviewed regional routes reach the Greenbrier/Mississippi system; this does not assert one intermediate spring or a surveyed underground divide for every surface catchment.",
+        "regional_reference": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
+      },
+      {
+        "source_basins": [
+          86592
+        ],
+        "target_basin": 72911,
+        "terminal_node": 8390317,
+        "modeled_sink": [
+          -80.40513888888887,
+          37.88958333333335
+        ],
+        "test_points": [
+          [
+            -80.39500000000001,
+            37.876666666666665
+          ]
+        ],
+        "name": "Luddington Cave groundwater connection",
+        "evidence_kind": "mapped_trace",
+        "source_url": "https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/Groundwater/MapServer/3",
+        "trace_path": [
+          {
+            "feature_id": 53,
+            "source_basin": 86592,
+            "receiving_basin": 72911,
+            "sink": "Luddington Cave",
+            "resurgence": "Davis Spring",
+            "reference": "Jones 1997",
+            "reference_location": "page 91 dye trace no 26",
+            "comment": ""
+          }
+        ],
+        "citation": "WVDEP WV Sunken Streams public GIS; original references recorded for each trace; Jones (1997), pp. 84\u201393, for regional drainage.",
+        "downstream_route": "Luddington Cave \u2192 Davis Spring \u2192 Greenbrier drainage \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "evidence": "Mapped trace endpoints intersect the listed source and receiving polygons. Shared terminal-node groups are kept together. The reviewed regional routes reach the Greenbrier/Mississippi system; this does not assert one intermediate spring or a surveyed underground divide for every surface catchment.",
+        "regional_reference": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
+      },
+      {
+        "source_basins": [
+          86521,
+          86629
+        ],
+        "target_basin": 72911,
+        "terminal_node": 8393908,
+        "modeled_sink": [
+          -80.56402777777782,
+          37.868750000000034
+        ],
+        "test_points": [
+          [
+            -80.55069444444445,
+            37.91763888888889
+          ],
+          [
+            -80.55763888888889,
+            37.863749999999996
+          ]
+        ],
+        "name": "Sinking Creek groundwater connection",
+        "evidence_kind": "mapped_trace",
+        "source_url": "https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/Groundwater/MapServer/3",
+        "trace_path": [
+          {
+            "feature_id": 14,
+            "source_basin": 86521,
+            "receiving_basin": 72911,
+            "sink": "Sinking Creek",
+            "resurgence": "Piercys Mill Cave",
+            "reference": "Jones 1997",
+            "reference_location": "page 92 dye trace no 2",
+            "comment": ""
+          }
+        ],
+        "citation": "WVDEP WV Sunken Streams public GIS; original references recorded for each trace; Jones (1997), pp. 84\u201393, for regional drainage.",
+        "downstream_route": "Sinking Creek \u2192 Piercys Mill Cave \u2192 Greenbrier drainage \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "evidence": "Mapped trace endpoints intersect the listed source and receiving polygons. Shared terminal-node groups are kept together. The reviewed regional routes reach the Greenbrier/Mississippi system; this does not assert one intermediate spring or a surveyed underground divide for every surface catchment.",
+        "regional_reference": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
+      },
+      {
+        "source_basins": [
+          86644,
+          86646
+        ],
+        "target_basin": 72911,
+        "terminal_node": 8400813,
+        "modeled_sink": [
+          -80.4401388888889,
+          37.841527777777856
+        ],
+        "test_points": [
+          [
+            -80.43916666666667,
+            37.84986111111111
+          ],
+          [
+            -80.44291666666666,
+            37.83958333333334
+          ]
+        ],
+        "name": "Lewisburg / Davis Spring regional drainage",
+        "evidence_kind": "documented_regional_drainage",
+        "source_url": "https://dep.wv.gov/WWE/Programs/nonptsource/WBP/Documents/WP/MilliganCreek_WBP.pdf",
+        "citation": "WVDEP Milligan Creek/Davis Spring Watershed Based Plan (March 2014), pp. 2\u20134; Jones (1997), pp. 90\u201391; WVDEP HUC 05050003 and 050500030903.",
+        "downstream_route": "Lewisburg/Davis Spring and adjacent Greenbrier drainage \u2192 Greenbrier \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "evidence": "The reviewed sinks lie in the official Milligan Creek\u2013Greenbrier River unit and the polygons lie wholly within the Greenbrier watershed. The plan and atlas document regional underground drainage toward Davis Spring/Greenbrier. This is regional primary-basin membership, not a claim of an individual dye trace from these modeled sink cells. A small eastern portion of source 86641 crosses the local HUC12 divide but remains in the Greenbrier system.",
+        "watershed_source_url": "https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/WV_Watersheds/MapServer",
+        "huc8": "05050003",
+        "huc12": "050500030903",
+        "regional_reference": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
+      },
+      {
+        "source_basins": [
+          86641
+        ],
+        "target_basin": 72911,
+        "terminal_node": 8403223,
+        "modeled_sink": [
+          -80.40902777777785,
+          37.832361111111254
+        ],
+        "test_points": [
+          [
+            -80.40986111111111,
+            37.83958333333334
+          ]
+        ],
+        "name": "Lewisburg / Davis Spring regional drainage",
+        "evidence_kind": "documented_regional_drainage",
+        "source_url": "https://dep.wv.gov/WWE/Programs/nonptsource/WBP/Documents/WP/MilliganCreek_WBP.pdf",
+        "citation": "WVDEP Milligan Creek/Davis Spring Watershed Based Plan (March 2014), pp. 2\u20134; Jones (1997), pp. 90\u201391; WVDEP HUC 05050003 and 050500030903.",
+        "downstream_route": "Lewisburg/Davis Spring and adjacent Greenbrier drainage \u2192 Greenbrier \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "evidence": "The reviewed sinks lie in the official Milligan Creek\u2013Greenbrier River unit and the polygons lie wholly within the Greenbrier watershed. The plan and atlas document regional underground drainage toward Davis Spring/Greenbrier. This is regional primary-basin membership, not a claim of an individual dye trace from these modeled sink cells. A small eastern portion of source 86641 crosses the local HUC12 divide but remains in the Greenbrier system.",
+        "watershed_source_url": "https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/WV_Watersheds/MapServer",
+        "huc8": "05050003",
+        "huc12": "050500030903",
+        "regional_reference": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
+      },
+      {
+        "source_basins": [
+          86690,
+          86694
+        ],
+        "target_basin": 72911,
+        "terminal_node": 8412671,
+        "modeled_sink": [
+          -80.46097222222221,
+          37.7940277777779
+        ],
+        "test_points": [
+          [
+            -80.4376388888889,
+            37.80819444444444
+          ],
+          [
+            -80.4673611111111,
+            37.78736111111111
+          ]
+        ],
+        "name": "Lewisburg Sink groundwater connection",
+        "evidence_kind": "mapped_trace",
+        "source_url": "https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/Groundwater/MapServer/3",
+        "trace_path": [
+          {
+            "feature_id": 6,
+            "source_basin": 86690,
+            "receiving_basin": 72911,
+            "sink": "Lewisburg Sink",
+            "resurgence": "Davis Spring",
+            "reference": "Jones 1997",
+            "reference_location": "page 91 dye trace no 27",
+            "comment": ""
+          }
+        ],
+        "citation": "WVDEP WV Sunken Streams public GIS; original references recorded for each trace; Jones (1997), pp. 84\u201393, for regional drainage.",
+        "downstream_route": "Lewisburg Sink \u2192 Davis Spring \u2192 Greenbrier drainage \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "evidence": "Mapped trace endpoints intersect the listed source and receiving polygons. Shared terminal-node groups are kept together. The reviewed regional routes reach the Greenbrier/Mississippi system; this does not assert one intermediate spring or a surveyed underground divide for every surface catchment.",
+        "regional_reference": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
+      },
+      {
+        "source_basins": [
+          86806,
+          86817
+        ],
+        "target_basin": 72911,
+        "terminal_node": 8440158,
+        "modeled_sink": [
+          -80.51736111111114,
+          37.68319444444444
+        ],
+        "test_points": [
+          [
+            -80.51888888888888,
+            37.67777777777778
+          ],
+          [
+            -80.53138888888888,
+            37.67055555555555
+          ]
+        ],
+        "name": "Marcus Wiley Cave groundwater connection",
+        "evidence_kind": "mapped_trace",
+        "source_url": "https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/Groundwater/MapServer/3",
+        "trace_path": [
+          {
+            "feature_id": 124,
+            "source_basin": 86817,
+            "receiving_basin": 72911,
+            "sink": "Marcus Wiley Cave",
+            "resurgence": "Mystic River in Scott Hollow Cave",
+            "reference": "Jones 1997",
+            "reference_location": "page 93 dye trace no 7",
+            "comment": "These springs are in the Greenbrier River"
+          }
+        ],
+        "citation": "WVDEP WV Sunken Streams public GIS; original references recorded for each trace; Jones (1997), pp. 84\u201393, for regional drainage.",
+        "downstream_route": "Marcus Wiley Cave \u2192 Mystic River in Scott Hollow Cave \u2192 Greenbrier drainage \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "evidence": "Mapped trace endpoints intersect the listed source and receiving polygons. Shared terminal-node groups are kept together. The reviewed regional routes reach the Greenbrier/Mississippi system; this does not assert one intermediate spring or a surveyed underground divide for every surface catchment.",
+        "regional_reference": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
+      },
+      {
+        "source_basins": [
+          86815
+        ],
+        "target_basin": 72911,
+        "terminal_node": 8441994,
+        "modeled_sink": [
+          -80.49597222222224,
+          37.68625000000003
+        ],
+        "test_points": [
+          [
+            -80.49722222222222,
+            37.67541666666666
+          ]
+        ],
+        "name": "Bailey Sinkhole groundwater connection",
+        "evidence_kind": "mapped_trace",
+        "source_url": "https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/Groundwater/MapServer/3",
+        "trace_path": [
+          {
+            "feature_id": 282,
+            "source_basin": 86815,
+            "receiving_basin": 72911,
+            "sink": "Bailey Sinkhole",
+            "resurgence": "Dickson Spring",
+            "reference": "George Dasher 2010",
+            "reference_location": "West Virginia CaverV28n4",
+            "comment": ""
+          }
+        ],
+        "citation": "WVDEP WV Sunken Streams public GIS; original references recorded for each trace; Jones (1997), pp. 84\u201393, for regional drainage.",
+        "downstream_route": "Bailey Sinkhole \u2192 Dickson Spring \u2192 Greenbrier drainage \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "evidence": "Mapped trace endpoints intersect the listed source and receiving polygons. Shared terminal-node groups are kept together. The reviewed regional routes reach the Greenbrier/Mississippi system; this does not assert one intermediate spring or a surveyed underground divide for every surface catchment.",
+        "regional_reference": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
+      },
+      {
+        "source_basins": [
+          86834,
+          86840,
+          86849
+        ],
+        "target_basin": 72911,
+        "terminal_node": 8447260,
+        "modeled_sink": [
+          -80.51263888888889,
+          37.65263888888899
+        ],
+        "test_points": [
+          [
+            -80.49180555555554,
+            37.64736111111111
+          ],
+          [
+            -80.54236111111112,
+            37.64819444444444
+          ],
+          [
+            -80.49638888888889,
+            37.630972222222226
+          ]
+        ],
+        "name": "Kessell Dig groundwater connection",
+        "evidence_kind": "mapped_trace",
+        "source_url": "https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/Groundwater/MapServer/3",
+        "trace_path": [
+          {
+            "feature_id": 222,
+            "source_basin": 86849,
+            "receiving_basin": 72911,
+            "sink": "Kessell Dig",
+            "resurgence": "Dickson Spring",
+            "reference": "George Dasher 2009",
+            "reference_location": " ",
+            "comment": ""
+          }
+        ],
+        "citation": "WVDEP WV Sunken Streams public GIS; original references recorded for each trace; Jones (1997), pp. 84\u201393, for regional drainage.",
+        "downstream_route": "Kessell Dig \u2192 Dickson Spring \u2192 Greenbrier drainage \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "evidence": "Mapped trace endpoints intersect the listed source and receiving polygons. Shared terminal-node groups are kept together. The reviewed regional routes reach the Greenbrier/Mississippi system; this does not assert one intermediate spring or a surveyed underground divide for every surface catchment.",
+        "regional_reference": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
+      },
+      {
+        "source_basins": [
+          86841
+        ],
+        "target_basin": 72911,
+        "terminal_node": 8447918,
+        "modeled_sink": [
+          -80.47069444444435,
+          37.66180555555559
+        ],
+        "test_points": [
+          [
+            -80.47777777777777,
+            37.65222222222222
+          ]
+        ],
+        "name": "Monitor Sinkhole groundwater connection",
+        "evidence_kind": "mapped_trace",
+        "source_url": "https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/Groundwater/MapServer/3",
+        "trace_path": [
+          {
+            "feature_id": 286,
+            "source_basin": 86841,
+            "receiving_basin": 72911,
+            "sink": "Monitor Sinkhole",
+            "resurgence": "Mud River",
+            "reference": "George Dasher",
+            "reference_location": "West Virginia Caver V26n4",
+            "comment": "This water may stay above the Taggard shales"
+          }
+        ],
+        "citation": "WVDEP WV Sunken Streams public GIS; original references recorded for each trace; Jones (1997), pp. 84\u201393, for regional drainage.",
+        "downstream_route": "Monitor Sinkhole \u2192 Mud River \u2192 Greenbrier drainage \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "evidence": "Mapped trace endpoints intersect the listed source and receiving polygons. Shared terminal-node groups are kept together. The reviewed regional routes reach the Greenbrier/Mississippi system; this does not assert one intermediate spring or a surveyed underground divide for every surface catchment.",
+        "regional_reference": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
       }
     ]
   },
@@ -63,30 +740,30 @@
   },
   "outlet_classification": {
     "ocean": 103348,
-    "unresolved_sink": 2226
+    "unresolved_sink": 2210
   },
   "file": "north-america-primary-watersheds.pmtiles",
-  "bytes": 290728946,
+  "bytes": 290688305,
   "maximum_zoom": 10,
   "maximum_zoom_extent": 16384,
   "maximum_zoom_simplification": false,
   "maximum_grid_quantization_error_m": 1.6890356573363923,
-  "sha256": "acfc4a217d7990d5b4daa714cbf64ba36678feb6ae228f9b24609221746dbd9e",
+  "sha256": "18d04a3250b409510c6b726014b64a974dc0642543907eff704bc14b165a8cc0",
   "parts": [
     {
-      "file": "north-america-primary-watersheds-acfc4a217d79.000.bin",
+      "file": "north-america-primary-watersheds-18d04a3250b4.000.bin",
       "bytes": 99614720,
-      "sha256": "79738701bdb3fca65841331fcee46dbb52885fd61f67f718d05c50a9fedf51dc"
+      "sha256": "fc797b78d548bd60bd99aa9546712e48cdcd76a2c7bc64ed1c28f090b5633d9a"
     },
     {
-      "file": "north-america-primary-watersheds-acfc4a217d79.001.bin",
+      "file": "north-america-primary-watersheds-18d04a3250b4.001.bin",
       "bytes": 99614720,
-      "sha256": "b3188b6f11531df4c536e7fa679604a121ce025720b577caf8773d3c0185fe0b"
+      "sha256": "74fb7117534ac85d5d19f7c4bbce3b7b1a5a9c54694320afc9aee2fa8643b311"
     },
     {
-      "file": "north-america-primary-watersheds-acfc4a217d79.002.bin",
-      "bytes": 91499506,
-      "sha256": "20b4a10e53e49995a20495e6b1f05005ec171396eb81cdbf4fa4277204a7ce62"
+      "file": "north-america-primary-watersheds-18d04a3250b4.002.bin",
+      "bytes": 91458865,
+      "sha256": "a258d2c01af49775fbb445d399bbbbfb639f18499c4e972fafae8e850b7d2496"
     }
   ]
 }

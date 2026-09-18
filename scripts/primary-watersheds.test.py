@@ -73,6 +73,8 @@ class PrimaryWatersheds(unittest.TestCase):
                 corrections.prepare(source, {2: (1.01, 1)}, {1: 'ocean', 2: 'inland'}, {'connections': [link]})
             with self.assertRaisesRegex(AssertionError, 'assigned twice'):
                 corrections.prepare(source, {2: (1, 1)}, {1: 'ocean', 2: 'inland'}, {'connections': [link, link]})
+            with self.assertRaisesRegex(AssertionError, 'terminal node has changed'):
+                corrections.prepare(source, {1: (0, 0), 2: (1, 1)}, {1: 'ocean', 2: 'inland'}, {'connections': [{**link, 'terminal_node': 999}]}, {1: 100, 2: 200})
 
     def test_shared_nodes_merge_and_equal_coordinates_alone_do_not(self):
         nodes = {10: 100, 11: 100, 12: 101}
