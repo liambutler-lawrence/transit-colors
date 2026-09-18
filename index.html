@@ -711,15 +711,20 @@
                 Retry boundaries
               </button>
               <p id="watershed-terrain-status" class="method-note" role="status"></p>
+              <div
+                id="watershed-exit-key"
+                class="watershed-exit-key"
+                aria-label="Receiving body colors"
+              ></div>
               <div class="watershed-key">
                 <span class="watershed-boundary-key"></span>Basin boundary
                 <span class="watershed-selected-key"></span>Selected basin
                 <span class="watershed-outlet-key"></span>Terminal outlet
               </div>
               <p class="method-note">
-                Colors help distinguish basins; they do not indicate elevation or water
-                quality. Gray indicates unresolved drainage. Outlines include
-                coastlines.
+                Colors show the receiving sea or ocean. Smaller bays and estuaries use
+                their larger receiving body’s color. Gray indicates unresolved drainage.
+                Outlines mark individual basins and include coastlines.
               </p>
             </section>
             <section class="sidebar-section selected-section">
@@ -763,10 +768,12 @@
                 modeled drainage endpoint, not necessarily the deepest point of a lake.
               </p>
               <p class="method-note">
-                Boundaries use HydroSHEDS v2 BAS beta’s 1 arc-second grid (about 30 m).
-                Zoom in for full detail. Source resolution is not positional accuracy: a
-                boundary within 100 m of the true divide everywhere is not verified.
-                Terrain shading is a separate visual reference.
+                Receiving bodies use generalized Natural Earth marine areas; colors do
+                not change basin boundaries. Boundaries use HydroSHEDS v2 BAS beta’s 1
+                arc-second grid (about 30 m). Zoom in for full detail. Source resolution
+                is not positional accuracy: a boundary within 100 m of the true divide
+                everywhere is not verified. Terrain shading is a separate visual
+                reference.
               </p>
               <p class="method-note">
                 North and Central America and the Caribbean are covered. Greenland is
@@ -786,7 +793,14 @@
                   target="_blank"
                   rel="noreferrer"
                   >Methods and limitations</a
-                >. Underground connections:
+                >. Receiving bodies:
+                <a
+                  href="https://www.naturalearthdata.com/downloads/10m-physical-vectors/"
+                  target="_blank"
+                  rel="noreferrer"
+                  >Natural Earth</a
+                >
+                (public domain). Underground connections:
                 <a
                   href="https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
                   target="_blank"
