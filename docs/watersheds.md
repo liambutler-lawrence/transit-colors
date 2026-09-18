@@ -173,3 +173,20 @@ storage only, without dropping basins or changing geometry.
 Tests verify reads crossing part boundaries, cancellation, truncated responses, all part
 hashes, and the hash of the reassembled archive. The production build includes only the
 current manifest’s parts.
+
+### Receiving-body colors
+
+`north-america-watersheds-exit-bodies.json` assigns every verified ocean-draining
+primary basin a named receiving sea or ocean. The fill and selected-basin details use
+the same lookup; neighboring basins remain distinct even when colors match. This
+separate lookup avoids rebuilding or simplifying the detailed boundaries for a
+cartographic change. Unknown and unresolved drainage stays gray.
+
+Run `scripts/build-watershed-exit-bodies.py` with the watershed Python environment and
+cached verified outlets to regenerate it. The script uses the vendored Natural Earth
+1:10m marine areas from release v5.1.2 (public domain), selecting the smallest covering
+marine polygon, or the nearest polygon for generalized coastline gaps. Explicit rollups
+group smaller bays, estuaries and channels into regional receiving bodies. Hudson Bay
+includes James Bay, Foxe Basin and Hudson Strait; Gulf of St. Lawrence includes the St.
+Lawrence estuary. These are generalized cartographic categories, not surveyed marine
+limits or changes to hydrologic routing.

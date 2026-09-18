@@ -1894,3 +1894,25 @@ body {
     grid-column: 1 / -1;
   }
 }
+
+.watershed-exit-key {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 7px 12px;
+  margin: 14px 0;
+  font-size: 11px;
+  color: var(--muted);
+}
+
+.watershed-exit-key > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.watershed-exit-key i {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 12px;
+  border-radius: 3px;
+}

@@ -2,6 +2,12 @@ import { GeoJSONSource, VectorTileSource } from 'maplibre-gl';
 import { FetchSource, PMTiles } from 'pmtiles';
 import watershedData from '../../data/north-america-watersheds-summary.json';
 import { MultipartPMTilesSource } from '../multipart-pmtiles.js';
+import {
+  watershedExitBodies,
+  watershedExitBody,
+  watershedFillColor,
+  unresolvedWatershedColor,
+} from '../watershed-colors.js';
 import { watershedDrainageLabel, watershedPropertiesSchema } from '../watersheds.js';
 import {
   compactPanelQuery,
@@ -88,27 +94,7 @@ function installBasins(): void {
       'source-layer': 'basins',
       layout: { visibility: 'none' },
       paint: {
-        'fill-color': [
-          'match',
-          ['case', ['==', ['get', 'drainage'], 'ocean'], ['get', 'color'], -1],
-          -1,
-          '#8c9693',
-          0,
-          '#2c8b83',
-          1,
-          '#6c8cbe',
-          2,
-          '#cfad64',
-          3,
-          '#b77c98',
-          4,
-          '#8fa961',
-          5,
-          '#ad8660',
-          6,
-          '#7d83b9',
-          '#5babc0',
-        ],
+        'fill-color': watershedFillColor(),
         'fill-opacity': 0.25,
       },
     },
@@ -165,6 +151,7 @@ function installBasins(): void {
       `${value.toLocaleString(undefined, { maximumFractionDigits: 1 })} km²`;
     replaceMetadata(requiredElement('#watershed-metadata', HTMLElement), [
       { label: 'Drainage', value: watershedDrainageLabel(basin.drainage) },
+      { label: 'Receiving body', value: watershedExitBody(basin.id, basin.drainage) },
       ...(basin.karst_connections
         ? [
             {
@@ -247,6 +234,18 @@ export function focusWatersheds(): void {
 export function installWatersheds(): void {
   if (installed) return;
   installed = true;
+  const legend = requiredElement('#watershed-exit-key', HTMLElement);
+  for (const body of [
+    ...watershedExitBodies,
+    { name: 'Unresolved', color: unresolvedWatershedColor },
+  ]) {
+    const item = document.createElement('span');
+    const swatch = document.createElement('i');
+    swatch.style.backgroundColor = body.color;
+    swatch.setAttribute('aria-hidden', 'true');
+    item.append(swatch, body.name);
+    legend.append(item);
+  }
   map.addSource('watershed-dem', {
     type: 'raster-dem',
     encoding: 'terrarium',

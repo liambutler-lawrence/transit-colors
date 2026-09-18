@@ -7,6 +7,9 @@ All notable changes to this project will be documented here. The format follows
 
 ### Added
 
+- Color watersheds by their receiving sea or ocean, with a named legend and
+  receiving-body details.
+
 - Added a North America Watersheds mode with optional terrain shading, basin colors, and
   basin inspection.
 
