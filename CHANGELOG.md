@@ -16,6 +16,12 @@ All notable changes to this project will be documented here. The format follows
 
 ### Fixed
 
+- Dissolved watershed polygons sharing the exact same terminal node across North
+  America. The eleven Baja source basins now form four basins; internal outlines and
+  overlapping upstream-area totals no longer inflate the displayed groups. Basin details
+  now identify the terminal node, and the marker is explained as a modeled endpoint
+  rather than a lake’s deepest point.
+
 - Joined the two Culverson Creek surface basins to the Mississippi using documented
   underground drainage, removing their internal outlines. Surface sinks without reviewed
   connections now say “Underground drainage unresolved” instead of claiming no ocean

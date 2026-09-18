@@ -117,7 +117,10 @@ test('surface sinks never claim verified endorheic drainage', () => {
 test('primary watershed archive uses the finer source and records its limits', async () => {
   const manifest = await json('north-america-watersheds-summary.json');
   assert.equal(manifest.resolution_arc_seconds, 1);
-  assert.equal(manifest.count, 108639);
+  assert.equal(manifest.count, 105574);
+  assert.equal(manifest.source_terminal_nodes, 105575);
+  assert.equal(manifest.shared_terminal_groups, 2034);
+  assert.equal(manifest.unique_displayed_terminal_nodes, manifest.count);
   assert.equal(manifest.source_primary_basins, 108641);
   assert.deepEqual(
     manifest.groundwater_corrections,
@@ -270,5 +273,44 @@ test('documented Culverson groundwater drainage joins Mississippi; other sinks r
         }
       }
     }
+  });
+});
+
+test('eleven Baja source polygons become four basins with unique terminal nodes', async () => {
+  const fixture = await json('north-america-watersheds-terminal-fixtures.json');
+  assert.deepEqual(
+    fixture.groups.map((group) => group.members.length).sort(),
+    [2, 3, 3, 3],
+  );
+  await withArchive(async (archive) => {
+    const ids = new Set();
+    const nodes = new Set();
+    for (const group of fixture.groups) {
+      for (const member of group.members) {
+        const basin = await basinAt(archive, member.coordinate);
+        assert.equal(basin.id, group.id);
+        assert.equal(basin.terminal_node, group.node);
+        assert.equal(basin.source_basins, group.members.length);
+        assert.equal(basin.catchments, group.catchments);
+        assert.equal(basin.drainage, 'unresolved_sink');
+        assert.equal(basin.karst_connections, undefined);
+        // Upstream totals for different terminal reaches overlap; they must not be summed.
+        assert.ok(Math.abs(basin.area_km2 - group.expected_area_km2) < 0.1);
+        ids.add(basin.id);
+        nodes.add(basin.terminal_node);
+        const { layer } = await tileAt(archive, member.coordinate);
+        for (let i = 0; i < layer.length; i++) {
+          const properties = layer.feature(i).properties;
+          if (properties.terminal_node === group.node)
+            assert.equal(properties.id, group.id);
+          assert.ok(
+            !group.members.some((m) => m.id !== group.id && m.id === properties.id),
+            'No old sub-basin outline survives',
+          );
+        }
+      }
+    }
+    assert.equal(ids.size, 4);
+    assert.equal(nodes.size, 4);
   });
 });

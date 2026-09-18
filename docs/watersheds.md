@@ -1,10 +1,11 @@
 # North America primary watersheds
 
-Open `?product=watersheds`. Each polygon joins the catchments belonging to one complete
-drainage system. The Mississippi, Missouri, Ohio, and their tributaries share one
-polygon; tributary boundaries are removed. Click a basin to inspect its area, the number
-of joined catchments, and its terminal stream. **View terminal outlet** takes you to the
-orange outlet marker. Selection also works with colors off.
+Open `?product=watersheds`. Each polygon joins catchments sharing one terminal node,
+with reviewed groundwater connections applied afterward. The Mississippi, Missouri,
+Ohio, and their tributaries share one polygon; tributary boundaries are removed. Click a
+basin to inspect its area, the number of joined catchments, and its terminal stream.
+**View terminal outlet** takes you to the orange outlet marker. Selection also works
+with colors off.
 
 ## Scope and accuracy
 
@@ -72,6 +73,25 @@ terminal cell within land is a modeled surface sink (the intermediate cache call
 unresolved traces remain unverified. That classification alone does not alter boundaries
 or establish groundwater routing.
 
+### Shared terminal nodes
+
+`MAIN_BAS` alone is insufficient: different terminal river reaches can have different
+basin IDs but end at the same `NODE_ID_DOWN`. The tiler groups by that verified node ID,
+requires exact coordinate and drainage-class agreement, and dissolves each group on the
+original lattice. It never groups nearby points or merely matching rounded coordinates.
+The smallest source basin ID identifies the combined basin; source catchment counts are
+summed once. The UI shows the terminal node ID and number of joined source basins.
+
+There are 2,034 shared terminal-node groups in this release, all surface sinks. Their
+upstream reach-area fields can overlap, so combined areas are recalculated from the
+disjoint polygons in EPSG:6933 instead of summing those fields. The outlet marker
+denotes a modeled endpoint, not a surveyed lake-bottom minimum.
+
+In the Baja regression area, source groups `[92273, 92400, 92434]`,
+`[92242, 92408, 92399]`, `[92450, 92412]`, and `[92352, 92568, 92477]` become four
+basins at four terminal nodes. Their former internal outlines disappear. This fixes
+grouping, without asserting that the surface sinks have no underground drainage.
+
 ### Reviewed groundwater connections
 
 `data/north-america-watersheds-corrections.json` records source basin IDs, the expected
@@ -93,10 +113,11 @@ added to the receiving basin's source area. This is an area estimate, not a surv
 groundwater boundary. Nearby sinks are not merged merely because they are surrounded by
 Mississippi drainage; each needs a documented, matched connection.
 
-This reduces 108,641 source basins to 108,639 displayed basins, preserving all
-11,558,529 routed catchments. There are 103,348 modeled ocean-draining basins and 5,291
-unresolved surface sinks. Higher-resolution topography cannot by itself resolve karst
-drainage.
+Shared-node grouping reduces 108,641 source basins to 105,575 terminal groups. The
+Culverson correction joins one of those groups to the Mississippi, yielding 105,574
+displayed basins and preserving all 11,558,529 routed catchments. There are 103,348
+modeled ocean-draining basins and 2,226 unresolved surface sinks. Higher-resolution
+topography cannot by itself resolve karst drainage.
 
 Mapzen/Tilezen Terrarium tiles provide optional hillshade. They are a separate visual
 reference, not the DEM used to delineate these basins. Failure of terrain requests does
@@ -131,13 +152,14 @@ results, source hashes, and final tile archive hash.
 
 `python scripts/primary-watersheds.test.py` exercises tributary dissolution, coastal
 composite exclusion, source-lattice validation, and ocean/inland/ambiguous D8 cases and
-groundwater union/area conservation without network access. `npm run check` additionally
-verifies the shipped archive, checks that five Mississippi tributary locations share one
-primary basin, separates neighboring major systems, keeps unreviewed sinks unresolved,
-verifies both Culverson source polygons now select the Mississippi outlet with no
-separate sink features, and compares 64 full-detail tile boundary points with their
-pre-tiling source coordinates. Those sampled comparisons validate display fidelity, not
-absolute terrain accuracy.
+groundwater union/area conservation and exact-node grouping without network access.
+`npm run check` additionally verifies all eleven Baja source polygons map to four unique
+terminal nodes, verifies the shipped archive, checks that five Mississippi tributary
+locations share one primary basin, separates neighboring major systems, keeps unreviewed
+sinks unresolved, verifies both Culverson source polygons now select the Mississippi
+outlet with no separate sink features, and compares 64 full-detail tile boundary points
+with their pre-tiling source coordinates. Those sampled comparisons validate display
+fidelity, not absolute terrain accuracy.
 
 ## Static hosting
 

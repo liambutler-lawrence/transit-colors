@@ -179,7 +179,8 @@ function installBasins(): void {
         label: 'Terminal outlet',
         value: `${basin.outlet_lat.toFixed(5)}°, ${basin.outlet_lon.toFixed(5)}°`,
       },
-      { label: 'Outlet stream ID', value: basin.outlet_stream },
+      { label: 'Terminal node ID', value: basin.terminal_node },
+      { label: 'Joined source basins', value: basin.source_basins },
       { label: 'Boundary source', value: 'HydroSHEDS v2 · 1 arc-second (~30 m)' },
       { label: 'Accuracy', value: '100 m everywhere is not verified' },
     ]);

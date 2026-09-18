@@ -2,6 +2,8 @@ import { z } from 'zod';
 
 export const watershedPropertiesSchema = z.object({
   id: z.number().int().positive(),
+  terminal_node: z.number().int().positive(),
+  source_basins: z.number().int().positive(),
   outlet_stream: z.number().int().positive(),
   area_km2: z.number().nonnegative(),
   catchments: z.number().int().positive(),
