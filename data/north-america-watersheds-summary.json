@@ -1,73 +1,55 @@
 {
-  "dataset": "HydroBASINS v1c, standard polygons",
-  "source": "https://www.hydrosheds.org/products/hydrobasins",
-  "citation": "Lehner, B., Grill G. (2013), Hydrological Processes 27(15): 2171\u20132186",
-  "resolution_arc_seconds": 15,
-  "regions": [
-    "na",
-    "ar",
-    "gr"
-  ],
-  "levels": {
-    "4": {
-      "count": 290,
-      "area_km2": 24375432.4,
-      "archives": [
-        {
-          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_na_lev04_v1c.zip",
-          "sha256": "071aaed3095c3459bf95dbf77f299d3ea42c811cf222e3c72413dc293a8fbe57"
-        },
-        {
-          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_ar_lev04_v1c.zip",
-          "sha256": "b2e1c46b1391ed7acf9b1b3ad448c6334548df6d13ca0e860c34a39dead16878"
-        },
-        {
-          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_gr_lev04_v1c.zip",
-          "sha256": "e5d1ea6b1e499556b9d49f89cd6612074ceab236769662073d922708ef4afb9e"
-        }
-      ],
-      "file": "north-america-watersheds-4.pmtiles",
-      "bytes": 15440178
+  "dataset": "HydroSHEDS v2.0, North America BAS beta and RIV",
+  "resolution_arc_seconds": 1,
+  "count": 108641,
+  "routed_catchments": 11558529,
+  "unresolved_coastal_units": 349737,
+  "source": "https://www.hydrosheds.org/hydrosheds-v2",
+  "single_terminal_outlet_verified": true,
+  "accuracy_guarantee_m": null,
+  "unresolved_coastal_area_km2": 179886.3957173669,
+  "routed_area_km2": 22674430.041545033,
+  "archives": {
+    "BAS": {
+      "url": "https://data.hydrosheds.org/file/hydrosheds-v2/BAS/1s/north-america_BAS_1s_v2r0.gdb.zip",
+      "sha256": "97f7d16a1a3cd026d586a42efd46bfae395c185d974cd8f176217a8f224dbc6e"
     },
-    "6": {
-      "count": 3194,
-      "area_km2": 24375431.5,
-      "archives": [
-        {
-          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_na_lev06_v1c.zip",
-          "sha256": "6d8e7d8820f5db7c42b4bae5af832265f757b224bce0f705212887b1c12e6d5f"
-        },
-        {
-          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_ar_lev06_v1c.zip",
-          "sha256": "969e25aa2a62cdf3121badcdfcb04701b755a5d79d69fa07b1ebc5e5e01d1358"
-        },
-        {
-          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_gr_lev06_v1c.zip",
-          "sha256": "4c8119b4a1135df6f9a4a7bfe2a569497c249cb51fd3bec256105b7114f53f34"
-        }
-      ],
-      "file": "north-america-watersheds-6.pmtiles",
-      "bytes": 32421253
-    },
-    "8": {
-      "count": 37800,
-      "area_km2": 24375433.0,
-      "archives": [
-        {
-          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_na_lev08_v1c.zip",
-          "sha256": "3f8a2135b98e271245d82e02ab66e48a54fcfd7d826e2e6249c78c1cc38b1886"
-        },
-        {
-          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_ar_lev08_v1c.zip",
-          "sha256": "28613fd7e9c00d950d3d3cf1217a392dc7ae98220c825227a96ff1296e77f60b"
-        },
-        {
-          "url": "https://data.hydrosheds.org/file/hydrobasins/standard/hybas_gr_lev08_v1c.zip",
-          "sha256": "a85562f544283b7fe01279532c866b16d129034f689a5da62efda6f00fa1925a"
-        }
-      ],
-      "file": "north-america-watersheds-8.pmtiles",
-      "bytes": 90397965
+    "RIV": {
+      "url": "https://data.hydrosheds.org/file/hydrosheds-v2/RIV/1s/north-america_RIV_1s_v2r0.gdb.zip",
+      "sha256": "48447b706795eb0fa7f83d93479ff7dd570a3353f41a86dfc95d34d040e2bde9"
     }
-  }
+  },
+  "terminal_coordinates_verified": true,
+  "direction_raster": {
+    "url": "https://data.hydrosheds.org/file/hydrosheds-v2/DIR/1s/north-america_DIR_1s_v2r0.tif",
+    "access": "Full-resolution block range reads; full-file hash not computed"
+  },
+  "outlet_classification": {
+    "inland": 5293,
+    "ocean": 103348
+  },
+  "file": "north-america-primary-watersheds.pmtiles",
+  "bytes": 285669607,
+  "maximum_zoom": 10,
+  "maximum_zoom_extent": 16384,
+  "maximum_zoom_simplification": false,
+  "maximum_grid_quantization_error_m": 1.6890356573363923,
+  "sha256": "730217a382e88e3a3d3434b1f86b23999387e0da353bd389ef07cc56f50b8b55",
+  "parts": [
+    {
+      "file": "north-america-primary-watersheds-730217a382e8.000.bin",
+      "bytes": 99614720,
+      "sha256": "63bac4ccb191394110128af5ce1d9ab730d258c53954f8f2fe5aef98716cca3a"
+    },
+    {
+      "file": "north-america-primary-watersheds-730217a382e8.001.bin",
+      "bytes": 99614720,
+      "sha256": "06dbb7d27b5aa746b5fe8546e1c6679ae8907b3a4e046bab039d1cfda9a0986c"
+    },
+    {
+      "file": "north-america-primary-watersheds-730217a382e8.002.bin",
+      "bytes": 86440167,
+      "sha256": "7d1eb7f0d136baf5b93ec842e50c372cb936ee0d0a8bfab0abcc828addf88076"
+    }
+  ]
 }

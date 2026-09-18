@@ -1,97 +1,236 @@
 import assert from 'node:assert/strict';
+import { createHash } from 'node:crypto';
+import { createReadStream } from 'node:fs';
 import { open, readFile, stat } from 'node:fs/promises';
 import test from 'node:test';
 import { VectorTile } from '@mapbox/vector-tile';
 import Pbf from 'pbf';
 import { PMTiles } from 'pmtiles';
-import {
-  WATERSHED_LEVELS,
-  watershedDrainageLabel,
-  watershedLevel,
-  watershedPropertiesSchema,
-} from './watersheds.ts';
+import { MultipartPMTilesSource } from './multipart-pmtiles.ts';
+import { watershedDrainageLabel, watershedPropertiesSchema } from './watersheds.ts';
 
-test('invalid detail links fall back to regional basins; inland sinks are not coastal outlets', () => {
-  for (const value of [null, '', '12', 'constructor'])
-    assert.equal(watershedLevel(value), 6);
-  assert.equal(watershedLevel('4'), 4);
-  assert.equal(watershedLevel('8'), 8);
-  assert.match(watershedDrainageLabel(2, 0), /Inland sink/);
-  assert.match(watershedDrainageLabel(1, 0), /inland-draining/);
-  assert.match(watershedDrainageLabel(0, 1), /coastal/);
-});
+const data = (name) => new URL(`../data/${name}`, import.meta.url);
+const json = async (name) => JSON.parse(await readFile(data(name), 'utf8'));
 
-test('shipped watershed hierarchy covers America, Arctic Canada, and Greenland at every level', async () => {
-  const manifest = JSON.parse(
-    await readFile(
-      new URL('../data/north-america-watersheds-summary.json', import.meta.url),
-      'utf8',
-    ),
-  );
-  let previousCount = 0;
-  for (const level of WATERSHED_LEVELS) {
-    const summary = manifest.levels[level];
-    assert.ok(summary.count > previousCount);
-    previousCount = summary.count;
-    assert.ok(
-      Math.abs(summary.area_km2 - manifest.levels[4].area_km2) < 100,
-      'Subdividing basins preserves total coverage',
-    );
-    const file = new URL(
-      `../data/north-america-watersheds-${level}.pmtiles`,
-      import.meta.url,
-    );
-    assert.equal((await stat(file)).size, summary.bytes);
-    assert.ok(summary.bytes < 100 * 1024 * 1024);
-    const handle = await open(file);
-    try {
-      const archive = new PMTiles({
-        getKey: () => `watersheds-test-${level}`,
-        getBytes: async (offset, length) => {
-          const buffer = Buffer.alloc(length);
-          const { bytesRead } = await handle.read(buffer, 0, length, offset);
-          return {
-            data: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + bytesRead),
-          };
+async function withArchive(callback) {
+  const manifest = await json('north-america-watersheds-summary.json');
+  const handles = [];
+  try {
+    const parts = [];
+    for (const part of manifest.parts) {
+      const handle = await open(data(part.file));
+      handles.push(handle);
+      parts.push({
+        bytes: part.bytes,
+        source: {
+          getKey: () => part.file,
+          getBytes: async (offset, length) => {
+            const buffer = Buffer.alloc(length);
+            const { bytesRead } = await handle.read(buffer, 0, length, offset);
+            return {
+              data: buffer.buffer.slice(
+                buffer.byteOffset,
+                buffer.byteOffset + bytesRead,
+              ),
+            };
+          },
         },
       });
-      const root = await archive.getZxy(0, 0, 0);
-      assert.ok(root, 'Continental overview tile exists');
-      const layer = new VectorTile(new Pbf(root.data)).layers['basins'];
-      const regions = new Set();
-      for (let index = 0; index < layer.length; index++) {
-        const basin = watershedPropertiesSchema.parse(layer.feature(index).properties);
-        assert.equal(basin.level, level);
-        regions.add(basin.region);
-      }
-      assert.deepEqual([...regions].sort(), ['ar', 'gr', 'na']);
-      // Exercise full-detail tiles near Mexico, the US, Canada, Alaska,
-      // Central America, the Caribbean, Arctic Canada, and Greenland.
-      for (const [longitude, latitude] of [
-        [-99, 19],
-        [-105, 40],
-        [-80, 48],
-        [-150, 65],
-        [-85, 13],
-        [-77, 21],
-        [-95, 68],
-        [-45, 65],
-      ]) {
-        const z = 9;
-        const x = Math.floor(((longitude + 180) / 360) * 2 ** z);
-        const y = Math.floor(
-          ((1 - Math.asinh(Math.tan((latitude * Math.PI) / 180)) / Math.PI) / 2) *
-            2 ** z,
-        );
-        const tile = await archive.getZxy(z, x, y);
-        assert.ok(tile, `Missing basin tile near ${longitude}, ${latitude}`);
-        const basins = new VectorTile(new Pbf(tile.data)).layers['basins'];
-        assert.ok(basins.length > 0);
-        for (let index = 0; index < basins.length; index++)
-          watershedPropertiesSchema.parse(basins.feature(index).properties);
-      }
-    } finally {
-      await handle.close();
     }
+    const archive = new PMTiles(
+      new MultipartPMTilesSource('primary-watersheds-test', parts, manifest.sha256),
+    );
+    await callback(archive);
+  } finally {
+    await Promise.all(handles.map((handle) => handle.close()));
   }
+}
+
+function tilePosition([longitude, latitude], z) {
+  const x = ((longitude + 180) / 360) * 2 ** z;
+  const y =
+    ((1 - Math.asinh(Math.tan((latitude * Math.PI) / 180)) / Math.PI) / 2) * 2 ** z;
+  return { x: Math.floor(x), y: Math.floor(y), localX: x % 1, localY: y % 1 };
+}
+
+async function tileAt(archive, coordinate, z = 10) {
+  const position = tilePosition(coordinate, z);
+  const tile = await archive.getZxy(z, position.x, position.y);
+  assert.ok(tile, `Missing watershed tile near ${coordinate}`);
+  const layer = new VectorTile(new Pbf(tile.data)).layers.basins;
+  assert.ok(layer?.length, `Empty watershed tile near ${coordinate}`);
+  return { layer, ...position };
+}
+
+function inRing(point, ring) {
+  let inside = false;
+  for (let i = 0, j = ring.length - 1; i < ring.length; j = i++) {
+    const a = ring[i];
+    const b = ring[j];
+    if (
+      a.y > point.y !== b.y > point.y &&
+      point.x < ((b.x - a.x) * (point.y - a.y)) / (b.y - a.y) + a.x
+    )
+      inside = !inside;
+  }
+  return inside;
+}
+
+async function basinAt(archive, coordinate) {
+  const { layer, localX, localY } = await tileAt(archive, coordinate);
+  for (let i = 0; i < layer.length; i++) {
+    const feature = layer.feature(i);
+    const point = { x: localX * feature.extent, y: localY * feature.extent };
+    if (
+      feature
+        .loadGeometry()
+        .reduce((inside, ring) => inside !== inRing(point, ring), false)
+    )
+      return watershedPropertiesSchema.parse(feature.properties);
+  }
+  assert.fail(`No watershed contains ${coordinate}`);
+}
+
+function segmentDistance(p, a, b) {
+  const dx = b.x - a.x;
+  const dy = b.y - a.y;
+  const t = Math.max(
+    0,
+    Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / (dx * dx + dy * dy) || 0),
+  );
+  return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
+}
+
+test('ocean outlets, inland sinks, and unverified terminals remain distinct', () => {
+  assert.match(watershedDrainageLabel('ocean'), /modeled ocean outlet/);
+  assert.match(watershedDrainageLabel('inland'), /no ocean outlet/);
+  assert.match(watershedDrainageLabel('unverified'), /unverified/);
+  assert.equal(
+    watershedPropertiesSchema.safeParse({ id: 1, drainage: 'ocean' }).success,
+    false,
+  );
+});
+
+test('primary watershed archive uses the finer source and records its limits', async () => {
+  const manifest = await json('north-america-watersheds-summary.json');
+  assert.equal(manifest.resolution_arc_seconds, 1);
+  assert.equal(manifest.count, 108641);
+  assert.equal(manifest.routed_catchments, 11558529);
+  assert.equal(manifest.unresolved_coastal_units, 349737);
+  assert.equal(manifest.single_terminal_outlet_verified, true);
+  assert.equal(manifest.terminal_coordinates_verified, true);
+  assert.equal(manifest.accuracy_guarantee_m, null);
+  assert.equal(manifest.maximum_zoom_simplification, false);
+  assert.ok(manifest.maximum_grid_quantization_error_m < 2);
+  assert.equal(
+    Object.values(manifest.outlet_classification).reduce((a, b) => a + b, 0),
+    manifest.count,
+  );
+  const archiveHash = createHash('sha256');
+  let bytes = 0;
+  for (const part of manifest.parts) {
+    assert.equal((await stat(data(part.file))).size, part.bytes);
+    assert.ok(
+      part.bytes < 100_000_000,
+      'Each immutable part fits static hosting limits',
+    );
+    assert.ok(part.file.includes(manifest.sha256.slice(0, 12)));
+    const hash = createHash('sha256');
+    for await (const chunk of createReadStream(data(part.file))) {
+      hash.update(chunk);
+      archiveHash.update(chunk);
+    }
+    assert.equal(hash.digest('hex'), part.sha256);
+    bytes += part.bytes;
+  }
+  assert.equal(bytes, manifest.bytes);
+  assert.equal(archiveHash.digest('hex'), manifest.sha256);
+  await withArchive(async (archive) => {
+    const header = await archive.getHeader();
+    assert.equal(header.maxZoom, manifest.maximum_zoom);
+    const tile = await archive.getZxy(0, 0, 0);
+    assert.ok(tile, 'Continental overview exists');
+    const layer = new VectorTile(new Pbf(tile.data)).layers.basins;
+    for (let i = 0; i < layer.length; i++)
+      watershedPropertiesSchema.parse(layer.feature(i).properties);
+  });
+});
+
+test('Missouri, Ohio, Tennessee, and upper Mississippi share one complete primary basin', async () => {
+  await withArchive(async (archive) => {
+    for (const coordinate of [
+      [-100.78, 46.81], // Missouri at Bismarck
+      [-79.98, 40.44], // Ohio headwaters at Pittsburgh
+      [-86.8, 35.5], // Tennessee catchment
+      [-94, 46], // Upper Mississippi
+      [-90.2, 38.6], // Mississippi at St. Louis
+    ]) {
+      const basin = await basinAt(archive, coordinate);
+      assert.equal(
+        basin.id,
+        72911,
+        `Mississippi tributary ${coordinate} must share the same basin`,
+      );
+      assert.equal(basin.name, 'Mississippi basin');
+      assert.equal(basin.drainage, 'ocean');
+      assert.equal(basin.outlet_stream, 10283920);
+      assert.ok(basin.area_km2 > 3_000_000);
+      assert.ok(basin.catchments > 100_000);
+    }
+    for (const [coordinate, expected] of [
+      [[-111.6, 36.9], 82920],
+      [[-119.8, 46.2], 66083],
+      [[-83, 42.3], 70334],
+    ]) {
+      assert.equal(
+        (await basinAt(archive, coordinate)).id,
+        expected,
+        'Neighboring drainage systems stay separate',
+      );
+    }
+    const inland = await basinAt(archive, [-112.2, 40.8]);
+    assert.equal(inland.id, 83239);
+    assert.equal(inland.drainage, 'inland');
+  });
+});
+
+test('primary basin coverage includes Mexico, Alaska, Central America, the Caribbean, and Arctic Canada', async () => {
+  await withArchive(async (archive) => {
+    for (const [coordinate, expected] of [
+      [[-99, 19], 101193],
+      [[-150, 65], 28864],
+      [[-85, 13], 106671],
+      [[-77, 21], 100236],
+      [[-105, 69.5], 23965],
+    ])
+      assert.equal((await basinAt(archive, coordinate)).id, expected);
+  });
+});
+
+test('full-detail tiles preserve sampled source divides within three metres', async () => {
+  const fixture = await json('north-america-watersheds-precision.json');
+  assert.equal(fixture.samples.length, 64);
+  await withArchive(async (archive) => {
+    for (const { id, coordinate } of fixture.samples) {
+      const { layer, localX, localY } = await tileAt(archive, coordinate);
+      let distance = Infinity;
+      for (let i = 0; i < layer.length; i++) {
+        const feature = layer.feature(i);
+        if (feature.properties.id !== id) continue;
+        const point = { x: localX * feature.extent, y: localY * feature.extent };
+        for (const ring of feature.loadGeometry()) {
+          for (let j = 1; j < ring.length; j++)
+            distance = Math.min(
+              distance,
+              (segmentDistance(point, ring[j - 1], ring[j]) * 40075016.686) /
+                (2 ** 10 * feature.extent),
+            );
+        }
+      }
+      assert.ok(
+        distance < 3,
+        `Source boundary ${id} at ${coordinate} moved ${distance} projected metres`,
+      );
+    }
+  });
 });
