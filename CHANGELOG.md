@@ -19,6 +19,10 @@ All notable changes to this project will be documented here. The format follows
 
 ### Fixed
 
+- Connect all 32 reviewed Greenbrier-area source polygons to the Mississippi basin using
+  WVDEP mapped underground routes and documented regional drainage, removing the
+  remaining internal unresolved divisions.
+
 - Dissolved watershed polygons sharing the exact same terminal node across North
   America. The eleven Baja source basins now form four basins; internal outlines and
   overlapping upstream-area totals no longer inflate the displayed groups. Basin details

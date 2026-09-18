@@ -102,22 +102,38 @@ basin on the original integer lattice. Shared boundaries and holes are removed, 
 catchments are counted once, and the receiving ocean outlet is retained. Corrections
 always start from the unmodified source GeoJSON; they are not cumulative between builds.
 
-The first correction connects **86409 and 86528**, which share the modeled Culverson
-Creek sink, to Mississippi basin **72911**. Dye tracing in Jones (1997),
-[Karst Hydrology Atlas of West Virginia](https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf),
-p. 90 and the Greenbrier tracer tables, establishes the route through springs on Spring
-Creek. The downstream route is Greenbrier → New → Kanawha → Ohio → Mississippi. The
-source's two upstream-area fields overlap in their accumulated totals; the added area
-therefore comes from the two disjoint polygons in WGS84 equal-area projection EPSG:6933,
-added to the receiving basin's source area. This is an area estimate, not a surveyed
-groundwater boundary. Nearby sinks are not merged merely because they are surrounded by
-Mississippi drainage; each needs a documented, matched connection.
+The West Virginia review now connects **32 source polygons at 17 modeled sinks**
+(including the original Culverson correction) to Mississippi basin **72911**. Fifteen
+sink groups are supported by matched paths in WVDEP's public
+[WV Sunken Streams dataset](https://tagis.dep.wv.gov/arcgis/rest/services/WRPA_Web_GIS/Groundwater/MapServer/3).
+These include Culverson, Buckeye, Sinking/Hughart, The Hole, Milligan/Davis Spring, and
+Scott Hollow/Second Creek connections. Two further sink groups (three source polygons
+near Lewisburg) use documented regional drainage in the
+[2014 Milligan Creek/Davis Spring plan](https://dep.wv.gov/WWE/Programs/nonptsource/WBP/Documents/WP/MilliganCreek_WBP.pdf),
+pp. 2–4, and Jones (1997), pp. 90–91, checked against official HUC12/HUC8 polygons. All
+three lie wholly within the Greenbrier watershed; their modeled sink points lie within
+the Milligan Creek–Greenbrier River unit. A small eastern part of 86641 crosses the
+local HUC12 divide but remains in Greenbrier drainage. The regional records do **not**
+claim an individual dye trace from each modeled sink cell.
 
-Shared-node grouping reduces 108,641 source basins to 105,575 terminal groups. The
-Culverson correction joins one of those groups to the Mississippi, yielding 105,574
-displayed basins and preserving all 11,558,529 routed catchments. There are 103,348
-modeled ocean-draining basins and 2,226 unresolved surface sinks. Higher-resolution
-topography cannot by itself resolve karst drainage.
+Run `scripts/review-wv-watersheds.py` before tiling to reproduce the reviewed crosswalk.
+It uses explicit reviewed terminal-node and trace-ID lists, checks each trace endpoint
+against original basin geometry, follows chained groundwater paths, and validates
+regional containment. Vendored WVDEP snapshots and SHA-256 hashes preserve the evidence.
+It never assigns arbitrary sinks to their nearest river. Surface catchments can span
+several intermediate groundwater routes; all reviewed routes reach the same ultimate
+Mississippi outlet. The Scott Hollow route is also supported by the
+[USGS 2023 Monroe County study](https://pubs.usgs.gov/publication/sir20235121/full).
+
+The added area is calculated from disjoint polygons in EPSG:6933 rather than the
+source's overlapping upstream totals. All 216 reviewed catchments are retained. These
+edits establish primary-basin membership, not surveyed groundwater divides.
+
+Shared-node grouping reduces 108,641 source basins to 105,575 terminal groups. The WV
+connections join 17 groups to the Mississippi, yielding **105,558 displayed basins**,
+preserving all 11,558,529 routed catchments. There are 103,348 modeled ocean-draining
+basins and 2,210 unresolved surface sinks. Higher-resolution topography cannot by itself
+resolve karst drainage.
 
 Mapzen/Tilezen Terrarium tiles provide optional hillshade. They are a separate visual
 reference, not the DEM used to delineate these basins. Failure of terrain requests does
@@ -156,7 +172,7 @@ groundwater union/area conservation and exact-node grouping without network acce
 `npm run check` additionally verifies all eleven Baja source polygons map to four unique
 terminal nodes, verifies the shipped archive, checks that five Mississippi tributary
 locations share one primary basin, separates neighboring major systems, keeps unreviewed
-sinks unresolved, verifies both Culverson source polygons now select the Mississippi
+sinks unresolved, verifies all 32 reviewed WV source polygons now select the Mississippi
 outlet with no separate sink features, and compares 64 full-detail tile boundary points
 with their pre-tiling source coordinates. Those sampled comparisons validate display
 fidelity, not absolute terrain accuracy.
