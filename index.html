@@ -718,7 +718,7 @@
               </div>
               <p class="method-note">
                 Colors help distinguish basins; they do not indicate elevation or water
-                quality. Gray indicates inland or unverified drainage. Outlines include
+                quality. Gray indicates unresolved drainage. Outlines include
                 coastlines.
               </p>
             </section>
@@ -756,7 +756,9 @@
               <p class="method-note">
                 Catchments are joined by their final downstream outlet, removing
                 internal tributary boundaries. Each mapped basin has one modeled
-                terminal outlet; inland sinks are identified separately.
+                terminal outlet. Documented underground connections join karst
+                catchments to their downstream basin. Gray surface sinks have unresolved
+                underground drainage; they are not confirmed endorheic basins.
               </p>
               <p class="method-note">
                 Boundaries use HydroSHEDS v2 BAS beta’s 1 arc-second grid (about 30 m).
@@ -782,7 +784,14 @@
                   target="_blank"
                   rel="noreferrer"
                   >Methods and limitations</a
-                >. Terrain:
+                >. Underground connections:
+                <a
+                  href="https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf"
+                  target="_blank"
+                  rel="noreferrer"
+                  >Karst Hydrology Atlas of West Virginia</a
+                >
+                (Jones, 1997). Terrain:
                 <a
                   href="https://registry.opendata.aws/terrain-tiles/"
                   target="_blank"

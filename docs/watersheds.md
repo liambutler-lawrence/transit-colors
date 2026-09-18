@@ -21,11 +21,13 @@ culverts, and human alterations can move a modeled divide beyond 100 m. The BAS 
 is beta. A guarantee at every point would require independent validation and local
 corrections; hillshade cannot establish that guarantee.
 
-Each main basin has exactly one terminal **modeled** outlet. This is a D8 network: real
-deltas and bifurcations can have multiple physical mouths. Inland sinks are retained as
-separate gray drainage systems, with no claimed ocean exit. Terminal types are checked
-against the matching full-resolution flow-direction raster; ambiguous results remain
-gray and explicitly unverified.
+Each displayed ocean-draining basin has one terminal **modeled** outlet. This is a D8
+network: real deltas and bifurcations can have multiple physical mouths. Surface sinks
+are retained in gray as **underground drainage unresolved**, not as confirmed endorheic
+basins. A zero in a surface flow-direction raster does not prove that water cannot reach
+the ocean. This conservative label also applies to genuinely closed basins until their
+status is separately verified. Documented groundwater connections can join surface
+basins to a downstream ocean-draining system.
 
 HydroSHEDS aggregates some coastal catchments of at most 1 km² into composite units with
 `STRM_ID = -1`. They do not establish a unique outlet. These units are omitted from the
@@ -65,8 +67,36 @@ rebuilding.
 
 The terminal classifier reads the matching DIR raster in native blocks and follows D8
 directions locally near each vector endpoint. Flow into sea/nodata is coastal; a
-terminal cell within land is an inland sink. Conflicting, cross-block, long, or
-unresolved traces remain unverified. This classification does not alter boundaries.
+terminal cell within land is a modeled surface sink (the intermediate cache calls this
+`inland`; the shipped tiles use `unresolved_sink`). Conflicting, cross-block, long, or
+unresolved traces remain unverified. That classification alone does not alter boundaries
+or establish groundwater routing.
+
+### Reviewed groundwater connections
+
+`data/north-america-watersheds-corrections.json` records source basin IDs, the expected
+modeled sink coordinates, the downstream basin, evidence, and regression points.
+`watershed_corrections.py` checks those identities, rejects duplicate/chained
+assignments and overlapping polygons, then unions the source polygons into the receiving
+basin on the original integer lattice. Shared boundaries and holes are removed, all
+catchments are counted once, and the receiving ocean outlet is retained. Corrections
+always start from the unmodified source GeoJSON; they are not cumulative between builds.
+
+The first correction connects **86409 and 86528**, which share the modeled Culverson
+Creek sink, to Mississippi basin **72911**. Dye tracing in Jones (1997),
+[Karst Hydrology Atlas of West Virginia](https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf),
+p. 90 and the Greenbrier tracer tables, establishes the route through springs on Spring
+Creek. The downstream route is Greenbrier → New → Kanawha → Ohio → Mississippi. The
+source's two upstream-area fields overlap in their accumulated totals; the added area
+therefore comes from the two disjoint polygons in WGS84 equal-area projection EPSG:6933,
+added to the receiving basin's source area. This is an area estimate, not a surveyed
+groundwater boundary. Nearby sinks are not merged merely because they are surrounded by
+Mississippi drainage; each needs a documented, matched connection.
+
+This reduces 108,641 source basins to 108,639 displayed basins, preserving all
+11,558,529 routed catchments. There are 103,348 modeled ocean-draining basins and 5,291
+unresolved surface sinks. Higher-resolution topography cannot by itself resolve karst
+drainage.
 
 Mapzen/Tilezen Terrarium tiles provide optional hillshade. They are a separate visual
 reference, not the DEM used to delineate these basins. Failure of terrain requests does
@@ -100,12 +130,14 @@ results, source hashes, and final tile archive hash.
 ## Verification
 
 `python scripts/primary-watersheds.test.py` exercises tributary dissolution, coastal
-composite exclusion, source-lattice validation, and ocean/inland/ambiguous D8 cases
-without network access. `npm run check` additionally verifies the shipped archive,
-checks that five Mississippi tributary locations share one primary basin, separates
-neighboring major systems, identifies the Great Salt Lake inland sink, and compares 64
-full-detail tile boundary points with their pre-tiling source coordinates. Those sampled
-comparisons validate display fidelity, not absolute terrain accuracy.
+composite exclusion, source-lattice validation, and ocean/inland/ambiguous D8 cases and
+groundwater union/area conservation without network access. `npm run check` additionally
+verifies the shipped archive, checks that five Mississippi tributary locations share one
+primary basin, separates neighboring major systems, keeps unreviewed sinks unresolved,
+verifies both Culverson source polygons now select the Mississippi outlet with no
+separate sink features, and compares 64 full-detail tile boundary points with their
+pre-tiling source coordinates. Those sampled comparisons validate display fidelity, not
+absolute terrain accuracy.
 
 ## Static hosting
 

@@ -101,9 +101,12 @@ function segmentDistance(p, a, b) {
   return Math.hypot(p.x - a.x - t * dx, p.y - a.y - t * dy);
 }
 
-test('ocean outlets, inland sinks, and unverified terminals remain distinct', () => {
+test('surface sinks never claim verified endorheic drainage', () => {
   assert.match(watershedDrainageLabel('ocean'), /modeled ocean outlet/);
-  assert.match(watershedDrainageLabel('inland'), /no ocean outlet/);
+  for (const kind of ['inland', 'unresolved_sink']) {
+    assert.match(watershedDrainageLabel(kind), /Underground drainage unresolved/);
+    assert.doesNotMatch(watershedDrainageLabel(kind), /no ocean outlet|endorheic/);
+  }
   assert.match(watershedDrainageLabel('unverified'), /unverified/);
   assert.equal(
     watershedPropertiesSchema.safeParse({ id: 1, drainage: 'ocean' }).success,
@@ -114,7 +117,12 @@ test('ocean outlets, inland sinks, and unverified terminals remain distinct', ()
 test('primary watershed archive uses the finer source and records its limits', async () => {
   const manifest = await json('north-america-watersheds-summary.json');
   assert.equal(manifest.resolution_arc_seconds, 1);
-  assert.equal(manifest.count, 108641);
+  assert.equal(manifest.count, 108639);
+  assert.equal(manifest.source_primary_basins, 108641);
+  assert.deepEqual(
+    manifest.groundwater_corrections,
+    await json('north-america-watersheds-corrections.json'),
+  );
   assert.equal(manifest.routed_catchments, 11558529);
   assert.equal(manifest.unresolved_coastal_units, 349737);
   assert.equal(manifest.single_terminal_outlet_verified, true);
@@ -190,7 +198,7 @@ test('Missouri, Ohio, Tennessee, and upper Mississippi share one complete primar
     }
     const inland = await basinAt(archive, [-112.2, 40.8]);
     assert.equal(inland.id, 83239);
-    assert.equal(inland.drainage, 'inland');
+    assert.equal(inland.drainage, 'unresolved_sink');
   });
 });
 
@@ -231,6 +239,36 @@ test('full-detail tiles preserve sampled source divides within three metres', as
         distance < 3,
         `Source boundary ${id} at ${coordinate} moved ${distance} projected metres`,
       );
+    }
+  });
+});
+
+test('documented Culverson groundwater drainage joins Mississippi; other sinks remain unresolved', async () => {
+  const corrections = await json('north-america-watersheds-corrections.json');
+  await withArchive(async (archive) => {
+    const unresolved = await basinAt(archive, [-80.493889, 37.915139]);
+    assert.equal(unresolved.id, 86548);
+    assert.equal(unresolved.drainage, 'unresolved_sink');
+    assert.equal(unresolved.karst_connections, undefined);
+    for (const connection of corrections.connections) {
+      for (const coordinate of connection.test_points) {
+        const basin = await basinAt(archive, coordinate);
+        assert.equal(basin.id, connection.target_basin);
+        assert.equal(basin.name, 'Mississippi basin');
+        assert.equal(basin.drainage, 'ocean');
+        assert.equal(basin.outlet_stream, 10283920);
+        assert.equal(basin.karst_connections, 2);
+        assert.equal(basin.catchments, 1723181 + 41 + 13);
+        // The second source's reported upstream area already includes the first.
+        assert.ok(basin.area_km2 > 3181360 && basin.area_km2 < 3181380);
+        const { layer } = await tileAt(archive, coordinate);
+        for (let i = 0; i < layer.length; i++) {
+          assert.ok(
+            !connection.source_basins.includes(layer.feature(i).properties.id),
+            'No separate sink polygon or internal outline survives in the corrected tiles',
+          );
+        }
+      }
     }
   });
 });
