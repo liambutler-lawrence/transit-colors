@@ -1,0 +1,12 @@
+[
+  {
+    "terminal_node": 160007002,
+    "coordinate": [4.0397840981, 51.8209994109],
+    "drainage": "ocean",
+    "exit_body": "North Sea",
+    "note": "GRIT labels the terminal Haringvliet node as inlet despite no downstream segment. Rijkswaterstaat documents Rhine–Meuse discharge through the Haringvliet sluices into the North Sea. This review changes the terminal classification only, not routing or geometry.",
+    "source_url": "https://www.rijkswaterstaat.nl/water/waterbeheer/bescherming-tegen-het-water/waterkeringen/deltawerken/haringvlietsluizen",
+    "facility_coordinate": [4.049981603, 51.832953211],
+    "facility_source_url": "https://geo.rijkswaterstaat.nl/services/ogc/gdr/disk_beheerobjecten/ogc/features/v1/collections/beheerobject_overstijgende_voorziening/items?f=text%2Fhtml&limit=25"
+  }
+]

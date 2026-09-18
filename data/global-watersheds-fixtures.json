@@ -1,0 +1,195 @@
+[
+  {
+    "river": "Amazon",
+    "coordinate": [
+      -63,
+      -4
+    ],
+    "receiving_body": "Atlantic Ocean",
+    "region": "SA"
+  },
+  {
+    "river": "Paraná",
+    "coordinate": [
+      -55,
+      -25
+    ],
+    "receiving_body": "Atlantic Ocean",
+    "region": "SA"
+  },
+  {
+    "river": "Nile",
+    "coordinate": [
+      32.5,
+      15.6
+    ],
+    "receiving_body": "Mediterranean Sea",
+    "region": "AF"
+  },
+  {
+    "river": "Nile",
+    "coordinate": [
+      32.9,
+      24.2
+    ],
+    "receiving_body": "Mediterranean Sea",
+    "region": "AF"
+  },
+  {
+    "river": "Congo",
+    "coordinate": [
+      25.2,
+      -0.5
+    ],
+    "receiving_body": "Atlantic Ocean",
+    "region": "AF"
+  },
+  {
+    "river": "Zambezi",
+    "coordinate": [
+      25.85,
+      -17.9
+    ],
+    "receiving_body": "Indian Ocean",
+    "region": "AF"
+  },
+  {
+    "river": "Danube",
+    "coordinate": [
+      16.37,
+      48.2
+    ],
+    "receiving_body": "Black Sea",
+    "region": "EU"
+  },
+  {
+    "river": "Danube",
+    "coordinate": [
+      20.45,
+      44.8
+    ],
+    "receiving_body": "Black Sea",
+    "region": "EU"
+  },
+  {
+    "river": "Rhine",
+    "coordinate": [
+      6.96,
+      50.94
+    ],
+    "receiving_body": "North Sea",
+    "region": "EU"
+  },
+  {
+    "river": "Rhine",
+    "coordinate": [
+      7.58,
+      47.56
+    ],
+    "receiving_body": "North Sea",
+    "region": "EU"
+  },
+  {
+    "river": "Volga",
+    "coordinate": [
+      49.12,
+      55.79
+    ],
+    "receiving_body": "Caspian Sea",
+    "region": "EU",
+    "primary_group": "Caspian Sea"
+  },
+  {
+    "river": "Yangtze",
+    "coordinate": [
+      106.55,
+      29.56
+    ],
+    "receiving_body": "East China Sea",
+    "region": "AS"
+  },
+  {
+    "river": "Ganges",
+    "coordinate": [
+      82.97,
+      25.32
+    ],
+    "receiving_body": "Bay of Bengal",
+    "region": "AS"
+  },
+  {
+    "river": "Mekong",
+    "coordinate": [
+      104.78,
+      15.24
+    ],
+    "receiving_body": "South China Sea",
+    "region": "AS"
+  },
+  {
+    "river": "Lena",
+    "coordinate": [
+      129.73,
+      62.03
+    ],
+    "receiving_body": "Laptev Sea",
+    "region": "SI"
+  },
+  {
+    "river": "Yenisei",
+    "coordinate": [
+      92.88,
+      56.01
+    ],
+    "receiving_body": "Kara Sea",
+    "region": "SI"
+  },
+  {
+    "river": "Murray–Darling",
+    "coordinate": [
+      146.92,
+      -36.08
+    ],
+    "receiving_body": "Indian Ocean",
+    "region": "SP"
+  },
+  {
+    "river": "Murray–Darling",
+    "coordinate": [
+      142.16,
+      -34.19
+    ],
+    "receiving_body": "Indian Ocean",
+    "region": "SP"
+  },
+  {
+    "river": "Wailuku River",
+    "coordinate": [
+      -155.48,
+      19.67
+    ],
+    "receiving_body": "Pacific Ocean",
+    "region": "NA",
+    "minimum_catchments": 1
+  },
+  {
+    "river": "Eastern Panama",
+    "coordinate": [
+      -77.9,
+      8.1
+    ],
+    "receiving_body": "Pacific Ocean",
+    "region": "NA",
+    "minimum_catchments": 1
+  },
+  {
+    "river": "Ural",
+    "coordinate": [
+      51.4,
+      51.2
+    ],
+    "receiving_body": "Caspian Sea",
+    "region": "EU",
+    "primary_group": "Caspian Sea"
+  }
+]

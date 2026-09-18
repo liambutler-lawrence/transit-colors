@@ -2,7 +2,10 @@ import { copyFileSync, mkdirSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import { defineConfig } from 'vite';
+import globalWatershedData from './data/global-watersheds-summary.json';
 import watershedData from './data/north-america-watersheds-summary.json';
+
+const globalWatershedParts: { file: string }[] = globalWatershedData.parts;
 
 export const RUNTIME_DATA_FILES: readonly string[] = [
   'athens-circumference.json',
@@ -26,6 +29,8 @@ export const RUNTIME_DATA_FILES: readonly string[] = [
   'north-america-highways-route.pmtiles',
   'north-america-highways.pmtiles',
   ...watershedData.parts.map((part) => part.file),
+  ...globalWatershedParts.map((part) => part.file),
+  'global-watersheds-summary.json',
   'north-america-watersheds-summary.json',
   'nyc-circumference.json',
   'nyc-metadata.json',

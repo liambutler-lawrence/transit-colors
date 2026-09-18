@@ -13,3 +13,6 @@ data/.osm-highway-cache/
 data/.cdmx-streets.ndjson
 data/.gtfs-cache/
 data/.automatic-timezone-cache/
+
+__pycache__/
+*.pyc

@@ -1,9 +1,10 @@
 import { GeoJSONSource, VectorTileSource } from 'maplibre-gl';
 import { FetchSource, PMTiles } from 'pmtiles';
+import globalWatershedData from '../../data/global-watersheds-summary.json';
 import watershedData from '../../data/north-america-watersheds-summary.json';
 import { MultipartPMTilesSource } from '../multipart-pmtiles.js';
 import {
-  watershedExitBodies,
+  worldwideExitBodies,
   watershedExitBody,
   watershedFillColor,
   unresolvedWatershedColor,
@@ -27,21 +28,23 @@ let selectedId: number | null = null;
 let selectedOutlet: [number, number] | null = null;
 const failedSources = new Set<string>();
 
-function sourceId(): string {
-  return 'watersheds-primary';
-}
+const datasets = [
+  { id: 'watersheds-primary', data: watershedData },
+  { id: 'watersheds-global', data: globalWatershedData },
+];
+type WatershedDataset = (typeof datasets)[number];
 
-function boundaryURL(retry?: string): string {
-  const url = new URL(`data/${watershedData.file}`, window.location.href);
-  url.searchParams.set('v', watershedData.sha256);
+function boundaryURL({ data }: WatershedDataset, retry?: string): string {
+  const url = new URL(`data/${data.file}`, window.location.href);
+  url.searchParams.set('v', data.sha256);
   if (retry) url.searchParams.set('retry', retry);
-  const parts = watershedData.parts.map((part) => {
+  const parts = data.parts.map((part) => {
     const partURL = new URL(`data/${part.file}`, window.location.href);
     if (retry) partURL.searchParams.set('retry', retry);
     return { source: new FetchSource(partURL.href), bytes: part.bytes };
   });
   pmtilesProtocol.add(
-    new PMTiles(new MultipartPMTilesSource(url.href, parts, watershedData.sha256)),
+    new PMTiles(new MultipartPMTilesSource(url.href, parts, data.sha256)),
   );
   return `pmtiles://${url.href}`;
 }
@@ -60,29 +63,33 @@ function resetSelection(): void {
   requiredElement('#watershed-name', HTMLElement).textContent =
     'Click a basin on the map';
   requiredElement('#watershed-metadata', HTMLElement).replaceChildren();
-  const layer = `${sourceId()}-selected`;
-  if (map.getLayer(layer)) map.setFilter(layer, ['==', ['get', 'id'], -1]);
+  for (const { id } of datasets) {
+    const layer = `${id}-selected`;
+    if (map.getLayer(layer)) map.setFilter(layer, ['==', ['get', 'id'], -1]);
+  }
 }
 
 function updateStatus(): void {
   if (runtime.activeProduct !== 'watersheds') return;
-  const failed = failedSources.has(sourceId());
+  const failed = datasets.some(({ id }) => failedSources.has(id));
   statusElement().textContent = failed
-    ? 'Boundary tiles could not load. Retry or return to North America.'
-    : map.getSource(sourceId()) && map.isSourceLoaded(sourceId())
+    ? 'Boundary tiles could not load. Retry loading the boundaries.'
+    : datasets.every(({ id }) => map.getSource(id) && map.isSourceLoaded(id))
       ? 'Primary basins loaded · Click a basin to inspect its outlet.'
       : 'Loading primary basin boundaries…';
   requiredElement('#watershed-retry', HTMLButtonElement).hidden = !failed;
 }
 
-function installBasins(): void {
-  const id = sourceId();
+function installBasins(dataset: WatershedDataset): void {
+  const { id } = dataset;
   if (map.getSource(id)) return;
   map.addSource(id, {
     type: 'vector',
-    url: boundaryURL(),
+    url: boundaryURL(dataset),
     attribution:
-      '<a href="https://www.hydrosheds.org/hydrosheds-v2">HydroSHEDS v2 / WWF / DLR</a> · Lehner et al. (2022) · CC BY 4.0',
+      id === 'watersheds-global'
+        ? '<a href="https://zenodo.org/records/17435232">GRIT v1.0 · Wortmann et al. (2025)</a> · CC BY-NC 4.0'
+        : '<a href="https://www.hydrosheds.org/hydrosheds-v2">HydroSHEDS v2 / WWF / DLR</a> · Lehner et al. (2022) · CC BY 4.0',
     promoteId: 'id',
   });
   const before = firstSymbolLayerId();
@@ -128,30 +135,45 @@ function installBasins(): void {
     before,
   );
   map.on('click', `${id}-fill`, (event) => {
-    if (runtime.activeProduct !== 'watersheds' || sourceId() !== id) return;
+    if (runtime.activeProduct !== 'watersheds') return;
     const parsed = watershedPropertiesSchema.safeParse(event.features?.[0]?.properties);
     if (!parsed.success) return;
+    resetSelection();
     const basin = parsed.data;
     selectedId = basin.id;
-    selectedOutlet = [basin.outlet_lon, basin.outlet_lat];
-    requiredElement('#watershed-outlet', HTMLButtonElement).disabled = false;
+    selectedOutlet =
+      basin.outlet_lon !== undefined && basin.outlet_lat !== undefined
+        ? [basin.outlet_lon, basin.outlet_lat]
+        : null;
+    requiredElement('#watershed-outlet', HTMLButtonElement).disabled =
+      selectedOutlet === null;
     const outletSource = map.getSource('watershed-outlet');
-    if (outletSource instanceof GeoJSONSource)
+    if (outletSource instanceof GeoJSONSource && selectedOutlet)
       outletSource.setData({
         type: 'Feature',
         properties: {},
         geometry: { type: 'Point', coordinates: selectedOutlet },
       });
     setLayerVisibility(`${id}-selected`, true);
-    setLayerVisibility('watershed-outlet', true);
+    setLayerVisibility('watershed-outlet', selectedOutlet !== null);
     map.setFilter(`${id}-selected`, ['==', ['get', 'id'], selectedId]);
     requiredElement('#watershed-name', HTMLElement).textContent =
-      basin.name || `Primary basin ${basin.id}`;
+      basin.name ||
+      `${basin.outlet_known === false ? 'Surface depression' : 'Primary basin'} ${basin.id}`;
     const area = (value: number): string =>
       `${value.toLocaleString(undefined, { maximumFractionDigits: 1 })} km²`;
     replaceMetadata(requiredElement('#watershed-metadata', HTMLElement), [
-      { label: 'Drainage', value: watershedDrainageLabel(basin.drainage) },
-      { label: 'Receiving body', value: watershedExitBody(basin.id, basin.drainage) },
+      {
+        label: 'Drainage',
+        value:
+          basin.source === 'grit' && basin.drainage === 'unresolved_sink'
+            ? 'Surface sink · final drainage unverified'
+            : watershedDrainageLabel(basin.drainage),
+      },
+      {
+        label: 'Receiving body',
+        value: basin.exit_body ?? watershedExitBody(basin.id, basin.drainage),
+      },
       ...(basin.karst_connections
         ? [
             {
@@ -164,16 +186,30 @@ function installBasins(): void {
       { label: 'Joined catchments', value: basin.catchments.toLocaleString() },
       {
         label: 'Terminal outlet',
-        value: `${basin.outlet_lat.toFixed(5)}°, ${basin.outlet_lon.toFixed(5)}°`,
+        value: selectedOutlet
+          ? `${selectedOutlet[1].toFixed(5)}°, ${selectedOutlet[0].toFixed(5)}°`
+          : basin.drainage === 'endorheic'
+            ? 'Terminal lake · no ocean outlet'
+            : 'Not provided by source',
       },
-      { label: 'Terminal node ID', value: basin.terminal_node },
-      { label: 'Joined source basins', value: basin.source_basins },
-      { label: 'Boundary source', value: 'HydroSHEDS v2 · 1 arc-second (~30 m)' },
+      ...(basin.terminal_node
+        ? [{ label: 'Terminal node ID', value: basin.terminal_node }]
+        : []),
+      ...(basin.source !== 'grit' || basin.drainage === 'endorheic'
+        ? [{ label: 'Joined source basins', value: basin.source_basins }]
+        : []),
+      {
+        label: 'Boundary source',
+        value:
+          basin.source === 'grit'
+            ? 'GRIT v1.0 · 30 m terrain; source vectors simplified'
+            : 'HydroSHEDS v2 · 1 arc-second (~30 m)',
+      },
       { label: 'Accuracy', value: '100 m everywhere is not verified' },
     ]);
   });
   map.on('mousemove', `${id}-fill`, () => {
-    if (runtime.activeProduct === 'watersheds' && sourceId() === id)
+    if (runtime.activeProduct === 'watersheds')
       map.getCanvas().style.cursor = 'pointer';
   });
   map.on('mouseleave', `${id}-fill`, () => {
@@ -186,9 +222,11 @@ export function positionWatershedLayers(): void {
   if (map.getLayer('watershed-hillshade')) {
     map.moveLayer('watershed-hillshade', map.getLayer('water') ? 'water' : before);
   }
-  for (const kind of ['fill', 'line', 'selected']) {
-    const id = `${sourceId()}-${kind}`;
-    if (map.getLayer(id)) map.moveLayer(id, before);
+  for (const dataset of datasets) {
+    for (const kind of ['fill', 'line', 'selected']) {
+      const id = `${dataset.id}-${kind}`;
+      if (map.getLayer(id)) map.moveLayer(id, before);
+    }
   }
   if (map.getLayer('watershed-outlet')) map.moveLayer('watershed-outlet');
 }
@@ -196,20 +234,21 @@ export function positionWatershedLayers(): void {
 export function syncWatershedVisibility(): void {
   if (!installed) return;
   const active = runtime.activeProduct === 'watersheds';
-  if (active) installBasins();
+  if (active) datasets.forEach(installBasins);
   const colors = requiredElement('#watershed-colors', HTMLInputElement).checked;
   setLayerVisibility(
     'watershed-hillshade',
     active && requiredElement('#watershed-terrain', HTMLInputElement).checked,
   );
-  const id = sourceId();
-  setLayerVisibility(`${id}-fill`, active);
-  if (map.getLayer(`${id}-fill`)) {
-    // Keep an invisible hit surface when colors are off.
-    map.setPaintProperty(`${id}-fill`, 'fill-opacity', colors ? 0.25 : 0);
+  for (const { id } of datasets) {
+    setLayerVisibility(`${id}-fill`, active);
+    if (map.getLayer(`${id}-fill`)) {
+      // Keep an invisible hit surface when colors are off.
+      map.setPaintProperty(`${id}-fill`, 'fill-opacity', colors ? 0.25 : 0);
+    }
+    setLayerVisibility(`${id}-line`, active);
+    setLayerVisibility(`${id}-selected`, active && selectedId !== null);
   }
-  setLayerVisibility(`${id}-line`, active);
-  setLayerVisibility(`${id}-selected`, active && selectedId !== null);
   setLayerVisibility('watershed-outlet', active && selectedOutlet !== null);
   if (!active) map.getCanvas().style.cursor = '';
   updateStatus();
@@ -219,8 +258,8 @@ export function focusWatersheds(): void {
   map.setMaxBounds(null);
   map.fitBounds(
     [
-      [-169, 7],
-      [-48, 76],
+      [-179, -57],
+      [179, 80],
     ],
     {
       bearing: 0,
@@ -236,7 +275,7 @@ export function installWatersheds(): void {
   installed = true;
   const legend = requiredElement('#watershed-exit-key', HTMLElement);
   for (const body of [
-    ...watershedExitBodies,
+    ...worldwideExitBodies,
     { name: 'Unresolved', color: unresolvedWatershedColor },
   ]) {
     const item = document.createElement('span');
@@ -305,17 +344,19 @@ export function installWatersheds(): void {
   requiredElement('#watershed-retry', HTMLButtonElement).addEventListener(
     'click',
     () => {
-      const source = map.getSource(sourceId());
-      if (source instanceof VectorTileSource) {
-        failedSources.delete(sourceId());
-        source.setUrl(boundaryURL(String(Date.now())));
-        updateStatus();
+      for (const dataset of datasets) {
+        const source = map.getSource(dataset.id);
+        if (source instanceof VectorTileSource) {
+          failedSources.delete(dataset.id);
+          source.setUrl(boundaryURL(dataset, String(Date.now())));
+          updateStatus();
+        }
       }
     },
   );
   map.on('idle', updateStatus);
   map.on('sourcedata', (event) => {
-    if (event.sourceId === sourceId()) updateStatus();
+    if (datasets.some(({ id }) => id === event.sourceId)) updateStatus();
   });
   map.on('error', (event) => {
     const failedSource =

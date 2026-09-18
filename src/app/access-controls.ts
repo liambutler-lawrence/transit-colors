@@ -1002,7 +1002,7 @@ export function updateAreaChrome(
   accessResultAreaEl.textContent = `Destination metro: ${area.label}`;
   document.title =
     runtime.activeProduct === 'watersheds'
-      ? 'North America Watersheds — Transit Colors'
+      ? 'World Watersheds — Transit Colors'
       : runtime.activeProduct === 'timezone'
         ? 'Clock Skew Map — Transit Colors'
         : runtime.activeProduct === 'landuse'
@@ -1013,7 +1013,7 @@ export function updateAreaChrome(
   mapEl.setAttribute(
     'aria-label',
     runtime.activeProduct === 'watersheds'
-      ? 'Interactive North America watershed boundaries and terrain map'
+      ? 'Interactive worldwide watershed boundaries and terrain map'
       : runtime.activeProduct === 'timezone'
         ? 'Interactive world map of clock time compared with mean solar time'
         : runtime.activeProduct === 'landuse'
