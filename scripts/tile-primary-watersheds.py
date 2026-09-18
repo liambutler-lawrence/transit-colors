@@ -43,7 +43,10 @@ def main():
         '--attribution=HydroSHEDS v2 / WWF / DLR; CC BY 4.0',
     ]
     corrections = json.loads((ROOT / 'data/north-america-watersheds-corrections.json').read_text())
-    replacements, removed = prepare(source, outlets, drainage, corrections)
+    nodes = {int(identifier): int(node) for identifier, node in zip(data['id'], data['node'])}
+    replacements, removed = prepare(source, outlets, drainage, corrections, nodes)
+    emitted_nodes = set()
+    total_catchments = 0
     classifications = Counter()
     count = 0
     samples = []
@@ -67,6 +70,10 @@ def main():
                 properties = feature['properties']
             lon, lat = outlets[identifier]
             kind = 'unresolved_sink' if drainage[identifier] == 'inland' else drainage[identifier]
+            assert nodes[identifier] not in emitted_nodes, 'Duplicate displayed terminal node'
+            emitted_nodes.add(nodes[identifier])
+            total_catchments += properties['catchments']
+            properties.update(terminal_node=nodes[identifier], source_basins=properties.get('source_basins', 1))
             classifications[kind] += 1
             count += 1
             properties.update(outlet_lon=lon, outlet_lat=lat, drainage=kind)
@@ -84,6 +91,7 @@ def main():
             raise subprocess.CalledProcessError(code, command)
     (ROOT / 'data/north-america-watersheds-precision.json').write_text(json.dumps({'source': 'HydroSHEDS v2 BAS, dissolved on the source lattice before tiling', 'samples': samples}, indent=2) + '\n')
     summary = json.loads((CACHE / 'watersheds-v2-manifest.json').read_text())
+    assert total_catchments == summary['routed_catchments'], 'Every source catchment must occur exactly once'
     bas = CACHE / 'watersheds-v2-bas/north-america_BAS_1s_v2r0.gdb'
     if bas.exists():
         _, coastal = pyogrio.read_arrow(bas, where='STRM_ID < 0', columns=['STRM_ID', 'UPLAND_SKM'], read_geometry=False)
@@ -95,6 +103,10 @@ def main():
     summary.update(
         count=count,
         source_primary_basins=len(outlets),
+        source_terminal_nodes=len(set(nodes.values())),
+        grouping='Shared terminal node, followed by reviewed groundwater connections',
+        unique_displayed_terminal_nodes=len(emitted_nodes),
+        shared_terminal_groups=sum(size > 1 for size in Counter(nodes.values()).values()),
         groundwater_corrections=corrections,
         unresolved_coastal_area_km2=coastal_area,
         routed_area_km2=float(data['area'].sum()),

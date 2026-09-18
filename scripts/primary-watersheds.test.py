@@ -74,6 +74,29 @@ class PrimaryWatersheds(unittest.TestCase):
             with self.assertRaisesRegex(AssertionError, 'assigned twice'):
                 corrections.prepare(source, {2: (1, 1)}, {1: 'ocean', 2: 'inland'}, {'connections': [link, link]})
 
+    def test_shared_nodes_merge_and_equal_coordinates_alone_do_not(self):
+        nodes = {10: 100, 11: 100, 12: 101}
+        outlets = {10: (1, 1), 11: (1, 1), 12: (1, 1)}
+        drainage = {i: 'inland' for i in nodes}
+        self.assertEqual(corrections.terminal_groups(nodes, outlets, drainage), {10: [10, 11], 12: [12]})
+        with self.assertRaisesRegex(AssertionError, 'inconsistent coordinates'):
+            corrections.terminal_groups(nodes, {**outlets, 11: (1.00001, 1)}, drainage)
+        with self.assertRaisesRegex(AssertionError, 'inconsistent drainage'):
+            corrections.terminal_groups(nodes, outlets, {**drainage, 11: 'ocean'})
+        features = [{'type': 'Feature', 'id': i, 'properties': {'id': i, 'area_km2': 999999, 'catchments': 2}, 'geometry': json.loads(shapely.to_geojson(shapely.box(i-10, 0, i-9, 1)))} for i in nodes]
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / 'source.geojsonl'
+            source.write_text(''.join(json.dumps(f, separators=(',', ':')) + '\n' for f in features))
+            replacements, removed = corrections.prepare(source, outlets, drainage, {'connections': []}, nodes)
+            self.assertEqual(removed, {11})
+            self.assertEqual(set(replacements), {10})
+            merged = replacements[10]
+            self.assertTrue(shapely.equals(shapely.from_geojson(json.dumps(merged)), shapely.box(0, 0, 2, 1)))
+            self.assertEqual(merged['properties']['catchments'], 4)
+            self.assertEqual(merged['properties']['source_basins'], 2)
+            self.assertNotIn('karst_connections', merged['properties'])
+            self.assertTrue(24000 < merged['properties']['area_km2'] < 25000)
+
     def classify(self, array):
         class Raster:
             def read(self, *args, **kwargs):

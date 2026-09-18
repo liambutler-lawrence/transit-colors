@@ -1,13 +1,17 @@
 {
   "dataset": "HydroSHEDS v2.0, North America BAS beta and RIV",
   "resolution_arc_seconds": 1,
-  "count": 108639,
+  "count": 105574,
   "routed_catchments": 11558529,
   "unresolved_coastal_units": 349737,
   "source": "https://www.hydrosheds.org/hydrosheds-v2",
   "single_terminal_outlet_verified": true,
   "accuracy_guarantee_m": null,
   "source_primary_basins": 108641,
+  "source_terminal_nodes": 105575,
+  "grouping": "Shared terminal node, followed by reviewed groundwater connections",
+  "unique_displayed_terminal_nodes": 105574,
+  "shared_terminal_groups": 2034,
   "groundwater_corrections": {
     "version": 1,
     "source_dataset": "HydroSHEDS v2.0 North America BAS beta / RIV v2r0",
@@ -59,30 +63,30 @@
   },
   "outlet_classification": {
     "ocean": 103348,
-    "unresolved_sink": 5291
+    "unresolved_sink": 2226
   },
   "file": "north-america-primary-watersheds.pmtiles",
-  "bytes": 285733633,
+  "bytes": 290728946,
   "maximum_zoom": 10,
   "maximum_zoom_extent": 16384,
   "maximum_zoom_simplification": false,
   "maximum_grid_quantization_error_m": 1.6890356573363923,
-  "sha256": "b12108a0481cb0a15346cf53e31ff977f20b1f57cc8706259fb62b9d7a4191f0",
+  "sha256": "acfc4a217d7990d5b4daa714cbf64ba36678feb6ae228f9b24609221746dbd9e",
   "parts": [
     {
-      "file": "north-america-primary-watersheds-b12108a0481c.000.bin",
+      "file": "north-america-primary-watersheds-acfc4a217d79.000.bin",
       "bytes": 99614720,
-      "sha256": "fe77fb729c3c11af3999a4184d799acdd6b4cecf4839ee93e2a700e65d7d92e3"
+      "sha256": "79738701bdb3fca65841331fcee46dbb52885fd61f67f718d05c50a9fedf51dc"
     },
     {
-      "file": "north-america-primary-watersheds-b12108a0481c.001.bin",
+      "file": "north-america-primary-watersheds-acfc4a217d79.001.bin",
       "bytes": 99614720,
-      "sha256": "241fc5e6de108028190f1f465694c9704cdf3a795c3c507e9ce2df0b4e917c99"
+      "sha256": "b3188b6f11531df4c536e7fa679604a121ce025720b577caf8773d3c0185fe0b"
     },
     {
-      "file": "north-america-primary-watersheds-b12108a0481c.002.bin",
-      "bytes": 86504193,
-      "sha256": "5f2cc25cd6a6cdfd1082ea10a86a5fdd1035c192cac4fbe0bf8abfd9701faa89"
+      "file": "north-america-primary-watersheds-acfc4a217d79.002.bin",
+      "bytes": 91499506,
+      "sha256": "20b4a10e53e49995a20495e6b1f05005ec171396eb81cdbf4fa4277204a7ce62"
     }
   ]
 }
