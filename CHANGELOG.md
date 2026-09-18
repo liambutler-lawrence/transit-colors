@@ -16,6 +16,11 @@ All notable changes to this project will be documented here. The format follows
 
 ### Fixed
 
+- Joined the two Culverson Creek surface basins to the Mississippi using documented
+  underground drainage, removing their internal outlines. Surface sinks without reviewed
+  connections now say “Underground drainage unresolved” instead of claiming no ocean
+  outlet.
+
 - Refresh the Circumference distance-gradient image from its rendered canvas so the
   Gradient layer toggle controls visible map pixels.
 - Accept unavailable NYC street histogram and street-count metadata without blocking

@@ -165,6 +165,14 @@ function installBasins(): void {
       `${value.toLocaleString(undefined, { maximumFractionDigits: 1 })} km²`;
     replaceMetadata(requiredElement('#watershed-metadata', HTMLElement), [
       { label: 'Drainage', value: watershedDrainageLabel(basin.drainage) },
+      ...(basin.karst_connections
+        ? [
+            {
+              label: 'Underground connections',
+              value: `${basin.karst_connections} source basins joined using documented drainage`,
+            },
+          ]
+        : []),
       { label: 'Basin area', value: area(basin.area_km2) },
       { label: 'Joined catchments', value: basin.catchments.toLocaleString() },
       {

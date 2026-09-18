@@ -1,5 +1,7 @@
 """Run with the documented watershed Python environment, without network access."""
 import importlib.util
+import json
+import tempfile
 from pathlib import Path
 import unittest
 
@@ -17,6 +19,7 @@ def module(name):
 
 builder = module('build-primary-watersheds')
 classifier = module('classify-watershed-outlets')
+corrections = module('watershed_corrections')
 
 
 class PrimaryWatersheds(unittest.TestCase):
@@ -35,6 +38,41 @@ class PrimaryWatersheds(unittest.TestCase):
     def test_source_lattice_must_match_before_snapping(self):
         with self.assertRaises(AssertionError):
             builder.dissolve(np.array([shapely.box(0, 0, .000123, .000123)]))
+
+    def test_groundwater_union_fills_hole_without_retaining_sink_boundary(self):
+        def feature(identifier, geometry, area, count):
+            return {'type': 'Feature', 'id': identifier, 'properties': {'id': identifier, 'area_km2': area, 'catchments': count, 'outlet_stream': 100 + identifier}, 'geometry': json.loads(shapely.to_geojson(geometry))}
+        hole = shapely.box(1, 1, 2, 2)
+        parent = feature(1, shapely.box(0, 0, 3, 3).difference(hole), 90000, 20)
+        child = feature(2, hole, 999999, 3)
+        merged = corrections.merge_features(parent, [child])
+        geometry = shapely.from_geojson(json.dumps(merged))
+        self.assertTrue(shapely.equals(geometry, shapely.box(0, 0, 3, 3)))
+        self.assertFalse(shapely.intersects(shapely.boundary(geometry), shapely.Point(1, 1.5)))
+        self.assertEqual(merged['properties']['catchments'], 23)
+        self.assertEqual(merged['properties']['outlet_stream'], 101)
+        self.assertEqual(merged['properties']['karst_connections'], 1)
+        self.assertTrue(100000 < merged['properties']['area_km2'] < 110000)
+        self.assertEqual(parent['properties']['catchments'], 20)
+        with self.assertRaisesRegex(AssertionError, 'overlaps'):
+            corrections.merge_features(parent, [parent])
+
+    def test_groundwater_connections_require_matching_reviewed_sink(self):
+        def feature(identifier, geometry):
+            return {'type': 'Feature', 'id': identifier, 'properties': {'id': identifier, 'area_km2': 100, 'catchments': 1}, 'geometry': json.loads(shapely.to_geojson(geometry))}
+        child = feature(2, shapely.box(1, 1, 2, 2))
+        parent = feature(1, shapely.box(0, 0, 3, 3).difference(shapely.box(1, 1, 2, 2)))
+        link = {'source_basins': [2], 'target_basin': 1, 'modeled_sink': [1, 1], 'source_url': 'https://example.org/evidence', 'evidence': 'Tracer connection', 'downstream_route': 'Spring to river'}
+        with tempfile.TemporaryDirectory() as directory:
+            source = Path(directory) / 'source.geojsonl'
+            source.write_text(''.join(json.dumps(f, separators=(',', ':')) + '\n' for f in [parent, child]))
+            replacements, removed = corrections.prepare(source, {2: (1, 1)}, {1: 'ocean', 2: 'inland'}, {'connections': [link]})
+            self.assertEqual(set(replacements), {1})
+            self.assertEqual(removed, {2})
+            with self.assertRaisesRegex(AssertionError, 'sink has moved'):
+                corrections.prepare(source, {2: (1.01, 1)}, {1: 'ocean', 2: 'inland'}, {'connections': [link]})
+            with self.assertRaisesRegex(AssertionError, 'assigned twice'):
+                corrections.prepare(source, {2: (1, 1)}, {1: 'ocean', 2: 'inland'}, {'connections': [link, link]})
 
     def classify(self, array):
         class Raster:

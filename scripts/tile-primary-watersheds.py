@@ -1,4 +1,5 @@
 """Attach checked terminal outlets and build precise, locally hosted vector tiles."""
+from collections import Counter
 import hashlib
 import json
 import os
@@ -9,6 +10,8 @@ import subprocess
 import numpy as np
 import shapely
 import pyogrio
+
+from watershed_corrections import prepare
 
 ROOT = Path(__file__).resolve().parents[1]
 CACHE = Path(os.environ.get('WATERSHED_V2_CACHE', '/tmp'))
@@ -39,6 +42,10 @@ def main():
         '--name=North America primary watersheds',
         '--attribution=HydroSHEDS v2 / WWF / DLR; CC BY 4.0',
     ]
+    corrections = json.loads((ROOT / 'data/north-america-watersheds-corrections.json').read_text())
+    replacements, removed = prepare(source, outlets, drainage, corrections)
+    classifications = Counter()
+    count = 0
     samples = []
     with source.open() as lines, subprocess.Popen(command, stdin=subprocess.PIPE, text=True) as tiler:
         output = tiler.stdin
@@ -51,8 +58,18 @@ def main():
             feature = json.loads(header + '}')
             properties = feature['properties']
             identifier = properties['id']
+            if identifier in removed:
+                continue
+            if identifier in replacements:
+                line = json.dumps(replacements[identifier], separators=(',', ':')) + '\n'
+                header, _, geometry_text = line.partition(',"geometry":')
+                feature = json.loads(header + '}')
+                properties = feature['properties']
             lon, lat = outlets[identifier]
-            properties.update(outlet_lon=lon, outlet_lat=lat, drainage=drainage[identifier])
+            kind = 'unresolved_sink' if drainage[identifier] == 'inland' else drainage[identifier]
+            classifications[kind] += 1
+            count += 1
+            properties.update(outlet_lon=lon, outlet_lat=lat, drainage=kind)
             if identifier in NAMES:
                 properties['name'] = NAMES[identifier]
             output.write(json.dumps(feature, separators=(',', ':'))[:-1] + ',"geometry":' + geometry_text)
@@ -67,14 +84,24 @@ def main():
             raise subprocess.CalledProcessError(code, command)
     (ROOT / 'data/north-america-watersheds-precision.json').write_text(json.dumps({'source': 'HydroSHEDS v2 BAS, dissolved on the source lattice before tiling', 'samples': samples}, indent=2) + '\n')
     summary = json.loads((CACHE / 'watersheds-v2-manifest.json').read_text())
-    _, coastal = pyogrio.read_arrow(CACHE / 'watersheds-v2-bas/north-america_BAS_1s_v2r0.gdb', where='STRM_ID < 0', columns=['STRM_ID', 'UPLAND_SKM'], read_geometry=False)
+    bas = CACHE / 'watersheds-v2-bas/north-america_BAS_1s_v2r0.gdb'
+    if bas.exists():
+        _, coastal = pyogrio.read_arrow(bas, where='STRM_ID < 0', columns=['STRM_ID', 'UPLAND_SKM'], read_geometry=False)
+        coastal_area = float(coastal['UPLAND_SKM'].to_numpy().sum())
+    else:
+        previous = json.loads(manifest_path.read_text())
+        assert previous['archives'] == json.loads((CACHE / 'watersheds-v2-archives.json').read_text()), 'Cached coastal area belongs to another source'
+        coastal_area = previous['unresolved_coastal_area_km2']
     summary.update(
-        unresolved_coastal_area_km2=float(coastal['UPLAND_SKM'].to_numpy().sum()),
+        count=count,
+        source_primary_basins=len(outlets),
+        groundwater_corrections=corrections,
+        unresolved_coastal_area_km2=coastal_area,
         routed_area_km2=float(data['area'].sum()),
         archives=json.loads((CACHE / 'watersheds-v2-archives.json').read_text()),
         terminal_coordinates_verified=True,
         direction_raster={'url': 'https://data.hydrosheds.org/file/hydrosheds-v2/DIR/1s/north-america_DIR_1s_v2r0.tif', 'access': 'Full-resolution block range reads; full-file hash not computed'},
-        outlet_classification=dict(connection.execute('SELECT drainage, COUNT(*) FROM outlets GROUP BY drainage')),
+        outlet_classification=dict(classifications),
         file=target.name, bytes=target.stat().st_size,
         maximum_zoom=MAX_ZOOM, maximum_zoom_extent=2 ** FULL_DETAIL,
         maximum_zoom_simplification=False,

@@ -1,12 +1,45 @@
 {
   "dataset": "HydroSHEDS v2.0, North America BAS beta and RIV",
   "resolution_arc_seconds": 1,
-  "count": 108641,
+  "count": 108639,
   "routed_catchments": 11558529,
   "unresolved_coastal_units": 349737,
   "source": "https://www.hydrosheds.org/hydrosheds-v2",
   "single_terminal_outlet_verified": true,
   "accuracy_guarantee_m": null,
+  "source_primary_basins": 108641,
+  "groundwater_corrections": {
+    "version": 1,
+    "source_dataset": "HydroSHEDS v2.0 North America BAS beta / RIV v2r0",
+    "connections": [
+      {
+        "name": "Culverson Creek karst drainage",
+        "source_basins": [
+          86409,
+          86528
+        ],
+        "target_basin": 72911,
+        "modeled_sink": [
+          -80.46319444444444,
+          37.93902777777778
+        ],
+        "downstream_route": "Culverson Creek caves \u2192 springs on Spring Creek \u2192 Greenbrier \u2192 New \u2192 Kanawha \u2192 Ohio \u2192 Mississippi",
+        "source_url": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf",
+        "citation": "Jones, W. K. (1997), Karst Hydrology Atlas of West Virginia, Karst Waters Institute Special Publication 4, p. 90 and Greenbrier County tracer tables",
+        "evidence": "Dye traces connect Culverson Creek Cave to four resurgences on Spring Creek. Both source polygons terminate at the same modeled Culverson sink. This connection corrects ultimate basin membership; the surface polygons are not a surveyed groundwater divide.",
+        "test_points": [
+          [
+            -80.436944,
+            38.00125
+          ],
+          [
+            -80.442083,
+            37.932778
+          ]
+        ]
+      }
+    ]
+  },
   "unresolved_coastal_area_km2": 179886.3957173669,
   "routed_area_km2": 22674430.041545033,
   "archives": {
@@ -25,31 +58,31 @@
     "access": "Full-resolution block range reads; full-file hash not computed"
   },
   "outlet_classification": {
-    "inland": 5293,
-    "ocean": 103348
+    "ocean": 103348,
+    "unresolved_sink": 5291
   },
   "file": "north-america-primary-watersheds.pmtiles",
-  "bytes": 285669607,
+  "bytes": 285733633,
   "maximum_zoom": 10,
   "maximum_zoom_extent": 16384,
   "maximum_zoom_simplification": false,
   "maximum_grid_quantization_error_m": 1.6890356573363923,
-  "sha256": "730217a382e88e3a3d3434b1f86b23999387e0da353bd389ef07cc56f50b8b55",
+  "sha256": "b12108a0481cb0a15346cf53e31ff977f20b1f57cc8706259fb62b9d7a4191f0",
   "parts": [
     {
-      "file": "north-america-primary-watersheds-730217a382e8.000.bin",
+      "file": "north-america-primary-watersheds-b12108a0481c.000.bin",
       "bytes": 99614720,
-      "sha256": "63bac4ccb191394110128af5ce1d9ab730d258c53954f8f2fe5aef98716cca3a"
+      "sha256": "fe77fb729c3c11af3999a4184d799acdd6b4cecf4839ee93e2a700e65d7d92e3"
     },
     {
-      "file": "north-america-primary-watersheds-730217a382e8.001.bin",
+      "file": "north-america-primary-watersheds-b12108a0481c.001.bin",
       "bytes": 99614720,
-      "sha256": "06dbb7d27b5aa746b5fe8546e1c6679ae8907b3a4e046bab039d1cfda9a0986c"
+      "sha256": "241fc5e6de108028190f1f465694c9704cdf3a795c3c507e9ce2df0b4e917c99"
     },
     {
-      "file": "north-america-primary-watersheds-730217a382e8.002.bin",
-      "bytes": 86440167,
-      "sha256": "7d1eb7f0d136baf5b93ec842e50c372cb936ee0d0a8bfab0abcc828addf88076"
+      "file": "north-america-primary-watersheds-b12108a0481c.002.bin",
+      "bytes": 86504193,
+      "sha256": "5f2cc25cd6a6cdfd1082ea10a86a5fdd1035c192cac4fbe0bf8abfd9701faa89"
     }
   ]
 }

@@ -1,7 +1,8 @@
 """Classify HydroSHEDS v2 terminal reaches using its matching D8 raster.
 
 Reads small raster blocks, never a lower-resolution coastline. Ambiguous terminals
-remain unverified. Run after extracting RIV; results are restartable in SQLite.
+remain unverified. The intermediate `inland` category only means a surface sink;
+it does not establish endorheic drainage. Run after extracting RIV; results are restartable in SQLite.
 """
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path

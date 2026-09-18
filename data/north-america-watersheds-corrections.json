@@ -1,0 +1,17 @@
+{
+  "version": 1,
+  "source_dataset": "HydroSHEDS v2.0 North America BAS beta / RIV v2r0",
+  "connections": [
+    {
+      "name": "Culverson Creek karst drainage",
+      "source_basins": [86409, 86528],
+      "target_basin": 72911,
+      "modeled_sink": [-80.46319444444444, 37.93902777777778],
+      "downstream_route": "Culverson Creek caves → springs on Spring Creek → Greenbrier → New → Kanawha → Ohio → Mississippi",
+      "source_url": "https://karstwaters.org/wp-content/uploads/2023/06/SP4-West-Va-Atlas-1.pdf",
+      "citation": "Jones, W. K. (1997), Karst Hydrology Atlas of West Virginia, Karst Waters Institute Special Publication 4, p. 90 and Greenbrier County tracer tables",
+      "evidence": "Dye traces connect Culverson Creek Cave to four resurgences on Spring Creek. Both source polygons terminate at the same modeled Culverson sink. This connection corrects ultimate basin membership; the surface polygons are not a surveyed groundwater divide.",
+      "test_points": [[-80.436944, 38.00125], [-80.442083, 37.932778]]
+    }
+  ]
+}
