@@ -100,3 +100,72 @@ test('published mainline merges omit crossed pairs and keep the clean continuing
     await handle.close();
   }
 });
+
+test('published tiles contain all four source-verified terminal merges', async () => {
+  const { recoverTerminalContinuations } =
+    await import('./highway-terminal-continuations.mjs');
+  const { averageReciprocalPathCoordinates } =
+    await import('./osm-highway-network.mjs');
+  const handle = await open(
+    new URL('../data/north-america-highways.pmtiles', import.meta.url),
+  );
+  try {
+    const archive = new PMTiles({
+      getKey: () => 'published-terminal-merges',
+      getBytes: async (offset, length) => {
+        const buffer = Buffer.alloc(length);
+        const { bytesRead } = await handle.read(buffer, 0, length, offset);
+        return {
+          data: buffer.buffer.slice(buffer.byteOffset, buffer.byteOffset + bytesRead),
+        };
+      },
+    });
+    for (const site of [
+      'richmond-i295-i95',
+      'petersburg-i85-i95',
+      'columbia-i26-i126',
+      'atlanta-i675-i75',
+    ]) {
+      const data = JSON.parse(
+        await readFile(
+          new URL(`./fixtures/${site}-terminal.json`, import.meta.url),
+          'utf8',
+        ),
+      );
+      const { additions } = recoverTerminalContinuations(
+        { nodes: new Map(data.nodes) },
+        data.prepared,
+        data.chains,
+        data.parts,
+        averageReciprocalPathCoordinates,
+        new Set([data.branchIndex]),
+      );
+      assert.equal(additions.length, 1);
+      const expected = additions[0];
+      for (const point of expected.coordinates) {
+        const x = Math.floor(((point[0] + 180) / 360) * 2 ** 14);
+        const y = Math.floor(
+          ((1 - Math.asinh(Math.tan((point[1] * Math.PI) / 180)) / Math.PI) / 2) *
+            2 ** 14,
+        );
+        const tile = await archive.getZxy(14, x, y);
+        assert.ok(tile, `${site} tile exists`);
+        const layer = new VectorTile(new Pbf(tile.data)).layers.highways;
+        let found = false;
+        for (let i = 0; i < layer.length; i++) {
+          const feature = layer.feature(i);
+          if (feature.properties.id !== expected.id) continue;
+          const geometry = feature.toGeoJSON(x, y, 14).geometry;
+          const lines =
+            geometry.type === 'LineString'
+              ? [geometry.coordinates]
+              : geometry.coordinates;
+          if (lines.some((line) => distanceToLine(point, line) < 3)) found = true;
+        }
+        assert.ok(found, `${site} publishes the merge at ${point}`);
+      }
+    }
+  } finally {
+    await handle.close();
+  }
+});

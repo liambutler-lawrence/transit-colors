@@ -1,15 +1,15 @@
 {
-  "sourceFingerprint": "64f10947c4718ff3ad3d669508f54f1835895ba2c73fc23c0ec9523b9a112680",
+  "sourceFingerprint": "651f5d332313e7a56f42f3271afd9f134ac79fe547d8860fcdf1a1848b1a165d",
   "boundaryProof": {
-    "sourceCorridors": 1520,
-    "matchedDisplaySegments": 292363,
+    "sourceCorridors": 1525,
+    "matchedDisplaySegments": 292448,
     "junctionAnomalies": 0
   },
   "sourceRecoveries": [
     "source-verified-401-east-dvp-south"
   ],
   "method": "Shortest WGS84 distance to the 5 km radius boundary; source-topology turn constraints and both directions at one interchange",
-  "circumferenceSha256": "9b57e164715ba0ab39e419407b5b685f063f5b774ae4bf6587abb1c67d8faa0e",
+  "circumferenceSha256": "0b90dbc0519829d6eb0c536c1a3a87cb0a8a3625c5c9ac3232845962ec2a67bd",
   "results": [
     {
       "id": "US-AL",
@@ -2139,8 +2139,8 @@
           "osm-source-mainline-48159600",
           "osm-source-mainline-48159587",
           "osm-source-mainline-48159590",
+          "osm-source-mainline-48159592",
           "osm-source-mainline-44075472",
-          "osm-source-mainline-48159596",
           "osm-source-mainline-48159571",
           "osm-source-mainline-32769710",
           "osm-source-mainline-39018187",
@@ -2323,8 +2323,7 @@
             "osm-source-mainline-48208387",
             "osm-source-mainline-455730555",
             "osm-source-mainline-628673456",
-            "osm-source-mainline-41840222",
-            "osm-source-mainline-39018650"
+            "osm-terminal-continuation-osm-mainline-3478-start"
           ]
         }
       ],
@@ -2447,8 +2446,8 @@
         "48159600",
         "48159587",
         "48159590",
+        "48159592",
         "44075472",
-        "48159596",
         "48159571",
         "32769710",
         "39018187",
@@ -5540,10 +5539,10 @@
     {
       "id": "US-IL",
       "subdivision": "Illinois",
-      "unrestrictedLengthMeters": 305489.3140962297,
+      "unrestrictedLengthMeters": 305488.3311254801,
       "nearestApproachAudit": {
         "boundaryNode": "center:1931:1678",
-        "direction": 1,
+        "direction": -1,
         "sourceParts": [
           "osm-source-mainline-40230890",
           "osm-source-mainline-166898146",
@@ -5750,7 +5749,6 @@
           "osm-source-mainline-484411335",
           "osm-source-mainline-484411337",
           "osm-source-mainline-484411338",
-          "osm-source-mainline-484411339",
           "osm-source-mainline-888303869",
           "osm-source-mainline-82650824",
           "osm-source-mainline-888303868",
@@ -5857,7 +5855,7 @@
         ]
       },
       "status": "connected",
-      "lengthMeters": 305489.31409622973,
+      "lengthMeters": 305488.3311254802,
       "circleEntry": [
         -89.59674631935334,
         39.80259609053733
@@ -6154,7 +6152,6 @@
         "484411335",
         "484411337",
         "484411338",
-        "484411339",
         "888303869",
         "82650824",
         "888303868",
@@ -6672,13 +6669,13 @@
           "osm-source-mainline-17263643",
           "osm-source-mainline-1340516782",
           "osm-source-mainline-51362908",
-          "osm-source-mainline-172599151",
-          "osm-source-mainline-172599157",
+          "osm-source-mainline-172599158",
           "osm-source-mainline-17371800",
           "osm-source-mainline-525865536",
           "osm-source-mainline-17371803",
           "osm-source-mainline-525865535",
           "osm-source-mainline-172599152",
+          "osm-source-mainline-172599157",
           "osm-source-mainline-525866375",
           "osm-source-mainline-17483056",
           "osm-source-mainline-613502923",
@@ -7251,13 +7248,13 @@
         "17263643",
         "1340516782",
         "51362908",
-        "172599151",
-        "172599157",
+        "172599158",
         "17371800",
         "525865536",
         "17371803",
         "525865535",
         "172599152",
+        "172599157",
         "525866375",
         "17483056",
         "613502923",
@@ -7856,7 +7853,7 @@
       "subdivision": "Michigan",
       "unrestrictedLengthMeters": 64133.702006273736,
       "nearestApproachAudit": {
-        "boundaryNode": "center:1431:5219",
+        "boundaryNode": "center:1431:5221",
         "direction": 1,
         "sourceParts": [
           "osm-connector-341",
@@ -7940,7 +7937,7 @@
       ],
       "approaches": [
         {
-          "boundaryNode": "center:1431:5219",
+          "boundaryNode": "center:1431:5221",
           "boundaryCoordinate": [
             -85.0073042,
             42.2973997
@@ -7955,7 +7952,7 @@
           ]
         },
         {
-          "boundaryNode": "center:1431:5257",
+          "boundaryNode": "center:1431:5259",
           "boundaryCoordinate": [
             -84.9847437,
             42.2972506
@@ -8079,7 +8076,7 @@
       "subdivision": "Mississippi",
       "unrestrictedLengthMeters": 252585.80284224777,
       "nearestApproachAudit": {
-        "boundaryNode": "center:304:763",
+        "boundaryNode": "center:304:764",
         "direction": 1,
         "sourceParts": [
           "osm-connector-4592",
@@ -8348,7 +8345,7 @@
       ],
       "approaches": [
         {
-          "boundaryNode": "center:304:2379",
+          "boundaryNode": "center:304:2380",
           "boundaryCoordinate": [
             -91.1096105,
             30.4141261
@@ -8363,7 +8360,7 @@
           ]
         },
         {
-          "boundaryNode": "center:304:2408",
+          "boundaryNode": "center:304:2409",
           "boundaryCoordinate": [
             -91.1223475,
             30.4204832
@@ -10783,7 +10780,7 @@
       "subdivision": "North Carolina",
       "unrestrictedLengthMeters": 42853.031180306694,
       "nearestApproachAudit": {
-        "boundaryNode": "center:498:5405",
+        "boundaryNode": "center:498:5407",
         "direction": 1,
         "sourceParts": [
           "osm-connector-2262",
@@ -10852,8 +10849,8 @@
           "osm-source-mainline-709188236",
           "osm-source-mainline-832425526",
           "osm-source-mainline-120108289",
-          "osm-source-mainline-120885490",
           "osm-source-mainline-33657980",
+          "osm-source-mainline-120885490",
           "osm-source-mainline-1539955504",
           "osm-source-mainline-1525013728",
           "osm-source-mainline-120885486",
@@ -10874,7 +10871,7 @@
       ],
       "approaches": [
         {
-          "boundaryNode": "center:498:5405",
+          "boundaryNode": "center:498:5407",
           "boundaryCoordinate": [
             -78.5140908,
             35.392151
@@ -10889,7 +10886,7 @@
           ]
         },
         {
-          "boundaryNode": "center:498:5433",
+          "boundaryNode": "center:498:5435",
           "boundaryCoordinate": [
             -78.5255645,
             35.38543
@@ -10974,8 +10971,8 @@
         "709188236",
         "832425526",
         "120108289",
-        "33657980",
         "120885490",
+        "33657980",
         "1539955504",
         "1525013728",
         "120885486",
@@ -11419,7 +11416,7 @@
     {
       "id": "US-TX",
       "subdivision": "Texas",
-      "unrestrictedLengthMeters": 109769.82070422999,
+      "unrestrictedLengthMeters": 109768.08988704078,
       "nearestApproachAudit": {
         "boundaryNode": "center:309:3762",
         "direction": -1,
@@ -11544,8 +11541,8 @@
           "osm-source-mainline-122593389",
           "osm-source-mainline-122593447",
           "osm-source-mainline-122593450",
-          "osm-source-mainline-122593431",
-          "osm-source-mainline-1070790901",
+          "osm-terminal-continuation-osm-mainline-3326-start",
+          "osm-source-mainline-123288699",
           "osm-source-mainline-122593226",
           "osm-source-mainline-966201709",
           "osm-source-mainline-122593238",
@@ -11749,7 +11746,7 @@
         ]
       },
       "status": "connected",
-      "lengthMeters": 109769.82070423022,
+      "lengthMeters": 109768.08988704102,
       "circleEntry": [
         -97.70950782737981,
         30.3108882062389
@@ -11911,6 +11908,7 @@
         "122593389",
         "122593447",
         "122593450",
+        "123288699",
         "122593431",
         "1070790901",
         "122593226",
@@ -11989,9 +11987,9 @@
         "123288708",
         "123288696",
         "123288704",
-        "966201708",
         "122593225",
         "966367240",
+        "966201708",
         "966367239",
         "122593235",
         "122593244",
@@ -12561,10 +12559,17 @@
         "3992909",
         "3696127",
         "34375354",
+        "1280888648",
+        "44081848",
+        "3992900",
+        "859067113",
         "3696087",
         "3996242",
         "24221832",
         "3696083",
+        "55346856",
+        "145657882",
+        "83347896",
         "1358961953",
         "1358962938",
         "55346855",
@@ -12690,14 +12695,7 @@
         "14348399",
         "33765231",
         "33765232",
-        "8823418",
-        "1280888648",
-        "44081848",
-        "3992900",
-        "859067113",
-        "55346856",
-        "145657882",
-        "83347896"
+        "8823418"
       ]
     },
     {

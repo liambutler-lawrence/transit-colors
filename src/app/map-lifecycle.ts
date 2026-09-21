@@ -271,12 +271,12 @@ export function installMapData(stations: StationCollection): void {
 
   map.addSource('highway-circumference', {
     type: 'vector',
-    url: `pmtiles://${new URL('data/north-america-highways-route.pmtiles?v=20260911a', window.location.href).href}`,
+    url: `pmtiles://${new URL('data/north-america-highways-route.pmtiles?v=20260921a', window.location.href).href}`,
     promoteId: 'segment_id',
   });
 
   const highwayTilesUrl = new URL(
-    'data/north-america-highways.pmtiles?v=20260911a',
+    'data/north-america-highways.pmtiles?v=20260921a',
     window.location.href,
   ).href;
   map.addSource('highway-network', {

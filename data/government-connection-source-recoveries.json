@@ -2,7 +2,7 @@
   {
     "id": "source-verified-401-east-dvp-south",
     "sourcePbfSha256": "f26c8b50810cab67f23749cc4b9a5fdc927da6a1379a0b44cbb6d5430b2318a4",
-    "sourceFingerprint": "64f10947c4718ff3ad3d669508f54f1835895ba2c73fc23c0ec9523b9a112680",
+    "sourceFingerprint": "651f5d332313e7a56f42f3271afd9f134ac79fe547d8860fcdf1a1848b1a165d",
     "start": {
       "partId": "osm-mainline-1103",
       "coordinate": [
