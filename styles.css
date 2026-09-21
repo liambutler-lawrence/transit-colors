@@ -1927,3 +1927,58 @@ body {
   flex: 0 0 12px;
   border-radius: 3px;
 }
+
+.government-seat-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  font-size: 0.88rem;
+  font-weight: 650;
+}
+.government-seat-controls {
+  margin-top: 12px;
+}
+.government-seat-controls label {
+  display: block;
+  font-size: 0.8rem;
+  margin-bottom: 6px;
+}
+.government-seat-controls select {
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--paper);
+  color: inherit;
+  font: inherit;
+  font-size: 0.85rem;
+}
+.government-seat-controls small {
+  display: block;
+  margin-top: 7px;
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+.government-seat-toggle[hidden],
+.government-seat-controls[hidden] {
+  display: none;
+}
+.government-seat-popup {
+  color: #182c3d;
+  line-height: 1.45;
+}
+.government-seat-popup strong {
+  font-size: 14px;
+}
+.government-seat-popup p {
+  margin: 7px 0;
+}
+.government-seat-popup a {
+  color: #076599;
+}
+.government-seat-popup .government-seat-checked {
+  color: #52616c;
+  font-size: 11px;
+}
