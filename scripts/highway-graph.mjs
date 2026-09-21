@@ -113,7 +113,7 @@ export function highwayTwoCore(nodeIds, edges) {
   return { activeEdges, activeNodes, incident };
 }
 
-export function compressHighwayCore(coordinateByNodeId, edges, core) {
+export function compressHighwayCore(coordinateByNodeId, edges, core, options = {}) {
   const junctions = new Set(
     [...core.activeNodes].filter(
       (nodeId) => (core.incident.get(nodeId)?.size ?? 0) !== 2,
@@ -152,6 +152,7 @@ export function compressHighwayCore(coordinateByNodeId, edges, core) {
       }
       const coordinates = [coordinateByNodeId.get(startId)];
       const partIndices = new Set();
+      const sourceEdgeIndices = [];
       const fromTurnPort = highwayTurnPort(edges[startingEdgeIndex], startId);
       let toTurnPort;
       let invalidTurn = false;
@@ -159,6 +160,7 @@ export function compressHighwayCore(coordinateByNodeId, edges, core) {
       let edgeIndex = startingEdgeIndex;
       while (true) {
         visitedEdges.add(edgeIndex);
+        if (options.includeSourceEdges) sourceEdgeIndices.push(edgeIndex);
         const edge = edges[edgeIndex];
         for (const partIndex of edge.partIndices) partIndices.add(partIndex);
         const nextId = edge.fromId === currentId ? edge.toId : edge.fromId;
@@ -189,6 +191,7 @@ export function compressHighwayCore(coordinateByNodeId, edges, core) {
         ...(fromTurnPort ? { fromTurnPort } : {}),
         ...(toTurnPort ? { toTurnPort } : {}),
         ...(invalidTurn ? { invalidTurn: true } : {}),
+        ...(options.includeSourceEdges ? { sourceEdgeIndices } : {}),
       });
     }
   }
