@@ -1,0 +1,1352 @@
+{
+  "reviewedAt": "2026-09-21",
+  "scope": "Canada (13), United States (50 states and DC), Mexico (32 federal entities). Dependencies, Central America and the Caribbean are outside this highway-dataset scope.",
+  "diameterMeters": 10000,
+  "attribution": "Coordinates: OpenStreetMap contributors (ODbL), Wikipedia contributors (CC BY-SA). Individual source links accompany every seat.",
+  "seats": [
+    {
+      "id": "US-AL",
+      "subdivision": "Alabama",
+      "country": "United States",
+      "building": "Alabama State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -86.3009417,
+        32.3774472
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-AK",
+      "subdivision": "Alaska",
+      "country": "United States",
+      "building": "Alaska State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -134.4104667,
+        58.3021972
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-AZ",
+      "subdivision": "Arizona",
+      "country": "United States",
+      "building": "Arizona Executive Tower",
+      "role": "State government",
+      "coordinates": [
+        -112.0978012,
+        33.4481203
+      ],
+      "sourceUrl": "https://publicmeetings.az.gov/executive-tower-directory",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/30694495",
+      "note": "Active executive offices west of the historic capitol museum."
+    },
+    {
+      "id": "US-AR",
+      "subdivision": "Arkansas",
+      "country": "United States",
+      "building": "Arkansas State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -92.2887611,
+        34.7467583
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-CA",
+      "subdivision": "California",
+      "country": "United States",
+      "building": "California State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -121.4934111,
+        38.5765722
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-CO",
+      "subdivision": "Colorado",
+      "country": "United States",
+      "building": "Colorado State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -104.9848972,
+        39.7390944
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-CT",
+      "subdivision": "Connecticut",
+      "country": "United States",
+      "building": "Connecticut State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -72.68278,
+        41.7641361
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-DE",
+      "subdivision": "Delaware",
+      "country": "United States",
+      "building": "Delaware Legislative Hall",
+      "role": "State government",
+      "coordinates": [
+        -75.51972,
+        39.157306
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-FL",
+      "subdivision": "Florida",
+      "country": "United States",
+      "building": "Florida State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -84.2821703,
+        30.4381743
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/550167700",
+      "note": "The working capitol tower, west of the historic capitol museum."
+    },
+    {
+      "id": "US-GA",
+      "subdivision": "Georgia",
+      "country": "United States",
+      "building": "Georgia State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -84.3882611,
+        33.7492722
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-HI",
+      "subdivision": "Hawaii",
+      "country": "United States",
+      "building": "Hawaii State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -157.8572667,
+        21.3073417
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-ID",
+      "subdivision": "Idaho",
+      "country": "United States",
+      "building": "Idaho State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -116.1996139,
+        43.6176972
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-IL",
+      "subdivision": "Illinois",
+      "country": "United States",
+      "building": "Illinois State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -89.654889,
+        39.7985167
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-IN",
+      "subdivision": "Indiana",
+      "country": "United States",
+      "building": "Indiana Statehouse",
+      "role": "State government",
+      "coordinates": [
+        -86.1625,
+        39.76861
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-IA",
+      "subdivision": "Iowa",
+      "country": "United States",
+      "building": "Iowa State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -93.6038694,
+        41.5911778
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-KS",
+      "subdivision": "Kansas",
+      "country": "United States",
+      "building": "Kansas State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -95.6781556,
+        39.0480083
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-KY",
+      "subdivision": "Kentucky",
+      "country": "United States",
+      "building": "State Office Building — Office of the Governor",
+      "role": "State government",
+      "coordinates": [
+        -84.8721744,
+        38.2000189
+      ],
+      "sourceUrl": "https://www.kentucky.gov/Pages/Activity-stream.aspx?n=FinanceandAdministrationCabinet&prId=334",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/285915972",
+      "note": "The governor works at 501 High Street while the capitol is closed for restoration."
+    },
+    {
+      "id": "US-LA",
+      "subdivision": "Louisiana",
+      "country": "United States",
+      "building": "Louisiana State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -91.1874056,
+        30.4570722
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-ME",
+      "subdivision": "Maine",
+      "country": "United States",
+      "building": "Maine State House",
+      "role": "State government",
+      "coordinates": [
+        -69.7816778,
+        44.3072361
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-MD",
+      "subdivision": "Maryland",
+      "country": "United States",
+      "building": "Maryland State House",
+      "role": "State government",
+      "coordinates": [
+        -76.49111,
+        38.97861
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-MA",
+      "subdivision": "Massachusetts",
+      "country": "United States",
+      "building": "Massachusetts State House",
+      "role": "State government",
+      "coordinates": [
+        -71.0637,
+        42.358175
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-MI",
+      "subdivision": "Michigan",
+      "country": "United States",
+      "building": "Michigan State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -84.5555889,
+        42.7337278
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-MN",
+      "subdivision": "Minnesota",
+      "country": "United States",
+      "building": "Minnesota State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -93.1022361,
+        44.9551472
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-MS",
+      "subdivision": "Mississippi",
+      "country": "United States",
+      "building": "Mississippi State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -90.18222,
+        32.30389
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-MO",
+      "subdivision": "Missouri",
+      "country": "United States",
+      "building": "Missouri State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -92.1729917,
+        38.5791194
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-MT",
+      "subdivision": "Montana",
+      "country": "United States",
+      "building": "Montana State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -112.0184,
+        46.5857
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-NE",
+      "subdivision": "Nebraska",
+      "country": "United States",
+      "building": "Nebraska State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -96.6995861,
+        40.8080889
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-NV",
+      "subdivision": "Nevada",
+      "country": "United States",
+      "building": "Nevada State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -119.7662917,
+        39.164075
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-NH",
+      "subdivision": "New Hampshire",
+      "country": "United States",
+      "building": "New Hampshire State House",
+      "role": "State government",
+      "coordinates": [
+        -71.5381278,
+        43.2067472
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-NJ",
+      "subdivision": "New Jersey",
+      "country": "United States",
+      "building": "New Jersey State House",
+      "role": "State government",
+      "coordinates": [
+        -74.7699028,
+        40.2204361
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-NM",
+      "subdivision": "New Mexico",
+      "country": "United States",
+      "building": "New Mexico State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -105.9396583,
+        35.6822806
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-NY",
+      "subdivision": "New York",
+      "country": "United States",
+      "building": "New York State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -73.7573222,
+        42.6525528
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-NC",
+      "subdivision": "North Carolina",
+      "country": "United States",
+      "building": "North Carolina State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -78.63917,
+        35.78028
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-ND",
+      "subdivision": "North Dakota",
+      "country": "United States",
+      "building": "North Dakota State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -100.7827417,
+        46.8208139
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-OH",
+      "subdivision": "Ohio",
+      "country": "United States",
+      "building": "Ohio Statehouse",
+      "role": "State government",
+      "coordinates": [
+        -82.99889,
+        39.96139
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-OK",
+      "subdivision": "Oklahoma",
+      "country": "United States",
+      "building": "Oklahoma State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -97.5033722,
+        35.4922806
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-OR",
+      "subdivision": "Oregon",
+      "country": "United States",
+      "building": "Oregon State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -123.0300972,
+        44.9387306
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-PA",
+      "subdivision": "Pennsylvania",
+      "country": "United States",
+      "building": "Pennsylvania State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -76.88333,
+        40.26444
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-RI",
+      "subdivision": "Rhode Island",
+      "country": "United States",
+      "building": "Rhode Island State House",
+      "role": "State government",
+      "coordinates": [
+        -71.415,
+        41.83083
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-SC",
+      "subdivision": "South Carolina",
+      "country": "United States",
+      "building": "South Carolina State House",
+      "role": "State government",
+      "coordinates": [
+        -81.0331472,
+        34.0004333
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-SD",
+      "subdivision": "South Dakota",
+      "country": "United States",
+      "building": "South Dakota State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -100.3463528,
+        44.367167
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-TN",
+      "subdivision": "Tennessee",
+      "country": "United States",
+      "building": "Tennessee State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -86.78417,
+        36.16583
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-TX",
+      "subdivision": "Texas",
+      "country": "United States",
+      "building": "Texas State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -97.74056,
+        30.27472
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-UT",
+      "subdivision": "Utah",
+      "country": "United States",
+      "building": "Utah State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -111.88806,
+        40.77722
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-VT",
+      "subdivision": "Vermont",
+      "country": "United States",
+      "building": "Vermont State House",
+      "role": "State government",
+      "coordinates": [
+        -72.58083,
+        44.26222
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-VA",
+      "subdivision": "Virginia",
+      "country": "United States",
+      "building": "Virginia State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -77.4335944,
+        37.5387583
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-WA",
+      "subdivision": "Washington",
+      "country": "United States",
+      "building": "Washington State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -122.905,
+        47.03556
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-WV",
+      "subdivision": "West Virginia",
+      "country": "United States",
+      "building": "West Virginia State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -81.61222,
+        38.33639
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-WI",
+      "subdivision": "Wisconsin",
+      "country": "United States",
+      "building": "Wisconsin State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -89.38472,
+        43.07444
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-WY",
+      "subdivision": "Wyoming",
+      "country": "United States",
+      "building": "Wyoming State Capitol",
+      "role": "State government",
+      "coordinates": [
+        -104.81972,
+        41.14028
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "US-DC",
+      "subdivision": "District of Columbia",
+      "country": "United States",
+      "building": "John A. Wilson Building",
+      "role": "District government",
+      "coordinates": [
+        -77.03167,
+        38.89472
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/List_of_state_and_territorial_capitols_in_the_United_States",
+      "note": ""
+    },
+    {
+      "id": "CA-AB",
+      "subdivision": "Alberta",
+      "country": "Canada",
+      "building": "Legislative Building of Alberta",
+      "role": "Provincial legislature",
+      "coordinates": [
+        -113.506531,
+        53.533714
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "note": ""
+    },
+    {
+      "id": "CA-BC",
+      "subdivision": "British Columbia",
+      "country": "Canada",
+      "building": "Parliament Buildings of British Columbia",
+      "role": "Provincial legislature",
+      "coordinates": [
+        -123.370261,
+        48.419631
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "note": ""
+    },
+    {
+      "id": "CA-MB",
+      "subdivision": "Manitoba",
+      "country": "Canada",
+      "building": "Legislative Building of Manitoba",
+      "role": "Provincial legislature",
+      "coordinates": [
+        -97.146918,
+        49.884394
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "note": ""
+    },
+    {
+      "id": "CA-NB",
+      "subdivision": "New Brunswick",
+      "country": "Canada",
+      "building": "Legislative Building of New Brunswick",
+      "role": "Provincial legislature",
+      "coordinates": [
+        -66.636103,
+        45.959325
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "note": ""
+    },
+    {
+      "id": "CA-NL",
+      "subdivision": "Newfoundland and Labrador",
+      "country": "Canada",
+      "building": "Confederation Building (Newfoundland and Labrador)",
+      "role": "Provincial legislature",
+      "coordinates": [
+        -52.7238083,
+        47.5834083
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "note": ""
+    },
+    {
+      "id": "CA-NT",
+      "subdivision": "Northwest Territories",
+      "country": "Canada",
+      "building": "Legislative Building of the Northwest Territories",
+      "role": "Territorial legislature",
+      "coordinates": [
+        -114.382042,
+        62.459384
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "note": ""
+    },
+    {
+      "id": "CA-NS",
+      "subdivision": "Nova Scotia",
+      "country": "Canada",
+      "building": "Province House (Nova Scotia)",
+      "role": "Provincial legislature",
+      "coordinates": [
+        -63.573396,
+        44.64791
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "note": ""
+    },
+    {
+      "id": "CA-NU",
+      "subdivision": "Nunavut",
+      "country": "Canada",
+      "building": "Legislative Building of Nunavut",
+      "role": "Territorial legislature",
+      "coordinates": [
+        -68.52306,
+        63.75028
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "note": ""
+    },
+    {
+      "id": "CA-ON",
+      "subdivision": "Ontario",
+      "country": "Canada",
+      "building": "Legislative Building of Ontario",
+      "role": "Provincial legislature",
+      "coordinates": [
+        -79.391708,
+        43.662447
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "note": ""
+    },
+    {
+      "id": "CA-PE",
+      "subdivision": "Prince Edward Island",
+      "country": "Canada",
+      "building": "Hon. George Coles Building",
+      "role": "Provincial legislature",
+      "coordinates": [
+        -63.125476,
+        46.2353219
+      ],
+      "sourceUrl": "https://www.assembly.pe.ca/visit",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/28325878",
+      "note": "Temporary legislative chamber during restoration of Province House."
+    },
+    {
+      "id": "CA-QC",
+      "subdivision": "Quebec",
+      "country": "Canada",
+      "building": "Parliament Building of Quebec",
+      "role": "Provincial legislature",
+      "coordinates": [
+        -71.214178,
+        46.808762
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "note": ""
+    },
+    {
+      "id": "CA-SK",
+      "subdivision": "Saskatchewan",
+      "country": "Canada",
+      "building": "Legislative Building of Saskatchewan",
+      "role": "Provincial legislature",
+      "coordinates": [
+        -104.615099,
+        50.432426
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "note": ""
+    },
+    {
+      "id": "CA-YT",
+      "subdivision": "Yukon",
+      "country": "Canada",
+      "building": "Legislative Building of Yukon",
+      "role": "Territorial legislature",
+      "coordinates": [
+        -135.049374,
+        60.716948
+      ],
+      "sourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "coordinateSourceUrl": "https://en.wikipedia.org/wiki/Legislative_buildings_of_Canada",
+      "note": ""
+    },
+    {
+      "id": "MX-AGU",
+      "subdivision": "Aguascalientes",
+      "country": "Mexico",
+      "building": "Palacio del Gobierno de Aguascalientes",
+      "role": "State executive government",
+      "coordinates": [
+        -102.2960219,
+        21.8798047
+      ],
+      "sourceUrl": "https://ags.gob.mx/turismo/conocemas/palaciodegobierno/index.html",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/420317019",
+      "note": ""
+    },
+    {
+      "id": "MX-BCN",
+      "subdivision": "Baja California",
+      "country": "Mexico",
+      "building": "Palacio Ejecutivo Estatal",
+      "role": "State executive government",
+      "coordinates": [
+        -115.4756342,
+        32.6411034
+      ],
+      "sourceUrl": "https://www.bajacalifornia.gob.mx/Secretarias/Secretario_Ejecutivo",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/node/6949928166",
+      "note": ""
+    },
+    {
+      "id": "MX-BCS",
+      "subdivision": "Baja California Sur",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno",
+      "role": "State executive government",
+      "coordinates": [
+        -110.3064892,
+        24.1486595
+      ],
+      "sourceUrl": "https://contraloria.bcs.gob.mx/wp-content/uploads/Anexo-de-Ejecucion-para-el-Ejercicio-2011.pdf",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/876515016",
+      "note": ""
+    },
+    {
+      "id": "MX-CAM",
+      "subdivision": "Campeche",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno",
+      "role": "State executive government",
+      "coordinates": [
+        -90.5396244,
+        19.8453909
+      ],
+      "sourceUrl": "https://ucs.campeche.gob.mx/la-gobernadora-layda-sansores-san-roman-puso-en-marcha-las-audiencias-publicas-ciudadanas/",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/258393348",
+      "note": ""
+    },
+    {
+      "id": "MX-CHP",
+      "subdivision": "Chiapas",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno",
+      "role": "State executive government",
+      "coordinates": [
+        -93.1149207,
+        16.753875
+      ],
+      "sourceUrl": "https://www.sistemas.chiapas.gob.mx/PortalTransparencia/PortalSO/InfoFracciones?idSO=1",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/161920944",
+      "note": ""
+    },
+    {
+      "id": "MX-CHH",
+      "subdivision": "Chihuahua",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno",
+      "role": "State executive government",
+      "coordinates": [
+        -106.0733679,
+        28.6390799
+      ],
+      "sourceUrl": "https://www.chihuahua.gob.mx/gobierno/dependencias_secretarias",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/139843656",
+      "note": ""
+    },
+    {
+      "id": "MX-CMX",
+      "subdivision": "Ciudad de México",
+      "country": "Mexico",
+      "building": "Antiguo Palacio del Ayuntamiento",
+      "role": "City executive government",
+      "coordinates": [
+        -99.134277,
+        19.4316429
+      ],
+      "sourceUrl": "https://www.jefaturadegobierno.cdmx.gob.mx/storage/app/media/info-audienciaspublicas.pdf",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/relation/16031597",
+      "note": ""
+    },
+    {
+      "id": "MX-COA",
+      "subdivision": "Coahuila",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno del Estado de Coahuila",
+      "role": "State executive government",
+      "coordinates": [
+        -101.0009458,
+        25.4219036
+      ],
+      "sourceUrl": "https://coahuila.gob.mx/",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/99272052",
+      "note": ""
+    },
+    {
+      "id": "MX-COL",
+      "subdivision": "Colima",
+      "country": "Mexico",
+      "building": "Complejo Administrativo — Edificio A",
+      "role": "State executive government",
+      "coordinates": [
+        -103.6878234,
+        19.2556971
+      ],
+      "sourceUrl": "https://sidofqa.segob.gob.mx/notas/getNewsletter/06-06-2025/Matutina/321423",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/1150796677",
+      "note": "Governor’s office in Building A; the historic downtown palace is a museum."
+    },
+    {
+      "id": "MX-DUR",
+      "subdivision": "Durango",
+      "country": "Mexico",
+      "building": "Centro de Convenciones Bicentenario — Despacho del Ejecutivo",
+      "role": "State executive government",
+      "coordinates": [
+        -104.6816455,
+        24.0342443
+      ],
+      "sourceUrl": "https://transparencia.durango.gob.mx/DESPACHO/organigrama",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/48142268",
+      "note": "Working executive seat at the Bicentenario complex; the former Palacio de Zambrano is a museum. Marker represents the complex."
+    },
+    {
+      "id": "MX-GUA",
+      "subdivision": "Guanajuato",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno del Estado de Guanajuato",
+      "role": "State executive government",
+      "coordinates": [
+        -101.2435337,
+        21.003277
+      ],
+      "sourceUrl": "https://es.wikipedia.org/wiki/Palacio_de_Gobierno_del_Estado_de_Guanajuato",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/node/4343800802",
+      "note": ""
+    },
+    {
+      "id": "MX-GRO",
+      "subdivision": "Guerrero",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno del Estado de Guerrero",
+      "role": "State executive government",
+      "coordinates": [
+        -99.4951336,
+        17.5282684
+      ],
+      "sourceUrl": "https://sidof.segob.gob.mx/notas/docFuente/5561014",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/284548794",
+      "note": ""
+    },
+    {
+      "id": "MX-HID",
+      "subdivision": "Hidalgo",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno del Estado de Hidalgo",
+      "role": "State executive government",
+      "coordinates": [
+        -98.736733,
+        20.1224804
+      ],
+      "sourceUrl": "https://comunicacion.hidalgo.gob.mx/?p=32732",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/276629153",
+      "note": ""
+    },
+    {
+      "id": "MX-JAL",
+      "subdivision": "Jalisco",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno",
+      "role": "State executive government",
+      "coordinates": [
+        -103.3460859,
+        20.6762137
+      ],
+      "sourceUrl": "https://info.jalisco.gob.mx/node/8631",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/relation/11634328",
+      "note": ""
+    },
+    {
+      "id": "MX-MEX",
+      "subdivision": "Estado de México",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno",
+      "role": "State executive government",
+      "coordinates": [
+        -99.6574758,
+        19.2935097
+      ],
+      "sourceUrl": "https://sgg.edomex.gob.mx/sites/sgg.edomex.gob.mx/files/files/Avisos_de_Privacidad/SRIA_PART_PETICIONES.pdf",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/relation/13545213",
+      "note": ""
+    },
+    {
+      "id": "MX-MIC",
+      "subdivision": "Michoacán",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno del Estado",
+      "role": "State executive government",
+      "coordinates": [
+        -101.1920605,
+        19.7033587
+      ],
+      "sourceUrl": "https://es.wikipedia.org/wiki/Palacio_de_Gobierno_de_Michoac%C3%A1n",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/node/3128104053",
+      "note": ""
+    },
+    {
+      "id": "MX-MOR",
+      "subdivision": "Morelos",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno",
+      "role": "State executive government",
+      "coordinates": [
+        -99.2349263,
+        18.9217479
+      ],
+      "sourceUrl": "https://www.morelos.gob.mx/sitios/contacto/jefatura-de-la-oficina-de-la-gubernatura-del-estado-de-morelos",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/relation/7062119",
+      "note": ""
+    },
+    {
+      "id": "MX-NAY",
+      "subdivision": "Nayarit",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno de Nayarit",
+      "role": "State executive government",
+      "coordinates": [
+        -104.8938049,
+        21.5074133
+      ],
+      "sourceUrl": "https://sic.cultura.gob.mx/ficha.php?table=monumento_icahe&table_id=3445",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/1314079500",
+      "note": ""
+    },
+    {
+      "id": "MX-NLE",
+      "subdivision": "Nuevo León",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno de Nuevo Leon",
+      "role": "State executive government",
+      "coordinates": [
+        -100.3089779,
+        25.6726155
+      ],
+      "sourceUrl": "https://sic.cultura.gob.mx/ficha.php?table=monumento_icahe&table_id=1493",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/relation/17343904",
+      "note": ""
+    },
+    {
+      "id": "MX-OAX",
+      "subdivision": "Oaxaca",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno",
+      "role": "State executive government",
+      "coordinates": [
+        -96.7258735,
+        17.0599152
+      ],
+      "sourceUrl": "https://www.oaxaca.gob.mx/gubernatura/aceca-de-la/",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/relation/19483737",
+      "note": ""
+    },
+    {
+      "id": "MX-PUE",
+      "subdivision": "Puebla",
+      "country": "Mexico",
+      "building": "Casa Aguayo",
+      "role": "State executive government",
+      "coordinates": [
+        -98.187995,
+        19.0455619
+      ],
+      "sourceUrl": "https://www.puebla.gob.mx/index.php/noticias/item/24999-se-coloca-bando-patrio-en-la-sede-del-ejecutivo-estatal",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/relation/7612752",
+      "note": ""
+    },
+    {
+      "id": "MX-QUE",
+      "subdivision": "Querétaro",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno",
+      "role": "State executive government",
+      "coordinates": [
+        -100.3901404,
+        20.5935382
+      ],
+      "sourceUrl": "https://queretaro.gob.mx/es/web/guest/oficialia-mayor",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/relation/12112800",
+      "note": ""
+    },
+    {
+      "id": "MX-ROO",
+      "subdivision": "Quintana Roo",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno del Estado de Quintana Roo",
+      "role": "State executive government",
+      "coordinates": [
+        -88.2981709,
+        18.4940044
+      ],
+      "sourceUrl": "https://qroo.gob.mx/dge/wp-content/uploads/2024/11/TRIPTICO-COEPCI-del-2024-1.pdf",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/relation/6575558",
+      "note": ""
+    },
+    {
+      "id": "MX-SLP",
+      "subdivision": "San Luis Potosí",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno de San Luis Potosí",
+      "role": "State executive government",
+      "coordinates": [
+        -100.976913,
+        22.1518061
+      ],
+      "sourceUrl": "https://es.wikipedia.org/wiki/Palacio_de_Gobierno_de_San_Luis_Potos%C3%AD",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/node/7879538552",
+      "note": ""
+    },
+    {
+      "id": "MX-SIN",
+      "subdivision": "Sinaloa",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno",
+      "role": "State executive government",
+      "coordinates": [
+        -107.4084307,
+        24.7981167
+      ],
+      "sourceUrl": "https://atencionciudadana.sinaloa.gob.mx/",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/relation/3880116",
+      "note": ""
+    },
+    {
+      "id": "MX-SON",
+      "subdivision": "Sonora",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno del Estado de Sonora",
+      "role": "State executive government",
+      "coordinates": [
+        -110.9582434,
+        29.0748857
+      ],
+      "sourceUrl": "https://www.sonora.gob.mx/gobierno/estructura-organizacional/item/ejecutivo-del-estado",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/652083195",
+      "note": ""
+    },
+    {
+      "id": "MX-TAB",
+      "subdivision": "Tabasco",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno del Estado de Tabasco",
+      "role": "State executive government",
+      "coordinates": [
+        -92.9194679,
+        17.9879904
+      ],
+      "sourceUrl": "https://tabasco.gob.mx/gubernatura",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/545593334",
+      "note": ""
+    },
+    {
+      "id": "MX-TAM",
+      "subdivision": "Tamaulipas",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno",
+      "role": "State executive government",
+      "coordinates": [
+        -99.143671,
+        23.7326173
+      ],
+      "sourceUrl": "https://www.tamaulipas.gob.mx/gobierno/",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/431797916",
+      "note": ""
+    },
+    {
+      "id": "MX-TLA",
+      "subdivision": "Tlaxcala",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno del Estado de Tlaxcala",
+      "role": "State executive government",
+      "coordinates": [
+        -98.2376127,
+        19.3176781
+      ],
+      "sourceUrl": "https://gubernatura.tlaxcala.gob.mx/index.php/despacho-de-la-gobernadora/secretaria-particular",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/relation/1405714",
+      "note": ""
+    },
+    {
+      "id": "MX-VER",
+      "subdivision": "Veracruz",
+      "country": "Mexico",
+      "building": "Palacio de Gobierno",
+      "role": "State executive government",
+      "coordinates": [
+        -96.92244,
+        19.5270243
+      ],
+      "sourceUrl": "https://repositorio.veracruz.gob.mx/finanzas/wp-content/uploads/sites/2/2017/05/DECLARATIVA_DE_PRIVACIDAD_CAC.pdf",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/relation/19247480",
+      "note": ""
+    },
+    {
+      "id": "MX-YUC",
+      "subdivision": "Yucatán",
+      "country": "Mexico",
+      "building": "Palacio del Gobierno del Estado de Yucatán",
+      "role": "State executive government",
+      "coordinates": [
+        -89.6233606,
+        20.9678331
+      ],
+      "sourceUrl": "https://yucatan.gob.mx/?p=palacio_gobierno",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/relation/2156116",
+      "note": ""
+    },
+    {
+      "id": "MX-ZAC",
+      "subdivision": "Zacatecas",
+      "country": "Mexico",
+      "building": "Ciudad Administrativa — Edificio A",
+      "role": "State executive government",
+      "coordinates": [
+        -102.6146349,
+        22.7788292
+      ],
+      "sourceUrl": "https://www.zacatecas.gob.mx/gobierno/dependencias/jog/",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/452430575",
+      "note": "Governor’s office in Building A of Ciudad Administrativa, not the historic downtown palace."
+    }
+  ]
+}

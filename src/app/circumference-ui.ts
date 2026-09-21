@@ -78,6 +78,7 @@ import {
   syncCircumferenceCriterionControls,
 } from './highway-circumference-ui.js';
 import { setLayerVisibility } from './map-ui-utils.js';
+import { syncGovernmentSeats } from './government-seats-ui.js';
 
 export function positionCircumferenceGradient(): void {
   // Keep the overlay below the detailed basemap water polygons. The stored
@@ -96,6 +97,7 @@ export function positionCircumferenceGradient(): void {
 
 export function syncCircumferenceVisibility(): void {
   const highwayMode = highwayCriterionActive();
+  syncGovernmentSeats(runtime.activeProduct === 'circumference' && highwayMode);
   const networkVisible =
     runtime.activeProduct === 'circumference' &&
     !highwayMode &&

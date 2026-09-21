@@ -1,3 +1,4 @@
+import { syncGovernmentSeats } from './government-seats-ui.js';
 import {
   EMPTY_CIRCUMFERENCE_GRADIENT_URL,
   type BoundsTuple,
@@ -95,6 +96,9 @@ function setLayerVisibility(id: string, visible: boolean): void {
 }
 
 export function syncHighwayLayerVisibility(): void {
+  syncGovernmentSeats(
+    runtime.activeProduct === 'circumference' && highwayCriterionActive(),
+  );
   const visible =
     runtime.activeProduct === 'circumference' &&
     highwayCriterionActive() &&
