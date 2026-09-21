@@ -18,6 +18,7 @@ const inputs = [
   'scripts/highway-ordered-midpoint.mjs',
   'scripts/highway-mainline-merges.mjs',
   'scripts/highway-mainline-endings.mjs',
+  'scripts/highway-terminal-continuations.mjs',
   'scripts/highway-cycle.mjs',
 ];
 const fingerprint = createHash('sha256');

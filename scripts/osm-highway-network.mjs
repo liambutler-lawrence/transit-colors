@@ -5,6 +5,10 @@ import readline from 'node:readline';
 
 import { hasProperSelfIntersection } from './highway-cycle.mjs';
 import { orderedCarriagewayMidpoints } from './highway-ordered-midpoint.mjs';
+import {
+  recoverTerminalContinuations,
+  pruneUnusableTerminalContinuations,
+} from './highway-terminal-continuations.mjs';
 import { coveredMainlineMergePairs } from './highway-mainline-merges.mjs';
 import {
   buildMainlineEndingIndex,
@@ -217,6 +221,8 @@ export function prepareWays(osm) {
       id: way.id,
       nodeIds,
       role,
+      mainlineTransition:
+        way.tags.highway === 'motorway' && !isAuxiliaryCarriageway(way.tags),
       startNodeId: nodeIds[0],
       tags: way.tags,
       tokens: routeTokens(way.tags),
@@ -1120,6 +1126,7 @@ function attachmentsForNodeByPart({ grid, mainlinePartIndices, nodeCoordinate })
 function buildPartSegmentGrid(parts) {
   const grid = new Map();
   for (const [partIndex, part] of parts.entries()) {
+    if (part.explicitMainlineMerge) continue;
     let startDistanceMeters = 0;
     for (
       let segmentIndex = 0;
@@ -2413,6 +2420,7 @@ function insertPartProjections(parts, insertionsByPart) {
 function indexPartsBySourceWay(parts) {
   const sourceWayIdToPartIndices = new Map();
   for (const [partIndex, part] of parts.entries()) {
+    if (part.explicitMainlineMerge) continue;
     for (const wayId of part.sourceWayIds) {
       const indices = sourceWayIdToPartIndices.get(wayId) ?? [];
       indices.push(partIndex);
@@ -2802,7 +2810,9 @@ export function buildPairedOsmSourceTopologyGraph(osm, averagedParts) {
   };
 
   const turnJunctions = new Map();
-  const pairedConnectors = averagedParts.filter((part) => part.role === 'connector');
+  const pairedConnectors = averagedParts.filter(
+    (part) => part.role === 'connector' || part.explicitMainlineMerge,
+  );
   for (const [connectorIndex, connector] of pairedConnectors.entries()) {
     const startNode = exactMappedMainlineNode(
       connector.startMainlinePartIndex,
@@ -2825,7 +2835,7 @@ export function buildPairedOsmSourceTopologyGraph(osm, averagedParts) {
     const partIndex = graphParts.length;
     graphParts.push({
       id: connector.id,
-      role: 'connector',
+      role: connector.role,
       sourceWayIds: connector.sourceWayIds,
       tokens: connector.tokens,
     });
@@ -2886,17 +2896,24 @@ export function buildPairedOsmSourceTopologyGraph(osm, averagedParts) {
     }
   }
 
-  return {
+  const result = {
     coordinateByNodeId,
     edges,
     parts: graphParts,
     statistics: {
       explicitTopologyKeyCount: pairedConnectors.length * 2,
       signalRejectedConnectorCount: 0,
-      sourceConnectorPartCount: pairedConnectors.length,
+      sourceConnectorPartCount: pairedConnectors.filter(
+        (part) => part.role === 'connector',
+      ).length,
+      sourceTerminalMainlinePartCount: pairedConnectors.filter(
+        (part) => part.role === 'mainline',
+      ).length,
       sourceMainlinePartCount: prepared.mainlines.length,
     },
   };
+  pruneUnusableTerminalContinuations(result, averagedParts);
+  return result;
 }
 
 function mainlineEndpoint(part, attachment) {
@@ -4428,12 +4445,23 @@ export function buildOsmHighwayCenterlines(osm, onProgress = () => {}) {
     ramps.connectors,
     buildMainlineEndingIndex(chains, prepared.mainlines, prepared.connectors),
   );
+  const completedParts = [...averaged.parts, ...ramps.connectors];
+  const terminalContinuations = recoverTerminalContinuations(
+    osm,
+    prepared,
+    chains,
+    completedParts,
+    averageReciprocalPathCoordinates,
+  );
+  onProgress({ terminalContinuationCount: terminalContinuations.additions.length });
   return {
     ...averaged,
-    parts: [...averaged.parts, ...ramps.connectors],
+    parts: completedParts,
+    terminalContinuationAudit: terminalContinuations.audit,
     statistics: {
       ...averaged.statistics,
-      averagedPartCount: averaged.parts.length,
+      averagedPartCount: completedParts.filter((part) => part.role === 'mainline')
+        .length,
       widePairContinuationCount: averaged.parts.filter(
         (part) => part.continuationEndpoints,
       ).length,
@@ -4449,6 +4477,9 @@ export function buildOsmHighwayCenterlines(osm, onProgress = () => {}) {
       ).length,
       ...ramps.statistics,
       ...endingAudit.statistics,
+      directConnectorCount: completedParts.filter((part) => part.role === 'connector')
+        .length,
+      terminalContinuationCount: terminalContinuations.additions.length,
     },
     connectorWays: prepared.connectors,
     mainlineWays: prepared.mainlines,

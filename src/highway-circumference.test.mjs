@@ -184,7 +184,9 @@ test('North America highway data publishes one validated maximum and full vector
   assert.equal(
     data.methodology.directionalRampPathCount -
       data.methodology.alternativeRampPathCount -
-      data.methodology.interchangeConnectorCount * 2,
+      (data.methodology.interchangeConnectorCount -
+        (data.methodology.terminalConnectorCount ?? 0)) *
+        2,
     data.methodology.unpairedRampPathCount,
   );
   assert.ok(data.methodology.osmPrecisionMainlineCount > 5_000);

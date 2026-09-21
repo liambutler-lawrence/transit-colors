@@ -128,7 +128,7 @@ const landmassBuffer = await readFile(landmassSourcePath);
 let derived;
 try {
   derived = deserialize(await readFile(derivedCachePath));
-  if (derived.displayTopologyVersion !== 48) {
+  if (derived.displayTopologyVersion !== 49) {
     throw new Error('The cached topology predates source-directed ramp junctions.');
   }
   console.log(`Reused ${derivedCachePath}.`);
@@ -146,6 +146,7 @@ try {
   const detailed = {
     parts: built.parts,
     statistics: built.statistics,
+    terminalContinuationAudit: built.terminalContinuationAudit,
     rampAttachmentRepairs: built.rampAttachmentRepairs,
     coveredMainlineMerges: built.coveredMainlineMerges,
   };
@@ -153,7 +154,7 @@ try {
   console.log(detailed.statistics);
   derived = {
     detailed,
-    displayTopologyVersion: 48,
+    displayTopologyVersion: 49,
   };
   await writeFile(derivedCachePath, serialize(derived));
 
@@ -182,7 +183,7 @@ try {
   derived = {
     compressed,
     detailed,
-    displayTopologyVersion: 48,
+    displayTopologyVersion: 49,
     graphStatistics,
     sourceCompressed: compressed,
     sourceGraphParts: exactGraph.parts.map(({ id, role, tokens }) => ({
@@ -191,7 +192,7 @@ try {
       tokens,
     })),
     sourceGraphStatistics: graphStatistics,
-    sourceTopologyVersion: 47,
+    sourceTopologyVersion: 48,
   };
   await writeFile(derivedCachePath, serialize(derived));
 }
@@ -207,7 +208,7 @@ for (const part of detailed.parts) {
     throw new Error(`Paired ramp ${part.id} is missing source carriageway directions.`);
   }
 }
-if (derived.sourceTopologyVersion !== 47) {
+if (derived.sourceTopologyVersion !== 48) {
   console.time('Read OSM mainline continuity topology');
   const osm = await readOsmMotorwayPbf(sourcePath);
   console.timeEnd('Read OSM mainline continuity topology');
@@ -236,11 +237,22 @@ if (derived.sourceTopologyVersion !== 47) {
     exactEdges: sourceGraph.edges.length,
     exactNodes: sourceGraph.coordinateByNodeId.size,
   };
-  derived.sourceTopologyVersion = 47;
+  derived.sourceTopologyVersion = 48;
   console.timeEnd('Build explicit paired-centerline route graph');
   console.log(derived.sourceGraphStatistics);
   await writeFile(derivedCachePath, serialize(derived));
 }
+// The graph rejects recoveries without a legal continuing leg at either port.
+// Refresh display counts after that final topology check.
+detailed.statistics.averagedPartCount = detailed.parts.filter(
+  (part) => part.role === 'mainline',
+).length;
+detailed.statistics.directConnectorCount = detailed.parts.filter(
+  (part) => part.role === 'connector',
+).length;
+detailed.statistics.terminalContinuationCount = detailed.parts.filter(
+  (part) => part.explicitMainlineMerge,
+).length;
 const { sourceCompressed, sourceGraphParts, sourceGraphStatistics } = derived;
 const routeGraphEdges = sourceCompressed.edges.map((edge) => {
   const roles = [...edge.partIndices].map(
@@ -430,6 +442,9 @@ const output = {
     giantNetworkEdgeCount: sourceGraphStatistics.exactEdges,
     giantNetworkNodeCount: sourceGraphStatistics.exactNodes,
     interchangeConnectorCount: detailed.statistics.directConnectorCount,
+    terminalConnectorCount: detailed.parts.filter(
+      (part) => part.explicitMainlineMerge && part.role === 'connector',
+    ).length,
     directionalRampPathCount: detailed.statistics.directedConnectorPathCount,
     osmPrecisionMainlineCount: detailed.statistics.averagedPartCount,
     optimizationMethod: 'detailed-topology-preserving-perimeter-ears',

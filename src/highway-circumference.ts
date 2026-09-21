@@ -51,6 +51,7 @@ export const highwayCircumferenceDataSchema = z.object({
     giantNetworkEdgeCount: z.number().int().positive(),
     giantNetworkNodeCount: z.number().int().positive(),
     interchangeConnectorCount: z.number().int().nonnegative(),
+    terminalConnectorCount: z.number().int().nonnegative().default(0),
     osmPrecisionMainlineCount: z.number().int().nonnegative(),
     optimizationMethod: z.enum([
       'exact-planar-biconnected-outer-boundary',
