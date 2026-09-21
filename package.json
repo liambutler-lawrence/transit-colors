@@ -50,7 +50,8 @@
     "format": "prettier . --write",
     "format:check": "prettier . --check",
     "test": "node --import tsx --test src/*.test.mjs scripts/*.test.mjs",
-    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build && npm run verify:build"
+    "check": "npm run format:check && npm run lint && npm run typecheck && npm test && npm run build && npm run verify:build",
+    "build:data:government-connections": "node --expose-gc --max-old-space-size=12288 --import tsx scripts/build-government-connections-network.mjs && node --max-old-space-size=12288 --import tsx scripts/build-government-connections.mjs"
   },
   "devDependencies": {
     "@eslint/js": "10.0.1",
