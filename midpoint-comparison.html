@@ -1,0 +1,154 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Midpoint comparison · Circumference Lab</title>
+  </head>
+  <body>
+    <header>
+      <div>
+        <p class="eyebrow">CIRCUMFERENCE LAB / GEOMETRY EXPERIMENT</p>
+        <h1>Two ways to find the middle</h1>
+        <p>14 source pairs · 11 real road examples + 3 synthetic controls</p>
+      </div>
+      <a href="./?product=circumference&criterion=motorway">Back to map ↗</a>
+    </header>
+    <main>
+      <aside>
+        <h2>Choose a case</h2>
+        <nav id="cases" aria-label="Comparison cases"></nav>
+        <p class="aside-note">
+          Both panels use the same scale and source roads. Drag or scroll either panel
+          to move both.
+        </p>
+      </aside>
+      <section class="workspace">
+        <div class="case-heading">
+          <div>
+            <p id="kind" class="eyebrow"></p>
+            <h2 id="name"></h2>
+          </div>
+          <div class="buttons">
+            <button id="previous" aria-label="Previous case">←</button
+            ><button id="next" aria-label="Next case">→</button
+            ><button id="fit">Fit roads</button>
+          </div>
+        </div>
+        <p id="note"></p>
+        <div class="controls">
+          <label
+            >Sample spacing
+            <select id="spacing">
+              <option value="1">1 m</option>
+              <option value="2">2 m</option>
+              <option value="5">5 m</option>
+              <option value="10">10 m</option>
+              <option value="20">20 m</option>
+            </select></label
+          ><label
+            >Experimental trace
+            <select id="trace">
+              <option value="combined">All midpoints, combined</option>
+              <option value="first">Side A → B only</option>
+              <option value="second">Side B → A only</option>
+              <option value="both">Both traces, separately</option>
+              <option value="cloud">All midpoints, unconnected</option>
+            </select></label
+          ><label><input type="checkbox" id="pairs" /> Show nearest pairs</label
+          ><label><input type="checkbox" id="points" /> Show midpoint samples</label>
+        </div>
+        <div class="panels">
+          <section>
+            <h3><span class="dot current"></span>Current production algorithm</h3>
+            <svg
+              id="current"
+              aria-label="Current midpoint and source roads"
+              role="img"
+            ></svg>
+          </section>
+          <section>
+            <h3>
+              <span class="dot proposed"></span>Proposed nearest-distance algorithm
+            </h3>
+            <svg
+              id="proposed"
+              aria-label="Proposed midpoint and source roads"
+              role="img"
+            ></svg>
+          </section>
+        </div>
+        <div class="legend">
+          <span>━━ Side A</span><span class="side-b">┄┄ Side B</span
+          ><span id="scale"></span><span>North ↑ · distances in meters</span>
+        </div>
+        <div id="metrics" aria-live="polite"></div>
+        <details open>
+          <summary>Exactly what is being compared</summary>
+          <p>
+            Sample both oriented sides every N meters, including their endpoints.
+            Project each sample onto the closest point anywhere on the opposite source
+            polyline, then take that pair’s midpoint. There is no tangent filter, forced
+            forward matching, smoothing, or endpoint snapping. The optional pair-link
+            overlay shows at most 240 evenly selected links; the midpoint line uses
+            every sample.
+          </p>
+          <p>
+            The union needs an order: the combined line sorts midpoints by the average
+            of their two normalized distances along the source roads. This is an
+            explicit experimental convention. “Both traces, separately” shows the two
+            sample sequences without interleaving them. The unconnected view removes the
+            ordering convention entirely. Decreasing N does not resolve differences
+            between those two traces.
+          </p>
+          <p>
+            Coordinates use a local WGS84 azimuthal-equidistant metric plane. Sampling,
+            segment projection, and midpoints are computed in that plane (a local
+            approximation to ellipsoidal distances). Ramp inputs already include the
+            existing mainline continuation at staggered joins. The current algorithm
+            retains its existing graph attachment endpoints; the proposed one does not
+            force those endpoints.
+          </p>
+          <p>
+            This experiment compares geometry on fixed source pairs. It does not change
+            pairing, interchange topology, route selection, or the production map.
+            Runtime measurements cover this pair in a worker, including indexing and
+            turn diagnostics, excluding rendering and the deviation audit. This is not a
+            continental rebuild benchmark.
+          </p>
+          <p id="fixture"></p>
+        </details>
+        <section class="overview">
+          <h2>All 14 at a glance</h2>
+          <p>
+            Metrics below describe the combined experimental line. A turn over 120°
+            counts only when both adjacent steps exceed 10 cm. Deviation measures
+            disagreement with the current line, not error against ground truth.
+          </p>
+          <div class="table-scroll">
+            <table>
+              <thead>
+                <tr>
+                  <th>Case</th>
+                  <th>Pairs</th>
+                  <th>Match reversals</th>
+                  <th>Turns &gt;120°</th>
+                  <th>Max step</th>
+                  <th>Max deviation*</th>
+                  <th>Compute</th>
+                </tr>
+              </thead>
+              <tbody id="overview"></tbody>
+            </table>
+          </div>
+          <p class="aside-note">
+            *Bidirectional sampled distance: every experimental midpoint and
+            current-line samples at 5 m. Sources: saved OpenStreetMap road fixtures
+            (ODbL); synthetic controls are labeled.
+          </p>
+        </section>
+      </section>
+    </main>
+    <script type="module" src="/src/midpoint-comparison/page.mjs"></script>
+  </body>
+</html>
