@@ -7,7 +7,7 @@ let selected = Math.max(
     0,
     Math.min(
       cases.length - 1,
-      Number(new URLSearchParams(location.search).get('case')) || 0,
+      parseInt(new URLSearchParams(location.search).get('case') ?? '0', 10) || 0,
     ),
   ),
   generation = 0,
@@ -43,6 +43,12 @@ function overview() {
     })
     .join('');
 }
+function updateViewport() {
+  for (const id of ['current', 'proposed'])
+    $(id).setAttribute('viewBox', view.join(' '));
+  $('scale').textContent =
+    `Panel width ${view[2] > 1000 ? number(view[2] / 1000) + ' km' : number(view[2]) + ' m'}`;
+}
 function render() {
   if (!view) return;
   const c = cases[selected],
@@ -69,10 +75,7 @@ function render() {
   $('current').innerHTML =
     sources + c.current.map((p) => line(p, '#b45b25', 2.5)).join('');
   $('proposed').innerHTML = pairs + sources + proposed + dots;
-  for (const id of ['current', 'proposed'])
-    $(id).setAttribute('viewBox', view.join(' '));
-  $('scale').textContent =
-    `Panel width ${view[2] > 1000 ? number(view[2] / 1000) + ' km' : number(view[2]) + ' m'}`;
+  updateViewport();
   $('metrics').innerHTML = r
     ? [
         [
@@ -188,7 +191,7 @@ for (const id of ['current', 'proposed']) {
         view[2] * factor,
         view[3] * factor,
       ];
-      render();
+      updateViewport();
     },
     { passive: false },
   );
@@ -204,7 +207,7 @@ for (const id of ['current', 'proposed']) {
       drag.view[2],
       drag.view[3],
     ];
-    render();
+    updateViewport();
   });
   svg.addEventListener('pointerup', () => (drag = null));
   svg.addEventListener('pointercancel', () => (drag = null));
