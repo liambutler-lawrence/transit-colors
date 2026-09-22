@@ -182,26 +182,21 @@ attachment also retains the source carriageway's travel direction relative to it
 ordered mainline. Each incident edge records its permitted side of that junction.
 Incoming and outgoing edges must use opposite sides; a ramp pair cannot be entered by
 reversing across the median. Degree-two compression preserves endpoint directions and
-rejects corridors containing an illegal internal turn. Route search distinguishes
-arrivals by incoming edge, so a longer legal approach is not discarded in favor of an
-unusable shorter arrival. If separately routed waypoint legs are incompatible, a
-combined search tracks progress through the ordered supports and the closing edge. Cycle
-validation checks every transition, including support points, ear attachments, and the
-closing turn. Geometric hook clipping cannot make an illegal turn acceptable. These
-restrictions apply to all reciprocal connectors, including collector and express-lane
-paths, even when the correct alternative ramp is missing.
+rejects corridors containing an illegal internal turn. The area optimizer enforces these
+junction-port transitions directly in its flow constraints, including the closing turn.
+These restrictions apply to all reciprocal connectors, including collector and
+express-lane paths, even when the correct alternative ramp is missing.
 
-The continental stages are largest-component selection, 2-core pruning, degree-two
-compression, a detailed northeastern perimeter cycle, and independent detailed
-node-disjoint ears for southeastern Massachusetts and the southern/western perimeter.
-The northeastern cycle is explicitly anchored through Highway 407, Ottawa, Québec, and
-coastal New England. The Toronto guide point is on Highway 407 itself, west of its
-Highway 400 interchange; the former point on the northern Highway 400 leg required a
-reversal to continue east. Every ear uses explicit source junctions. A small hook where
-two consecutive averaged edges overshoot their shared junction is clipped only between
-those adjacent tails; any nonlocal geometric crossing forbids the responsible corridor
-and triggers another routing attempt. The accepted boundary is a simple cycle in both
-graph topology and rendered geometry.
+After 2-core pruning and degree-two compression, a binary directed-edge model maximizes
+additive WGS84 enclosed area over the entire eligible graph. It contains no named-road
+requirements, geographic waypoints, or connector penalties. Mainlines and connectors
+retain their already-computed coordinates; the route solver does not clip, smooth, or
+replace them. Robust crossing checks, winding constraints, and conditional connectivity
+cuts restrict the result to one simple loop. A valid loop's area provides a lower bound;
+blocks whose total possible area is smaller can be pruned without choosing a geographic
+root. The builder accepts a result only when its validated single loop attains the
+optimization bound within numerical tolerance. See
+[Highway area optimization](highway-area-optimization.md) for regeneration and details.
 
 The circumference map keeps one independent route state and gradient image source per
 metro area. It merges all complete networks and selected boundaries into one GeoJSON

@@ -6,7 +6,7 @@ import { VectorTile } from '@mapbox/vector-tile';
 import Pbf from 'pbf';
 import { PMTiles } from 'pmtiles';
 
-import { hasProperSelfIntersection } from '../scripts/highway-cycle.mjs';
+import { properHighwayBoundaryIntersection } from '../scripts/highway-area-crossings.mjs';
 import { geodesicDistanceMeters } from '../scripts/wgs84-geodesy.mjs';
 import {
   highwayCircumferenceDataSchema,
@@ -128,10 +128,16 @@ async function assertPublishedContinuation(archive, repair) {
 }
 
 test('North America highway data publishes one validated maximum and full vector network', () => {
-  assert.equal(data.methodology.optimizationStatus, 'validated-detailed');
+  assert.equal(data.methodology.optimizationStatus, 'optimal');
+  assert.ok(
+    Math.abs(
+      data.methodology.objectiveUpperBoundSquareMeters - data.route.areaSquareMeters,
+    ) < 2,
+  );
+  assert.ok(data.methodology.optimizationIterations > 0);
   assert.equal(
     data.methodology.optimizationMethod,
-    'detailed-topology-preserving-perimeter-ears',
+    'source-topology-wgs84-area-integer-program',
   );
   assert.match(data.centerline_method, /Closest-tangent.*staggered joins/);
   assert.equal(data.network.featureCount, data.methodology.sourceFeatureCount);
@@ -178,7 +184,7 @@ test('North America highway data publishes one validated maximum and full vector
     ),
     'route should include the I-495 southeastern Massachusetts detour',
   );
-  assert.equal(hasProperSelfIntersection(data.route.coordinates), false);
+  assert.equal(properHighwayBoundaryIntersection(data.route.coordinates), null);
   assert.ok(data.methodology.interchangeConnectorCount > 4_500);
   assert.ok(data.methodology.directionalRampPathCount > 12_000);
   assert.equal(
@@ -206,6 +212,21 @@ test('highway route stores WGS84 land-contained and coastward areas', () => {
   const landmass = highwayLandmassArea(data);
   assert.equal(landmass.landmasses[0]?.label, 'North American mainland');
   assert.equal(landmass.mask?.length, 1);
+});
+
+test('area optimization reaches outer corridors omitted by the former waypoint route', () => {
+  // Regression observations only: none of these places is an input to the solver.
+  for (const [name, point] of [
+    ['Tampa I-275', [-82.6793, 27.7018]],
+    ['Richmond I-295', [-77.2787, 37.5382]],
+    ['Green Bay US-41/I-43', [-88.085, 44.506]],
+    ['Québec City A-20/A-40', [-71.29, 46.75]],
+  ]) {
+    assert.ok(
+      data.route.coordinates.some((p) => geodesicDistanceMeters(p, point) < 500),
+      name,
+    );
+  }
 });
 
 test('highway map collection separates thin network, thick route, and inside', () => {

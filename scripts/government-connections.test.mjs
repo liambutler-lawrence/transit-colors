@@ -407,11 +407,24 @@ test('published routes end at the circle edge and have opposing approaches at on
   }
   const ontario = results.find((r) => r.id === 'CA-ON');
   assert.equal(ontario.status, 'connected');
-  assert.ok(ontario.lengthMeters < 13000);
-  assert.ok(
-    ontario.approaches.some((a) =>
-      a.sourceParts.includes('source-verified-401-east-dvp-south'),
-    ),
-  );
+  // The area-maximizing boundary now uses 407, north of the old 401 join.
+  // Both-direction access attains the unrestricted shortest distance here.
+  assert.ok(ontario.lengthMeters > 18000 && ontario.lengthMeters < 20000);
+  assert.ok(Math.abs(ontario.lengthMeters - ontario.unrestrictedLengthMeters) < 0.01);
+  assert.ok(ontario.approaches.every((a) => a.boundaryCoordinate[1] > 43.83));
   assert.equal(results.find((r) => r.id === 'US-DE').status, 'connected');
+});
+
+test('authoritative state boundaries keep the El Paso border highway in Texas', () => {
+  const { features } = JSON.parse(
+    fs.readFileSync('data/north-america-subdivisions.geojson', 'utf8'),
+  );
+  const line = [
+    [-106.3275493, 31.67506],
+    [-106.328046, 31.6749083],
+  ];
+  const geometry = (id) =>
+    features.find((feature) => feature.properties.id === id).geometry;
+  assert.equal(lineTraversesSubdivision(line, geometry('US-TX')), true);
+  assert.equal(lineTraversesSubdivision(line, geometry('MX-CHH')), false);
 });

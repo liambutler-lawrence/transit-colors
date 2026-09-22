@@ -5,19 +5,18 @@ import { createWriteStream } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { deserialize, serialize } from 'node:v8';
+import { createHash } from 'node:crypto';
 import polygonClipping from 'polygon-clipping';
 
 import { calculateLandmassCoverage } from '../src/circumference-landmass.ts';
 import { geodesicLineLengthMeters } from '../src/geodesy.ts';
 import { compressHighwayCore, highwayTwoCore } from './highway-graph.mjs';
-import { hasProperSelfIntersection } from './highway-cycle.mjs';
+import { properHighwayBoundaryIntersection } from './highway-area-crossings.mjs';
 import { highwayCycleTurnViolation } from './highway-turns.mjs';
-import {
-  NORTH_AMERICAN_HIGHWAY_ENVELOPE_COORDINATES,
-  northAmericanHighwayEnvelopeSupportNodeIds,
-  refineHighwayCycleThroughWaypoints,
-  solveHighwayEnvelopeCycleThroughWaypoints,
-} from './highway-envelope-cycle.mjs';
+import { solveHighwayAreaCycle } from './highway-area-cycle.mjs';
+import { nativeHighwayAreaSolver } from './highway-area-native.mjs';
+import { highwayAreaGraphDigest } from './highway-area-cache.mjs';
+import { lineTraversesSubdivision } from './government-connections-geometry.mjs';
 import {
   buildOsmHighwayCenterlines,
   buildPairedOsmSourceTopologyGraph,
@@ -254,104 +253,68 @@ detailed.statistics.terminalContinuationCount = detailed.parts.filter(
   (part) => part.explicitMainlineMerge,
 ).length;
 const { sourceCompressed, sourceGraphParts, sourceGraphStatistics } = derived;
-const routeGraphEdges = sourceCompressed.edges.map((edge) => {
-  const roles = [...edge.partIndices].map(
-    (partIndex) => sourceGraphParts[partIndex].role,
-  );
-  const role = roles.includes('mainline') ? 'mainline' : 'connector';
-  return {
-    ...edge,
-    // Prefer continuous mainlines when two detailed paths enclose the same
-    // area. A connector remains available when it is required to change
-    // highways, but is not used as a gratuitous interchange shortcut.
-    role,
-    routingPenaltyMeters: role === 'connector' ? 2_000 : 0,
-  };
-});
-
-const supportNodeIds = (supportCoordinates) =>
-  northAmericanHighwayEnvelopeSupportNodeIds(sourceCompressed.nodes, routeGraphEdges, {
-    supportCoordinates,
-  });
-const envelopeCoordinates = NORTH_AMERICAN_HIGHWAY_ENVELOPE_COORDINATES;
-console.time('Solve detailed northeastern outer-envelope cycle');
-let exact = solveHighwayEnvelopeCycleThroughWaypoints(
-  sourceCompressed.nodes,
-  routeGraphEdges,
-  supportNodeIds([...envelopeCoordinates.slice(0, 5), envelopeCoordinates[6]]),
-  { tryReverse: false },
-);
-console.timeEnd('Solve detailed northeastern outer-envelope cycle');
-console.time('Expand boundary through southeastern Massachusetts');
-exact = refineHighwayCycleThroughWaypoints(
-  sourceCompressed.nodes,
-  routeGraphEdges,
-  exact.segments,
-  supportNodeIds([envelopeCoordinates[5]]),
-  {
-    attachmentCoordinates: [envelopeCoordinates[4], envelopeCoordinates[6]],
-  },
-);
-console.timeEnd('Expand boundary through southeastern Massachusetts');
-console.time('Expand boundary through southern and western perimeter');
-exact = refineHighwayCycleThroughWaypoints(
-  sourceCompressed.nodes,
-  routeGraphEdges,
-  exact.segments,
-  supportNodeIds(envelopeCoordinates.slice(7)),
-  {
-    attachmentCoordinates: [envelopeCoordinates[6], envelopeCoordinates[0]],
-    maximumRerouteAttempts: 500,
-  },
-);
-console.timeEnd('Expand boundary through southern and western perimeter');
+// Every eligible edge uses its existing geometry, independent of road role.
+const routeGraphEdges = sourceCompressed.edges;
+const solverFingerprint = createHash('sha256');
+solverFingerprint.update(highwayAreaGraphDigest(sourceCompressed));
+for (const file of [
+  'highway-area-cycle.mjs',
+  'highway-area-crossings.mjs',
+  'highway-area-objective.mjs',
+  'highway-area-cache.mjs',
+  'highway-cycle.mjs',
+  'highway-turns.mjs',
+  'wgs84-geodesy.mjs',
+]) {
+  solverFingerprint.update(await readFile(new URL(file, import.meta.url)));
+}
+const areaSolverFingerprint = solverFingerprint.digest('hex');
+console.time('Maximize highway cycle area');
+const exact =
+  derived.areaSolverFingerprint === areaSolverFingerprint
+    ? derived.areaCycle
+    : await solveHighwayAreaCycle(sourceCompressed.nodes, routeGraphEdges, {
+        onIteration: console.log,
+        timeLimitSeconds: 1800,
+        solveModel: process.env['HIGHWAY_HIGHS_PYTHON']
+          ? nativeHighwayAreaSolver(process.env['HIGHWAY_HIGHS_PYTHON'])
+          : null,
+      });
+if (exact.optimizationStatus !== 'optimal')
+  throw new Error('The area solve did not prove optimality.');
+derived.areaSolverFingerprint = areaSolverFingerprint;
+derived.areaCycle = exact;
+await writeFile(derivedCachePath, serialize(derived));
+console.timeEnd('Maximize highway cycle area');
 const forbiddenTurn = highwayCycleTurnViolation(exact.segments, routeGraphEdges);
 if (forbiddenTurn) {
   throw new Error(
     `The highway boundary contains an illegal ramp turn at segments ${forbiddenTurn.join(', ')}.`,
   );
 }
-console.log({
-  areaSquareKilometers: exact.areaSquareMeters / 1_000_000,
-  supportNodeIds: exact.supportNodeIds,
-});
-if (exact.areaSquareMeters < 6_000_000_000_000) {
-  throw new Error('Detailed outer-envelope cycle is below the continental area floor.');
-}
-
 // Preserve the validated centerline precision. A second rounding pass can
 // turn closely spaced source vertices into a crossing in the exported ring.
 const routeCoordinates = exact.coordinates;
-if (hasProperSelfIntersection(routeCoordinates)) {
+if (properHighwayBoundaryIntersection(routeCoordinates)) {
   throw new Error('The exported highway boundary must remain a simple cycle.');
 }
-if (
-  !routeCoordinates.some(([longitude, latitude]) => longitude > -74 && latitude > 45) ||
-  !routeCoordinates.some(([longitude, latitude]) => longitude > -71 && latitude > 42)
-) {
-  throw new Error(
-    'Detailed highway boundary does not reach both Québec and eastern New England.',
-  );
-}
-for (const [region, includesRegion] of [
-  [
-    'Highway 407 north of Toronto',
-    ([longitude, latitude]) => longitude > -80 && longitude < -78.5 && latitude > 43.65,
-  ],
-  [
-    'the Ottawa 416 / 417 corridor',
-    ([longitude, latitude]) => longitude > -76 && longitude < -75.4 && latitude > 45.25,
-  ],
-  [
-    'southeastern Massachusetts',
-    ([longitude, latitude]) =>
-      longitude > -71.3 && longitude < -70.4 && latitude > 41.4 && latitude < 42,
-  ],
-]) {
-  if (!routeCoordinates.some(includesRegion)) {
-    throw new Error(`Detailed highway boundary omits ${region}.`);
-  }
-}
+const subdivisions = JSON.parse(
+  await readFile('data/north-america-subdivisions.geojson', 'utf8'),
+);
+const { seats } = JSON.parse(
+  await readFile('data/north-america-government-seats.json', 'utf8'),
+);
+const countries = [...new Set(seats.map((seat) => seat.country))].filter((country) =>
+  seats
+    .filter((seat) => seat.country === country)
+    .some((seat) =>
+      lineTraversesSubdivision(
+        routeCoordinates,
+        subdivisions.features.find((feature) => feature.properties.id === seat.id)
+          .geometry,
+      ),
+    ),
+);
 const americanMainlandRing = readPolygonRings(landmassBuffer).find((ring) =>
   pointInRing([-99.1332, 19.4326], ring),
 );
@@ -433,7 +396,7 @@ const output = {
   landmass_source_version: '5.1.1',
   methodology: {
     alternativeRampPathCount: detailed.statistics.alternativeConnectorPathCount,
-    biconnectedBlockCount: 1,
+    biconnectedBlockCount: exact.biconnectedBlockCount,
     compressedEdgeCount: sourceGraphStatistics.compressedEdges,
     compressedNodeCount: sourceGraphStatistics.compressedNodes,
     crossBorderSeamConnectorCount: 0,
@@ -447,8 +410,10 @@ const output = {
     ).length,
     directionalRampPathCount: detailed.statistics.directedConnectorPathCount,
     osmPrecisionMainlineCount: detailed.statistics.averagedPartCount,
-    optimizationMethod: 'detailed-topology-preserving-perimeter-ears',
-    optimizationStatus: 'validated-detailed',
+    optimizationMethod: 'source-topology-wgs84-area-integer-program',
+    optimizationStatus: exact.optimizationStatus,
+    objectiveUpperBoundSquareMeters: exact.objectiveUpperBoundSquareMeters,
+    optimizationIterations: exact.optimizationIterations,
     sourceFeatureCount: detailed.parts.length,
     unpairedRampPathCount: detailed.statistics.unpairedConnectorPathCount,
   },
@@ -466,7 +431,7 @@ const output = {
     boundaryRoadFeatureCount: boundaryPartIndices.size,
     containedLandAreaSquareMeters: landmassCoverage.insideAreaSquareMeters,
     coordinates: routeCoordinates,
-    countries: ['Canada', 'United States'],
+    countries,
     id: 'north-america-controlled-access-maximum',
     lengthMeters: geodesicLineLengthMeters(routeCoordinates),
     outsideLandAreaSquareMeters: landmassCoverage.outsideAreaSquareMeters,

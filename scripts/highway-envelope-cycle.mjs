@@ -914,30 +914,10 @@ export function solveHighwayEnvelopeCycleThroughWaypoints(
   };
 }
 
-export const NORTH_AMERICAN_HIGHWAY_ENVELOPE_COORDINATES = [
-  [-87.74, 41.96], // Chicago
-  [-79.55, 43.78], // Highway 407 itself, west of the Highway 400 ramp junction
-  [-75.7, 45.42], // Highway 416 / 417 through Ottawa
-  [-73.6, 45.5], // Montréal
-  [-70.9, 42.86], // coastal New England
-  [-70.95, 41.9], // I-495 through southeastern Massachusetts
-  [-81.24, 32.08], // Savannah
-  [-80.2, 25.8], // Miami
-  [-90.1, 30], // New Orleans
-  [-95.4, 29.8], // Houston
-  [-98.5, 29.4], // San Antonio
-  [-106.5, 31.8], // El Paso
-  [-117.1, 32.7], // San Diego
-  [-118.2, 34], // Los Angeles
-  [-122.2, 37.7], // San Francisco Bay
-  [-122.3, 47.5], // Seattle
-  [-93.2, 45], // Minneapolis
-];
-
 export function northAmericanHighwayEnvelopeSupportNodeIds(
   nodes,
   edges,
-  { supportCoordinates = NORTH_AMERICAN_HIGHWAY_ENVELOPE_COORDINATES } = {},
+  { supportCoordinates },
 ) {
   edges = edges.filter(highwayEdgeUsable);
   const largestBlock = biconnectedEdgeBlocks(nodes, edges).sort(
