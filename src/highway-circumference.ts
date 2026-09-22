@@ -54,6 +54,7 @@ export const highwayCircumferenceDataSchema = z.object({
     terminalConnectorCount: z.number().int().nonnegative().default(0),
     osmPrecisionMainlineCount: z.number().int().nonnegative(),
     optimizationMethod: z.enum([
+      'source-topology-wgs84-area-integer-program',
       'exact-planar-biconnected-outer-boundary',
       'coarse-exact-detailed-map-match',
       'detailed-macro-cycle-expansion',
@@ -65,6 +66,8 @@ export const highwayCircumferenceDataSchema = z.object({
       'optimal-guide-refined',
       'validated-detailed',
     ]),
+    objectiveUpperBoundSquareMeters: z.number().nonnegative().optional(),
+    optimizationIterations: z.number().int().positive().optional(),
     sourceFeatureCount: z.number().int().positive(),
     unpairedRampPathCount: z.number().int().nonnegative(),
   }),
