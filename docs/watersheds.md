@@ -230,9 +230,11 @@ Additional source sink polygons without a river-network outlet appear as gray su
 depressions with no fabricated outlet marker. They are not assumed to be endorheic.
 Composite coastal polygons below GRIT's 50 km² stream-initiation threshold are omitted
 because they can encompass multiple outlets. A source coastal endpoint assigned to the
-Caspian Sea is labeled as a closed inland receiving body, not an ocean outlet.
-Generalized Natural Earth marine areas supply receiving-body colors; they do not
-determine divides.
+Caspian Sea is labeled as an inland receiving sea. Like ocean-draining rivers, its
+tributaries keep separate primary watersheds by terminal node, with their own
+river-mouth markers. All share the Caspian Sea color; sharing a receiving body does not
+merge basins. Generalized Natural Earth marine areas supply receiving-body colors; they
+do not determine divides.
 
 The North American archive, groundwater corrections, terminal-node joins, and
 receiving-body assignments remain independently versioned and unchanged.
@@ -251,6 +253,13 @@ receiving-body assignments remain independently versioned and unchanged.
    maximum-zoom simplification, and immutable parts smaller than 100 MiB.
 5. Run `npm run check` to verify routing fixtures, shipped tiles, and production asset
    integrity.
+
+For an archive built before the Caspian outlet split,
+`scripts/restore-caspian-watersheds.py` performs the equivalent migration using only the
+pinned EU/AS sources. It verifies that all 293 original terminal groups, their total
+area, and catchment counts are recovered, then replaces the former combined feature
+using `tile-join` without simplifying the other continents. Full builds retain those
+outlet groups directly.
 
 GRIT-derived `global-primary-watersheds-*.bin` files are **CC BY-NC 4.0**, not MIT. They
 adapt the source by main-route grouping, dissolving, receiving-body labeling,

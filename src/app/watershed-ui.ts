@@ -195,7 +195,7 @@ function installBasins(dataset: WatershedDataset): void {
       ...(basin.terminal_node
         ? [{ label: 'Terminal node ID', value: basin.terminal_node }]
         : []),
-      ...(basin.source !== 'grit' || basin.drainage === 'endorheic'
+      ...(basin.source !== 'grit'
         ? [{ label: 'Joined source basins', value: basin.source_basins }]
         : []),
       {
