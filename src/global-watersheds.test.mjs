@@ -72,13 +72,17 @@ async function basinsAt(archive, [longitude, latitude]) {
   const matches = [];
   for (let i = 0; i < layer.length; i++) {
     const feature = layer.feature(i);
+    assert.equal(feature.extent, 16384, 'Full-detail tile extent must be preserved');
     const point = { x: (x % 1) * feature.extent, y: (y % 1) * feature.extent };
     if (
       feature
         .loadGeometry()
         .reduce((inside, ring) => inside !== inRing(point, ring), false)
     )
-      matches.push(watershedPropertiesSchema.parse(feature.properties));
+      matches.push({
+        ...watershedPropertiesSchema.parse(feature.properties),
+        fill_color: feature.properties.fill_color,
+      });
   }
   return matches;
 }
@@ -102,8 +106,7 @@ test('global archive retains source detail, scope, license, and complete regiona
   assert.equal(
     summary.count,
     summary.regions.reduce((sum, r) => sum + r.displayed_individual_basins, 0) +
-      summary.surface_depressions.basins +
-      summary.closed_basins.count,
+      summary.surface_depressions.basins,
   );
   for (const region of summary.regions) {
     assert.ok(region.catchments > region.basins);
@@ -147,9 +150,47 @@ test('major world rivers reach their expected receiving bodies and tributary poi
       ids.set(group, basin.id);
     }
     assert.notEqual(
+      ids.get('Volga'),
+      ids.get('Ural'),
+      'Caspian rivers retain separate basins',
+    );
+    assert.notEqual(
       ids.get('Rhine'),
       ids.get('Danube'),
       'Canals must not merge Rhine and Danube',
+    );
+  });
+});
+
+test('Caspian tributaries have distinct outlets and one shared receiving-body color', async () => {
+  await withArchive(async (archive) => {
+    const [volga] = await basinsAt(archive, [49.12, 55.79]);
+    const [ural] = await basinsAt(archive, [51.4, 51.2]);
+    assert.equal(volga.fill_color, ural.fill_color);
+    assert.equal(
+      volga.fill_color,
+      worldwideExitBodies.find((body) => body.name === 'Caspian Sea').color,
+    );
+    assert.notEqual(volga.id, ural.id);
+    assert.notEqual(volga.terminal_node, ural.terminal_node);
+    assert.notDeepEqual(
+      [volga.outlet_lon, volga.outlet_lat],
+      [ural.outlet_lon, ural.outlet_lat],
+    );
+    for (const basin of [volga, ural]) {
+      assert.equal(basin.exit_body, 'Caspian Sea');
+      assert.equal(basin.drainage, 'endorheic');
+      assert.equal(basin.source_basins, 1);
+      assert.ok(Number.isFinite(basin.outlet_lon));
+      assert.ok(Number.isFinite(basin.outlet_lat));
+      assert.notEqual(basin.outlet_known, false);
+      assert.notEqual(basin.id, 2900000001);
+    }
+    const summary = await json('global-watersheds-summary.json');
+    assert.equal(summary.closed_basins, undefined);
+    assert.equal(
+      summary.regions.reduce((sum, r) => sum + r.inland_sea_terminal_groups, 0),
+      293,
     );
   });
 });

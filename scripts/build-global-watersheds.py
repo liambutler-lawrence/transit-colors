@@ -214,9 +214,8 @@ def finalize_regions(stats):
         (CACHE / f"basins-{entry['region']}.json").write_text(json.dumps(entry, indent=2) + '\n')
 
 
-def merge_closed_basins(stats):
-    """All rivers entering the same confirmed terminal lake share one closed basin."""
-    members = []
+def prepare_display_regions(stats):
+    """Keep each receiving-body outlet separate; omit unsupported ice-sheet routing."""
     for entry in stats:
         source = CACHE / f"basins-{entry['region']}.geojsonl"
         target = CACHE / f"display-{entry['region']}.geojsonl"
@@ -229,31 +228,17 @@ def merge_closed_basins(stats):
                     continue
                 if p['drainage'] == 'endorheic':
                     assert p['exit_body'] == 'Caspian Sea'
-                    members.append((p, shapely.from_geojson(line)))
                     groups += 1
-                else:
-                    output.write(line)
-        entry['closed_lake_terminal_groups'] = groups
+                output.write(line)
+        entry['inland_sea_terminal_groups'] = groups
+        entry.pop('closed_lake_terminal_groups', None)
         entry['unsupported_greenland_basins'] = unsupported
-        entry['displayed_individual_basins'] = entry['basins'] - groups - unsupported
-    assert len(members) > 1
-    properties = dict(id=2_900_000_001, source='grit', name='Caspian Sea basin',
-        drainage='endorheic', exit_body='Caspian Sea', fill_color=MARINE.colors['Caspian Sea'],
-        outlet_known=False, source_basins=len(members),
-        catchments=sum(p['catchments'] for p, _ in members),
-        area_km2=sum(p['area_km2'] for p, _ in members))
-    geometry = shapely.union_all([g for _, g in members])
-    assert geometry.is_valid
-    feature = dict(type='Feature', properties=properties, geometry=mapping(geometry))
-    (CACHE / 'basins-closed.geojsonl').write_text(json.dumps(feature, separators=(',', ':'), allow_nan=False) + '\n')
-    return dict(count=1, terminal_groups_joined=len(members), members=[p['id'] for p, _ in members], area_km2=properties['area_km2'], catchments=properties['catchments'])
+        entry['displayed_individual_basins'] = entry['basins'] - unsupported
 
 
-def tile(stats, sinks, closed):
-    manifest_path = ROOT / 'data/global-watersheds-summary.json'
-    previous_parts = json.loads(manifest_path.read_text()).get('parts', []) if manifest_path.exists() else []
+def tile(stats, sinks):
     target = CACHE / 'global-primary-watersheds.pmtiles'
-    sources = [CACHE / f'display-{r}.geojsonl' for r in REGIONS] + [CACHE / 'basins-sinks.geojsonl', CACHE / 'basins-closed.geojsonl']
+    sources = [CACHE / f'display-{r}.geojsonl' for r in REGIONS] + [CACHE / 'basins-sinks.geojsonl']
     command = ['tippecanoe', '--force', f'--output={target}', '--layer=basins',
         '--minimum-zoom=0', '--maximum-zoom=10', '--full-detail=14', '--low-detail=12',
         '--simplify-only-low-zooms', '--detect-shared-borders', '--no-tiny-polygon-reduction-at-maximum-zoom',
@@ -261,15 +246,26 @@ def tile(stats, sinks, closed):
         '--name=Global primary watersheds outside North America',
         '--attribution=GRIT v1.0 / Wortmann et al. (2025); CC BY-NC 4.0'] + list(map(str, sources))
     subprocess.run(command, check=True)
-    with target.open('rb') as stream:
-        digest = hashlib.file_digest(stream, 'sha256').hexdigest()
     summary = dict(source='GRIT v1.0', source_url='https://zenodo.org/records/17435232',
         license='CC BY-NC 4.0', outlet_reviews=list(OUTLET_REVIEWS.values()), source_resolution_m=30, source_vectors_simplified=True,
-        grouping='Follow mainstem at bifurcations, then dissolve segment catchments by terminal node. Secondary outlets remain distinct.',
-        regions=stats, surface_depressions=sinks, closed_basins=closed, exclusions=['Greenland', 'Antarctica', 'Composite coastal units below the source 50 km² stream threshold'],
-        count=sum(s['displayed_individual_basins'] for s in stats) + sinks['basins'] + closed['count'], file=target.name, sha256=digest,
-        bytes=target.stat().st_size, maximum_zoom=10, maximum_zoom_extent=16384,
+        grouping='Follow mainstem at bifurcations, then dissolve segment catchments by terminal node. Secondary outlets remain distinct. Receiving bodies, including the Caspian Sea, do not merge distinct terminal nodes.',
+        regions=stats, surface_depressions=sinks, exclusions=['Greenland', 'Antarctica', 'Composite coastal units below the source 50 km² stream threshold'],
+        count=sum(s['displayed_individual_basins'] for s in stats) + sinks['basins'], maximum_zoom=10, maximum_zoom_extent=16384,
         maximum_zoom_simplification=False, parts=[])
+    publish_archive(target, summary)
+    used = {name for s in stats for name in s['receiving_bodies']}
+    bodies = [dict(name=name, color=MARINE.colors[name]) for name in sorted(used)]
+    (ROOT / 'data/global-watersheds-exit-bodies.json').write_text(json.dumps(bodies, indent=2) + '\n')
+    print(json.dumps(summary, indent=2), flush=True)
+
+
+def publish_archive(target, summary):
+    """Publish immutable parts, keeping unrelated regional data intact."""
+    manifest_path = ROOT / 'data/global-watersheds-summary.json'
+    previous_parts = json.loads(manifest_path.read_text()).get('parts', []) if manifest_path.exists() else []
+    with target.open('rb') as stream:
+        digest = hashlib.file_digest(stream, 'sha256').hexdigest()
+    summary.update(file=target.name, sha256=digest, bytes=target.stat().st_size, parts=[])
     with target.open('rb') as stream:
         index = 0
         while chunk := stream.read(95 * 1024 * 1024):
@@ -283,10 +279,6 @@ def tile(stats, sinks, closed):
         name = part['file']
         if name not in current_names and Path(name).name == name and name.startswith('global-primary-watersheds-') and name.endswith('.bin'):
             (ROOT / 'data' / name).unlink(missing_ok=True)
-    used = {name for s in stats for name in s['receiving_bodies']}
-    bodies = [dict(name=name, color=MARINE.colors[name]) for name in sorted(used)]
-    (ROOT / 'data/global-watersheds-exit-bodies.json').write_text(json.dumps(bodies, indent=2) + '\n')
-    print(json.dumps(summary, indent=2), flush=True)
 
 
 if __name__ == '__main__':
@@ -297,4 +289,5 @@ if __name__ == '__main__':
     else:
         stats = [build_region(region) for region in REGIONS]
         finalize_regions(stats)
-        tile(stats, build_sinks(stats), merge_closed_basins(stats))
+        prepare_display_regions(stats)
+        tile(stats, build_sinks(stats))

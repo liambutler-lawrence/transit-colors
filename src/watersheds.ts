@@ -31,7 +31,7 @@ export const watershedPropertiesSchema = z
   );
 
 export function watershedDrainageLabel(drainage: string): string {
-  if (drainage === 'endorheic') return 'Closed inland receiving body';
+  if (drainage === 'endorheic') return 'Inland sea drainage';
   if (drainage === 'ocean') return 'One modeled ocean outlet';
   if (drainage === 'inland' || drainage === 'unresolved_sink')
     return 'Underground drainage unresolved';

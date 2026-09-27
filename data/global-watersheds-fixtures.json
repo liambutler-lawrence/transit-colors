@@ -96,8 +96,7 @@
       55.79
     ],
     "receiving_body": "Caspian Sea",
-    "region": "EU",
-    "primary_group": "Caspian Sea"
+    "region": "EU"
   },
   {
     "river": "Yangtze",
@@ -189,7 +188,6 @@
       51.2
     ],
     "receiving_body": "Caspian Sea",
-    "region": "EU",
-    "primary_group": "Caspian Sea"
+    "region": "AS"
   }
 ]
