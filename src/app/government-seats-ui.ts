@@ -1,10 +1,15 @@
 import { Popup } from 'maplibre-gl';
 import { z } from 'zod';
-import seatsData from '../../data/north-america-government-seats.json';
-import circlesUrl from '../../data/north-america-government-seats.geojson?url';
+import northAmericaSeats from '../../data/north-america-government-seats.json';
+import chinaSeats from '../../data/china-government-seats.json';
+import circlesUrl from '../../data/government-seats.geojson?url';
 import connectionsUrl from '../../data/north-america-government-connections.geojson?url';
 import connectionStatuses from '../../data/north-america-government-connection-status.json';
 import { map } from './context.js';
+
+const seats = [northAmericaSeats, chinaSeats].flatMap((catalog) =>
+  catalog.seats.map((seat) => ({ ...seat, reviewedAt: catalog.reviewedAt })),
+);
 
 const connectionRecords = z
   .array(
@@ -41,7 +46,7 @@ let active = false;
 let installed = false;
 let popup: Popup | null = null;
 
-type Seat = (typeof seatsData.seats)[number];
+type Seat = (typeof seats)[number];
 
 function seatPosition(seat: Seat): [number, number] {
   const [longitude, latitude] = seat.coordinates;
@@ -74,6 +79,11 @@ function showSeat(seat: Seat, anchor: [number, number] = seatPosition(seat)): vo
             : 'No qualifying freeway connection with access to both circumference directions was found in the road dataset.';
     content.append(status);
   }
+  if (seat.country === 'China') {
+    const status = document.createElement('p');
+    status.textContent = 'Government building circle only; routes have not been added.';
+    content.append(status);
+  }
   if (seat.note) {
     const note = document.createElement('p');
     note.textContent = seat.note;
@@ -92,7 +102,7 @@ function showSeat(seat: Seat, anchor: [number, number] = seatPosition(seat)): vo
   }
   const checked = document.createElement('p');
   checked.className = 'government-seat-checked';
-  checked.textContent = `Dataset reviewed ${seatsData.reviewedAt}`;
+  checked.textContent = `Dataset reviewed ${seat.reviewedAt}`;
   content.append(checked);
   popup = new Popup({ maxWidth: '320px', offset: 10 })
     .setLngLat(anchor)
@@ -161,7 +171,7 @@ function install(): void {
     });
     map.on('click', lineId, (event) => {
       const id: unknown = event.features?.[0]?.properties['id'];
-      const seat = seatsData.seats.find((entry) => entry.id === id);
+      const seat = seats.find((entry) => entry.id === id);
       if (seat) showSeat(seat, event.lngLat.toArray());
     });
   }
@@ -218,7 +228,7 @@ function install(): void {
   });
   map.on('click', LAYERS.marker, (event) => {
     const id: unknown = event.features?.[0]?.properties['id'];
-    const seat = seatsData.seats.find((entry) => entry.id === id);
+    const seat = seats.find((entry) => entry.id === id);
     if (seat) showSeat(seat, event.lngLat.toArray());
   });
   map.on('mouseenter', LAYERS.marker, () => {
@@ -246,10 +256,10 @@ toggle?.addEventListener('change', () => {
   syncGovernmentSeats(active);
 });
 if (select) {
-  for (const country of ['Canada', 'United States', 'Mexico']) {
+  for (const country of ['Canada', 'United States', 'Mexico', 'China']) {
     const group = document.createElement('optgroup');
     group.label = country;
-    for (const seat of seatsData.seats
+    for (const seat of seats
       .filter((seat) => seat.country === country)
       .sort((a, b) => a.subdivision.localeCompare(b.subdivision))) {
       const option = document.createElement('option');
@@ -260,7 +270,7 @@ if (select) {
     select.append(group);
   }
   select.addEventListener('change', () => {
-    const seat = seatsData.seats.find((entry) => entry.id === select.value);
+    const seat = seats.find((entry) => entry.id === select.value);
     if (!seat || !active) return;
     if (toggle) toggle.checked = true;
     syncGovernmentSeats(active);
