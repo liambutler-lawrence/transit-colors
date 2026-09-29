@@ -34,14 +34,24 @@ export function governmentSeatFeatures(seats) {
   };
 }
 if (process.argv[1] === fileURLToPath(import.meta.url)) {
-  const catalog = JSON.parse(
-    await readFile(
-      new URL('../data/north-america-government-seats.json', import.meta.url),
-      'utf8',
+  const catalogs = await Promise.all(
+    ['north-america', 'china'].map(async (region) =>
+      JSON.parse(
+        await readFile(
+          new URL(`../data/${region}-government-seats.json`, import.meta.url),
+          'utf8',
+        ),
+      ),
     ),
   );
   await writeFile(
+    new URL('../data/government-seats.geojson', import.meta.url),
+    JSON.stringify(
+      governmentSeatFeatures(catalogs.flatMap((catalog) => catalog.seats)),
+    ) + '\n',
+  );
+  await writeFile(
     new URL('../data/north-america-government-seats.geojson', import.meta.url),
-    JSON.stringify(governmentSeatFeatures(catalog.seats)) + '\n',
+    JSON.stringify(governmentSeatFeatures(catalogs[0].seats)) + '\n',
   );
 }

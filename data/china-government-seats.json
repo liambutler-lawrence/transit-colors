@@ -1,0 +1,470 @@
+{
+  "reviewedAt": "2026-09-29",
+  "scope": "31 mainland provincial-level divisions, Hong Kong and Macao. Taiwan is outside this catalog. Circles only; no China routes.",
+  "diameterMeters": 10000,
+  "attribution": "Coordinates: OpenStreetMap contributors (ODbL), Wikidata (CC0). Building references: Wikipedia contributors (CC BY-SA). Individual source links accompany every seat.",
+  "seats": [
+    {
+      "id": "CN-AH",
+      "subdivision": "Anhui",
+      "country": "China",
+      "building": "Anhui People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        117.3233024,
+        31.7362865
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E5%AE%89%E5%BE%BD%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/relation/20598301",
+      "note": "Working provincial headquarters on Zhongshan Road in Hefei’s Binhu area."
+    },
+    {
+      "id": "CN-BJ",
+      "subdivision": "Beijing",
+      "country": "China",
+      "building": "Beijing People's Government headquarters",
+      "role": "Municipal government",
+      "coordinates": [
+        116.7185035,
+        39.9039959
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E5%8C%97%E4%BA%AC%E5%B8%82%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/653984468",
+      "note": "Working municipal headquarters at 57 Yunhe East Street, Tongzhou; the former Zhengyi Road offices are not used."
+    },
+    {
+      "id": "CN-CQ",
+      "subdivision": "Chongqing",
+      "country": "China",
+      "building": "Chongqing People's Government headquarters",
+      "role": "Municipal government",
+      "coordinates": [
+        106.5466009,
+        29.5664478
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E9%87%8D%E5%BA%86%E5%B8%82%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/583430778",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-FJ",
+      "subdivision": "Fujian",
+      "country": "China",
+      "building": "Fujian People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        119.2900833,
+        26.1035419
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E7%A6%8F%E5%BB%BA%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/327563916",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-GS",
+      "subdivision": "Gansu",
+      "country": "China",
+      "building": "Gansu People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        103.8240141,
+        36.0613814
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E7%94%98%E8%82%83%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/405352718",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-GD",
+      "subdivision": "Guangdong",
+      "country": "China",
+      "building": "Guangdong People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        113.2610687,
+        23.13579
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E5%B9%BF%E4%B8%9C%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/330746859",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-GX",
+      "subdivision": "Guangxi",
+      "country": "China",
+      "building": "Guangxi People's Government headquarters",
+      "role": "Autonomous region government",
+      "coordinates": [
+        108.3236815,
+        22.8192963
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E5%B9%BF%E8%A5%BF%E5%A3%AE%E6%97%8F%E8%87%AA%E6%B2%BB%E5%8C%BA%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/915070926",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-GZ",
+      "subdivision": "Guizhou",
+      "country": "China",
+      "building": "Guizhou People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        106.7015722,
+        26.6039807
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E8%B4%B5%E5%B7%9E%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/1285855320",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-HI",
+      "subdivision": "Hainan",
+      "country": "China",
+      "building": "Hainan People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        110.3444534,
+        20.0211828
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E6%B5%B7%E5%8D%97%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/node/5207781376",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-HE",
+      "subdivision": "Hebei",
+      "country": "China",
+      "building": "Hebei People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        114.5244415,
+        38.0365198
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E6%B2%B3%E5%8C%97%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/1061264367",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-HL",
+      "subdivision": "Heilongjiang",
+      "country": "China",
+      "building": "Heilongjiang People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        126.6561874,
+        45.7403114
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E9%BB%91%E9%BE%99%E6%B1%9F%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/relation/15850295",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-HA",
+      "subdivision": "Henan",
+      "country": "China",
+      "building": "Henan People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        113.7468615,
+        34.7679182
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E6%B2%B3%E5%8D%97%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/642737670",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-HK",
+      "subdivision": "Hong Kong",
+      "country": "China",
+      "building": "Central Government Offices, Tamar",
+      "role": "Special administrative region government",
+      "coordinates": [
+        114.1655778,
+        22.2807917
+      ],
+      "sourceUrl": "https://www.wikidata.org/wiki/Q5061134",
+      "coordinateSourceUrl": "https://www.wikidata.org/wiki/Q5061134",
+      "note": ""
+    },
+    {
+      "id": "CN-HB",
+      "subdivision": "Hubei",
+      "country": "China",
+      "building": "Hubei People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        114.3364211,
+        30.5489695
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E6%B9%96%E5%8C%97%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/99145316",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-HN",
+      "subdivision": "Hunan",
+      "country": "China",
+      "building": "Hunan People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        112.9778175,
+        28.1176515
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E6%B9%96%E5%8D%97%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/186039494",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-NM",
+      "subdivision": "Inner Mongolia",
+      "country": "China",
+      "building": "Inner Mongolia People's Government headquarters",
+      "role": "Autonomous region government",
+      "coordinates": [
+        111.7579732,
+        40.8171293
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E5%86%85%E8%92%99%E5%8F%A4%E8%87%AA%E6%B2%BB%E5%8C%BA%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/1343633561",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-JS",
+      "subdivision": "Jiangsu",
+      "country": "China",
+      "building": "Jiangsu People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        118.7583286,
+        32.063518
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E6%B1%9F%E8%8B%8F%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/node/9636284471",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-JX",
+      "subdivision": "Jiangxi",
+      "country": "China",
+      "building": "Jiangxi People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        115.8081313,
+        28.6411015
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E6%B1%9F%E8%A5%BF%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/node/4417244253",
+      "note": "Working provincial headquarters at 999 Wolong Road; the former Beijing West Road offices are not used."
+    },
+    {
+      "id": "CN-JL",
+      "subdivision": "Jilin",
+      "country": "China",
+      "building": "Jilin People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        125.3198337,
+        43.8943502
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E5%90%89%E6%9E%97%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/relation/4249897",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-LN",
+      "subdivision": "Liaoning",
+      "country": "China",
+      "building": "Liaoning People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        123.4278094,
+        41.8343028
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E8%BE%BD%E5%AE%81%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/644337591",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-MO",
+      "subdivision": "Macao",
+      "country": "China",
+      "building": "Macao Government Headquarters",
+      "role": "Special administrative region government",
+      "coordinates": [
+        113.53786,
+        22.1898539
+      ],
+      "sourceUrl": "https://www.wikidata.org/wiki/Q6722701",
+      "coordinateSourceUrl": "https://www.wikidata.org/wiki/Q6722701",
+      "note": ""
+    },
+    {
+      "id": "CN-NX",
+      "subdivision": "Ningxia",
+      "country": "China",
+      "building": "Ningxia People's Government headquarters",
+      "role": "Autonomous region government",
+      "coordinates": [
+        106.2551424,
+        38.4715607
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E5%AE%81%E5%A4%8F%E5%9B%9E%E6%97%8F%E8%87%AA%E6%B2%BB%E5%8C%BA%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/423095385",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-QH",
+      "subdivision": "Qinghai",
+      "country": "China",
+      "building": "Qinghai People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        101.7785005,
+        36.6224067
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E9%9D%92%E6%B5%B7%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/1339970053",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-SN",
+      "subdivision": "Shaanxi",
+      "country": "China",
+      "building": "Shaanxi People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        108.9495345,
+        34.2670693
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E9%99%95%E8%A5%BF%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/1465146336",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-SD",
+      "subdivision": "Shandong",
+      "country": "China",
+      "building": "Shandong People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        117.0147297,
+        36.6699668
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E5%B1%B1%E4%B8%9C%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/571698855",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-SH",
+      "subdivision": "Shanghai",
+      "country": "China",
+      "building": "Shanghai People's Government headquarters",
+      "role": "Municipal government",
+      "coordinates": [
+        121.46903,
+        31.23243
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E4%B8%8A%E6%B5%B7%E5%B8%82%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/178801539",
+      "note": "Renmin Building on People’s Square; the former Bund offices are not used."
+    },
+    {
+      "id": "CN-SX",
+      "subdivision": "Shanxi",
+      "country": "China",
+      "building": "Shanxi People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        112.572335,
+        37.8138469
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E5%B1%B1%E8%A5%BF%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/822442478",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-SC",
+      "subdivision": "Sichuan",
+      "country": "China",
+      "building": "Sichuan People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        104.0739761,
+        30.6538778
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E5%9B%9B%E5%B7%9D%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/620291493",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-TJ",
+      "subdivision": "Tianjin",
+      "country": "China",
+      "building": "Tianjin People's Government headquarters",
+      "role": "Municipal government",
+      "coordinates": [
+        117.1963073,
+        39.0849197
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E5%A4%A9%E6%B4%A5%E5%B8%82%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/1274582737",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-XZ",
+      "subdivision": "Tibet",
+      "country": "China",
+      "building": "Tibet People's Government headquarters",
+      "role": "Autonomous region government",
+      "coordinates": [
+        91.1163814,
+        29.6517414
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E8%A5%BF%E8%97%8F%E8%87%AA%E6%B2%BB%E5%8C%BA%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/177275931",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-XJ",
+      "subdivision": "Xinjiang",
+      "country": "China",
+      "building": "Xinjiang People's Government headquarters",
+      "role": "Autonomous region government",
+      "coordinates": [
+        87.6256525,
+        43.792174
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E6%96%B0%E7%96%86%E7%BB%B4%E5%90%BE%E5%B0%94%E8%87%AA%E6%B2%BB%E5%8C%BA%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/1301269523",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-YN",
+      "subdivision": "Yunnan",
+      "country": "China",
+      "building": "Yunnan People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        102.7071685,
+        25.0493451
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E4%BA%91%E5%8D%97%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/1002870694",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    },
+    {
+      "id": "CN-ZJ",
+      "subdivision": "Zhejiang",
+      "country": "China",
+      "building": "Zhejiang People's Government headquarters",
+      "role": "Provincial government",
+      "coordinates": [
+        120.1485902,
+        30.2696455
+      ],
+      "sourceUrl": "https://zh.wikipedia.org/wiki/%E6%B5%99%E6%B1%9F%E7%9C%81%E4%BA%BA%E6%B0%91%E6%94%BF%E5%BA%9C",
+      "coordinateSourceUrl": "https://www.openstreetmap.org/way/1273987097",
+      "note": "Coordinates identify the mapped government headquarters building or campus."
+    }
+  ]
+}
