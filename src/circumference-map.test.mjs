@@ -257,7 +257,7 @@ test('pixels beyond the fade stay fully transparent across latitude scales', () 
 test('the sidebar follows product, mode, results, and selection hierarchy', async () => {
   const shell = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 
-  const productIndex = shell.indexOf('1 · Product');
+  const productIndex = shell.indexOf('class="product-tabs"');
   const accessModeIndex = shell.indexOf('<span class="section-eyebrow">Mode</span>');
   const accessResultsIndex = shell.indexOf(
     '<span class="section-eyebrow">Results</span>',

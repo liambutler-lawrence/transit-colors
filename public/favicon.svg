@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <rect width="64" height="64" rx="32" fill="#f3efe5" />
+  <circle cx="32" cy="32" r="29" fill="none" stroke="#18392b" stroke-width="2" />
+  <text
+    x="32"
+    y="37"
+    fill="#18392b"
+    font-family="Arial, sans-serif"
+    font-size="15"
+    letter-spacing="1"
+    text-anchor="middle"
+  >
+    LBL
+  </text>
+</svg>

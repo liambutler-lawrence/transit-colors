@@ -3,11 +3,46 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta
+      name="description"
+      content="A different way to look at the places we live. Explore transit access, city geometry, time zones, land use, and watersheds on an interactive globe."
+    />
     <title>Transit Colors</title>
+    <meta name="theme-color" content="#f3efe5" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://tiles.openfreemap.org" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&family=Manrope:wght@400;500&display=swap"
+      rel="stylesheet"
+    />
     <link href="/styles.css" rel="stylesheet" />
   </head>
   <body>
+    <header class="site-header">
+      <div class="site-brand">
+        <a
+          class="monogram"
+          href="https://liambutlerlawrence.com/"
+          aria-label="Liam Butler-Lawrence home"
+          >LBL</a
+        >
+        <div class="site-title">
+          <span class="site-eyebrow">Maps &amp; urban exploration</span>
+          <h1>Transit <span>Colors</span></h1>
+        </div>
+      </div>
+      <p class="site-intro">A different way to look at the places we live.</p>
+      <nav aria-label="Main navigation">
+        <a class="projects-link" href="https://liambutlerlawrence.com/#projects">
+          <span>All projects</span>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 12h14m-6-6 6 6-6 6" />
+          </svg>
+        </a>
+      </nav>
+    </header>
     <main class="app-shell">
       <div id="map" aria-label="Transit access map"></div>
       <div id="map-loading" class="map-loading" role="status" aria-live="polite">
@@ -18,7 +53,7 @@
       <section class="panel" aria-label="Map details">
         <div class="panel-header">
           <div class="panel-heading">
-            <span class="hierarchy-label">1 · Product</span>
+            <span class="hierarchy-label">Explore the maps</span>
             <div class="product-tabs" role="tablist" aria-label="Map product">
               <button
                 id="product-access"
@@ -87,7 +122,12 @@
         </div>
 
         <div id="panel-content" class="panel-content">
-          <div id="access-product" class="product-panel" role="tabpanel">
+          <div
+            id="access-product"
+            class="product-panel"
+            role="tabpanel"
+            aria-labelledby="product-access"
+          >
             <section class="sidebar-section display-section">
               <div class="section-heading compact-heading">
                 <div>
@@ -262,6 +302,7 @@
             id="circumference-product"
             class="product-panel circumference-product"
             role="tabpanel"
+            aria-labelledby="product-circumference"
             hidden
           >
             <section class="sidebar-section display-section">
@@ -443,6 +484,7 @@
             id="timezone-product"
             class="product-panel timezone-product"
             role="tabpanel"
+            aria-labelledby="product-timezone"
             hidden
           >
             <section class="sidebar-section display-section">
@@ -877,6 +919,7 @@
             id="land-use-product"
             class="product-panel land-use-product"
             role="tabpanel"
+            aria-labelledby="product-land-use"
             hidden
           >
             <section class="sidebar-section display-section">
