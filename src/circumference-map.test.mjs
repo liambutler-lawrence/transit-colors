@@ -254,10 +254,10 @@ test('pixels beyond the fade stay fully transparent across latitude scales', () 
   assert.ok(renderedImage.data.every((value) => value === 0));
 });
 
-test('the sidebar follows product, mode, results, and selection hierarchy', async () => {
+test('map selection precedes the sidebar mode, results, and selection hierarchy', async () => {
   const shell = await readFile(new URL('../index.html', import.meta.url), 'utf8');
 
-  const productIndex = shell.indexOf('class="product-tabs"');
+  const productIndex = shell.indexOf('id="map-type-menu"');
   const accessModeIndex = shell.indexOf('<span class="section-eyebrow">Mode</span>');
   const accessResultsIndex = shell.indexOf(
     '<span class="section-eyebrow">Results</span>',

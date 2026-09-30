@@ -344,6 +344,9 @@ export const futureStationToggle = requiredElement(
 export const areaSelect = requiredElement('#metro-area', HTMLSelectElement);
 export const accessResultAreaEl = requiredElement('#access-result-area', HTMLElement);
 export const accessResultsEl = requiredElement('#access-results', HTMLElement);
+export const mapTypeTrigger = requiredElement('#map-type-trigger', HTMLButtonElement);
+export const mapTypeMenu = requiredElement('#map-type-menu', HTMLElement);
+export const mapModeNameEl = requiredElement('#map-mode-name', HTMLElement);
 export const accessProductButton = requiredElement(
   '#product-access',
   HTMLButtonElement,
