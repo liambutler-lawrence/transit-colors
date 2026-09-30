@@ -7,7 +7,7 @@
       name="description"
       content="A different way to look at the places we live. Explore transit access, city geometry, time zones, land use, and watersheds on an interactive globe."
     />
-    <title>Transit Colors</title>
+    <title>Maps</title>
     <meta name="theme-color" content="#f3efe5" />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <link rel="preconnect" href="https://tiles.openfreemap.org" />
@@ -29,8 +29,82 @@
           >LBL</a
         >
         <div class="site-title">
-          <span class="site-eyebrow">Maps &amp; urban exploration</span>
-          <h1>Transit <span>Colors</span></h1>
+          <span class="site-eyebrow">Maps</span>
+          <h1>
+            <button
+              id="map-type-trigger"
+              class="map-type-trigger"
+              type="button"
+              popovertarget="map-type-menu"
+              aria-haspopup="menu"
+              aria-expanded="false"
+              aria-controls="map-type-menu"
+              aria-label="Choose map type: Transit heatmap"
+            >
+              <span id="map-mode-name">Transit heatmap</span>
+              <svg viewBox="0 0 20 20" aria-hidden="true">
+                <path d="m5 7.5 5 5 5-5" />
+              </svg>
+            </button>
+          </h1>
+          <div
+            id="map-type-menu"
+            class="map-type-menu"
+            popover="auto"
+            role="menu"
+            aria-label="Map type"
+          >
+            <button
+              id="product-access"
+              type="button"
+              tabindex="-1"
+              role="menuitemradio"
+              aria-checked="true"
+              aria-controls="access-product"
+            >
+              Transit heatmap
+            </button>
+            <button
+              id="product-circumference"
+              type="button"
+              tabindex="-1"
+              role="menuitemradio"
+              aria-checked="false"
+              aria-controls="circumference-product"
+            >
+              Circumference routes
+            </button>
+            <button
+              id="product-timezone"
+              type="button"
+              tabindex="-1"
+              role="menuitemradio"
+              aria-checked="false"
+              aria-controls="timezone-product"
+            >
+              Clock skew
+            </button>
+            <button
+              id="product-land-use"
+              type="button"
+              tabindex="-1"
+              role="menuitemradio"
+              aria-checked="false"
+              aria-controls="land-use-product"
+            >
+              Land use
+            </button>
+            <button
+              id="product-watersheds"
+              type="button"
+              tabindex="-1"
+              role="menuitemradio"
+              aria-checked="false"
+              aria-controls="watershed-product"
+            >
+              Watersheds
+            </button>
+          </div>
         </div>
       </div>
       <p class="site-intro">A different way to look at the places we live.</p>
@@ -53,54 +127,7 @@
       <section class="panel" aria-label="Map details">
         <div class="panel-header">
           <div class="panel-heading">
-            <span class="hierarchy-label">Explore the maps</span>
-            <div class="product-tabs" role="tablist" aria-label="Map product">
-              <button
-                id="product-access"
-                type="button"
-                role="tab"
-                aria-selected="true"
-                aria-controls="access-product"
-              >
-                Transit heatmap
-              </button>
-              <button
-                id="product-circumference"
-                type="button"
-                role="tab"
-                aria-selected="false"
-                aria-controls="circumference-product"
-              >
-                Circumference routes
-              </button>
-              <button
-                id="product-timezone"
-                type="button"
-                role="tab"
-                aria-selected="false"
-                aria-controls="timezone-product"
-              >
-                Clock skew
-              </button>
-              <button
-                id="product-land-use"
-                type="button"
-                role="tab"
-                aria-selected="false"
-                aria-controls="land-use-product"
-              >
-                Land use
-              </button>
-              <button
-                id="product-watersheds"
-                type="button"
-                role="tab"
-                aria-selected="false"
-                aria-controls="watershed-product"
-              >
-                Watersheds
-              </button>
-            </div>
+            <span class="hierarchy-label">Map controls</span>
           </div>
           <div class="panel-actions">
             <span id="status" class="status loading">Loading map</span>
@@ -125,7 +152,7 @@
           <div
             id="access-product"
             class="product-panel"
-            role="tabpanel"
+            role="region"
             aria-labelledby="product-access"
           >
             <section class="sidebar-section display-section">
@@ -301,7 +328,7 @@
           <div
             id="circumference-product"
             class="product-panel circumference-product"
-            role="tabpanel"
+            role="region"
             aria-labelledby="product-circumference"
             hidden
           >
@@ -483,7 +510,7 @@
           <div
             id="timezone-product"
             class="product-panel timezone-product"
-            role="tabpanel"
+            role="region"
             aria-labelledby="product-timezone"
             hidden
           >
@@ -732,7 +759,7 @@
           <div
             id="watershed-product"
             class="product-panel"
-            role="tabpanel"
+            role="region"
             aria-labelledby="product-watersheds"
             hidden
           >
@@ -918,7 +945,7 @@
           <div
             id="land-use-product"
             class="product-panel land-use-product"
-            role="tabpanel"
+            role="region"
             aria-labelledby="product-land-use"
             hidden
           >

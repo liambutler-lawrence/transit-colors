@@ -8,6 +8,7 @@ import type {
   FilterSpecification,
   LngLatBoundsLike,
 } from 'maplibre-gl';
+import { createProductMenu } from './product-menu.js';
 
 import { isHeatmapRoadLayer, ROAD_SOURCE } from '../transit-road-tiles.js';
 
@@ -98,6 +99,9 @@ import {
   mapEl,
   mapLoadingEl,
   mapLoadingLabelEl,
+  mapModeNameEl,
+  mapTypeMenu,
+  mapTypeTrigger,
   nearCountEl,
   nearCountLabelEl,
   openStationFilter,
@@ -139,21 +143,12 @@ export function setActiveProduct(
   const timezoneActive = runtime.activeProduct === 'timezone';
   const landUseActive = runtime.activeProduct === 'landuse';
   const watershedActive = runtime.activeProduct === 'watersheds';
+  updateProductMenu(product);
   appShellEl.classList.toggle('watershed-active', watershedActive);
-  watershedProductButton.setAttribute('aria-selected', String(watershedActive));
-  watershedProductButton.tabIndex = watershedActive ? 0 : -1;
   watershedProductEl.hidden = !watershedActive;
   appShellEl.classList.toggle('circumference-active', circumferenceActive);
   appShellEl.classList.toggle('timezone-active', timezoneActive);
   appShellEl.classList.toggle('land-use-active', landUseActive);
-  accessProductButton.setAttribute('aria-selected', String(accessActive));
-  circumferenceProductButton.setAttribute('aria-selected', String(circumferenceActive));
-  timezoneProductButton.setAttribute('aria-selected', String(timezoneActive));
-  landUseProductButton.setAttribute('aria-selected', String(landUseActive));
-  accessProductButton.tabIndex = accessActive ? 0 : -1;
-  circumferenceProductButton.tabIndex = circumferenceActive ? 0 : -1;
-  timezoneProductButton.tabIndex = timezoneActive ? 0 : -1;
-  landUseProductButton.tabIndex = landUseActive ? 0 : -1;
   accessProductEl.hidden = !accessActive;
   circumferenceProductEl.hidden = !circumferenceActive;
   timezoneProductEl.hidden = !timezoneActive;
@@ -219,47 +214,19 @@ export function setActiveProduct(
   }
 }
 
-accessProductButton.addEventListener('click', () => {
-  setActiveProduct('access');
+const updateProductMenu = createProductMenu({
+  trigger: mapTypeTrigger,
+  menu: mapTypeMenu,
+  label: mapModeNameEl,
+  items: [
+    [accessProductButton, 'access'],
+    [circumferenceProductButton, 'circumference'],
+    [timezoneProductButton, 'timezone'],
+    [landUseProductButton, 'landuse'],
+    [watershedProductButton, 'watersheds'],
+  ],
+  onSelect: setActiveProduct,
 });
-circumferenceProductButton.addEventListener('click', () => {
-  setActiveProduct('circumference');
-});
-timezoneProductButton.addEventListener('click', () => {
-  setActiveProduct('timezone');
-});
-watershedProductButton.addEventListener('click', () => {
-  setActiveProduct('watersheds');
-});
-landUseProductButton.addEventListener('click', () => {
-  setActiveProduct('landuse');
-});
-const productTabs: readonly [HTMLButtonElement, Product][] = [
-  [accessProductButton, 'access'],
-  [circumferenceProductButton, 'circumference'],
-  [timezoneProductButton, 'timezone'],
-  [landUseProductButton, 'landuse'],
-  [watershedProductButton, 'watersheds'],
-];
-for (const [index, [button]] of productTabs.entries()) {
-  button.addEventListener('keydown', (event) => {
-    const next =
-      event.key === 'Home'
-        ? 0
-        : event.key === 'End'
-          ? productTabs.length - 1
-          : event.key === 'ArrowRight'
-            ? (index + 1) % productTabs.length
-            : event.key === 'ArrowLeft'
-              ? (index + productTabs.length - 1) % productTabs.length
-              : -1;
-    const target = productTabs[next];
-    if (!target) return;
-    event.preventDefault();
-    setActiveProduct(target[1]);
-    target[0].focus();
-  });
-}
 for (const toggle of [timezoneColorsToggle, timezoneBoundariesToggle]) {
   toggle.addEventListener('change', syncTimezoneSkewVisibility);
 }
@@ -1002,14 +969,14 @@ export function updateAreaChrome(
   accessResultAreaEl.textContent = `Destination metro: ${area.label}`;
   document.title =
     runtime.activeProduct === 'watersheds'
-      ? 'World Watersheds — Transit Colors'
+      ? 'Watersheds — Maps'
       : runtime.activeProduct === 'timezone'
-        ? 'Clock Skew Map — Transit Colors'
+        ? 'Clock skew — Maps'
         : runtime.activeProduct === 'landuse'
-          ? 'Jersey City Land Use — Transit Colors'
+          ? 'Land use — Jersey City · Maps'
           : runtime.activeProduct === 'circumference'
-            ? `Circumference Lab — ${area.label}`
-            : `Transit Colors — ${area.label}`;
+            ? `Circumference routes — ${area.label} · Maps`
+            : `Transit heatmap — ${area.label} · Maps`;
   mapEl.setAttribute(
     'aria-label',
     runtime.activeProduct === 'watersheds'
