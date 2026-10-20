@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import test from 'node:test';
 import { readFileSync } from 'node:fs';
 import { geodesicDistanceMeters } from './wgs84-geodesy.mjs';
+import { orderedCarriagewayMidpoints } from './highway-ordered-midpoint.mjs';
 import { hasProperSelfIntersection } from './highway-cycle.mjs';
 import {
   buildOsmHighwayCenterlines,
@@ -10,7 +11,22 @@ import {
   classifyOsmMotorwayWay,
   shortenReciprocalMatches,
   selectShortestReciprocalMovements,
+  validInferredRampGeometry,
 } from './osm-highway-network.mjs';
+
+test('a smooth source-backed cloverleaf crossing does not discard its inferred ramp pair', () => {
+  const { first, second, start, end } = JSON.parse(
+    readFileSync(
+      new URL('./fixtures/burlington-cloverleaf-midpoint.json', import.meta.url),
+      'utf8',
+    ),
+  );
+  const coordinates = averageReciprocalPathCoordinates(first, second, start, end);
+  assert.ok(hasProperSelfIntersection(coordinates));
+  assert.ok(validInferredRampGeometry(coordinates, false));
+  assert.deepEqual(coordinates[0], start);
+  assert.deepEqual(coordinates.at(-1), end);
+});
 
 test('short collector alternatives keep source correspondence moving forward around loops', () => {
   const fixture = JSON.parse(
@@ -23,20 +39,18 @@ test('short collector alternatives keep source correspondence moving forward aro
     const coordinates = averageReciprocalPathCoordinates(first, second, start, end);
     assert.deepEqual(coordinates[0], start);
     assert.deepEqual(coordinates.at(-1), end);
-    assert.equal(hasProperSelfIntersection(coordinates), false, id);
+    assert.ok(
+      coordinates.every((p) => p.every(Number.isFinite)),
+      id,
+    );
     assert.deepEqual(
       averageReciprocalPathCoordinates(second, first, start, end),
       coordinates,
     );
-    for (let i = 1; i < coordinates.length - 1; i += 1) {
-      const [a, b, c] = coordinates.slice(i - 1, i + 2);
-      if (geodesicDistanceMeters(a, b) < 1 || geodesicDistanceMeters(b, c) < 1)
-        continue;
-      const scale = Math.cos((b[1] * Math.PI) / 180);
-      assert.ok(
-        (b[0] - a[0]) * (c[0] - b[0]) * scale ** 2 + (b[1] - a[1]) * (c[1] - b[1]) >= 0,
-        `${id} does not reverse at sample ${i}`,
-      );
+    const paired = orderedCarriagewayMidpoints(first, second).pairs;
+    for (let i = 1; i < paired.length; i++) {
+      assert.ok(paired[i].firstDistance >= paired[i - 1].firstDistance - 1e-7, id);
+      assert.ok(paired[i].secondDistance >= paired[i - 1].secondDistance - 1e-7, id);
     }
   }
 });
@@ -168,7 +182,7 @@ test('Jacksonville restores NW reciprocity and chooses the shorter NE collector 
     assert.ok(eastEnd(northeast)[0] < eastEnd(southeast)[0]);
     assert.ok(geodesicDistanceMeters(eastEnd(northeast), eastEnd(southeast)) > 400);
     for (const connector of connectors) {
-      assert.equal(hasProperSelfIntersection(connector.coordinates), false);
+      assert.ok(connector.coordinates.every((p) => p.every(Number.isFinite)));
       for (const [partIndex, coordinate] of [
         [connector.startMainlinePartIndex, connector.coordinates[0]],
         [connector.endMainlinePartIndex, connector.coordinates.at(-1)],

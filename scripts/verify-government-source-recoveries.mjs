@@ -77,7 +77,7 @@ for (const recovery of recoveries) {
     recovery.end.coordinate,
   );
   if (JSON.stringify(expected) !== JSON.stringify(recovery.coordinates))
-    throw new Error('Recovery is not the source closest-tangent midpoint');
+    throw new Error('Recovery is not the source ordered midpoint');
   console.log(
     'Verified',
     recovery.id,

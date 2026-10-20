@@ -6,6 +6,7 @@ import {
   classifyOsmMotorwayWay,
   parseOplLine,
   prepareWays,
+  selectShortestAuxiliaryRampOptions,
 } from './osm-highway-network.mjs';
 import { hasProperSelfIntersection } from './highway-cycle.mjs';
 
@@ -126,13 +127,153 @@ test('I-295 north of SR 9B pairs the general lanes continuously and retains all 
   const auxiliary = built.parts.filter((part) =>
     part.sourceWayIds.some((id) => expressIds.has(id)),
   );
-  assert.ok(
-    auxiliary.length > 0,
-    'eligible express paths remain available as connectors',
+  assert.equal(
+    auxiliary.length,
+    0,
+    'the reciprocal general-lane merge beats the 9 km express-lane detour',
   );
-  for (const part of auxiliary) {
-    assert.equal(part.role, 'connector');
-    assert.equal(part.pairedDirectionCount, 2);
-    assert.equal(hasProperSelfIntersection(part.coordinates), false);
-  }
+  const sr9b = mainlines.find((part) => part.tokens.includes('SR9B'));
+  const junctionKeys = new Set(i295[0].topologyCoordinates.map((entry) => entry.key));
+  assert.ok(
+    sr9b.topologyCoordinates.some((entry) => junctionKeys.has(entry.key)),
+    'the local general-lane connection remains in the midpoint graph',
+  );
+  assert.equal(built.statistics.restoredConnectorCount, 0);
+  assert.equal(built.statistics.directConnectorCount, 8);
+  assert.equal(
+    built.parts.filter(
+      (part) =>
+        part.role === 'connector' &&
+        part.tokens.includes('I95') &&
+        part.tokens.includes('SR9B'),
+    ).length,
+    4,
+  );
+});
+
+function auxiliaryOptions() {
+  const chains = [
+    { id: 'a', nodeIds: ['a0', 'a1', 'north'] },
+    { id: 'b', nodeIds: ['north', 'b1', 'b2'] },
+    { id: 'c', nodeIds: ['c0', 'c1', 'south'] },
+    { id: 'd', nodeIds: ['south', 'd1', 'd2'] },
+  ];
+  const nodes = new Map(
+    chains.flatMap((chain) => chain.nodeIds).map((id) => [id, { tags: {} }]),
+  );
+  const attachment = (nodeId, partIndex, chain) => ({
+    nodeId,
+    partIndex,
+    carriagewayIds: [chain],
+  });
+  const pair = (inner, sourceWayId, meters) => [
+    {
+      firstAttachment: attachment(inner ? 'a1' : 'a0', 0, 'a'),
+      secondAttachment: attachment(inner ? 'b1' : 'b2', 1, 'b'),
+      sourceWayIds: [sourceWayId],
+      distanceMeters: meters,
+    },
+    {
+      firstAttachment: attachment(inner ? 'c1' : 'c0', 1, 'c'),
+      secondAttachment: attachment(inner ? 'd1' : 'd2', 0, 'd'),
+      sourceWayIds: [sourceWayId],
+      distanceMeters: meters,
+    },
+  ];
+  return {
+    long: pair(false, 'aux', 9000),
+    short: pair(true, 'ramp', 500),
+    groups: new Map([
+      [0, 0],
+      [1, 1],
+    ]),
+    context: {
+      chains,
+      osm: { nodes },
+      parts: [{}, {}],
+      connectorWays: [{ id: 'aux', tags: { name: 'Express Lanes' } }],
+    },
+  };
+}
+
+test('shorter reciprocal options beat an express detour across different source merge nodes', () => {
+  const { long, short, groups, context } = auxiliaryOptions();
+  for (const options of [
+    [long, short],
+    [short, long],
+  ])
+    assert.deepEqual(selectShortestAuxiliaryRampOptions(options, groups, context), [
+      short,
+    ]);
+  assert.deepEqual(
+    selectShortestAuxiliaryRampOptions([long], groups, context),
+    [long],
+    'express lanes remain eligible when there is no shorter movement',
+  );
+  short.forEach((path) => {
+    path.distanceMeters = 10000;
+  });
+  assert.deepEqual(
+    selectShortestAuxiliaryRampOptions([long, short], groups, context),
+    [long, short],
+    'lane designation alone does not disqualify the shortest express option',
+  );
+});
+
+test('a nearby option on a different carriageway is not the same reciprocal movement', () => {
+  const { long, short, groups, context } = auxiliaryOptions();
+  short[1].firstAttachment.carriagewayIds = ['another-highway-leg'];
+  assert.deepEqual(selectShortestAuxiliaryRampOptions([long, short], groups, context), [
+    long,
+    short,
+  ]);
+});
+
+test('an auxiliary option can win when it is the shorter reciprocal movement', () => {
+  const { long, short, groups, context } = auxiliaryOptions();
+  long.forEach((path) => {
+    path.sourceWayIds = ['ramp'];
+  });
+  short.forEach((path) => {
+    path.sourceWayIds = ['aux'];
+  });
+  assert.deepEqual(selectShortestAuxiliaryRampOptions([long, short], groups, context), [
+    short,
+  ]);
+});
+
+test('direct mainline merges supersede an auxiliary detour only with both source directions and midpoint connectivity', () => {
+  const { long, groups, context } = auxiliaryOptions();
+  assert.deepEqual(selectShortestAuxiliaryRampOptions([long], groups, context), [long]);
+  context.parts.forEach((part) => {
+    part.startTopologyKeys = ['real-mainline-junction'];
+  });
+  assert.deepEqual(selectShortestAuxiliaryRampOptions([long], groups, context), []);
+  context.chains[3].nodeIds[0] = 'different-node';
+  assert.deepEqual(
+    selectShortestAuxiliaryRampOptions([long], groups, context),
+    [long],
+    'one directional source merge is insufficient',
+  );
+});
+
+test('a mainline merge behind the departure or beyond the arrival cannot supersede a ramp', () => {
+  const { long, groups, context } = auxiliaryOptions();
+  context.parts.forEach((part) => {
+    part.startTopologyKeys = ['real-mainline-junction'];
+  });
+  context.chains[0].nodeIds = ['north', 'a0', 'a1'];
+  assert.deepEqual(selectShortestAuxiliaryRampOptions([long], groups, context), [long]);
+});
+
+test('a blocked mainline is not a shorter eligible option', () => {
+  const { long, short, groups, context } = auxiliaryOptions();
+  context.parts.forEach((part) => {
+    part.startTopologyKeys = ['real-mainline-junction'];
+  });
+  context.osm.nodes.get('a1').tags.highway = 'traffic_signals';
+  assert.deepEqual(selectShortestAuxiliaryRampOptions([long, short], groups, context), [
+    long,
+    short,
+  ]);
 });

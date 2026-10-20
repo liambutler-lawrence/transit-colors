@@ -38,6 +38,7 @@ const toggleLabel = document.querySelector<HTMLElement>(
 );
 const select = document.querySelector<HTMLSelectElement>('#government-seat-select');
 let active = false;
+let accessRoutesEnabled = true;
 let installed = false;
 let popup: Popup | null = null;
 
@@ -229,15 +230,33 @@ function install(): void {
   });
 }
 
-export function syncGovernmentSeats(highwayMode: boolean): void {
+export function syncGovernmentSeats(
+  highwayMode: boolean,
+  routesEnabled = accessRoutesEnabled,
+): void {
   active = highwayMode;
+  accessRoutesEnabled = routesEnabled;
   if (controls) controls.hidden = !active;
   if (toggleLabel) toggleLabel.hidden = !active;
+  const label = toggleLabel?.querySelector('span');
+  if (label)
+    label.textContent = accessRoutesEnabled
+      ? 'Government seats · circles & routes'
+      : 'Government seats · circles';
   const visible = active && (toggle?.checked ?? true);
   if (visible && map.getLayer('highway-circumference-route-line')) install();
   for (const layer of Object.values(LAYERS)) {
+    const routeLayer =
+      layer === LAYERS.route ||
+      layer === LAYERS.routeCasing ||
+      layer === LAYERS.ramp ||
+      layer === LAYERS.rampCasing;
     if (map.getLayer(layer))
-      map.setLayoutProperty(layer, 'visibility', visible ? 'visible' : 'none');
+      map.setLayoutProperty(
+        layer,
+        'visibility',
+        visible && (!routeLayer || accessRoutesEnabled) ? 'visible' : 'none',
+      );
   }
   if (!visible) popup?.remove();
 }

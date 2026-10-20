@@ -10,6 +10,7 @@ export function matchBoundaryCorridors(graph, route) {
   const core = highwayTwoCore(new Set(graph.coordinateByNodeId.keys()), graph.edges);
   const compressed = compressHighwayCore(graph.coordinateByNodeId, graph.edges, core, {
     includeSourceEdges: true,
+    parts: graph.parts,
   });
   const owners = new Map();
   route.segments.forEach((segment, i) => {

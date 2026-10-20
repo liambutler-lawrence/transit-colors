@@ -51,12 +51,6 @@ export default defineConfig({
   base: './',
   build: {
     emptyOutDir: true,
-    rolldownOptions: {
-      input: {
-        main: resolve(import.meta.dirname, 'index.html'),
-        midpointComparison: resolve(import.meta.dirname, 'midpoint-comparison.html'),
-      },
-    },
     sourcemap: false,
     target: 'es2024',
   },

@@ -1,5 +1,4 @@
 import { geodesicDistanceMeters as distance } from './wgs84-geodesy.mjs';
-import { hasProperSelfIntersection } from './highway-cycle.mjs';
 import { highwayTurnAllowed } from './highway-turns.mjs';
 // Limit source-graph searches to a local interchange; this is not a snapping radius.
 const LIMIT = 2500;
@@ -255,26 +254,30 @@ export function recoverTerminalContinuations(
     }
     return best;
   }
-  const coordinateOwners = new Map();
-  const cell = (p) => p.map((v) => Math.floor(v * 10000));
+  // Nearby drawn coordinates do not establish graph connectivity. In
+  // particular, denser midpoint sampling must not hide a missing terminal merge.
+  const topologyOwners = new Map();
   for (const [index, part] of parts.entries())
-    for (const point of part.coordinates) {
-      const key = cell(point).join(','),
-        entries = coordinateOwners.get(key) ?? [];
-      entries.push({ index, point });
-      coordinateOwners.set(key, entries);
+    for (const key of [
+      ...(part.startTopologyKeys ?? []),
+      ...(part.endTopologyKeys ?? []),
+      ...(part.topologyCoordinates ?? []).map((entry) => entry.key),
+    ]) {
+      const owners = topologyOwners.get(key) ?? new Set();
+      owners.add(index);
+      topologyOwners.set(key, owners);
     }
-  const connected = (index, point) => {
-    const [x, y] = cell(point);
-    for (let dx = -1; dx <= 1; dx++)
-      for (let dy = -1; dy <= 1; dy++)
-        if (
-          (coordinateOwners.get(`${x + dx},${y + dy}`) ?? []).some(
-            (e) => e.index !== index && distanceFast(e.point, point) < 3,
-          )
-        )
-          return true;
-    return false;
+  const connected = (index, point, atEnd) => {
+    const part = parts[index];
+    const keys = [
+      ...(part[atEnd ? 'endTopologyKeys' : 'startTopologyKeys'] ?? []),
+      ...(part.topologyCoordinates ?? [])
+        .filter((entry) => distanceFast(entry.coordinate, point) < 3)
+        .map((entry) => entry.key),
+    ];
+    return keys.some((key) =>
+      [...(topologyOwners.get(key) ?? [])].some((owner) => owner !== index),
+    );
   };
   const additions = [],
     audit = [],
@@ -290,7 +293,7 @@ export function recoverTerminalContinuations(
       continue;
     for (const atEnd of [false, true]) {
       const endpoint = atEnd ? part.coordinates.at(-1) : part.coordinates[0];
-      if (connected(i, endpoint)) continue;
+      if (connected(i, endpoint, atEnd)) continue;
       const a = trace(i, 0, atEnd),
         b = trace(i, 1, atEnd),
         candidates = [];
@@ -348,23 +351,12 @@ export function recoverTerminalContinuations(
           if (
             coordinates.length < 2 ||
             distance(endpoint, end) < 50 ||
-            reversed(coordinates) ||
-            hasProperSelfIntersection(coordinates)
+            reversed(coordinates)
           )
             continue;
-          // A midpoint that switches to the wrong branch can be simple yet far
-          // closer to one carriageway. Reject it instead of smoothing it over.
-          if (
-            coordinates
-              .slice(1, -1)
-              .some(
-                (p) =>
-                  Math.abs(
-                    curveDistance(p, pa.coordinates) - curveDistance(p, pb.coordinates),
-                  ) > 35,
-              )
-          )
-            continue;
+          // Shared ordered pairing can faithfully retain a source loop and need
+          // not be equidistant from unrelated nearby sections of either curve.
+          // Connectivity remains determined by the directed source paths below.
           const firstEdges = new Set(
             pa.segments.map((s) => [s.from, s.to].sort().join(':')),
           );
@@ -455,22 +447,6 @@ export function recoverTerminalContinuations(
 function distanceFast(a, b) {
   if (Math.abs(a[0] - b[0]) > 0.0001 || Math.abs(a[1] - b[1]) > 0.0001) return Infinity;
   return distance(a, b);
-}
-
-function curveDistance(p, curve) {
-  const c = Math.cos((p[1] * Math.PI) / 180);
-  let best = Infinity;
-  for (let i = 1; i < curve.length; i++) {
-    const a = curve[i - 1],
-      b = curve[i],
-      ax = (a[0] - p[0]) * c * 111320,
-      ay = (a[1] - p[1]) * 110574,
-      dx = (b[0] - a[0]) * c * 111320,
-      dy = (b[1] - a[1]) * 110574,
-      t = Math.max(0, Math.min(1, -(ax * dx + ay * dy) / (dx * dx + dy * dy || 1)));
-    best = Math.min(best, Math.hypot(ax + t * dx, ay + t * dy));
-  }
-  return best;
 }
 
 // Source geometry alone is insufficient: both ports must also attach to usable

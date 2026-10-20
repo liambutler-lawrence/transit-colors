@@ -6,6 +6,21 @@ import Pbf from 'pbf';
 import { PMTiles } from 'pmtiles';
 import { geodesicDistanceMeters } from './wgs84-geodesy.mjs';
 
+function distanceToLine(point, coordinates) {
+  const scale = Math.cos((point[1] * Math.PI) / 180);
+  return Math.min(
+    ...coordinates.slice(1).map((end, index) => {
+      const start = coordinates[index];
+      const x = (start[0] - point[0]) * 111_320 * scale;
+      const y = (start[1] - point[1]) * 110_574;
+      const dx = (end[0] - start[0]) * 111_320 * scale;
+      const dy = (end[1] - start[1]) * 110_574;
+      const t = Math.max(0, Math.min(1, -(x * dx + y * dy) / (dx * dx + dy * dy || 1)));
+      return Math.hypot(x + t * dx, y + t * dy);
+    }),
+  );
+}
+
 for (const [fixture, title, requiredWays] of [
   [
     'express-lane-audit.json',
@@ -73,7 +88,8 @@ for (const [fixture, title, requiredWays] of [
       );
     }
     const handle = await open(
-      new URL('../data/north-america-highways.pmtiles', import.meta.url),
+      process.env['HIGHWAY_AUDIT_TILES'] ??
+        new URL('../data/north-america-highways.pmtiles', import.meta.url),
     );
     try {
       const archive = new PMTiles({
@@ -113,13 +129,19 @@ for (const [fixture, title, requiredWays] of [
             if (
               coordinates.some(
                 (coordinate) => geodesicDistanceMeters(coordinate, point) < 2,
-              )
+              ) ||
+              (((audit.mainlines ?? []).includes(connector) ||
+                (index > 0 && index < connector.points.length - 1)) &&
+                (geometry.type === 'LineString'
+                  ? [geometry.coordinates]
+                  : geometry.coordinates
+                ).some((line) => distanceToLine(point, line) < 2))
             )
               touching.add(feature.properties.id);
           }
           assert.ok(
             touching.has(connector.id),
-            `${connector.id} retains its corrected curve`,
+            `${connector.id} retains its corrected curve at sample ${index} (${point.join(', ')})`,
           );
           if (index === 0 && connector.startMainlineId)
             assert.ok(

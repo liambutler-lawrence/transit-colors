@@ -3,7 +3,7 @@ import { spawn } from 'node:child_process';
 import { once } from 'node:events';
 import { createWriteStream } from 'node:fs';
 import { readFile, writeFile } from 'node:fs/promises';
-import { resolve } from 'node:path';
+import { resolve, dirname } from 'node:path';
 import { deserialize, serialize } from 'node:v8';
 import { createHash } from 'node:crypto';
 import polygonClipping from 'polygon-clipping';
@@ -13,13 +13,13 @@ import { geodesicLineLengthMeters } from '../src/geodesy.ts';
 import { compressHighwayCore, highwayTwoCore } from './highway-graph.mjs';
 import { properHighwayBoundaryIntersection } from './highway-area-crossings.mjs';
 import { highwayCycleTurnViolation } from './highway-turns.mjs';
-import { solveHighwayAreaCycle } from './highway-area-cycle.mjs';
-import { nativeHighwayAreaSolver } from './highway-area-native.mjs';
+import { solveInterchangeBoundary } from './highway-interchange-solver.mjs';
 import { highwayAreaGraphDigest } from './highway-area-cache.mjs';
 import { lineTraversesSubdivision } from './government-connections-geometry.mjs';
 import {
   buildOsmHighwayCenterlines,
-  buildPairedOsmSourceTopologyGraph,
+  buildMidpointTopologyGraph,
+  finalizeMidpointTopology,
   readOsmMotorwayPbf,
 } from './osm-highway-network.mjs';
 import {
@@ -41,6 +41,17 @@ const tileInputPath = resolve('data/.osm-highway-cache/north-america-highways.nd
 const derivedCachePath = resolve(
   'data/.osm-highway-cache/north-america-derived-network.bin',
 );
+const previewUnrestricted = process.env['HIGHWAY_UNRESTRICTED_PREVIEW'] === '1';
+if (
+  previewUnrestricted &&
+  (!process.argv[3] ||
+    !process.argv[4] ||
+    outputPath === resolve('data/north-america-highway-circumference.json') ||
+    tilesPath === resolve('data/north-america-highways.pmtiles'))
+)
+  throw new Error(
+    'Unrestricted previews require separate local output and tile paths.',
+  );
 function boundarySegments(detailedSegments, graphParts) {
   return detailedSegments.map((segment, index) => {
     const role = [...segment.partIndices].some(
@@ -122,16 +133,36 @@ async function buildTiles(parts) {
   }
 }
 
-const landmassBuffer = await readFile(landmassSourcePath);
-
+const geometryFingerprint = createHash('sha256');
+for (const name of [
+  'osm-highway-network.mjs',
+  'highway-midpoint-topology.mjs',
+  'highway-ordered-midpoint.mjs',
+  'highway-source-correspondence.mjs',
+  'highway-shared-midpoints.mjs',
+  'highway-mainline-endings.mjs',
+  'ordered-midline.mjs',
+  'highway-ramp-attachment-aliases.mjs',
+  'highway-terminal-continuations.mjs',
+])
+  geometryFingerprint.update(await readFile(new URL(name, import.meta.url)));
+const midpointFingerprint = geometryFingerprint.digest('hex');
 let derived;
 try {
   derived = deserialize(await readFile(derivedCachePath));
-  if (derived.displayTopologyVersion !== 49) {
+  if (
+    derived.displayTopologyVersion !== 50 ||
+    (!previewUnrestricted && derived.midpointFingerprint !== midpointFingerprint) ||
+    !derived.detailed?.parts
+  ) {
     throw new Error('The cached topology predates source-directed ramp junctions.');
   }
   console.log(`Reused ${derivedCachePath}.`);
 } catch {
+  if (previewUnrestricted)
+    throw new Error(
+      'Local preview requires the existing derived network cache; no rebuild was started.',
+    );
   console.time('Read detailed OpenStreetMap motorway topology');
   let osm = await readOsmMotorwayPbf(sourcePath);
   console.timeEnd('Read detailed OpenStreetMap motorway topology');
@@ -153,12 +184,13 @@ try {
   console.log(detailed.statistics);
   derived = {
     detailed,
-    displayTopologyVersion: 49,
+    displayTopologyVersion: 50,
+    midpointFingerprint,
   };
   await writeFile(derivedCachePath, serialize(derived));
 
   console.time('Build exact-identity highway graph');
-  let exactGraph = buildPairedOsmSourceTopologyGraph(osm, detailed.parts);
+  let exactGraph = buildMidpointTopologyGraph(finalizeMidpointTopology(detailed.parts));
   let core = highwayTwoCore(
     new Set(exactGraph.coordinateByNodeId.keys()),
     exactGraph.edges,
@@ -167,6 +199,7 @@ try {
     exactGraph.coordinateByNodeId,
     exactGraph.edges,
     core,
+    { parts: exactGraph.parts },
   );
   const graphStatistics = {
     ...exactGraph.statistics,
@@ -182,16 +215,20 @@ try {
   derived = {
     compressed,
     detailed,
-    displayTopologyVersion: 49,
+    displayTopologyVersion: 50,
+    midpointFingerprint,
     graphStatistics,
     sourceCompressed: compressed,
-    sourceGraphParts: exactGraph.parts.map(({ id, role, tokens }) => ({
-      id,
-      role,
-      tokens,
-    })),
+    sourceGraphParts: exactGraph.parts.map(
+      ({ id, role, tokens, explicitMainlineMerge }) => ({
+        id,
+        role,
+        tokens,
+        explicitMainlineMerge: Boolean(explicitMainlineMerge),
+      }),
+    ),
     sourceGraphStatistics: graphStatistics,
-    sourceTopologyVersion: 48,
+    sourceTopologyVersion: 52,
   };
   await writeFile(derivedCachePath, serialize(derived));
 }
@@ -207,12 +244,11 @@ for (const part of detailed.parts) {
     throw new Error(`Paired ramp ${part.id} is missing source carriageway directions.`);
   }
 }
-if (derived.sourceTopologyVersion !== 48) {
-  console.time('Read OSM mainline continuity topology');
-  const osm = await readOsmMotorwayPbf(sourcePath);
-  console.timeEnd('Read OSM mainline continuity topology');
+if (derived.sourceTopologyVersion !== 52) {
   console.time('Build explicit paired-centerline route graph');
-  const sourceGraph = buildPairedOsmSourceTopologyGraph(osm, detailed.parts);
+  const sourceGraph = buildMidpointTopologyGraph(
+    finalizeMidpointTopology(detailed.parts),
+  );
   const sourceCore = highwayTwoCore(
     new Set(sourceGraph.coordinateByNodeId.keys()),
     sourceGraph.edges,
@@ -221,12 +257,16 @@ if (derived.sourceTopologyVersion !== 48) {
     sourceGraph.coordinateByNodeId,
     sourceGraph.edges,
     sourceCore,
+    { parts: sourceGraph.parts },
   );
-  derived.sourceGraphParts = sourceGraph.parts.map(({ id, role, tokens }) => ({
-    id,
-    role,
-    tokens,
-  }));
+  derived.sourceGraphParts = sourceGraph.parts.map(
+    ({ id, role, tokens, explicitMainlineMerge }) => ({
+      id,
+      role,
+      tokens,
+      explicitMainlineMerge: Boolean(explicitMainlineMerge),
+    }),
+  );
   derived.sourceGraphStatistics = {
     ...sourceGraph.statistics,
     compressedEdges: derived.sourceCompressed.edges.length,
@@ -236,7 +276,7 @@ if (derived.sourceTopologyVersion !== 48) {
     exactEdges: sourceGraph.edges.length,
     exactNodes: sourceGraph.coordinateByNodeId.size,
   };
-  derived.sourceTopologyVersion = 48;
+  derived.sourceTopologyVersion = 52;
   console.timeEnd('Build explicit paired-centerline route graph');
   console.log(derived.sourceGraphStatistics);
   await writeFile(derivedCachePath, serialize(derived));
@@ -253,14 +293,35 @@ detailed.statistics.terminalContinuationCount = detailed.parts.filter(
   (part) => part.explicitMainlineMerge,
 ).length;
 const { sourceCompressed, sourceGraphParts, sourceGraphStatistics } = derived;
+// Older source caches omitted the merge role; recover only that metadata from
+// the same cached geometry without changing nodes, edges, or source identity.
+const partsById = new Map(detailed.parts.map((part) => [part.id, part]));
+for (const part of sourceGraphParts)
+  part.explicitMainlineMerge ??= Boolean(partsById.get(part.id)?.explicitMainlineMerge);
 // Every eligible edge uses its existing geometry, independent of road role.
 const routeGraphEdges = sourceCompressed.edges;
+if (process.env['HIGHWAY_GRAPH_ONLY'] === '1') {
+  console.log(
+    'Highway graph cached; stopping before area optimization and publication.',
+  );
+  process.exit(0);
+}
+const previewTemplate = previewUnrestricted
+  ? JSON.parse(await readFile('data/north-america-highway-circumference.json', 'utf8'))
+  : null;
+const landmassBuffer = previewUnrestricted ? null : await readFile(landmassSourcePath);
 const solverFingerprint = createHash('sha256');
 solverFingerprint.update(highwayAreaGraphDigest(sourceCompressed));
+solverFingerprint.update(highwayAreaGraphDigest(sourceGraphParts));
 for (const file of [
-  'highway-area-cycle.mjs',
+  'highway-interchange-graph.mjs',
+  'highway-interchange-solver.mjs',
+  'highway-paired-boundary-search.mjs',
+  'highway-boundary-pairings.mjs',
+  'highway-boundary-regions.mjs',
+  'highway-boundary-search.mjs',
+  'highway-geodesic-splits.mjs',
   'highway-area-crossings.mjs',
-  'highway-area-objective.mjs',
   'highway-area-cache.mjs',
   'highway-cycle.mjs',
   'highway-turns.mjs',
@@ -271,23 +332,28 @@ for (const file of [
 const areaSolverFingerprint = solverFingerprint.digest('hex');
 console.time('Maximize highway cycle area');
 const exact =
-  derived.areaSolverFingerprint === areaSolverFingerprint
+  !previewUnrestricted && derived.areaSolverFingerprint === areaSolverFingerprint
     ? derived.areaCycle
-    : await solveHighwayAreaCycle(sourceCompressed.nodes, routeGraphEdges, {
-        onIteration: console.log,
-        timeLimitSeconds: 1800,
-        solveModel: process.env['HIGHWAY_HIGHS_PYTHON']
-          ? nativeHighwayAreaSolver(process.env['HIGHWAY_HIGHS_PYTHON'])
-          : null,
+    : solveInterchangeBoundary(sourceCompressed, sourceGraphParts, {
+        onTiming: console.log,
+        maxPhaseMilliseconds: 30000,
+        previewUnrestricted,
+        checkpointPath: resolve(
+          'data/.osm-highway-cache/interchange-solver',
+          areaSolverFingerprint,
+          'search.bin',
+        ),
       });
-if (exact.optimizationStatus !== 'optimal')
+if (!previewUnrestricted && exact.optimizationStatus !== 'optimal')
   throw new Error('The area solve did not prove optimality.');
-derived.areaSolverFingerprint = areaSolverFingerprint;
-derived.areaCycle = exact;
-await writeFile(derivedCachePath, serialize(derived));
+if (!previewUnrestricted) {
+  derived.areaSolverFingerprint = areaSolverFingerprint;
+  derived.areaCycle = exact;
+  await writeFile(derivedCachePath, serialize(derived));
+}
 console.timeEnd('Maximize highway cycle area');
 const forbiddenTurn = highwayCycleTurnViolation(exact.segments, routeGraphEdges);
-if (forbiddenTurn) {
+if (forbiddenTurn && !previewUnrestricted) {
   throw new Error(
     `The highway boundary contains an illegal ramp turn at segments ${forbiddenTurn.join(', ')}.`,
   );
@@ -295,7 +361,7 @@ if (forbiddenTurn) {
 // Preserve the validated centerline precision. A second rounding pass can
 // turn closely spaced source vertices into a crossing in the exported ring.
 const routeCoordinates = exact.coordinates;
-if (properHighwayBoundaryIntersection(routeCoordinates)) {
+if (!previewUnrestricted && properHighwayBoundaryIntersection(routeCoordinates)) {
   throw new Error('The exported highway boundary must remain a simple cycle.');
 }
 const subdivisions = JSON.parse(
@@ -315,30 +381,35 @@ const countries = [...new Set(seats.map((seat) => seat.country))].filter((countr
       ),
     ),
 );
-const americanMainlandRing = readPolygonRings(landmassBuffer).find((ring) =>
-  pointInRing([-99.1332, 19.4326], ring),
-);
+console.time('Subdivision and landmass coverage');
+const americanMainlandRing = previewUnrestricted
+  ? previewTemplate.landmass.mask[0][0]
+  : readPolygonRings(landmassBuffer).find((ring) =>
+      pointInRing([-99.1332, 19.4326], ring),
+    );
 if (!americanMainlandRing) {
   throw new Error('Natural Earth land data does not contain the American mainland.');
 }
-const northAmericanMainlandMask = polygonClipping
-  .intersection(
-    [[americanMainlandRing]],
-    [
-      [
+const northAmericanMainlandMask = previewUnrestricted
+  ? previewTemplate.landmass.mask
+  : polygonClipping
+      .intersection(
+        [[americanMainlandRing]],
         [
-          [-180, 7],
-          [-20, 7],
-          [-20, 90],
-          [-180, 90],
-          [-180, 7],
+          [
+            [
+              [-180, 7],
+              [-20, 7],
+              [-20, 90],
+              [-180, 90],
+              [-180, 7],
+            ],
+          ],
         ],
-      ],
-    ],
-  )
-  .map((polygon) =>
-    polygon.map((ring) => ring.map((coordinate) => roundCoordinate(coordinate))),
-  );
+      )
+      .map((polygon) =>
+        polygon.map((ring) => ring.map((coordinate) => roundCoordinate(coordinate))),
+      );
 const northAmericanMainlandAreaSquareMeters = multiPolygonAreaSquareMeters(
   northAmericanMainlandMask,
 );
@@ -365,13 +436,14 @@ if (!landmassCoverage) {
     'The detailed highway boundary does not intersect North American land.',
   );
 }
+console.timeEnd('Subdivision and landmass coverage');
 
 const routeSegments = boundarySegments(exact.segments, sourceGraphParts);
 const boundaryPartIndices = new Set(
   exact.segments.flatMap((segment) => [...segment.partIndices]),
 );
 
-if (process.env['HIGHWAY_REUSE_EXISTING_TILES'] === '1') {
+if (previewUnrestricted || process.env['HIGHWAY_REUSE_EXISTING_TILES'] === '1') {
   console.log(`Reused existing ${tilesPath}.`);
 } else {
   console.time('Build detailed motorway vector tiles');
@@ -380,8 +452,30 @@ if (process.env['HIGHWAY_REUSE_EXISTING_TILES'] === '1') {
 }
 
 const output = {
+  ...(previewUnrestricted
+    ? {
+        preview: {
+          mode: 'unrestricted',
+          usesCachedNetwork: true,
+          skippedSteps: [
+            'legal-route-search',
+            'optimality-proof',
+            'legal-turn-publication-check',
+            'simple-ring-publication-check',
+          ],
+          junctionCount: exact.diagnostics.junctions.length,
+          interchangeConflicts: exact.diagnostics.junctions.filter(
+            (p) => p.kind === 'interchange-movement',
+          ).length,
+          geometricContacts: exact.diagnostics.junctions.filter(
+            (p) => p.kind === 'geometric-contact',
+          ).length,
+          repeatedBoundaryVertices: exact.diagnostics.repeatedVertices,
+        },
+      }
+    : {}),
   centerline_method:
-    'Closest-tangent geodesic midpoints of opposing OSM motorway carriageways and reciprocal ramps, continued along source mainlines through staggered joins',
+    'Shared ordered source correspondence with a 200 m pairing taper; WGS84 midpoints for mainlines and reciprocal ramps, continued along source mainlines through staggered joins',
   criterion:
     'Separated controlled-access mainlines (2+ lanes per direction where lane counts are explicit) with paired reciprocal motorway-link connectors',
   landmass: {
@@ -410,9 +504,11 @@ const output = {
     ).length,
     directionalRampPathCount: detailed.statistics.directedConnectorPathCount,
     osmPrecisionMainlineCount: detailed.statistics.averagedPartCount,
-    optimizationMethod: 'source-topology-wgs84-area-integer-program',
+    optimizationMethod: 'interchange-ports-outer-boundary',
     optimizationStatus: exact.optimizationStatus,
-    objectiveUpperBoundSquareMeters: exact.objectiveUpperBoundSquareMeters,
+    ...(exact.objectiveUpperBoundSquareMeters === null
+      ? {}
+      : { objectiveUpperBoundSquareMeters: exact.objectiveUpperBoundSquareMeters }),
     optimizationIterations: exact.optimizationIterations,
     sourceFeatureCount: detailed.parts.length,
     unpairedRampPathCount: detailed.statistics.unpairedConnectorPathCount,
@@ -442,10 +538,26 @@ const output = {
   source_version: '2026-07-30',
 };
 await writeFile(outputPath, `${JSON.stringify(output)}\n`);
+if (previewUnrestricted) {
+  await writeFile(
+    resolve(dirname(outputPath), 'highway-preview-junctions.geojson'),
+    JSON.stringify({
+      type: 'FeatureCollection',
+      features: exact.diagnostics.junctions.map(({ coordinate, ...properties }) => ({
+        type: 'Feature',
+        id: properties.number,
+        properties,
+        geometry: { type: 'Point', coordinates: coordinate },
+      })),
+    }),
+  );
+}
+console.time('Build normal highway display assets');
 await buildHighwayDisplayAssets(
   outputPath,
   tilesPath.replace(/\.pmtiles$/, '-route.pmtiles'),
 );
+console.timeEnd('Build normal highway display assets');
 console.log({
   outputPath,
   routeAreaSquareKilometers: output.route.areaSquareMeters / 1_000_000,

@@ -1,5 +1,10 @@
 import { syncGovernmentSeats } from './government-seats-ui.js';
 import {
+  installHighwayPreview,
+  highwayPreviewControls,
+  syncHighwayPreviewVisibility,
+} from './highway-preview.js';
+import {
   EMPTY_CIRCUMFERENCE_GRADIENT_URL,
   type BoundsTuple,
   createCircumferenceGradientSource,
@@ -51,9 +56,10 @@ import {
 } from './context.js';
 
 const HIGHWAY_DATA_URL =
-  'data/north-america-highway-circumference-summary.json?v=20260921b';
+  'data/north-america-highway-circumference-summary.json?v=20260921c';
 const HIGHWAY_GEOMETRY_URL =
-  'data/north-america-highway-circumference.json?v=20260921b';
+  'data/north-america-highway-circumference.json?v=20260921c';
+const initialViewportHash = window.location.hash;
 let highwayData: HighwayCircumferenceSummary | null = null;
 let highwayPromise: Promise<HighwayCircumferenceSummary> | null = null;
 const HIGHWAY_GRADIENT_SOURCE_ID = 'highway-circumference-gradient';
@@ -98,6 +104,7 @@ function setLayerVisibility(id: string, visible: boolean): void {
 export function syncHighwayLayerVisibility(): void {
   syncGovernmentSeats(
     runtime.activeProduct === 'circumference' && highwayCriterionActive(),
+    !highwayData?.preview,
   );
   const visible =
     runtime.activeProduct === 'circumference' &&
@@ -116,6 +123,7 @@ export function syncHighwayLayerVisibility(): void {
   setLayerVisibility('highway-circumference-route-line', visible);
   setLayerVisibility('highway-circumference-route-connector-casing', visible);
   setLayerVisibility('highway-circumference-route-connector-line', visible);
+  syncHighwayPreviewVisibility(visible);
   refreshHighwayGradient();
 }
 
@@ -149,8 +157,13 @@ export function syncCircumferenceCriterionControls(): void {
     ? 'Highway details'
     : 'Line or transfer details';
   circumferenceMethodNoteEl.textContent = highwayMode
-    ? 'Solid lines are separated 2+ lane general-purpose mainlines; dashed lines join closest-tangent midpoints of opposing ramps, continuing along the mainline where their joins are staggered. Separated express lanes and collector/distributor roads use the same two-way ramp rules. One-way-only ramps are excluded. Only explicit paired endpoints form graph junctions—grade-separated crossings do not. The thick route is the largest validated detailed simple boundary.'
+    ? 'Solid lines are separated 2+ lane general-purpose mainlines; dashed lines join ordered midpoints of opposing ramps, continuing along the mainline where their joins are staggered. Separated express lanes and collector/distributor roads use the same two-way ramp rules. One-way-only ramps are excluded. Only explicit paired endpoints form graph junctions—grade-separated crossings do not. The thick route is the largest validated detailed simple boundary.'
     : 'All metro networks stay visible, including metros without a circle. Each result card is the largest circle that does not reuse another result’s rail segments and focuses it on the map; clicking any visible line, platform, transfer, street, or station updates this final section directly.';
+  if (highwayMode && highwayData?.preview) {
+    circumferenceResultsHeadingEl.textContent = 'Local unrestricted boundary';
+    circumferenceMethodNoteEl.textContent =
+      'Local diagnostic using the normal highway pipeline and renderer. Legal-route search and publication checks are paused. Legal ramp movements use their stored geometry; marked forbidden transitions remain visible. This working boundary can retrace sections and is not a validated route.';
+  }
 }
 
 function replaceMetadata(details: readonly MetadataDetail[]): void {
@@ -186,7 +199,9 @@ function highwayResultCard(data: HighwayCircumferenceSummary): HTMLElement {
     'Focus map on the North America controlled-access highway circle',
   );
   const name = document.createElement('h3');
-  name.textContent = 'North America · Highway circle';
+  name.textContent = data.preview
+    ? 'North America · Local unrestricted preview'
+    : 'North America · Highway circle';
   const description = document.createElement('small');
   description.textContent = `${data.methodology.sourceFeatureCount.toLocaleString(
     'en-US',
@@ -241,6 +256,10 @@ function highwayResultCard(data: HighwayCircumferenceSummary): HTMLElement {
   summary.textContent =
     'Largest validated continental cycle expanded through explicit paired-centerline topology · mainlines plus reciprocal ramp pairs · WGS84 ellipsoidal area';
   result.append(summary);
+  if (data.preview)
+    summary.textContent = `Local preview · ${data.preview.junctionCount} flagged points · ${data.preview.repeatedBoundaryVertices} repeated junction visits · legal-route search paused`;
+  const previewControls = highwayPreviewControls(data);
+  if (previewControls) result.append(previewControls);
   return result;
 }
 
@@ -334,6 +353,11 @@ function renderHighwayCircumference({
   circumferenceNameEl.textContent = 'North America controlled-access maximum';
   circumferenceSummaryEl.textContent =
     'Largest validated simple loop in separated controlled-access mainlines connected only by paired reciprocal ramp paths.';
+  if (data.preview) {
+    circumferenceNameEl.textContent = 'Local unrestricted outer boundary';
+    circumferenceSummaryEl.textContent =
+      'Normal pipeline preview with legal-route search paused. Highlighted geometry is unvalidated and can include repeated sections.';
+  }
   replaceMetadata([
     {
       label: 'Contained land',
@@ -349,7 +373,7 @@ function renderHighwayCircumference({
     },
     { label: 'Countries touched', value: data.route.countries.join(', ') },
     {
-      label: 'Proof graph',
+      label: data.preview ? 'Working graph' : 'Proof graph',
       value: `${data.methodology.compressedNodeCount.toLocaleString(
         'en-US',
       )} junctions · ${data.methodology.compressedEdgeCount.toLocaleString(
@@ -372,8 +396,9 @@ function renderHighwayCircumference({
       value: `${data.precision_source} · ${data.precision_source_license}`,
     },
   ]);
-  routeChoiceSummaryEl.textContent =
-    'Automatic continental winner, refined onto explicit OSM-derived centerlines for paired carriageways and paired reciprocal ramps; route segments remain manually overridable in the data build.';
+  routeChoiceSummaryEl.textContent = data.preview
+    ? 'Initial unrestricted working boundary. Legal-route search and publication checks are paused; repeated sections and forbidden transfers remain visible.'
+    : 'Automatic continental winner, refined onto explicit OSM-derived centerlines for paired carriageways and paired reciprocal ramps; route segments remain manually overridable in the data build.';
   routeChoiceSelect.disabled = true;
   routeAutoButton.disabled = true;
   routeRequireSegmentButton.disabled = true;
@@ -382,9 +407,19 @@ function renderHighwayCircumference({
   positionHighwayGradient();
   syncHighwayLayerVisibility();
   if (fit && runtime.activeProduct === 'circumference') {
-    fitHighwayCircumference();
+    const viewport = data.preview
+      ? /^#(\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)\/(-?\d+(?:\.\d+)?)$/.exec(
+          initialViewportHash,
+        )
+      : null;
+    if (viewport) {
+      map.jumpTo({
+        zoom: Number(viewport[1]),
+        center: [Number(viewport[3]), Number(viewport[2])],
+      });
+    } else fitHighwayCircumference();
   }
-  updateStatus('Highway route ready');
+  updateStatus(data.preview ? 'Local preview' : 'Highway route ready');
 }
 
 export function showHighwayFeature(properties: HighwayFeatureProperties): void {
@@ -406,7 +441,7 @@ export function showHighwayFeature(properties: HighwayFeatureProperties): void {
     ? 'Highlighted maximum-area controlled-access highway circle'
     : [
         connector
-          ? 'Closest-tangent midpoint between opposing ramps, with mainline continuation at staggered joins'
+          ? 'Ordered midpoint between opposing ramps with a 200 m pairing taper and mainline continuation at staggered joins'
           : seam
             ? 'International source seam repair'
             : properties.type,
@@ -449,6 +484,7 @@ export async function prepareHighwayCircumference({
   }
   try {
     await loadHighwayCircumference();
+    if (highwayData) installHighwayPreview(highwayData);
     if (!highwayCriterionActive()) return;
     renderHighwayCircumference({ fit });
   } catch (error) {

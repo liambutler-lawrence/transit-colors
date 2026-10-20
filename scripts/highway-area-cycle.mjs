@@ -1,3 +1,4 @@
+import { checkpointHighwayAreaSolver } from './highway-area-checkpoint.mjs';
 import { createRequire } from 'node:module';
 import { signedAreaContributionSquareMeters } from './wgs84-geodesy.mjs';
 import { geodesicLineLengthMeters } from '../src/geodesy.ts';
@@ -16,16 +17,37 @@ import { balancedHighwayAreaCoefficients } from './highway-area-objective.mjs';
 const sum = (terms) =>
   terms.map(([c, v]) => `${c < 0 ? '-' : '+'} ${Math.abs(c)} ${v}`).join(' ') || '0';
 
+function createPhaseTimer(onTiming) {
+  let phaseStarted = performance.now();
+  return (phase, iteration = null) => {
+    const now = performance.now();
+    onTiming({ phase, iteration, milliseconds: now - phaseStarted });
+    phaseStarted = now;
+  };
+}
+
 // Maximize the additive WGS84 signed area of a single simple directed cycle.
 // Both orientations of every eligible edge are available. Neither geography,
 // road class, connector count, nor distance contributes to the objective.
 export async function solveHighwayAreaCycle(
   nodes,
   edges,
-  { onIteration = () => {}, timeLimitSeconds = 300, solveModel = null } = {},
+  {
+    onIteration = () => {},
+    onTiming = () => {},
+    checkBudget = () => {},
+    timeLimitSeconds = 300,
+    solveModel = null,
+    checkpointDirectory = null,
+  } = {},
 ) {
+  const timed = createPhaseTimer(onTiming);
   const require = createRequire(import.meta.url);
   const highs = solveModel ? null : await require('highs')();
+  const backend = solveModel ?? ((lp, options) => highs.solve(lp, options));
+  const solve = checkpointDirectory
+    ? checkpointHighwayAreaSolver(backend, checkpointDirectory)
+    : backend;
   const arcs = [],
     incoming = new Map(),
     outgoing = new Map(),
@@ -56,6 +78,7 @@ export async function solveHighwayAreaCycle(
     add(incident, edge.fromId, edgeIndex);
     add(incident, edge.toId, edgeIndex);
   }
+  timed('arc-indexing');
   const byEdge = new Map();
   for (const arc of arcs) add(byEdge, arc.edgeIndex, arc.index);
   const x = (i) => `x${i}`;
@@ -99,12 +122,14 @@ export async function solveHighwayAreaCycle(
   }
   for (const indices of byEdge.values())
     constraints.push(`${sum(terms(indices))} <= 1`);
-  const crossingPairs = highwayCrossingEdgePairs(edges, usable);
+  timed('turn-and-degree-constraints');
+  const crossingPairs = highwayCrossingEdgePairs(edges, usable, { check: checkBudget });
   for (const pair of crossingPairs) {
     constraints.push(
       `${sum(terms(pair.flatMap((i) => byEdge.get(i))))} <= ${pair.length - 1}`,
     );
   }
+  timed('crossing-constraints');
   const areaCoefficients = balancedHighwayAreaCoefficients(nodes, arcs);
   const blocks = biconnectedEdgeBlocks(
     nodes,
@@ -118,6 +143,18 @@ export async function solveHighwayAreaCycle(
       0,
     ),
   }));
+  // A simple cycle cannot pass through an articulation vertex twice. Select
+  // at most one biconnected block up front, rather than repeatedly solving
+  // invalid covers that sum unrelated or nested blocks' areas.
+  const blockVariables = blocks.length > 1 ? blocks.map((_, i) => `b${i}`) : [];
+  if (blockVariables.length) {
+    constraints.push(`${sum(blockVariables.map((name) => [1, name]))} <= 1`);
+    for (const [index, block] of blocks.entries())
+      for (const edgeIndex of block.edges)
+        constraints.push(
+          `${sum(terms(byEdge.get(edgeIndex)))} - ${blockVariables[index]} <= 0`,
+        );
+  }
   const cyclicEdges = new Set(blocks.flatMap((block) => block.edges));
   for (const i of usable)
     if (!cyclicEdges.has(i)) constraints.push(`${sum(terms(byEdge.get(i)))} = 0`);
@@ -125,6 +162,7 @@ export async function solveHighwayAreaCycle(
   const objective = sum(arcs.map((a) => [areaCoefficients[a.index], x(a.index)]));
   // A simple ring has winding number at most one at every point. These lazy
   // inequalities stop nested cycle covers from counting the same land twice.
+  timed('objective-and-blocks');
   const rayBands = new Map();
   for (const i of usable) {
     const points = edges[i].coordinates;
@@ -179,9 +217,12 @@ export async function solveHighwayAreaCycle(
     cut(expression);
     return 1;
   };
+  timed('winding-index');
   for (let iteration = 1; iteration <= 1000; iteration++) {
-    const lp = `Maximize\n area: ${objective}\nSubject To\n${constraints.map((c, i) => ` c${i}: ${c}`).join('\n')}\nBinary\n${arcs.map((a) => x(a.index)).join(' ')}\nEnd`;
-    const solution = await (solveModel ?? ((lp, options) => highs.solve(lp, options)))(
+    if (iteration > 1) timed('validation-and-cuts', iteration - 1);
+    const lp = `Maximize\n area: ${objective}\nSubject To\n${constraints.map((c, i) => ` c${i}: ${c}`).join('\n')}\nBinary\n${[...arcs.map((a) => x(a.index)), ...blockVariables].join(' ')}\nEnd`;
+    timed('model-serialization', iteration);
+    const solution = await solve(
       lp,
       {
         mip_rel_gap: 0,
@@ -191,6 +232,7 @@ export async function solveHighwayAreaCycle(
       },
       incumbentColumns,
     );
+    timed('backend', iteration);
     const provenOptimal = solution.Status === 'Optimal';
     if (!provenOptimal && solution.Status !== 'Time limit reached')
       throw new Error(
@@ -233,26 +275,23 @@ export async function solveHighwayAreaCycle(
     let invalid = false,
       windingCutCount = 0;
     for (const cycle of cycles) {
-      const arc = cycle.reduce(
-        (best, a) =>
-          edges[a.edgeIndex].coordinates.length >
-          edges[best.edgeIndex].coordinates.length
-            ? a
-            : best,
-        cycle[0],
-      );
-      const points = edges[arc.edgeIndex].coordinates,
-        a = points[Math.floor((points.length - 1) / 2)],
-        b = points[Math.floor((points.length - 1) / 2) + 1];
-      const dx = b[0] - a[0],
-        dy = b[1] - a[1],
-        length = Math.hypot(dx, dy) || 1;
-      for (const side of [-1, 1]) {
-        const point = [
-          (a[0] + b[0]) / 2 + ((side * dy) / length) * 1e-7,
-          (a[1] + b[1]) / 2 - ((side * dx) / length) * 1e-7,
-        ];
-        windingCutCount += cutExcessWinding(point, solution);
+      // A short ramp can contain a nested loop even when the longest road
+      // and the coarse interior grid miss it. Probe every selected road.
+      for (const arc of cycle) {
+        checkBudget();
+        const points = edges[arc.edgeIndex].coordinates,
+          a = points[Math.floor((points.length - 1) / 2)],
+          b = points[Math.floor((points.length - 1) / 2) + 1];
+        const dx = b[0] - a[0],
+          dy = b[1] - a[1],
+          length = Math.hypot(dx, dy) || 1;
+        for (const side of [-1, 1]) {
+          const point = [
+            (a[0] + b[0]) / 2 + ((side * dy) / length) * 1e-7,
+            (a[1] + b[1]) / 2 - ((side * dx) / length) * 1e-7,
+          ];
+          windingCutCount += cutExcessWinding(point, solution);
+        }
       }
     }
     const validGeometryCycles = [];
@@ -322,6 +361,12 @@ export async function solveHighwayAreaCycle(
       incumbentColumns = Object.fromEntries(
         cycle.map((a) => [x(a.index), { Primal: 1 }]),
       );
+      if (blockVariables.length) {
+        const activeBlock = blocks.findIndex((block) =>
+          block.edges.includes(cycle[0].edgeIndex),
+        );
+        incumbentColumns[blockVariables[activeBlock]] = { Primal: 1 };
+      }
       break;
     }
     // Zero-area cycles can remain in an optimal relaxation. A validated single
@@ -369,10 +414,12 @@ export async function solveHighwayAreaCycle(
       continue;
     }
     if (invalid || windingCutCount) continue;
-    if (!provenOptimal)
+    if (!provenOptimal) {
+      timed('validation-and-cuts', iteration);
       throw new Error(
         'A valid area cycle was found, but its maximum area is not yet proven',
       );
+    }
     const segments = cycles[0].map((a) => ({
       edgeIndex: a.edgeIndex,
       fromId: a.fromId,
@@ -385,6 +432,7 @@ export async function solveHighwayAreaCycle(
     const coordinates = segments.flatMap((s, i) =>
       i ? s.coordinates.slice(1) : s.coordinates,
     );
+    timed('validation-and-output', iteration);
     return {
       segments,
       coordinates,

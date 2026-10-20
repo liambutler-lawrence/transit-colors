@@ -1,256 +1,180 @@
-import { hasProperSelfIntersection } from './highway-cycle.mjs';
-import { pointInRing } from './natural-earth-land.mjs';
+import geographicLib from 'geographiclib-geodesic';
+import { orderedMidline, curve, taperMatches } from './ordered-midline.mjs';
 import { geodesicDistanceMeters, geodesicMidpoint } from './wgs84-geodesy.mjs';
 
-const SPACING_METERS = 50;
-const MATCH_SPACING_METERS = 10;
-const MIN_ALIGNMENT = 0.25;
+const earth = geographicLib.Geodesic.WGS84;
+export const HIGHWAY_MIDPOINT_TAPER_METERS = 200;
 
-function direction(first, second) {
-  const x = (second[0] - first[0]) * Math.cos(((first[1] + second[1]) * Math.PI) / 360);
-  const y = second[1] - first[1];
-  const length = Math.hypot(x, y) || 1;
-  return [x / length, y / length];
-}
-
-function alignment(first, second) {
-  return first[0] * second[0] + first[1] * second[1];
-}
-
-function sourceCurve(coordinates) {
-  const distances = [0];
-  for (let index = 1; index < coordinates.length; index += 1) {
-    distances.push(
-      distances.at(-1) +
-        geodesicDistanceMeters(coordinates[index - 1], coordinates[index]),
-    );
-  }
-  return { coordinates, distances, length: distances.at(-1) };
-}
-
-function pointAlong(curve, distance) {
-  let index = 1;
-  while (index < curve.distances.length - 1 && curve.distances[index] < distance)
-    index += 1;
-  const fraction = Math.max(
-    0,
-    Math.min(
-      1,
-      (distance - curve.distances[index - 1]) /
-        (curve.distances[index] - curve.distances[index - 1] || 1),
-    ),
-  );
-  const first = curve.coordinates[index - 1];
-  const second = curve.coordinates[index];
-  return {
-    coordinate: first.map((value, axis) => value + fraction * (second[axis] - value)),
-    direction: direction(first, second),
-    distance,
-  };
-}
-
-function samples(curve) {
-  const count = Math.max(1, Math.ceil(curve.length / MATCH_SPACING_METERS));
-  return Array.from({ length: count + 1 }, (_, index) =>
-    pointAlong(curve, (curve.length * index) / count),
-  );
-}
-
-function orderedCorrespondence(first, second, maximumWidthMeters, corridor) {
-  const rows = first.length;
-  const columns = second.length;
-  const parents = new Uint8Array(rows * columns);
-  const longitudeScale = 111_320 * Math.cos((first[0].coordinate[1] * Math.PI) / 180);
-  let previous = new Float64Array(columns).fill(Infinity);
-  for (let row = 0; row < rows; row += 1) {
-    const current = new Float64Array(columns).fill(Infinity);
-    const firstStep = row ? first[row].distance - first[row - 1].distance : 0;
-    for (let column = 0; column < columns; column += 1) {
-      const a = first[row];
-      const b = second[column];
-      if (alignment(a.direction, b.direction) < MIN_ALIGNMENT) continue;
-      const squaredDistance =
-        ((a.coordinate[0] - b.coordinate[0]) * longitudeScale) ** 2 +
-        ((a.coordinate[1] - b.coordinate[1]) * 110_574) ** 2;
-      if (squaredDistance > maximumWidthMeters ** 2) continue;
-      // A close pair around a hairpin can still put its midpoint across one
-      // roadway. Keep the correspondence inside the two bounded source sides.
-      if (
-        (row || column) &&
-        (row !== rows - 1 || column !== columns - 1) &&
-        !pointInRing(
-          a.coordinate.map((value, axis) => (value + b.coordinate[axis]) / 2),
-          corridor,
-        )
-      )
-        continue;
-      if (row === 0 && column === 0) {
-        current[0] = 0;
-        continue;
+// Drop redundant vertices, not shape: every removed point stays within 10 cm
+// of its retained segment in the local metric plane. Endpoints remain exact.
+export function compactMidpointIndices(coordinates, tolerance = 0.1) {
+  if (coordinates.length <= 2) return coordinates.map((_, i) => i);
+  const scale = Math.cos((coordinates[0][1] * Math.PI) / 180);
+  const points = coordinates.map(([x, y]) => [
+    (x - coordinates[0][0]) * 111320 * scale,
+    (y - coordinates[0][1]) * 110574,
+  ]);
+  const keep = new Set([0, points.length - 1]);
+  const pending = [[0, points.length - 1]];
+  while (pending.length) {
+    const [start, end] = pending.pop();
+    const a = points[start],
+      b = points[end];
+    const dx = b[0] - a[0],
+      dy = b[1] - a[1];
+    const denominator = dx * dx + dy * dy;
+    let maximum = tolerance * tolerance,
+      furthest = -1;
+    for (let i = start + 1; i < end; i++) {
+      const x = points[i][0] - a[0],
+        y = points[i][1] - a[1];
+      const t = Math.max(0, Math.min(1, (x * dx + y * dy) / (denominator || 1)));
+      const squared = (x - t * dx) ** 2 + (y - t * dy) ** 2;
+      if (squared > maximum) {
+        maximum = squared;
+        furthest = i;
       }
-      const secondStep = column
-        ? second[column].distance - second[column - 1].distance
-        : 0;
-      let score = Infinity;
-      let parent = 0;
-      // Integrate separation over distance travelled on BOTH roads. Equal
-      // per-cell costs would bias the result toward equal sample indices.
-      if (row && column) {
-        score = previous[column - 1] + squaredDistance * (firstStep + secondStep);
-        parent = 3;
-      }
-      if (row && previous[column] + squaredDistance * firstStep < score) {
-        score = previous[column] + squaredDistance * firstStep;
-        parent = 1;
-      }
-      if (column && current[column - 1] + squaredDistance * secondStep < score) {
-        score = current[column - 1] + squaredDistance * secondStep;
-        parent = 2;
-      }
-      current[column] = score;
-      parents[row * columns + column] = parent;
     }
-    previous = current;
+    if (furthest >= 0) {
+      keep.add(furthest);
+      pending.push([start, furthest], [furthest, end]);
+    }
   }
-  if (!Number.isFinite(previous.at(-1))) return null;
-  const matches = [];
-  let row = rows - 1;
-  let column = columns - 1;
-  while (row || column) {
-    matches.push([first[row].distance, second[column].distance]);
-    const parent = parents[row * columns + column];
-    if (parent & 1) row -= 1;
-    if (parent & 2) column -= 1;
-  }
-  matches.push([0, 0]);
-  return matches.reverse();
+  return [...keep].sort((a, b) => a - b);
 }
 
-function correspondenceKnots(matches) {
-  const total = matches.at(-1)[0] + matches.at(-1)[1];
-  const count = Math.max(1, Math.ceil(total / (4 * SPACING_METERS)));
-  const knots = [];
-  let index = 1;
-  for (let sample = 0; sample <= count; sample += 1) {
-    const distance = (total * sample) / count;
-    while (
-      index < matches.length - 1 &&
-      matches[index][0] + matches[index][1] < distance
-    )
-      index += 1;
-    const first = matches[index - 1];
-    const last = matches[index];
-    const fraction =
-      (distance - first[0] - first[1]) / (last[0] + last[1] - first[0] - first[1]);
-    knots.push([
-      distance,
-      ...first.map((value, axis) => value + fraction * (last[axis] - value)),
-    ]);
-  }
-  return knots;
-}
-
-function monotoneSlopes(knots, axis) {
-  const slopes = knots
-    .slice(1)
-    .map(
-      (point, index) =>
-        (point[axis] - knots[index][axis]) / (point[0] - knots[index][0]),
+/** Inputs are proven source pairs oriented in the same travel direction. */
+export function orderedCarriagewayMidpoints(first, second, options = {}) {
+  if (first.length < 2 || second.length < 2) return null;
+  const reverse =
+    JSON.stringify([first.at(-1), second.at(-1)].sort()) <
+    JSON.stringify([first[0], second[0]].sort());
+  if (reverse) {
+    const result = orderedCarriagewayMidpoints(
+      first.toReversed(),
+      second.toReversed(),
+      options,
     );
-  return knots.map((_, index) => {
-    if (!index) return slopes[0];
-    if (index === knots.length - 1) return slopes.at(-1);
-    const before = slopes[index - 1];
-    const after = slopes[index];
-    return before * after > 0 ? (2 * before * after) / (before + after) : 0;
+    if (!result) return null;
+    const a = result.pairs.at(-1).firstDistance,
+      b = result.pairs.at(-1).secondDistance;
+    return {
+      ...result,
+      coordinates: result.coordinates.toReversed(),
+      pairs: result.pairs.toReversed().map((p) => ({
+        ...p,
+        firstDistance: a - p.firstDistance,
+        secondDistance: b - p.secondDistance,
+        firstPosition: first.length - 1 - p.firstPosition,
+        secondPosition: second.length - 1 - p.secondPosition,
+      })),
+    };
+  }
+  // Canonical side order makes swapping the two source arguments identical,
+  // including projection origin and deterministic equal-cost grid tie breaks.
+  const swapped = JSON.stringify(first) > JSON.stringify(second);
+  const sides = swapped ? [second, first] : [first, second];
+  const origin = sides[0][0];
+  const project = (p) => {
+    const g = earth.Inverse(origin[1], origin[0], p[1], p[0]);
+    const angle = (g.azi1 * Math.PI) / 180;
+    return [g.s12 * Math.sin(angle), g.s12 * Math.cos(angle)];
+  };
+  const projected = sides.map((side) => side.map(project));
+  const curves = projected.map(curve);
+  if (curves.some((c) => c.length < 0.01)) return null;
+  const result = orderedMidline(...projected, 1, 1, HIGHWAY_MIDPOINT_TAPER_METERS);
+  const sourcePoint = (side, s) => {
+    const distances = curves[side].along;
+    let lo = 0,
+      hi = distances.length - 1;
+    while (hi - lo > 1) {
+      const mid = (lo + hi) >> 1;
+      if (distances[mid] <= s) lo = mid;
+      else hi = mid;
+    }
+    const fraction = Math.max(
+      0,
+      Math.min(1, (s - distances[lo]) / (distances[hi] - distances[lo] || 1)),
+    );
+    return {
+      coordinate: sides[side][lo].map(
+        (v, k) => v + fraction * (sides[side][hi][k] - v),
+      ),
+      position: lo + fraction,
+    };
+  };
+  // The bounded optimization grid can be coarse on very long highways. Follow
+  // its continuous source correspondence at <=10 m increments before applying
+  // the taper, preserving source bends and the physical 200 m taper width.
+  let matches = result.matches;
+  if (
+    result.rawMatches.some(
+      (p, i, all) => i > 0 && Math.max(p.sa - all[i - 1].sa, p.sb - all[i - 1].sb) > 10,
+    )
+  ) {
+    const dense = [];
+    for (let i = 0; i < result.rawMatches.length; i++) {
+      const p = result.rawMatches[i],
+        before = result.rawMatches[i - 1];
+      const count = before
+        ? Math.max(1, Math.ceil(Math.max(p.sa - before.sa, p.sb - before.sb) / 10))
+        : 1;
+      for (let j = 1; j <= count; j++)
+        dense.push(
+          before
+            ? {
+                sa: before.sa + ((p.sa - before.sa) * j) / count,
+                sb: before.sb + ((p.sb - before.sb) * j) / count,
+              }
+            : p,
+        );
+    }
+    matches = taperMatches(dense, curves[0], curves[1], HIGHWAY_MIDPOINT_TAPER_METERS);
+  }
+  const pairs = matches.map((p) => {
+    const a = sourcePoint(0, p.sa),
+      b = sourcePoint(1, p.sb);
+    return swapped
+      ? {
+          first: b.coordinate,
+          second: a.coordinate,
+          firstPosition: b.position,
+          secondPosition: a.position,
+          firstDistance: p.sb,
+          secondDistance: p.sa,
+        }
+      : {
+          first: a.coordinate,
+          second: b.coordinate,
+          firstPosition: a.position,
+          secondPosition: b.position,
+          firstDistance: p.sa,
+          secondDistance: p.sb,
+        };
   });
-}
-
-/**
- * Follow both source roads monotonically, minimizing their integrated separation.
- * Inputs run in the same direction and already have proven paired endpoints.
- * Interpolation removes sampling-grid stair steps in SOURCE correspondence;
- * every output vertex is still the WGS84 midpoint of two points on those roads.
- */
-export function orderedCarriagewayMidpoints(
-  firstCoordinates,
-  secondCoordinates,
-  maximumWidthMeters,
-) {
-  const first = sourceCurve(firstCoordinates);
-  const second = sourceCurve(secondCoordinates);
-  if (first.length < 1 || second.length < 1) return null;
-  const corridor = [
-    ...firstCoordinates,
-    ...secondCoordinates.toReversed(),
-    firstCoordinates[0],
-  ];
-  if (hasProperSelfIntersection(corridor)) return null;
-  const matches = orderedCorrespondence(
-    samples(first),
-    samples(second),
-    maximumWidthMeters,
-    corridor,
+  const coordinates = pairs.map((p) =>
+    geodesicMidpoint(p.first, p.second).map((v) => Number(v.toFixed(7))),
   );
-  if (!matches) return null;
-  const knots = correspondenceKnots(matches);
-  const slopes = [monotoneSlopes(knots, 1), monotoneSlopes(knots, 2)];
-  const total = knots.at(-1)[0];
-  const count = Math.ceil(total / SPACING_METERS);
-  const coordinates = [];
-  const pairs = [];
-  let index = 1;
-  for (let sample = 0; sample <= count; sample += 1) {
-    const distance = (total * sample) / count;
-    while (index < knots.length - 1 && knots[index][0] < distance) index += 1;
-    const span = knots[index][0] - knots[index - 1][0];
-    const t = (distance - knots[index - 1][0]) / span;
-    const sourceDistances = [1, 2].map(
-      (axis, side) =>
-        (2 * t ** 3 - 3 * t ** 2 + 1) * knots[index - 1][axis] +
-        (t ** 3 - 2 * t ** 2 + t) * span * slopes[side][index - 1] +
-        (-2 * t ** 3 + 3 * t ** 2) * knots[index][axis] +
-        (t ** 3 - t ** 2) * span * slopes[side][index],
-    );
-    const a = pointAlong(first, sourceDistances[0]);
-    const b = pointAlong(second, sourceDistances[1]);
-    if (
-      // Interpolation can straddle a source corner between sampled tangents,
-      // but it must never pair points travelling in opposite directions.
-      alignment(a.direction, b.direction) < 0 ||
-      geodesicDistanceMeters(a.coordinate, b.coordinate) > maximumWidthMeters
-    )
-      return null;
-    const coordinate = geodesicMidpoint(a.coordinate, b.coordinate).map((value) =>
-      Number(value.toFixed(7)),
-    );
-    if (
-      coordinates.length &&
-      geodesicDistanceMeters(coordinates.at(-1), coordinate) > SPACING_METERS * 2.8
-    )
-      return null;
-    if (
-      coordinates.length > 1 &&
-      alignment(
-        direction(coordinates.at(-2), coordinates.at(-1)),
-        direction(coordinates.at(-1), coordinate),
-      ) < 0
-    )
-      return null;
-    coordinates.push(coordinate);
-    pairs.push({
-      first: a.coordinate,
-      second: b.coordinate,
-      firstDistance: sourceDistances[0],
-      secondDistance: sourceDistances[1],
-    });
-  }
-  if (hasProperSelfIntersection(coordinates)) return null;
-  // Validate interpolated correspondence too: it must not cut across a source
-  // bend between the discrete matches or cross a cap at either paired endpoint.
-  for (const side of [firstCoordinates, secondCoordinates]) {
-    if (hasProperSelfIntersection([...side, ...coordinates.toReversed(), side[0]]))
-      return null;
-  }
-  return { coordinates, pairs };
+  // Retain metre-scale shape without turning sub-centimetre coordinate rounding
+  // into artificial bends, or adding redundant routing vertices every metre.
+  const kept = [0];
+  for (let i = 1; i < coordinates.length - 1; i++)
+    if (geodesicDistanceMeters(coordinates[kept.at(-1)], coordinates[i]) >= 5)
+      kept.push(i);
+  if (
+    kept.length > 1 &&
+    geodesicDistanceMeters(coordinates[kept.at(-1)], coordinates.at(-1)) < 1
+  )
+    kept.pop();
+  kept.push(coordinates.length - 1);
+  const compact = options.compact
+    ? compactMidpointIndices(kept.map((i) => coordinates[i])).map((i) => kept[i])
+    : kept;
+  return {
+    coordinates: compact.map((i) => coordinates[i]),
+    pairs: compact.map((i) => pairs[i]),
+    spacing: [result.spacingA, result.spacingB],
+    taper: result.taper,
+  };
 }

@@ -81,13 +81,13 @@ Three cases required particular source review:
 - **Ontario:** the east-401/south-DVP reciprocal pair was missing from the derived graph
   because the two directional paths attached to overlapping DVP mainline fragments.
   `government-connection-source-recoveries.json` records both actual directed source
-  paths, their road and node IDs, the source fingerprint, and the closest-tangent
-  midpoint. Every one of its 72 directional segments was checked against the original
-  OSM directed road edges, including continuation to the staggered mainline join. Only
-  the specified parent mainlines may receive the recovered endpoints. A source change
-  requires a fresh audit. This produces the 10.2 km shortest connection, including the
-  west-401 approach at the same 401/DVP interchange. It does not change the published
-  circumference.
+  paths, their road and node IDs, the source fingerprint, and the shared ordered
+  midpoint with a 200 m correspondence taper. Every one of its 72 directional segments
+  was checked against the original OSM directed road edges, including continuation to
+  the staggered mainline join. Only the specified parent mainlines may receive the
+  recovered endpoints. A source change requires a fresh audit. This produces the 10.2 km
+  shortest connection, including the west-401 approach at the same 401/DVP interchange.
+  It does not change the published circumference.
 - **Mississippi:** the unrestricted 252.6 km candidate uses I-55/I-10 at LaPlace, which
   lacks the required direct connection for the other direction. The chosen 266.0 km
   connection uses I-10/I-12 at Baton Rouge. The source topology is consistent with the

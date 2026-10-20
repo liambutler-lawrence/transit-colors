@@ -23,6 +23,14 @@ const data = highwayCircumferenceDataSchema.parse(
   ),
 );
 
+test('highway metadata accepts an interchange-port outer-boundary solve', () => {
+  const methodology = highwayCircumferenceDataSchema.shape.methodology.parse({
+    ...data.methodology,
+    optimizationMethod: 'interchange-ports-outer-boundary',
+  });
+  assert.equal(methodology.optimizationMethod, 'interchange-ports-outer-boundary');
+});
+
 function webMercatorTile(longitude, latitude, zoom) {
   const dimension = 2 ** zoom;
   return {
@@ -139,7 +147,7 @@ test('North America highway data publishes one validated maximum and full vector
     data.methodology.optimizationMethod,
     'source-topology-wgs84-area-integer-program',
   );
-  assert.match(data.centerline_method, /Closest-tangent.*staggered joins/);
+  assert.match(data.centerline_method, /Shared ordered.*200 m.*staggered joins/);
   assert.equal(data.network.featureCount, data.methodology.sourceFeatureCount);
   assert.equal(
     data.network.featureCount,

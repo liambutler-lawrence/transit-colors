@@ -33,6 +33,43 @@ function recover(data) {
     new Set([data.branchIndex]),
   );
 }
+test('a nearby unconnected line cannot suppress a source-proven terminal merge', () => {
+  const data = fixture('petersburg-i85-i95');
+  const endpoint = data.parts[data.branchIndex].coordinates.at(-1);
+  data.parts.push({
+    id: 'grade-separated-crossing',
+    role: 'mainline',
+    coordinates: [endpoint, [endpoint[0] + 0.001, endpoint[1]]],
+    startTopologyKeys: ['unrelated:start'],
+    endTopologyKeys: ['unrelated:end'],
+  });
+  assert.equal(recover(data).additions.length, 1);
+});
+
+test('a shared explicit terminal key suppresses a duplicate merge', () => {
+  const data = fixture('petersburg-i85-i95');
+  const branch = data.parts[data.branchIndex];
+  branch.endTopologyKeys = ['already-connected'];
+  data.parts.push({
+    id: 'existing-connection',
+    role: 'connector',
+    coordinates: [branch.coordinates.at(-1), branch.coordinates.at(-2)],
+    startTopologyKeys: ['already-connected'],
+    endTopologyKeys: [],
+  });
+  assert.equal(recover(data).additions.length, 0);
+});
+
+test('San Ysidro retains a smooth source-backed loop with ordered pairing', () => {
+  const data = fixture('san-ysidro');
+  const { additions, audit } = recover(data);
+  assert.equal(additions.length, 1);
+  assert.equal(additions[0].endMainlinePartIndex, data.targetIndex);
+  assert.ok(hasProperSelfIntersection(additions[0].coordinates));
+  assert.equal(audit[0].paths.length, 2);
+  assert.ok(audit[0].paths.every((path) => path.segments.length > 0));
+});
+
 for (const site of sites) {
   test(`${site}: recover the source-connected mainline merge with explicit directional ports`, () => {
     const data = fixture(site),
@@ -77,6 +114,10 @@ for (const site of sites) {
     const branch = data.parts[data.branchIndex];
     branch.coordinates.reverse();
     branch.sourceRanges.reverse();
+    [branch.startTopologyKeys, branch.endTopologyKeys] = [
+      branch.endTopologyKeys,
+      branch.startTopologyKeys,
+    ];
     const { additions } = recover(data);
     assert.equal(additions.length, 1);
     assert.equal(additions[0].startMainlineDirection, -1);

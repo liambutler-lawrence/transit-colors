@@ -35,7 +35,8 @@ test('published source-interval repairs retain clean mainlines at merges and gra
     'published checks cover more than the reported interchange',
   );
   const handle = await open(
-    new URL('../data/north-america-highways.pmtiles', import.meta.url),
+    process.env['HIGHWAY_AUDIT_TILES'] ??
+      new URL('../data/north-america-highways.pmtiles', import.meta.url),
   );
   try {
     const archive = new PMTiles({

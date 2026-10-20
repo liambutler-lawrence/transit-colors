@@ -204,9 +204,11 @@ test('Monteagle remains continuous through its widely separated winding carriage
     assert.ok(
       gap.some(([longitude, latitude]) => longitude > -85.81 && latitude < 35.21),
     );
-    for (let index = 1; index < line.length; index += 1) {
-      assert.ok(geodesicDistanceMeters(line[index - 1], line[index]) < 140);
-    }
+    // Ordinary mainlines may compact long straight segments; the recovered
+    // join retains dense samples and shares exact endpoints with both sides.
+    const bridge = result.parts.find((part) => part.orderedContinuation).coordinates;
+    for (let index = 1; index < bridge.length; index += 1)
+      assert.ok(geodesicDistanceMeters(bridge[index - 1], bridge[index]) < 140);
     for (const source of result.chains) {
       const side =
         geodesicDistanceMeters(source.coordinates[0], line[0]) <
@@ -241,8 +243,10 @@ test('Coachochitlán retains one continuous midpoint line across the separated c
     const direction = Math.sign(line.at(-1)[0] - line[0][0]);
     for (let i = 1; i < line.length; i += 1) {
       assert.ok((line[i][0] - line[i - 1][0]) * direction > 0);
-      assert.ok(geodesicDistanceMeters(line[i - 1], line[i]) < 120);
     }
+    const bridge = result.parts.find((part) => part.continuationEndpoints).coordinates;
+    for (let i = 1; i < bridge.length; i++)
+      assert.ok(geodesicDistanceMeters(bridge[i - 1], bridge[i]) < 120);
   }
 });
 

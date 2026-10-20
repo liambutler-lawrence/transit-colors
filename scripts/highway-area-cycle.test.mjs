@@ -145,7 +145,7 @@ test('nested cycles cannot count the same enclosed area twice', async () => {
     new Set(result.segments.map((s) => s.edgeIndex)),
     new Set([0, 1, 2, 3]),
   );
-  assert.ok(result.optimizationIterations > 1);
+  assert.equal(result.optimizationIterations, 1);
   assert.ok(
     Math.abs(result.areaSquareMeters - result.objectiveUpperBoundSquareMeters) < 1,
   );
@@ -253,5 +253,71 @@ test('a timed-out feasible loop is not reported as a proven maximum', async () =
       }),
     }),
     /maximum area is not yet proven/,
+  );
+});
+
+test('cycles sharing only an articulation vertex are separated before optimization', async () => {
+  const { nodes, edges } = network(
+    { A: [0, 0], B: [1, 0], C: [1, 1], D: [0, 1], E: [4, 1], F: [4, 4], G: [1, 4] },
+    [
+      ['A', 'B'],
+      ['B', 'C'],
+      ['C', 'D'],
+      ['D', 'A'],
+      ['C', 'E'],
+      ['E', 'F'],
+      ['F', 'G'],
+      ['G', 'C'],
+    ],
+  );
+  const result = await solveHighwayAreaCycle(nodes, edges);
+  assert.deepEqual(
+    new Set(result.segments.map((s) => s.edgeIndex)),
+    new Set([4, 5, 6, 7]),
+  );
+  assert.equal(result.optimizationIterations, 1);
+  assert.equal(result.biconnectedBlockCount, 2);
+});
+
+test('crossing preprocessing checks cancellation inside a large edge', () => {
+  let checks = 0;
+  const coordinates = Array.from({ length: 1025 }, (_, i) => [i / 100000, 0]);
+  assert.throws(
+    () =>
+      highwayCrossingEdgePairs([{ coordinates }], [0], {
+        check: () => {
+          if (++checks === 2) throw new Error('budget exhausted');
+        },
+      }),
+    /budget exhausted/,
+  );
+  assert.equal(checks, 2);
+});
+
+test('winding checks reject a small nested loop away from the longest road', async () => {
+  const { nodes, edges } = network(
+    { a: [0, 0], b: [0.01, 0], c: [0.01, 0.01], d: [0, 0.01] },
+    [
+      ['a', 'b'],
+      ['b', 'c'],
+      ['c', 'd'],
+      ['d', 'a'],
+    ],
+  );
+  edges[0].coordinates = [
+    [0, 0],
+    [0.002, 0],
+    [0.003, 0.001],
+    [0.002, 0.001],
+    [0.002, 0],
+    [0.01, 0],
+  ];
+  edges[2].coordinates = Array.from({ length: 21 }, (_, i) => [
+    0.01 - i * 0.0005,
+    0.01,
+  ]);
+  await assert.rejects(
+    solveHighwayAreaCycle(nodes, edges),
+    /No eligible highway cycle|Infeasible/,
   );
 });

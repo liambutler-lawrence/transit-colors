@@ -114,10 +114,26 @@ export function highwayTwoCore(nodeIds, edges) {
 }
 
 export function compressHighwayCore(coordinateByNodeId, edges, core, options = {}) {
+  const categories = options.parts
+    ? edges.map((edge) => {
+        const roles = new Set(
+          [...edge.partIndices].map((i) =>
+            options.parts[i]?.explicitMainlineMerge ? 'merge' : options.parts[i]?.role,
+          ),
+        );
+        if (roles.size !== 1 || roles.has(undefined))
+          throw new Error('Source highway edge has mixed or missing road roles.');
+        return roles.values().next().value;
+      })
+    : null;
   const junctions = new Set(
-    [...core.activeNodes].filter(
-      (nodeId) => (core.incident.get(nodeId)?.size ?? 0) !== 2,
-    ),
+    [...core.activeNodes].filter((nodeId) => {
+      const incident = [...(core.incident.get(nodeId) ?? [])];
+      return (
+        incident.length !== 2 ||
+        (categories && categories[incident[0]] !== categories[incident[1]])
+      );
+    }),
   );
   const unvisitedNodes = new Set(core.activeNodes);
   while (unvisitedNodes.size > 0) {
@@ -212,6 +228,7 @@ export function buildCompressedHighwayGraph(parts) {
     exact.coordinateByNodeId,
     component.edges,
     core,
+    { parts },
   );
   return { component, compressed, core, exact };
 }

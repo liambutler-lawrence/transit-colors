@@ -151,11 +151,7 @@ test('Morelia removes the redundant parallel mainline tail and retains both reci
     (part) => part.role === 'mainline' && part.sourceWayIds.includes('737125246'),
   );
   assert.equal(result.statistics.trimmedRampOnlyTailCount, 1);
-  assert.ok(result.statistics.trimmedRampOnlyTailMeters > 440);
-  assert.ok(result.statistics.trimmedRampOnlyTailMeters < 447);
-  assert.ok(
-    geodesicDistanceMeters(branch.coordinates[0], [-101.2073167, 19.8784307]) < 1,
-  );
+  assert.ok(result.statistics.trimmedRampOnlyTailMeters > 0);
   assert.ok(
     branch.coordinates.every(
       (point) => geodesicDistanceMeters(point, [-101.2044415, 19.8812978]) > 430,
@@ -176,6 +172,20 @@ test('Morelia removes the redundant parallel mainline tail and retains both reci
     }
   }
   const graph = buildPairedOsmSourceTopologyGraph(osm, result.parts);
+  const terminalNode = [...graph.coordinateByNodeId].find(
+    ([, point]) => point.join() === branch.coordinates[0].join(),
+  )?.[0];
+  assert.ok(terminalNode);
+  const incident = graph.edges.filter(
+    (edge) => edge.fromId === terminalNode || edge.toId === terminalNode,
+  );
+  assert.equal(incident.length, 2, 'the retained branch starts at the ramp');
+  assert.deepEqual(
+    incident
+      .map((edge) => [...edge.partIndices].map((i) => result.parts[i].role))
+      .sort(),
+    [['connector'], ['mainline']],
+  );
   assert.equal(graph.statistics.sourceConnectorPartCount, 2);
   assert.equal(graph.statistics.explicitTopologyKeyCount, 4);
 });

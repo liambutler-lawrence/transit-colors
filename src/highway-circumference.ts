@@ -33,6 +33,17 @@ const highwayLandmassSchema = z.object({
 });
 
 export const highwayCircumferenceDataSchema = z.object({
+  preview: z
+    .object({
+      mode: z.literal('unrestricted'),
+      usesCachedNetwork: z.boolean(),
+      skippedSteps: z.array(z.string()),
+      junctionCount: z.number().int().nonnegative(),
+      interchangeConflicts: z.number().int().nonnegative(),
+      geometricContacts: z.number().int().nonnegative(),
+      repeatedBoundaryVertices: z.number().int().nonnegative(),
+    })
+    .optional(),
   centerline_method: z.string().min(1),
   criterion: z.string().min(1),
   landmass: highwayLandmassSchema,
@@ -55,6 +66,7 @@ export const highwayCircumferenceDataSchema = z.object({
     osmPrecisionMainlineCount: z.number().int().nonnegative(),
     optimizationMethod: z.enum([
       'source-topology-wgs84-area-integer-program',
+      'interchange-ports-outer-boundary',
       'exact-planar-biconnected-outer-boundary',
       'coarse-exact-detailed-map-match',
       'detailed-macro-cycle-expansion',
@@ -65,6 +77,7 @@ export const highwayCircumferenceDataSchema = z.object({
       'optimal',
       'optimal-guide-refined',
       'validated-detailed',
+      'unrestricted-preview',
     ]),
     objectiveUpperBoundSquareMeters: z.number().nonnegative().optional(),
     optimizationIterations: z.number().int().positive().optional(),

@@ -106,7 +106,11 @@ test('Kansas City keeps both reciprocal movements without a crossed mainline or 
     nodes: new Map(fixture.nodes),
     ways: fixture.ways,
   });
-  assert.equal(built.statistics.coveredMainlineMergeCount, 1);
+  assert.equal(
+    built.statistics.coveredMainlineMergeCount,
+    0,
+    'local route identity prevents the crossed pair before merge cleanup',
+  );
   const north = built.parts.find(
     (part) => part.role === 'connector' && part.sourceWayIds.includes('26140794'),
   );
@@ -116,7 +120,8 @@ test('Kansas City keeps both reciprocal movements without a crossed mainline or 
   assert.ok(north, 'preserve the northern reciprocal ramp');
   const osm = { nodes: new Map(fixture.nodes), ways: fixture.ways };
   const prepared = prepareWays(osm);
-  const original = buildAveragedMainlines(traceMotorwayChains(prepared.mainlines));
+  const chains = traceMotorwayChains(prepared.mainlines);
+  const original = buildAveragedMainlines(chains);
   const originalThrough = structuredClone(
     original.parts.find(
       (part) =>
@@ -124,12 +129,13 @@ test('Kansas City keeps both reciprocal movements without a crossed mainline or 
         part.sourceWayIds.includes('527423798'),
     ),
   );
-  connectMainlinePartsAtSourceNodes(osm, prepared.mainlines, original.parts);
+  connectMainlinePartsAtSourceNodes(osm, prepared.mainlines, original.parts, chains);
   const originalRamps = buildRampConnectors(
     osm,
     prepared.mainlines,
     original.parts,
     prepared.connectors,
+    chains,
   );
   assert.deepEqual(
     north.coordinates,

@@ -157,45 +157,87 @@ movement is shortened against all compatible candidates, including alternatives 
 its own matched return, without consuming a direction assigned to another movement.
 Released paths remain available for further shortening until total distance stops
 decreasing. Shared collector stems for distinct turns remain separate; proximity alone
-never merges connections. Ramp samples use the closest point on a tangent-aligned
-opposing segment and its WGS84 geodesic midpoint, as mainlines do. The shorter of the
-two oriented paths supplies the samples; endpoints are never warped to create
-correspondence and the midpoints are not smoothed afterward. If successive projections
-skip a source bend, nearby closest-tangent anchors bound a local, monotone Hermite
-interpolation of distance along each source path. Denser samples then trace that bend
-before the geodesic midpoints are computed. This does not normalize progress across the
-complete ramps or round off their output coordinates. The continuation is rejected if it
-traverses a reverse-facing loop or makes a sharper corner, including at its joins to the
-untouched correspondence. If the resulting midpoint doubles back, the builder tries the
-ordered closest-tangent correspondence used for mainline bends across both source paths.
-It accepts this fallback only when the new midpoint stays between the source roads,
-removes backward turns, improves the maximum turn, and has no self-intersection after
-endpoint attachment. If that still leaves a reversal, a second closest-tangent search
-only advances along the opposite source path, preventing a return to an earlier loop.
-This retry must eliminate backward turns and self-intersections and reduce the maximum
-turn; the existing midpoint remains unchanged when it is already valid. Where ramp joins
-are staggered, the path extends along its actual source mainline carriageway through
-explicit OSM nodes, from the earlier split to the later merge. Only then are the shared
-centerline endpoints attached to the mainline graph. Geometry crossings never create
-graph nodes; topology comes from explicit shared source nodes. A reciprocal ramp's
-attachment also retains the source carriageway's travel direction relative to its
+never merges connections. All paired mainlines and ramps use shared ordered source
+correspondence (`scripts/ordered-midline.mjs`), with a 200 m taper in source progress.
+The deterministic full-grid dynamic program minimizes integrated cross-link length plus
+a unit-weight penalty on changing the link vector and one-sided progress. It samples at
+1 m, bounded to approximately 1,600 points per side on long spans. On long highways, the
+continuous source correspondence is resampled at no more than 10 m increments before
+tapering, so the grid bound does not replace source bends with long chords or broaden
+the 200 m taper. A local WGS84 azimuthal-equidistant plane supplies metric
+correspondence distances; final coordinates are WGS84 geodesic midpoints of interpolated
+original source points. Closed source chains, including cycles embedded in longer
+chains, retain their full road span across the arbitrary coordinate-array seam; a
+wrapped interval is never replaced by a chord. Endpoint identity uses the actual source
+projection within half the 50 m source-search spacing, rather than the label of the
+nearby search sample. The taper averages correspondence over 100 m before and after each
+mean-progress position; odd endpoint reflection preserves monotonicity and endpoint
+pairs. It does not smooth final coordinates or impose tangent, corridor, or geographical
+direction filters. Source loops may produce midpoint loops, which do not form graph
+junctions. Canonical source order and orientation make the output independent of input
+ordering. Output samples are retained at about 5 m spacing before explicit graph
+attachments. Mainline vertices are then compacted within a 10 cm local metric error
+bound to keep continent-scale topology generation within memory limits. Ramps and
+wide-gap continuations retain their density for attachment checks; short attachment
+overhangs are trimmed instead of creating reverse terminal hooks. The 200 m taper is
+capped at the sum of source lengths for short pairs. Where ramp joins are staggered, the
+path extends along its actual source mainline carriageway through explicit OSM nodes,
+from the earlier split to the later merge. Mainlines retain the source-chain positions
+used by their ordered correspondence. Ramp junctions use that mapping to attach to the
+midpoint, and extensions stop at the paired source positions rather than seeking a
+nearby median vertex. A confirmed pair includes its actual pavement terminal when the 50
+m selection samples stopped short; recovery is bounded by 160 m of source arc length and
+requires the opposing source carriageway. The later beginning or earlier ending of the
+two carriageways bounds their shared mainline. Once both sides are mainline, the
+connector ends and the existing mainline continues. While both sides still use shared
+collector or ramp pavement, `highway-shared-midpoints.mjs` computes that source section
+once and reuses identical coordinates in every movement that owns both source sides.
+Nearby geometry alone never establishes shared pavement. Source terminals retain their
+canonical mainline attachments before the shared section is stitched into each movement.
+Repeated endpoint insertions do not create zero-length geometry edges. Only then are the
+shared centerline endpoints attached to the mainline graph. Geometry crossings never
+create graph nodes; topology comes from explicit shared source nodes. A reciprocal
+ramp's attachment also retains the source carriageway's travel direction relative to its
 ordered mainline. Each incident edge records its permitted side of that junction.
 Incoming and outgoing edges must use opposite sides; a ramp pair cannot be entered by
 reversing across the median. Degree-two compression preserves endpoint directions and
-rejects corridors containing an illegal internal turn. The area optimizer enforces these
-junction-port transitions directly in its flow constraints, including the closing turn.
-These restrictions apply to all reciprocal connectors, including collector and
-express-lane paths, even when the correct alternative ramp is missing.
+rejects corridors containing an illegal internal turn. The area optimizer checks these
+junction-port transitions, including the closing turn. These restrictions apply to all
+reciprocal connectors, including collector and express-lane paths, even when the correct
+alternative ramp is missing.
 
-After 2-core pruning and degree-two compression, a binary directed-edge model maximizes
-additive WGS84 enclosed area over the entire eligible graph. It contains no named-road
-requirements, geographic waypoints, or connector penalties. Mainlines and connectors
-retain their already-computed coordinates; the route solver does not clip, smooth, or
-replace them. Robust crossing checks, winding constraints, and conditional connectivity
-cuts restrict the result to one simple loop. A valid loop's area provides a lower bound;
-blocks whose total possible area is smaller can be pruned without choosing a geographic
-root. The builder accepts a result only when its validated single loop attains the
-optimization bound within numerical tolerance. See
+At a shared endpoint, adjacent source intervals are alternative representations of the
+same attachment. Ramp matching considers those explicit endpoint identities while
+retaining the original directed source paths. Mixed mainline returns choose the shortest
+valid return across those representations. This prevents centimetre-scale changes in the
+drawn median from suppressing a ramp pair. Terminal recovery likewise checks shared
+topology keys, including an existing attachment within 3 m along its own terminal,
+rather than treating a nearby line as a connection. Smooth source loops are eligible;
+they do not create junctions at their geometric crossings.
+
+After 2-core pruning and degree-two compression, the highway circumference builder uses
+`highway-interchange-solver.mjs`. Source-proven ramp connections and their intervening
+mainline sections form a logical interchange with distinct approach ports. Each allowed
+approach pair retains its shortest legal reciprocal source path, including ramp
+geometry; missing movements cannot be invented by reversing along another ramp. A
+mainline that leaves and returns to a complex stays outside that interchange. Roads
+crossing without ramps remain separate. Government-seat routing retains the full source
+graph.
+
+The solver planarizes only the external mainlines, restricts artificial contacts to
+same-road continuation, and branches on legal approach pairings. There are no named-road
+requirements, geographic waypoints, or connector penalties. Selected movements expand to
+their stored source geometry for WGS84 area calculation. Only the largest enclosed
+region counts; secondary loops never increase the objective. A conservative relaxation
+uses all bounded faces plus interchange footprint envelopes as an upper bound, including
+geodesic curvature between source vertices. It does not use the contracted node stubs as
+final route geometry. Identical oriented candidate walks reuse a bounded geometry score
+cache across branches.
+
+Graph construction, planarization, and search each have a separate 30-second budget and
+timing report. Source-, role-, and implementation-addressed atomic search checkpoints
+preserve pending alternatives after interruption. Incomplete results are rejected by the
+builder and do not update the published route. See
 [Highway area optimization](highway-area-optimization.md) for regeneration and details.
 
 The circumference map keeps one independent route state and gradient image source per

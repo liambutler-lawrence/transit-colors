@@ -1,10 +1,18 @@
+import { finalizeMidpointTopology } from './highway-midpoint-topology.mjs';
+export { finalizeMidpointTopology } from './highway-midpoint-topology.mjs';
+import { rampAttachmentAliases } from './highway-ramp-attachment-aliases.mjs';
 /* eslint-disable max-lines -- Parsing, carriageway pairing, and explicit-node topology are one audited pipeline. */
 
 import { spawn } from 'node:child_process';
 import readline from 'node:readline';
 
-import { hasProperSelfIntersection } from './highway-cycle.mjs';
 import { orderedCarriagewayMidpoints } from './highway-ordered-midpoint.mjs';
+import {
+  sourceCorrespondence,
+  sourceMidpointAttachment,
+  sourceExtensionPath,
+} from './highway-source-correspondence.mjs';
+import { sharedRampMidpoints } from './highway-shared-midpoints.mjs';
 import {
   recoverTerminalContinuations,
   pruneUnusableTerminalContinuations,
@@ -24,8 +32,6 @@ const MAX_PAIRED_CONTINUATION_LENGTH_METERS = 25_000;
 const GRID_SIZE_DEGREES = 0.002;
 const MAX_DIRECT_CONNECTOR_METERS = 25_000;
 const MAX_RECIPROCAL_ENDPOINT_GAP_METERS = 2_500;
-const MAX_RAMP_CORRESPONDENCE_SAMPLES = 240;
-const RAMP_CORRESPONDENCE_SPACING_METERS = 25;
 const MIN_PAIRED_TANGENT_ALIGNMENT = 0.62;
 
 function decodeOplString(value) {
@@ -291,9 +297,11 @@ export function traceMotorwayChains(mainlines) {
     const coordinates = [];
     const nodeIds = [];
     const tokens = new Set();
+    const segmentTokens = [];
     for (const [index, way] of ways.entries()) {
       coordinates.push(...(index === 0 ? way.coordinates : way.coordinates.slice(1)));
       nodeIds.push(...(index === 0 ? way.nodeIds : way.nodeIds.slice(1)));
+      for (let i = 1; i < way.coordinates.length; i++) segmentTokens.push(way.tokens);
       for (const token of way.tokens) tokens.add(token);
     }
     chains.push({
@@ -302,6 +310,7 @@ export function traceMotorwayChains(mainlines) {
       id: `chain-${chains.length + 1}`,
       nodeIds,
       sourceWayIds: ways.map((way) => way.id),
+      segmentTokens,
       startNodeId: nodeIds[0],
       tokens,
     });
@@ -381,14 +390,20 @@ function gridCell([longitude, latitude]) {
   ];
 }
 
+const pairingWitnesses = new WeakMap();
+const pairIdentity = (a, b) => (a < b ? `${a}:${b}` : `${b}:${a}`);
+
 function nearestOpposingSample(
   sample,
   chain,
   grid,
   chainById,
   maximumDistanceMeters = PAIR_SEARCH_METERS,
+  collectCompatiblePairs,
 ) {
   const [cellX, cellY] = gridCell(sample.coordinate);
+  const local = chain.segmentTokens?.[sample.sourceSegmentIndex] ?? chain.tokens;
+  const localRefs = [...local].filter((t) => !t.startsWith('NAME:'));
   const cellRadius =
     maximumDistanceMeters === PAIR_SEARCH_METERS
       ? 2
@@ -413,6 +428,22 @@ function nearestOpposingSample(
         if (visitedSegments.has(segmentKey)) continue;
         visitedSegments.add(segmentKey);
         const candidateChain = chainById.get(candidate.chainId);
+        // Chains may continue through several route numbers. Pair only the
+        // local source segments, never the union of routes elsewhere on a chain.
+        const opposite =
+          candidateChain.segmentTokens?.[candidate.sourceSegmentIndex] ??
+          candidateChain.tokens;
+        const oppositeRefs = [...opposite].filter((t) => !t.startsWith('NAME:'));
+        const compatibleRef = localRefs.some((ref) => opposite.has(ref));
+        const localRefConflict =
+          localRefs.length > 0 && oppositeRefs.length > 0 && !compatibleRef;
+        const witnesses = pairingWitnesses.get(chainById);
+        if (
+          localRefConflict &&
+          witnesses &&
+          !witnesses.has(pairIdentity(chain.id, candidate.chainId))
+        )
+          continue;
         const segmentStart = candidateChain.coordinates[candidate.sourceSegmentIndex];
         const segmentEnd = candidateChain.coordinates[candidate.sourceSegmentIndex + 1];
         const projectedCoordinate = projectCoordinateOntoSegment(
@@ -425,7 +456,9 @@ function nearestOpposingSample(
           projectedCoordinate,
         );
         if (distanceMeters > maximumDistanceMeters) continue;
+        // Missing refs and names retain the existing geometric fallback.
         const routePenalty =
+          !(localRefConflict && witnesses) &&
           chain.tokens.size > 0 &&
           candidateChain.tokens.size > 0 &&
           !tokenOverlap(chain.tokens, candidateChain.tokens)
@@ -439,6 +472,8 @@ function nearestOpposingSample(
             coordinate: projectedCoordinate,
             distanceMeters,
             score,
+            compatibleRef,
+            localRefConflict,
           });
         }
       }
@@ -467,6 +502,8 @@ function nearestOpposingSample(
     ) {
       continue;
     }
+    if (match.compatibleRef)
+      collectCompatiblePairs?.add(pairIdentity(chain.id, match.chainId));
     if (!best || match.score < best.score) {
       best = {
         ...match,
@@ -506,24 +543,204 @@ function midpoint(first, second) {
   return geodesicMidpoint(first, second).map((value) => Number(value.toFixed(7)));
 }
 
-function sourceSection(chain, first, last) {
-  return [
-    first.coordinate,
-    ...chain.coordinates.slice(
-      first.sourceSegmentIndex + 1,
-      last.sourceSegmentIndex + 1,
-    ),
-    last.coordinate,
+function sourceSection(
+  chain,
+  first,
+  last,
+  crossesSeam = false,
+  bounds = null,
+  metadata = false,
+) {
+  const position = (sample) =>
+    sample.sourceSegmentIndex +
+    coordinateProjectionFraction(
+      sample.coordinate,
+      chain.coordinates[sample.sourceSegmentIndex],
+      chain.coordinates[sample.sourceSegmentIndex + 1],
+    );
+  const firstPosition = position(first),
+    lastPosition = position(last);
+  // A ring can occupy only part of a longer OSM chain. Follow its repeated
+  // source node across the storage seam, including rings with approach tails.
+  let cycle = null;
+  if (crossesSeam || firstPosition >= lastPosition) {
+    const seen = new Map();
+    for (let j = 0; j < chain.coordinates.length; j++) {
+      const key = chain.nodeIds?.[j] ?? chain.coordinates[j].join(',');
+      const i = seen.get(key);
+      if (
+        i !== undefined &&
+        i <= Math.min(lastPosition, bounds?.[0] ?? Infinity) &&
+        j >= Math.max(firstPosition, bounds?.[1] ?? -Infinity)
+      ) {
+        cycle = [i, j];
+        break;
+      }
+      if (i === undefined) seen.set(key, j);
+    }
+  }
+  const indices = cycle
+    ? [
+        ...Array.from(
+          { length: cycle[1] - first.sourceSegmentIndex },
+          (_, i) => first.sourceSegmentIndex + 1 + i,
+        ),
+        ...Array.from(
+          { length: last.sourceSegmentIndex - cycle[0] },
+          (_, i) => cycle[0] + 1 + i,
+        ),
+      ]
+    : Array.from(
+        { length: Math.max(0, last.sourceSegmentIndex - first.sourceSegmentIndex) },
+        (_, i) => first.sourceSegmentIndex + 1 + i,
+      );
+  const vertices = [
+    { coordinate: first.coordinate, position: firstPosition },
+    ...indices.map((i) => ({ coordinate: chain.coordinates[i], position: i })),
+    { coordinate: last.coordinate, position: lastPosition },
   ].filter(
-    (point, index, points) =>
-      index === 0 || geodesicDistanceMeters(points[index - 1], point) > 0.01,
+    (v, i, all) =>
+      i === 0 || geodesicDistanceMeters(all[i - 1].coordinate, v.coordinate) > 0.01,
   );
+  const coordinates = vertices.map((v) => v.coordinate);
+  return metadata
+    ? {
+        coordinates,
+        positions: vertices.map((v) => v.position),
+        chainId: chain.id,
+        direction: 1,
+      }
+    : coordinates;
+}
+
+const sourceChainDistances = new WeakMap();
+
+function sourceEndpointClearance(chain, sample, atStart) {
+  let distances = sourceChainDistances.get(chain);
+  if (!distances) {
+    distances = [0];
+    for (let i = 1; i < chain.coordinates.length; i++)
+      distances.push(
+        distances.at(-1) +
+          geodesicDistanceMeters(chain.coordinates[i - 1], chain.coordinates[i]),
+      );
+    sourceChainDistances.set(chain, distances);
+  }
+  const i = sample.sourceSegmentIndex;
+  const fraction = Math.max(
+    0,
+    Math.min(
+      1,
+      coordinateProjectionFraction(
+        sample.coordinate,
+        chain.coordinates[i],
+        chain.coordinates[i + 1],
+      ),
+    ),
+  );
+  const distance = distances[i] + (distances[i + 1] - distances[i]) * fraction;
+  return atStart ? distance : distances.at(-1) - distance;
+}
+
+function physicalSourceEndpoint(chain, opposite, sample, match, atStart) {
+  // A closed chain's array seam is not a physical split or merge.
+  if (chain.startNodeId && chain.startNodeId === chain.endNodeId)
+    return { sample, match };
+  const coordinate = atStart ? chain.coordinates[0] : chain.coordinates.at(-1);
+  if (sourceEndpointClearance(chain, sample, atStart) > PAIR_SEARCH_METERS)
+    return { sample, match };
+  // The pair is already source-proven. Include its physical terminal when the
+  // 50 m selection samples stopped just short of it; do not end at a later
+  // midpoint vertex and force every ramp to redraw that common mainline gap.
+  let best = null;
+  const segments = new Set([match.sourceSegmentIndex]);
+  for (const step of [-1, 1]) {
+    let distance = 0;
+    for (
+      let i = match.sourceSegmentIndex + step;
+      i >= 0 && i + 1 < opposite.coordinates.length;
+      i += step
+    ) {
+      distance += geodesicDistanceMeters(
+        opposite.coordinates[i],
+        opposite.coordinates[i + 1],
+      );
+      segments.add(i);
+      if (distance > PAIR_SEARCH_METERS * 2) break;
+    }
+  }
+  for (const segment of segments) {
+    const i = segment + 1;
+    const a = opposite.coordinates[i - 1],
+      b = opposite.coordinates[i];
+    const terminalSegment = atStart ? 0 : chain.coordinates.length - 2;
+    // Recover only pavement that still satisfies the existing opposing-road
+    // eligibility rule. A diverging one-way fork is not a shared mainline gap.
+    if (
+      dot(
+        vector(
+          chain.coordinates[terminalSegment],
+          chain.coordinates[terminalSegment + 1],
+        ),
+        vector(a, b),
+      ) > -MIN_PAIRED_TANGENT_ALIGNMENT
+    )
+      continue;
+    if (
+      Math.min(
+        geodesicDistanceMeters(a, match.coordinate),
+        geodesicDistanceMeters(b, match.coordinate),
+      ) >
+      PAIR_SEARCH_METERS * 2
+    )
+      continue;
+    const projected = projectCoordinateOntoSegment(coordinate, a, b);
+    const distance = geodesicDistanceMeters(coordinate, projected);
+    if (distance <= PAIR_SEARCH_METERS && (!best || distance < best.distance))
+      best = { coordinate: projected, sourceSegmentIndex: i - 1, distance };
+  }
+  return best
+    ? {
+        sample: {
+          coordinate,
+          sourceSegmentIndex: atStart ? 0 : chain.coordinates.length - 2,
+        },
+        match: best,
+      }
+    : { sample, match };
+}
+
+function sourcePairEndpoint(chain, opposite, sample, match, atStart) {
+  const own = physicalSourceEndpoint(chain, opposite, sample, match, atStart);
+  const other = physicalSourceEndpoint(opposite, chain, match, sample, !atStart);
+  if (other.sample === match) return own;
+  const swapped = { sample: other.match, match: other.sample };
+  if (own.sample === sample) return swapped;
+  const position = (p) =>
+    p.sourceSegmentIndex +
+    coordinateProjectionFraction(
+      p.coordinate,
+      chain.coordinates[p.sourceSegmentIndex],
+      chain.coordinates[p.sourceSegmentIndex + 1],
+    );
+  // Stop at the boundary of the common pavement: the later beginning or the
+  // earlier ending. The result must not depend on which side was paired first.
+  return position(own.sample) >= position(swapped.sample) === atStart ? own : swapped;
 }
 
 function orderedGapContinuation(chain, before, after, start, end, grid, chainById) {
   const opposite = chainById.get(before.chainId);
-  const first = sourceSection(chain, chain.samples[start], chain.samples[end]);
-  const second = sourceSection(opposite, after, before);
+  const firstSection = sourceSection(
+    chain,
+    chain.samples[start],
+    chain.samples[end],
+    false,
+    null,
+    true,
+  );
+  const secondSection = sourceSection(opposite, after, before, false, null, true);
+  const first = firstSection.coordinates;
+  const second = secondSection.coordinates;
   const firstLength = lineLengthMeters(first);
   const secondLength = lineLengthMeters(second);
   if (Math.max(firstLength, secondLength) > MAX_PAIRED_CONTINUATION_LENGTH_METERS)
@@ -546,9 +763,18 @@ function orderedGapContinuation(chain, before, after, start, end, grid, chainByI
         return null;
     }
   }
-  const paired = orderedCarriagewayMidpoints(first, second.toReversed(), maximumWidth);
+  const paired = orderedCarriagewayMidpoints(first, second.toReversed());
+  secondSection.coordinates.reverse();
+  secondSection.positions.reverse();
+  secondSection.direction = -1;
   return (
-    paired && { start, end, chainId: opposite.id, coordinates: paired.coordinates }
+    paired && {
+      start,
+      end,
+      chainId: opposite.id,
+      coordinates: paired.coordinates,
+      sourceCorrespondence: sourceCorrespondence(paired, firstSection, secondSection),
+    }
   );
 }
 
@@ -647,7 +873,55 @@ function continueBoundedCarriagewayPairs(chain, matches, grid, chainById, ordere
   return continuations;
 }
 
-export function buildAveragedMainlines(chains) {
+function projectedEndpointKeys(chain, match) {
+  // The spatial-index sample identifies a segment, not the projected position.
+  // Preserve terminal coverage within half a sampling step on that end segment.
+  return [
+    [0, chain.startNodeId, chain.coordinates[0]],
+    [chain.coordinates.length - 2, chain.endNodeId, chain.coordinates.at(-1)],
+  ].flatMap(([segment, nodeId, coordinate]) =>
+    nodeId &&
+    match.sourceSegmentIndex === segment &&
+    geodesicDistanceMeters(match.coordinate, coordinate) <= SAMPLE_SPACING_METERS / 2
+      ? [`osm-node:${nodeId}`]
+      : [],
+  );
+}
+
+function discoverPairingWitnesses(sampledChains, grid, chainById, onProgress) {
+  // A union of distant route names does not prove these two carriageways are
+  // opposite sides of a road. Discover actual, locally ref-compatible spans
+  // among all eligible candidates before selecting pairs. These witnesses also
+  // preserve asymmetric tags on a continuous pair at real route transitions.
+  const compatiblePairs = new Set();
+  const initialMatches = new Map();
+  for (const [i, chain] of sampledChains.entries()) {
+    if (i % 100 === 0)
+      onProgress({
+        phase: 'pair-mainlines',
+        chainsDone: i,
+        chainsTotal: sampledChains.length,
+      });
+    initialMatches.set(
+      chain.id,
+      chain.samples.map((sample) =>
+        nearestOpposingSample(
+          sample,
+          chain,
+          grid,
+          chainById,
+          PAIR_SEARCH_METERS,
+          compatiblePairs,
+        ),
+      ),
+    );
+  }
+  pairingWitnesses.set(chainById, compatiblePairs);
+
+  return { compatiblePairs, initialMatches };
+}
+
+export function buildAveragedMainlines(chains, onProgress = () => {}) {
   const sampledChains = chains.map(resampleChain);
   const chainById = new Map(sampledChains.map((chain) => [chain.id, chain]));
   const grid = new Map();
@@ -661,15 +935,34 @@ export function buildAveragedMainlines(chains) {
     }
   }
 
+  const { compatiblePairs, initialMatches } = discoverPairingWitnesses(
+    sampledChains,
+    grid,
+    chainById,
+    onProgress,
+  );
+
   const parts = [];
   const pendingOrderedContinuations = [];
   let widePairContinuationCount = 0;
   let widePairSampleCount = 0;
   const endpointsByTopologyKey = new Map();
-  for (const chain of sampledChains) {
-    const matches = chain.samples.map((sample) =>
-      nearestOpposingSample(sample, chain, grid, chainById),
-    );
+  for (const [chainIndex, chain] of sampledChains.entries()) {
+    if (chainIndex % 100 === 0)
+      onProgress({
+        phase: 'pair-mainlines',
+        chainsDone: chainIndex,
+        chainsTotal: sampledChains.length,
+      });
+    const matches = initialMatches
+      .get(chain.id)
+      .map((match, i) =>
+        match?.localRefConflict &&
+        !compatiblePairs.has(pairIdentity(chain.id, match.chainId))
+          ? nearestOpposingSample(chain.samples[i], chain, grid, chainById)
+          : match,
+      );
+    initialMatches.delete(chain.id);
     const continuedMatches = [...matches];
     const orderedGaps = [];
     const continuations = continueBoundedCarriagewayPairs(
@@ -686,8 +979,6 @@ export function buildAveragedMainlines(chains) {
     let matchedChainId = null;
     let runStartSampleIndex = null;
     let runEndSampleIndex = null;
-    let runStartMatchSampleIndex = null;
-    let runEndMatchSampleIndex = null;
     let minimumMatchPosition = Infinity;
     let maximumMatchPosition = -Infinity;
     let priorRunEndTopologyKey = null;
@@ -702,13 +993,7 @@ export function buildAveragedMainlines(chains) {
           runStartSampleIndex === 0 && chain.startNodeId
             ? `osm-node:${chain.startNodeId}`
             : null,
-          runStartMatchSampleIndex === 0 && pairedChain.startNodeId
-            ? `osm-node:${pairedChain.startNodeId}`
-            : null,
-          runStartMatchSampleIndex === pairedChain.samples.length - 1 &&
-          pairedChain.endNodeId
-            ? `osm-node:${pairedChain.endNodeId}`
-            : null,
+          ...projectedEndpointKeys(pairedChain, matches[runStartSampleIndex]),
         ].filter(Boolean);
         const endTopologyKey =
           runEndSampleIndex === chain.samples.length - 1 && chain.endNodeId
@@ -716,43 +1001,86 @@ export function buildAveragedMainlines(chains) {
             : `${chain.id}:sample-boundary:${runEndSampleIndex + 0.5}`;
         const endTopologyKeys = [
           endTopologyKey,
-          runEndMatchSampleIndex === 0 && pairedChain.startNodeId
-            ? `osm-node:${pairedChain.startNodeId}`
-            : null,
-          runEndMatchSampleIndex === pairedChain.samples.length - 1 &&
-          pairedChain.endNodeId
-            ? `osm-node:${pairedChain.endNodeId}`
-            : null,
+          ...projectedEndpointKeys(pairedChain, matches[runEndSampleIndex]),
         ].filter(Boolean);
+        // Use both complete source spans, not independent nearest midpoints.
+        const startPair = sourcePairEndpoint(
+          chain,
+          pairedChain,
+          chain.samples[runStartSampleIndex],
+          matches[runStartSampleIndex],
+          true,
+        );
+        const endPair = sourcePairEndpoint(
+          chain,
+          pairedChain,
+          chain.samples[runEndSampleIndex],
+          matches[runEndSampleIndex],
+          false,
+        );
+        const source = sourceSection(
+          chain,
+          startPair.sample,
+          endPair.sample,
+          false,
+          null,
+          true,
+        );
+        const opposite = sourceSection(
+          pairedChain,
+          endPair.match,
+          startPair.match,
+          matches
+            .slice(runStartSampleIndex, runEndSampleIndex + 1)
+            .some(
+              (match, i, run) =>
+                i > 0 &&
+                match.sourceSegmentIndex - run[i - 1].sourceSegmentIndex >
+                  pairedChain.coordinates.length / 2,
+            ),
+          [minimumMatchPosition, maximumMatchPosition],
+          true,
+        );
+        opposite.coordinates.reverse();
+        opposite.positions.reverse();
+        opposite.direction = -1;
+        const ordered = orderedCarriagewayMidpoints(
+          source.coordinates,
+          opposite.coordinates,
+          { compact: true },
+        );
+        coordinates = ordered?.coordinates ?? coordinates;
+        const startNodeId = source.positions[0] < 1e-9 ? chain.startNodeId : null;
+        const endNodeId =
+          source.positions.at(-1) > chain.coordinates.length - 1 - 1e-9
+            ? chain.endNodeId
+            : null;
+        if (startNodeId) startTopologyKeys.push(`osm-node:${startNodeId}`);
+        if (endNodeId) endTopologyKeys.push(`osm-node:${endNodeId}`);
         const part = {
           coordinates,
-          endNodeId:
-            runEndSampleIndex === chain.samples.length - 1 ? chain.endNodeId : null,
+          ...(ordered
+            ? { sourceCorrespondence: sourceCorrespondence(ordered, source, opposite) }
+            : {}),
+          endNodeId,
           id: `osm-mainline-${parts.length + 1}`,
           role: 'mainline',
           sourceChainId: chain.id,
-          startNodeId: runStartSampleIndex === 0 ? chain.startNodeId : null,
-          startTopologyKeys,
-          endTopologyKeys,
+          startNodeId,
+          startTopologyKeys: [...new Set(startTopologyKeys)],
+          endTopologyKeys: [...new Set(endTopologyKeys)],
           pairedChainId: matchedChainId,
           sourceRanges: [
             {
               chainId: chain.id,
-              positions: [runStartSampleIndex, runEndSampleIndex].map((index) => {
-                const sample = chain.samples[index];
-                return (
-                  sample.sourceSegmentIndex +
-                  coordinateProjectionFraction(
-                    sample.coordinate,
-                    chain.coordinates[sample.sourceSegmentIndex],
-                    chain.coordinates[sample.sourceSegmentIndex + 1],
-                  )
-                );
-              }),
+              positions: [source.positions[0], source.positions.at(-1)],
             },
             {
               chainId: matchedChainId,
-              positions: [minimumMatchPosition, maximumMatchPosition],
+              positions: [
+                opposite.positions.reduce((a, b) => Math.min(a, b), Infinity),
+                opposite.positions.reduce((a, b) => Math.max(a, b), -Infinity),
+              ],
             },
           ],
           sourceWayIds: [
@@ -780,8 +1108,6 @@ export function buildAveragedMainlines(chains) {
       matchedChainId = null;
       runStartSampleIndex = null;
       runEndSampleIndex = null;
-      runStartMatchSampleIndex = null;
-      runEndMatchSampleIndex = null;
       minimumMatchPosition = Infinity;
       maximumMatchPosition = -Infinity;
     };
@@ -808,11 +1134,7 @@ export function buildAveragedMainlines(chains) {
         finishPart();
       }
       if (runStartSampleIndex === null) runStartSampleIndex = sampleIndex;
-      if (runStartMatchSampleIndex === null) {
-        runStartMatchSampleIndex = match.sampleIndex;
-      }
       runEndSampleIndex = sampleIndex;
-      runEndMatchSampleIndex = match.sampleIndex;
       minimumMatchPosition = Math.min(minimumMatchPosition, match.sourcePosition);
       maximumMatchPosition = Math.max(maximumMatchPosition, match.sourcePosition);
       matchedChainId = match.chainId;
@@ -836,18 +1158,40 @@ export function buildAveragedMainlines(chains) {
       before.endTopologyKeys.push(startKey);
       after.startTopologyKeys.push(endKey);
       const partIndex = parts.length;
-      const bridgeCoordinates = [before.coordinates.at(-1)];
-      for (let i = continuation.start + 1; i < continuation.end; i += 1) {
-        bridgeCoordinates.push(
-          midpoint(chain.samples[i].coordinate, continuedMatches[i].coordinate),
-        );
-      }
-      bridgeCoordinates.push(after.coordinates[0]);
+      const firstBridge = sourceSection(
+        chain,
+        chain.samples[continuation.start],
+        chain.samples[continuation.end],
+        false,
+        null,
+        true,
+      );
+      const secondBridge = sourceSection(
+        chainById.get(continuation.chainId),
+        continuedMatches[continuation.end],
+        continuedMatches[continuation.start],
+        false,
+        null,
+        true,
+      );
+      secondBridge.coordinates.reverse();
+      secondBridge.positions.reverse();
+      secondBridge.direction = -1;
+      const bridge = orderedCarriagewayMidpoints(
+        firstBridge.coordinates,
+        secondBridge.coordinates,
+      );
+      const bridgeCoordinates = [
+        before.coordinates.at(-1),
+        ...bridge.coordinates.slice(1, -1),
+        after.coordinates[0],
+      ];
       // Keep existing feature extents: merging long features changes which
       // distant junctions attach to their terminals. The new sampled section
       // joins their exact endpoints through explicit shared topology keys.
       parts.push({
         ...before,
+        sourceCorrespondence: sourceCorrespondence(bridge, firstBridge, secondBridge),
         id: `osm-mainline-${partIndex + 1}`,
         coordinates: bridgeCoordinates,
         startNodeId: null,
@@ -890,6 +1234,7 @@ export function buildAveragedMainlines(chains) {
     after.startTopologyKeys.push(endKey);
     parts.push({
       ...before,
+      sourceCorrespondence: gap.sourceCorrespondence,
       id: `osm-mainline-${partIndex + 1}`,
       coordinates: [
         before.coordinates.at(-1),
@@ -1307,88 +1652,6 @@ function directedConnectorPaths(component, graph, attachments, osm) {
   return paths;
 }
 
-function rampCurveSamples(coordinates) {
-  const lengthMeters = lineLengthMeters(coordinates);
-  const sampleCount = Math.max(
-    3,
-    Math.min(
-      MAX_RAMP_CORRESPONDENCE_SAMPLES,
-      Math.ceil(lengthMeters / RAMP_CORRESPONDENCE_SPACING_METERS) + 1,
-    ),
-  );
-  return resampleCoordinates(
-    coordinates,
-    Math.max(1, lengthMeters / Math.max(1, sampleCount - 1)),
-  );
-}
-
-function rampSourceCurve(coordinates) {
-  const distances = [0];
-  for (let index = 1; index < coordinates.length; index += 1) {
-    distances.push(
-      distances.at(-1) +
-        geodesicDistanceMeters(coordinates[index - 1], coordinates[index]),
-    );
-  }
-  return { coordinates, distances };
-}
-
-function rampPointAlong(curve, distance) {
-  const { coordinates, distances } = curve;
-  let index = 1;
-  while (index < distances.length - 1 && distances[index] < distance) index += 1;
-  const fraction =
-    (distance - distances[index - 1]) / (distances[index] - distances[index - 1] || 1);
-  return {
-    coordinate: coordinates[index - 1].map(
-      (value, axis) => value + (coordinates[index][axis] - value) * fraction,
-    ),
-    direction: vector(coordinates[index - 1], coordinates[index]),
-  };
-}
-
-function rampCorrespondenceWindows(matches) {
-  const windows = [];
-  for (let index = 1; index < matches.length; index += 1) {
-    const before = matches[index - 1];
-    const after = matches[index];
-    const advance = after.oppositeDistance - before.oppositeDistance;
-    const spacing = after.referenceDistance - before.referenceDistance;
-    // A nearest-tangent switch can omit an entire source bend between two
-    // neighboring samples. Ordinary projections and short source corners stay exact.
-    if (advance <= Math.max(75, 4 * spacing)) continue;
-    const margin = Math.max(50, advance / 2);
-    let start = index - 1;
-    let end = index;
-    while (
-      start > 0 &&
-      before.referenceDistance - matches[start].referenceDistance < margin
-    ) {
-      start -= 1;
-    }
-    while (
-      end < matches.length - 1 &&
-      matches[end].referenceDistance - after.referenceDistance < margin
-    ) {
-      end += 1;
-    }
-    if (windows.length && start <= windows.at(-1).end) {
-      windows.at(-1).end = Math.max(end, windows.at(-1).end);
-    } else {
-      windows.push({ start, end });
-    }
-  }
-  return windows;
-}
-
-function rampCorrespondenceSlope(first, last) {
-  return Math.max(
-    0,
-    (last.oppositeDistance - first.oppositeDistance) /
-      (last.referenceDistance - first.referenceDistance),
-  );
-}
-
 function rampBendMetrics(coordinates) {
   let maximum = 0;
   let backwards = 0;
@@ -1406,295 +1669,53 @@ function rampBendMetrics(coordinates) {
   return { maximum, backwards };
 }
 
-function continuousRampCorrespondence(
-  matches,
-  reference,
-  opposite,
-  coordinateForMatch,
-) {
-  const result = [...matches];
-  for (const { start, end } of rampCorrespondenceWindows(matches).toReversed()) {
-    const first = matches[start];
-    const last = matches[end];
-    const referenceSpan = last.referenceDistance - first.referenceDistance;
-    const oppositeSpan = last.oppositeDistance - first.oppositeDistance;
-    if (oppositeSpan <= 0) continue;
-    const slope = oppositeSpan / referenceSpan;
-    let firstSlope =
-      start > 0 ? rampCorrespondenceSlope(matches[start - 1], first) : slope;
-    let lastSlope =
-      end < matches.length - 1
-        ? rampCorrespondenceSlope(last, matches[end + 1])
-        : slope;
-    // Limit Hermite derivatives so correspondence moves forward on both source
-    // paths. Interpolate distance along the roads, never the resulting map line.
-    const slopeNorm = Math.hypot(firstSlope / slope, lastSlope / slope);
-    if (slopeNorm > 3) {
-      firstSlope *= 3 / slopeNorm;
-      lastSlope *= 3 / slopeNorm;
-    }
-    const sampleCount = Math.ceil(
-      (referenceSpan + oppositeSpan) / RAMP_CORRESPONDENCE_SPACING_METERS,
-    );
-    const replacement = [first];
-    let valid = true;
-    for (let index = 1; index < sampleCount; index += 1) {
-      const t = index / sampleCount;
-      const referenceDistance = first.referenceDistance + t * referenceSpan;
-      const oppositeDistance =
-        (2 * t ** 3 - 3 * t ** 2 + 1) * first.oppositeDistance +
-        (t ** 3 - 2 * t ** 2 + t) * referenceSpan * firstSlope +
-        (-2 * t ** 3 + 3 * t ** 2) * last.oppositeDistance +
-        (t ** 3 - t ** 2) * referenceSpan * lastSlope;
-      const sample = rampPointAlong(reference, referenceDistance);
-      const paired = rampPointAlong(opposite, oppositeDistance);
-      // A skipped loop can contain travel in the opposite direction. It must
-      // not be pulled into a different movement just to make correspondence continuous.
-      if (dot(sample.direction, paired.direction) < 0.25) {
-        valid = false;
-        break;
-      }
-      replacement.push({
-        referenceDistance,
-        oppositeDistance,
-        sample: sample.coordinate,
-        opposite: paired.coordinate,
-      });
-    }
-    if (!valid) continue;
-    replacement.push(last);
-    const before = start > 0 ? [matches[start - 1]] : [];
-    const after = end < matches.length - 1 ? [matches[end + 1]] : [];
-    const oldCoordinates = [...before, ...matches.slice(start, end + 1), ...after].map(
-      coordinateForMatch,
-    );
-    const newCoordinates = [...before, ...replacement, ...after].map(
-      coordinateForMatch,
-    );
-    // Include the joins to untouched samples: a repaired bend cannot introduce
-    // a sharper corner or a backward turn at the edge of its correspondence window.
-    if (
-      rampBendMetrics(newCoordinates).maximum >
-      rampBendMetrics(oldCoordinates).maximum + 1e-4
-    )
-      continue;
-    result.splice(start, end - start + 1, ...replacement);
-  }
-  return result;
-}
-
-function repairReversingRamp(coordinates, first, second, start, end) {
-  const before = rampBendMetrics(coordinates);
-  if (!before.backwards) return coordinates;
-  // Independent nearest projections can revisit an earlier section of an
-  // asymmetric ramp. Use the same ordered, tangent-compatible correspondence
-  // as mainlines only when the original midpoint actually turns backwards.
-  const ordered = orderedCarriagewayMidpoints(
-    first,
-    second,
-    MAX_RECIPROCAL_ENDPOINT_GAP_METERS,
-  );
-  if (!ordered) return coordinates;
-  const candidate = [start, ...ordered.coordinates.slice(1, -1), end];
-  const after = rampBendMetrics(candidate);
-  if (
-    after.backwards ||
-    after.maximum >= before.maximum ||
-    hasProperSelfIntersection(candidate)
-  )
-    return coordinates;
-  return candidate;
-}
-
-/**
- * Closest tangent-aligned projections supply the correspondence anchors. When
- * their source positions jump across a bend, continue monotonically along both
- * carriageways through that bend before taking their WGS84 midpoints. Both
- * inputs run in the same direction; endpoints and final midpoints are never warped.
- */
-function reciprocalPathMidpoints(
-  firstCoordinates,
-  secondCoordinates,
-  startCoordinate,
-  endCoordinate,
-  monotone = false,
-) {
-  const [reference, opposite] =
-    lineLengthMeters(firstCoordinates) <= lineLengthMeters(secondCoordinates)
-      ? [firstCoordinates, secondCoordinates]
-      : [secondCoordinates, firstCoordinates];
-  const referenceCurve = rampSourceCurve(reference);
-  const oppositeCurve = rampSourceCurve(opposite);
-  const segments = opposite.slice(1).map((end, index) => ({
-    start: opposite[index],
-    end,
-    distanceAlong: oppositeCurve.distances[index],
-    direction: vector(opposite[index], end),
-  }));
-  const matches = [];
-  for (const sample of rampCurveSamples(reference)) {
-    let best = null;
-    for (const segment of segments) {
-      if (dot(sample.direction, segment.direction) < MIN_PAIRED_TANGENT_ALIGNMENT)
-        continue;
-      const projected = projectCoordinateOntoSegment(
-        sample.coordinate,
-        segment.start,
-        segment.end,
-      );
-      const oppositeDistance =
-        segment.distanceAlong + geodesicDistanceMeters(segment.start, projected);
-      if (
-        monotone &&
-        matches.length &&
-        oppositeDistance < matches.at(-1).oppositeDistance - 0.01
-      )
-        continue;
-      const distanceMeters = geodesicDistanceMeters(sample.coordinate, projected);
-      if (!best || distanceMeters < best.distanceMeters) {
-        best = {
-          opposite: projected,
-          oppositeDistance,
-          distanceMeters,
-        };
-      }
-    }
-    if (best)
-      matches.push({
-        ...best,
-        sample: sample.coordinate,
-        referenceDistance: sample.distanceMeters,
-      });
-  }
-  const length = referenceCurve.distances.at(-1);
-  const coordinateForMatch = (match) => {
-    if (match.referenceDistance === 0) return startCoordinate;
-    if (Math.abs(match.referenceDistance - length) < 1e-6) return endCoordinate;
-    return midpoint(match.sample, match.opposite);
-  };
-  const paired = continuousRampCorrespondence(
-    matches,
-    referenceCurve,
-    oppositeCurve,
-    coordinateForMatch,
-  );
-  const midpointCoordinates = (correspondence) => {
-    const coordinates = [startCoordinate];
-    for (const match of correspondence) {
-      if (
-        match.referenceDistance === 0 ||
-        Math.abs(match.referenceDistance - length) < 1e-6
-      )
-        continue;
-      const coordinate = coordinateForMatch(match);
-      if (geodesicDistanceMeters(coordinates.at(-1), coordinate) > 0.25)
-        coordinates.push(coordinate);
-    }
-    coordinates.push(endCoordinate);
-    return coordinates;
-  };
-  const coordinates = midpointCoordinates(paired);
-  if (
-    paired.length === matches.length &&
-    paired.every((match, index) => match === matches[index])
-  )
-    return repairReversingRamp(
-      coordinates,
-      reference,
-      opposite,
-      startCoordinate,
-      endCoordinate,
-    );
-  const original = midpointCoordinates(matches);
-  const before = rampBendMetrics(original);
-  const after = rampBendMetrics(coordinates);
-  // Check the complete output after endpoint attachment and duplicate removal.
-  // Even a locally regular correspondence can intersect another part of a loop.
-  if (
-    after.backwards > before.backwards ||
-    after.maximum > before.maximum + 1e-4 ||
-    (hasProperSelfIntersection(coordinates) && !hasProperSelfIntersection(original))
-  )
-    return repairReversingRamp(
-      original,
-      reference,
-      opposite,
-      startCoordinate,
-      endCoordinate,
-    );
-  return repairReversingRamp(
-    coordinates,
-    reference,
-    opposite,
-    startCoordinate,
-    endCoordinate,
+export function validInferredRampGeometry(coordinates, throughMainline, first, second) {
+  // A paired cloverleaf may inherit a smooth loop that crosses itself. That
+  // crossing is not a junction and must not erase source-proven connectivity.
+  return (
+    !rampBendMetrics(coordinates).backwards &&
+    (!throughMainline || throughConnectionExtendsMainline(coordinates, first, second))
   );
 }
 
-function trimRampAttachmentOverhangs(coordinates) {
-  // A projected mainline attachment can fall just beyond the first sampled
-  // midpoint. Keep the attachment and the remaining source midpoints, without
-  // making a short excursion behind the attachment before following the ramp.
-  const result = [...coordinates];
-  for (const reverse of [false, true]) {
-    if (reverse) result.reverse();
-    while (result.length > 2) {
-      const [attachment, sample, next] = result;
-      if (
-        geodesicDistanceMeters(attachment, sample) >
-          RAMP_CORRESPONDENCE_SPACING_METERS ||
-        dot(vector(attachment, sample), vector(sample, next)) >= 0 ||
-        dot(vector(attachment, next), vector(sample, next)) < 0
-      )
-        break;
-      result.splice(1, 1);
-    }
-    if (reverse) result.reverse();
-  }
-  return result;
-}
-
-function directionalReciprocalPathCoordinates(first, second, start, end) {
-  const coordinates = trimRampAttachmentOverhangs(
-    reciprocalPathMidpoints(first, second, start, end),
-  );
-  const before = rampBendMetrics(coordinates);
-  if (!before.backwards) return coordinates;
-  // A shorter collector can expose an earlier loop to independent nearest
-  // projections. Search only forward along the opposite source path on retry.
-  // This keeps tangent-qualified source midpoints instead of smoothing the line.
-  const candidate = trimRampAttachmentOverhangs(
-    reciprocalPathMidpoints(first, second, start, end, true),
-  );
-  const after = rampBendMetrics(candidate);
-  if (
-    after.backwards >= before.backwards ||
-    after.maximum >= before.maximum ||
-    hasProperSelfIntersection(candidate)
-  )
-    return coordinates;
-  return candidate;
-}
-
+// Source pairing and explicit topology are already established here. Geometry
+// uses the same ordered correspondence and 200 m taper for every road role.
 export function averageReciprocalPathCoordinates(first, second, start, end) {
-  const coordinates = directionalReciprocalPathCoordinates(first, second, start, end);
-  const before = rampBendMetrics(coordinates);
-  if (!before.backwards) return coordinates;
-  // A cutoff around a loop can give the forward correspondence a different
-  // set of closest tangent anchors. Try the same source calculation from the
-  // other end; retain it only when the complete attached curve improves.
-  const candidate = directionalReciprocalPathCoordinates(
-    first.toReversed(),
-    second.toReversed(),
-    end,
+  const result = orderedCarriagewayMidpoints(first, second);
+  if (!result) return [start, end];
+  const points = result.coordinates;
+  const projection = (target, from, to) => {
+    let best = { distance: Infinity, position: from };
+    for (let i = from; i < to; i++) {
+      const point = projectCoordinateOntoSegment(target, points[i], points[i + 1]);
+      const distance = geodesicDistanceMeters(target, point);
+      if (distance < best.distance)
+        best = {
+          distance,
+          position: i + coordinateProjectionFraction(point, points[i], points[i + 1]),
+        };
+    }
+    return best.position;
+  };
+  const startPosition = projection(
     start,
-  ).reverse();
-  const after = rampBendMetrics(candidate);
-  return after.backwards < before.backwards &&
-    after.maximum < before.maximum &&
-    !hasProperSelfIntersection(candidate)
-    ? candidate
-    : coordinates;
+    0,
+    Math.max(1, Math.ceil((points.length - 1) / 2)),
+  );
+  const last = projection(end, Math.floor((points.length - 1) / 2), points.length - 1);
+  const attachmentClearance = Math.min(20, lineLengthMeters(points) / 4);
+  const coordinates = [
+    start,
+    ...points.filter(
+      (p, i) =>
+        i > startPosition &&
+        i < last &&
+        geodesicDistanceMeters(p, start) > attachmentClearance &&
+        geodesicDistanceMeters(p, end) > attachmentClearance,
+    ),
+    end,
+  ];
+  return coordinates;
 }
 
 function travelDirectionAtNode(coordinates, nodeIndex) {
@@ -1897,6 +1918,122 @@ export function shortenReciprocalMatches(matches, candidates, groupByPartIndex) 
   return pairs;
 }
 
+export function selectShortestAuxiliaryRampOptions(
+  pairs,
+  groupByPartIndex,
+  { parts, chains, connectorWays, osm },
+) {
+  const auxiliaryWays = new Set(
+    connectorWays
+      .filter((way) => isAuxiliaryCarriageway(way.tags ?? {}))
+      .map((way) => way.id),
+  );
+  const auxiliary = (pair) =>
+    pair.some((path) => path.sourceWayIds.some((id) => auxiliaryWays.has(id)));
+  if (!pairs.some(auxiliary)) return pairs;
+
+  // Compare actual directed source intervals, rather than a radius around
+  // ramp endpoints. An express/CD road can rejoin the same carriageway far
+  // beyond the shorter local movement, but another interchange or quadrant
+  // must never be discarded merely because it has the same highway names.
+  const byId = new Map(chains.map((chain) => [chain.id, chain]));
+  const indices = new Map();
+  const index = (id) => {
+    if (indices.has(id)) return indices.get(id);
+    const chain = byId.get(id);
+    if (!chain) return null;
+    const positions = new Map();
+    const blocked = [0];
+    for (const [i, nodeId] of chain.nodeIds.entries()) {
+      const entries = positions.get(nodeId) ?? [];
+      entries.push(i);
+      positions.set(nodeId, entries);
+      blocked.push(
+        blocked.at(-1) + Number(blockingTrafficSignal(osm.nodes.get(nodeId))),
+      );
+    }
+    const result = { chain, positions, blocked };
+    indices.set(id, result);
+    return result;
+  };
+  const advances = (id, first, second) => {
+    const entry = index(id);
+    return (
+      entry &&
+      (entry.positions.get(first) ?? []).some((a) =>
+        (entry.positions.get(second) ?? []).some(
+          (b) => a <= b && entry.blocked[b + 1] === entry.blocked[a],
+        ),
+      )
+    );
+  };
+  const sameGroup = (a, b) =>
+    (groupByPartIndex.get(a.partIndex) ?? a.partIndex) ===
+    (groupByPartIndex.get(b.partIndex) ?? b.partIndex);
+  const inside = (short, long) =>
+    ['firstAttachment', 'secondAttachment'].every((end) => {
+      const a = short[end],
+        b = long[end];
+      return (
+        sameGroup(a, b) &&
+        (a.carriagewayIds ?? []).some(
+          (id) =>
+            b.carriagewayIds?.includes(id) &&
+            (end === 'firstAttachment'
+              ? advances(id, b.nodeId, a.nodeId)
+              : advances(id, a.nodeId, b.nodeId)),
+        )
+      );
+    });
+  const keys = (part) =>
+    new Set([
+      ...(part.startTopologyKeys ?? []),
+      ...(part.endTopologyKeys ?? []),
+      ...(part.topologyCoordinates ?? []).map((entry) => entry.key),
+    ]);
+  const direct = (path) => {
+    const first = path.firstAttachment,
+      second = path.secondAttachment;
+    if (sameGroup(first, second)) return false;
+    const firstKeys = keys(parts[first.partIndex]);
+    if (![...keys(parts[second.partIndex])].some((key) => firstKeys.has(key)))
+      return false;
+    // A direct mainline merge has no intervening ramp distance. Require a
+    // source-proven forward connection on BOTH reciprocal carriageways and
+    // an already established midpoint junction before preferring it.
+    return (first.carriagewayIds ?? []).some((a) =>
+      (second.carriagewayIds ?? []).some((b) => {
+        if (a === b) return false;
+        const source = index(a),
+          target = index(b);
+        if (!source || !target) return false;
+        return source.chain.nodeIds.some(
+          (nodeId, i) =>
+            i > 0 &&
+            advances(a, first.nodeId, nodeId) &&
+            (target.positions.get(nodeId) ?? []).some(
+              (j) =>
+                j < target.chain.nodeIds.length - 1 &&
+                advances(b, nodeId, second.nodeId),
+            ),
+        );
+      }),
+    );
+  };
+  const distance = (pair) => pair[0].distanceMeters + pair[1].distanceMeters;
+  return pairs.filter((pair) => {
+    if (auxiliary(pair) && pair.every(direct)) return false;
+    return !pairs.some(
+      (other) =>
+        (auxiliary(pair) || auxiliary(other)) &&
+        distance(other) < distance(pair) - 0.001 &&
+        [other, other.toReversed()].some((oriented) =>
+          pair.every((path, direction) => inside(oriented[direction], path)),
+        ),
+    );
+  });
+}
+
 function mainlineLegContinuation(osm, parts, chains, graph) {
   // Opposing ramp joins can straddle a change of paired source intervals.
   // Follow actual motorway pavement near those ends to find a median interval
@@ -2094,7 +2231,7 @@ export function findReciprocalMainlineContinuations({
   );
 }
 
-function reciprocalPathPairs(paths, groupByPartIndex, pairedChains) {
+export function reciprocalPathPairs(paths, groupByPartIndex, pairedChains) {
   const groups = new Map();
   for (const [pathIndex, path] of paths.entries()) {
     const firstPartIndex = path.firstAttachment.partIndex;
@@ -2102,26 +2239,32 @@ function reciprocalPathPairs(paths, groupByPartIndex, pairedChains) {
     const firstGroup = groupByPartIndex.get(firstPartIndex) ?? firstPartIndex;
     const secondGroup = groupByPartIndex.get(secondPartIndex) ?? secondPartIndex;
     const sameGroup = firstGroup === secondGroup;
-    const lowGroup = sameGroup
-      ? Math.min(firstPartIndex, secondPartIndex)
-      : Math.min(firstGroup, secondGroup);
-    const highGroup = sameGroup
-      ? Math.max(firstPartIndex, secondPartIndex)
-      : Math.max(firstGroup, secondGroup);
-    const key = `${lowGroup}:${highGroup}`;
-    const group = groups.get(key) ?? { forward: [], reverse: [] };
-    const forward = sameGroup ? firstPartIndex === lowGroup : firstGroup === lowGroup;
-    (forward ? group.forward : group.reverse).push({
-      path,
-      pathIndex,
-    });
-    groups.set(key, group);
+    const firstIds = sameGroup
+      ? (path.firstAttachment.pairingPartIndices ?? [firstPartIndex])
+      : [firstGroup];
+    const secondIds = sameGroup
+      ? (path.secondAttachment.pairingPartIndices ?? [secondPartIndex])
+      : [secondGroup];
+    const seen = new Set();
+    for (const first of firstIds)
+      for (const second of secondIds) {
+        const lowGroup = Math.min(first, second),
+          highGroup = Math.max(first, second);
+        const key = `${lowGroup}:${highGroup}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const group = groups.get(key) ?? { forward: [], reverse: [] };
+        (first === lowGroup ? group.forward : group.reverse).push({ path, pathIndex });
+        groups.set(key, group);
+      }
   }
 
-  const used = new Set();
   const pairs = [];
   const alternativeCandidates = [];
   for (const group of groups.values()) {
+    // A directional collector may serve several external movements. Match
+    // within each pair of highway legs; deduplicate complete movements below.
+    const used = new Set();
     const candidates = [];
     for (const first of group.forward) {
       for (const second of group.reverse) {
@@ -2328,9 +2471,11 @@ function mainlineExtension(osm, graph, attachment, target, part, backwards) {
   if (direction && backwards) direction = direction.map((value) => -value);
   const visited = new Set([nodeId]);
   const coordinates = [origin];
+  const nodeIds = [attachment.nodeId];
   let best = {
     distance: geodesicDistanceMeters(origin, target),
     coordinates: [origin],
+    nodeIds: [attachment.nodeId],
   };
   let traversed = 0;
   while (traversed < maximumDistance) {
@@ -2354,36 +2499,56 @@ function mainlineExtension(osm, graph, attachment, target, part, backwards) {
     const projected = projectCoordinateOntoSegment(target, coordinate, next.coordinate);
     const distance = geodesicDistanceMeters(projected, target);
     if (distance < best.distance) {
-      best = { distance, coordinates: [...coordinates, projected] };
+      best = {
+        distance,
+        coordinates: [...coordinates, projected],
+        nodeIds: [...nodeIds, null],
+      };
     }
     traversed += geodesicDistanceMeters(coordinate, next.coordinate);
     coordinate = next.coordinate;
     nodeId = next.nextNodeId;
     direction = next.direction;
     coordinates.push(coordinate);
+    nodeIds.push(nodeId);
     visited.add(nodeId);
   }
-  return best.coordinates;
+  return best;
 }
 
-function extendReciprocalPath(osm, path, start, end, parts, graph) {
-  const before = mainlineExtension(
-    osm,
-    graph.backward,
-    path.firstAttachment,
-    start,
-    parts[path.firstAttachment.partIndex],
-    true,
-  );
-  const after = mainlineExtension(
-    osm,
-    graph.forward,
-    path.secondAttachment,
-    end,
-    parts[path.secondAttachment.partIndex],
-    false,
-  );
-  return [...before.reverse().slice(0, -1), ...path.coordinates, ...after.slice(1)];
+function extendReciprocalPath(osm, path, start, end, parts, graph, chains) {
+  const before =
+    sourceExtensionPath(path.firstAttachment, start, chains, true) ??
+    mainlineExtension(
+      osm,
+      graph.backward,
+      path.firstAttachment,
+      osm.nodes.get(start.nodeId).coordinate,
+      parts[path.firstAttachment.partIndex],
+      true,
+    );
+  const after =
+    sourceExtensionPath(path.secondAttachment, end, chains, false) ??
+    mainlineExtension(
+      osm,
+      graph.forward,
+      path.secondAttachment,
+      osm.nodes.get(end.nodeId).coordinate,
+      parts[path.secondAttachment.partIndex],
+      false,
+    );
+  return {
+    coordinates: [
+      ...before.coordinates.toReversed().slice(0, -1),
+      ...path.coordinates,
+      ...after.coordinates.slice(1),
+    ],
+    nodeIds: [
+      ...before.nodeIds.toReversed().slice(0, -1),
+      ...path.nodeIds,
+      ...after.nodeIds.slice(1),
+    ],
+  };
 }
 
 function topologyCoordinate(part, coordinate, key) {
@@ -2402,17 +2567,19 @@ function insertPartProjections(parts, insertionsByPart) {
       bySegment.set(insertion.segmentIndex, entries);
     }
     const coordinates = [];
+    const append = (coordinate) => {
+      if (coordinates.at(-1)?.join() !== coordinate.join())
+        coordinates.push(coordinate);
+    };
     for (let index = 0; index < part.coordinates.length - 1; index += 1) {
-      coordinates.push(part.coordinates[index]);
+      append(part.coordinates[index]);
       for (const insertion of (bySegment.get(index) ?? []).sort(
         (first, second) => first.distanceAlongMeters - second.distanceAlongMeters,
       )) {
-        if (geodesicDistanceMeters(coordinates.at(-1), insertion.coordinate) > 0.25) {
-          coordinates.push(insertion.coordinate);
-        }
+        append(insertion.coordinate);
       }
     }
-    coordinates.push(part.coordinates.at(-1));
+    append(part.coordinates.at(-1));
     part.coordinates = coordinates;
   }
 }
@@ -2618,15 +2785,12 @@ export function buildOsmSourceTopologyGraph(osm, averagedParts) {
   };
 }
 
-export function buildPairedOsmSourceTopologyGraph(osm, averagedParts) {
-  if (!osm) throw new Error('OSM mainline topology is required.');
-  const prepared = prepareWays(osm);
-  const sourceNodes = indexPartsBySourceNode(
-    averagedParts,
-    traceMotorwayChains(prepared.mainlines),
-  );
-  const sourceWayIdToPartIndices = indexPartsBySourceWay(averagedParts);
-  const partSegmentGrid = buildPartSegmentGrid(averagedParts);
+// Compatibility entry point: source roads are deliberately not read here.
+export function buildPairedOsmSourceTopologyGraph(_osm, averagedParts) {
+  return buildMidpointTopologyGraph(finalizeMidpointTopology(averagedParts));
+}
+
+export function buildMidpointTopologyGraph(averagedParts) {
   const coordinateByNodeId = new Map();
   const graphParts = [];
   const edges = [];
@@ -2648,166 +2812,94 @@ export function buildPairedOsmSourceTopologyGraph(osm, averagedParts) {
     return edges.length - 1;
   };
 
-  const mappedMainlineNodeByOsmNodeId = new Map();
-  const mappedCenterNodesByPartIndex = new Map();
-  const mappedCenterNode = (partIndex, vertexIndex) => {
-    const id = `center:${partIndex}:${vertexIndex}`;
-    const entries = mappedCenterNodesByPartIndex.get(partIndex) ?? new Map();
-    entries.set(vertexIndex, id);
-    mappedCenterNodesByPartIndex.set(partIndex, entries);
-    const node = {
-      coordinate: averagedParts[partIndex].coordinates[vertexIndex],
-      id,
-      partIndex,
-      vertexIndex,
-    };
-    coordinateByNodeId.set(node.id, node.coordinate);
-    return node;
-  };
-  for (const way of prepared.mainlines) {
-    const eligiblePartIndices = new Set(sourceWayIdToPartIndices.get(way.id) ?? []);
-    const graphNodes = way.nodeIds.map((nodeId) => {
-      const cached = mappedMainlineNodeByOsmNodeId.get(nodeId);
-      if (cached) return cached;
-      const sourceCoordinate = osm.nodes.get(nodeId).coordinate;
-      const attachment =
-        eligiblePartIndices.size > 0
-          ? attachmentForNode({
-              grid: partSegmentGrid,
-              mainlinePartIndices: supportedPartsAtNode(
-                averagedParts,
-                eligiblePartIndices,
-                sourceNodes,
-                nodeId,
-              ),
-              nodeCoordinate: sourceCoordinate,
-            })
-          : null;
-      const node = attachment
-        ? (() => {
-            const part = averagedParts[attachment.partIndex];
-            const segmentStart = part.coordinates[attachment.segmentIndex];
-            const segmentEnd = part.coordinates[attachment.segmentIndex + 1];
-            const vertexIndex =
-              geodesicDistanceMeters(attachment.coordinate, segmentStart) <=
-              geodesicDistanceMeters(attachment.coordinate, segmentEnd)
-                ? attachment.segmentIndex
-                : attachment.segmentIndex + 1;
-            return mappedCenterNode(attachment.partIndex, vertexIndex);
-          })()
-        : {
-            coordinate: sourceCoordinate,
-            id: `osm-mainline:${nodeId}`,
-          };
-      mappedMainlineNodeByOsmNodeId.set(nodeId, node);
-      coordinateByNodeId.set(node.id, node.coordinate);
-      return node;
-    });
-    const partIndex = graphParts.length;
+  // Geometry is emitted once from the paired midlines. Source-way sampling must
+  // never reconstruct it or add shortcuts between parts.
+  const mappedCenterNode = (partIndex, vertexIndex) => ({
+    coordinate: averagedParts[partIndex].coordinates[vertexIndex],
+    id: `center:${partIndex}:${vertexIndex}`,
+  });
+  const mainlineIndices = new Set();
+  const graphPartByMainline = new Map();
+  for (const [partIndex, part] of averagedParts.entries()) {
+    if (part.role !== 'mainline' || part.explicitMainlineMerge) continue;
+    mainlineIndices.add(partIndex);
+    const graphPartIndex = graphParts.length;
+    graphPartByMainline.set(partIndex, graphPartIndex);
     graphParts.push({
-      id: `osm-source-mainline-${way.id}`,
-      role: 'mainline',
-      sourceWayIds: [way.id],
-      tokens: [...way.tokens],
+      id: part.id,
+      role: part.role,
+      sourceWayIds: part.sourceWayIds,
+      tokens: part.tokens,
     });
-    for (let index = 1; index < graphNodes.length; index += 1) {
-      const fromNode = graphNodes[index - 1];
-      const toNode = graphNodes[index];
-      if (fromNode.partIndex !== undefined && fromNode.partIndex === toNode.partIndex) {
-        const direction = Math.sign(toNode.vertexIndex - fromNode.vertexIndex);
-        let currentNode = fromNode;
-        for (
-          let vertexIndex = fromNode.vertexIndex + direction;
-          direction !== 0 &&
-          (direction > 0
-            ? vertexIndex <= toNode.vertexIndex
-            : vertexIndex >= toNode.vertexIndex);
-          vertexIndex += direction
-        ) {
-          const nextNode = mappedCenterNode(fromNode.partIndex, vertexIndex);
-          addEdge(currentNode.id, nextNode.id, partIndex);
-          currentNode = nextNode;
-        }
-      } else {
-        addEdge(fromNode.id, toNode.id, partIndex);
-      }
+    for (let vertex = 0; vertex < part.coordinates.length; vertex += 1) {
+      const node = mappedCenterNode(partIndex, vertex);
+      coordinateByNodeId.set(node.id, node.coordinate);
+      if (vertex > 0)
+        addEdge(mappedCenterNode(partIndex, vertex - 1).id, node.id, graphPartIndex);
     }
   }
-
-  const attachmentPartIndexByMainlinePartIndex = new Map();
-  const attachmentPartIndex = (mainlinePartIndex) => {
-    const existing = attachmentPartIndexByMainlinePartIndex.get(mainlinePartIndex);
-    if (existing !== undefined) return existing;
-    const partIndex = graphParts.length;
-    const mainlinePart = averagedParts[mainlinePartIndex];
-    graphParts.push({
-      id: `osm-centerline-attachment-${mainlinePartIndex}`,
-      role: 'mainline',
-      sourceWayIds: mainlinePart.sourceWayIds,
-      tokens: mainlinePart.tokens,
-    });
-    attachmentPartIndexByMainlinePartIndex.set(mainlinePartIndex, partIndex);
-    return partIndex;
+  const exactMappedMainlineNode = (partIndex, coordinate) => {
+    if (!mainlineIndices.has(partIndex))
+      throw new Error(`Missing midpoint mainline ${partIndex}.`);
+    const vertex = averagedParts[partIndex].coordinates.findIndex(
+      (point) => point[0] === coordinate[0] && point[1] === coordinate[1],
+    );
+    if (vertex < 0)
+      throw new Error(
+        `Attachment is not an exact midpoint vertex on ${averagedParts[partIndex].id}.`,
+      );
+    return mappedCenterNode(partIndex, vertex);
   };
-  const exactMappedMainlineNode = (mainlinePartIndex, coordinate) => {
-    const candidates = mappedCenterNodesByPartIndex.get(mainlinePartIndex);
-    if (!candidates || candidates.size === 0) {
-      throw new Error(
-        `Paired ramp has no mapped mainline nodes on part ${mainlinePartIndex}.`,
-      );
-    }
-    let best = null;
-    for (const [vertexIndex, nodeId] of candidates) {
-      const candidateCoordinate =
-        averagedParts[mainlinePartIndex].coordinates[vertexIndex];
-      const distanceMeters = geodesicDistanceMeters(coordinate, candidateCoordinate);
-      if (!best || distanceMeters < best.distanceMeters) {
-        best = { coordinate: candidateCoordinate, distanceMeters, nodeId, vertexIndex };
-      }
-    }
-    const mainlinePart = averagedParts[mainlinePartIndex];
-    let targetVertexIndex = 0;
-    let targetDistanceMeters = Infinity;
-    for (const [
-      vertexIndex,
-      candidateCoordinate,
-    ] of mainlinePart.coordinates.entries()) {
-      const distanceMeters = geodesicDistanceMeters(coordinate, candidateCoordinate);
-      if (distanceMeters < targetDistanceMeters) {
-        targetDistanceMeters = distanceMeters;
-        targetVertexIndex = vertexIndex;
-      }
-    }
-    if (targetDistanceMeters > 1) {
-      throw new Error(
-        `Paired ramp endpoint is not a vertex of mainline part ${mainlinePartIndex}.`,
-      );
-    }
-    const direction = Math.sign(targetVertexIndex - best.vertexIndex);
-    let currentNode = best;
-    const partIndex = attachmentPartIndex(mainlinePartIndex);
-    for (
-      let vertexIndex = best.vertexIndex + direction;
-      direction !== 0 &&
-      (direction > 0
-        ? vertexIndex <= targetVertexIndex
-        : vertexIndex >= targetVertexIndex);
-      vertexIndex += direction
+  const join = (first, second, partIndex) => {
+    if (
+      first.coordinate[0] !== second.coordinate[0] ||
+      first.coordinate[1] !== second.coordinate[1]
     ) {
-      const nextNode = mappedCenterNode(mainlinePartIndex, vertexIndex);
-      addEdge(currentNode.nodeId, nextNode.id, partIndex);
-      currentNode = { ...nextNode, nodeId: nextNode.id };
+      throw new Error(
+        `Explicit midpoint seam has different coordinates: ${first.id}, ${second.id}.`,
+      );
     }
-    return direction === 0
-      ? {
-          coordinate: best.coordinate,
-          id: best.nodeId,
-        }
-      : {
-          coordinate: currentNode.coordinate,
-          id: currentNode.nodeId,
-        };
+    // A zero-length topological link preserves both parts' vertex identities.
+    addEdge(first.id, second.id, graphPartByMainline.get(partIndex));
   };
+  const topologyOwners = new Map();
+  const register = (key, node, partIndex) => {
+    const prior = topologyOwners.get(key);
+    if (prior) join(prior, node, partIndex);
+    else topologyOwners.set(key, node);
+  };
+  const partIndexById = new Map(averagedParts.map((part, index) => [part.id, index]));
+  for (const partIndex of mainlineIndices) {
+    const part = averagedParts[partIndex];
+    for (const key of part.startTopologyKeys ?? [])
+      register(key, mappedCenterNode(partIndex, 0), partIndex);
+    for (const key of part.endTopologyKeys ?? [])
+      register(
+        key,
+        mappedCenterNode(partIndex, part.coordinates.length - 1),
+        partIndex,
+      );
+    for (const entry of part.topologyCoordinates ?? [])
+      register(
+        entry.key,
+        exactMappedMainlineNode(partIndex, entry.coordinate),
+        partIndex,
+      );
+    for (const [neighborId, vertex, end] of [
+      [part.continuationEndpoints?.beforeId, 0, 'last'],
+      [part.continuationEndpoints?.afterId, part.coordinates.length - 1, 'first'],
+    ]) {
+      const neighborIndex = partIndexById.get(neighborId);
+      if (!mainlineIndices.has(neighborIndex)) continue;
+      const neighborVertex =
+        end === 'last' ? averagedParts[neighborIndex].coordinates.length - 1 : 0;
+      join(
+        mappedCenterNode(partIndex, vertex),
+        mappedCenterNode(neighborIndex, neighborVertex),
+        partIndex,
+      );
+    }
+  }
 
   const turnJunctions = new Map();
   const pairedConnectors = averagedParts.filter(
@@ -2836,6 +2928,7 @@ export function buildPairedOsmSourceTopologyGraph(osm, averagedParts) {
     graphParts.push({
       id: connector.id,
       role: connector.role,
+      explicitMainlineMerge: Boolean(connector.explicitMainlineMerge),
       sourceWayIds: connector.sourceWayIds,
       tokens: connector.tokens,
     });
@@ -2909,7 +3002,7 @@ export function buildPairedOsmSourceTopologyGraph(osm, averagedParts) {
       sourceTerminalMainlinePartCount: pairedConnectors.filter(
         (part) => part.role === 'mainline',
       ).length,
-      sourceMainlinePartCount: prepared.mainlines.length,
+      sourceMainlinePartCount: mainlineIndices.size,
     },
   };
   pruneUnusableTerminalContinuations(result, averagedParts);
@@ -3486,6 +3579,7 @@ function rampAttachmentResolver(
   continuationGraph,
   sourceNodes,
   rampGraph,
+  chainById,
 ) {
   const groups = mainlineGroupByPartIndex(parts);
   const partsByGroup = new Map();
@@ -3614,17 +3708,37 @@ function rampAttachmentResolver(
   };
   const repairs = [];
   const originalByNode = new Map();
+  const sourceAttachment = (nodeId, indices) => {
+    let best = null;
+    for (const partIndex of indices) {
+      const source = sourceMidpointAttachment(parts[partIndex], nodeId, chainById);
+      if (!source || (best && source.gap >= best.sourceGap)) continue;
+      const attachment = attachmentForNode({
+        grid,
+        mainlinePartIndices: new Set([partIndex]),
+        nodeCoordinate: source.coordinate,
+      });
+      if (attachment)
+        best = {
+          ...attachment,
+          sourceTargets: source.sourceTargets,
+          sourceGap: source.gap,
+        };
+    }
+    return best;
+  };
   const resolve = (nodeId, directParts) => {
     const nodeCoordinate = osm.nodes.get(nodeId).coordinate;
     const direct =
       directParts.size === 0
         ? null
-        : attachmentForNode({
+        : (sourceAttachment(nodeId, directParts) ??
+          attachmentForNode({
             grid,
             mainlinePartIndices: directParts,
             maximumDistanceMeters: MAX_RECIPROCAL_ENDPOINT_GAP_METERS,
             nodeCoordinate,
-          });
+          }));
     originalByNode.set(nodeId, direct);
     if (direct?.distanceMeters <= PAIR_SEARCH_METERS) return direct;
     let group = singleGroup(directParts);
@@ -3958,17 +4072,114 @@ function mixedMainlineReturn(path, osm, waysById, parts, graph, grid, sourcePart
   return null;
 }
 
+function shortestMainlineReturn(path, aliases, context) {
+  const {
+    osm,
+    waysById,
+    parts,
+    continuationGraph,
+    partSegmentGrid,
+    sourceWayIdToPartIndices,
+  } = context;
+  const options = [];
+  for (const firstAttachment of aliases(path.firstAttachment))
+    for (const secondAttachment of aliases(path.secondAttachment)) {
+      const candidate = { ...path, firstAttachment, secondAttachment };
+      const reverse = mixedMainlineReturn(
+        candidate,
+        osm,
+        waysById,
+        parts,
+        continuationGraph,
+        partSegmentGrid,
+        sourceWayIdToPartIndices,
+      );
+      if (reverse) options.push({ candidate, reverse, through: false });
+      else {
+        const through = throughMainlineReturn(
+          candidate,
+          osm,
+          waysById,
+          parts,
+          continuationGraph,
+        );
+        if (through) options.push({ candidate, reverse: through, through: true });
+      }
+    }
+  options.sort((a, b) => a.reverse.distanceMeters - b.reverse.distanceMeters);
+  return options[0];
+}
+
+function prepareRampMidpointMovements(
+  pairs,
+  { osm, parts, continuationGraph, chainById },
+) {
+  return pairs
+    .map(([forward, reverse], pairIndex) => {
+      if (shareDirectedSourceEdges(forward, reverse)) return null;
+      const startAttachment = outerReciprocalAttachment(
+        forward.firstAttachment,
+        reverse.secondAttachment,
+        parts,
+        true,
+      );
+      const endAttachment = outerReciprocalAttachment(
+        forward.secondAttachment,
+        reverse.firstAttachment,
+        parts,
+        false,
+      );
+      const first = extendReciprocalPath(
+        osm,
+        forward,
+        startAttachment,
+        endAttachment,
+        parts,
+        continuationGraph,
+        chainById,
+      );
+      const backward = extendReciprocalPath(
+        osm,
+        reverse,
+        endAttachment,
+        startAttachment,
+        parts,
+        continuationGraph,
+        chainById,
+      );
+      const second = {
+        coordinates: backward.coordinates.toReversed(),
+        nodeIds: backward.nodeIds.toReversed(),
+      };
+      return {
+        pairIndex,
+        forward,
+        reverse,
+        startAttachment,
+        endAttachment,
+        first,
+        second,
+        start: startAttachment.coordinate,
+        end: endAttachment.coordinate,
+      };
+    })
+    .filter(Boolean);
+}
+
 export function buildRampConnectors(
   osm,
   mainlineWays,
   parts,
   connectorWays,
   chains = [],
+  onProgress = () => {},
 ) {
+  onProgress({ phase: 'index-ramp-attachments' });
   const partSegmentGrid = buildPartSegmentGrid(parts);
   const sourceWayIdToPartIndices = indexPartsBySourceWay(parts);
   const graph = connectorSegmentGraph(connectorWays);
   const continuationGraph = mainlineContinuationGraph(osm, mainlineWays);
+  const chainById = new Map(chains.map((chain) => [chain.id, chain]));
   const sourceNodes = indexPartsBySourceNode(parts, chains);
   const resolver = rampAttachmentResolver(
     osm,
@@ -3978,6 +4189,7 @@ export function buildRampConnectors(
     continuationGraph,
     sourceNodes,
     graph,
+    chainById,
   );
   const mainlinePartIndicesByNode = new Map();
   const mainlineDirectionsByNodeAndPart = new Map();
@@ -4032,11 +4244,14 @@ export function buildRampConnectors(
     }
   }
   const components = traceLinkComponents(graph);
+  onProgress({ phase: 'trace-ramp-paths', components: components.length });
   const connectors = [];
   const insertionsByPart = new Map();
   const allDirectedPaths = [];
   const originalDirectedPaths = [];
+  const aliases = rampAttachmentAliases(parts);
   const describeAttachment = (attachment, nodeId) => ({
+    pairingPartIndices: aliases(attachment).map((a) => a.partIndex),
     ...attachment,
     nodeId,
     carriagewayIds: [
@@ -4100,6 +4315,7 @@ export function buildRampConnectors(
     groupByPartIndex,
     pairedChains,
   );
+  onProgress({ phase: 'pair-ramp-paths', establishedPairs: established.pairs.length });
   const usedByJunction = new Map();
   for (const path of established.pairs.flat()) {
     for (const nodeId of [path.firstAttachment.nodeId, path.secondAttachment.nodeId]) {
@@ -4124,7 +4340,7 @@ export function buildRampConnectors(
   const pathIdentity = (path) =>
     `${path.nodeIds.join(':')}|${path.edgeIndices.join(',')}`;
   let rejectedInferredConnectorCount = 0;
-  const pairs = [
+  let pairs = [
     ...established.pairs,
     ...inferred.pairs.filter((pair) =>
       pair.some(
@@ -4148,31 +4364,20 @@ export function buildRampConnectors(
       )
     )
       continue;
-    const reverse = mixedMainlineReturn(
-      path,
+    const selected = shortestMainlineReturn(path, aliases, {
       osm,
       waysById,
       parts,
       continuationGraph,
       partSegmentGrid,
       sourceWayIdToPartIndices,
-    );
-    if (!reverse) {
-      const through = throughMainlineReturn(
-        path,
-        osm,
-        waysById,
-        parts,
-        continuationGraph,
-      );
-      if (through) {
-        throughPairs.push([path, through]);
-        mixedPaths.push(through);
-      }
-      continue;
-    }
-    mixedPairs.push([path, reverse]);
-    mixedPaths.push(reverse);
+    });
+    if (!selected) continue;
+    (selected.through ? throughPairs : mixedPairs).push([
+      selected.candidate,
+      selected.reverse,
+    ]);
+    mixedPaths.push(selected.reverse);
   }
   const shortestMixedPairs = selectShortestReciprocalMovements(
     mixedPairs,
@@ -4192,8 +4397,7 @@ export function buildRampConnectors(
   );
   pairs.push(...shortestMixedPairs);
   pairs.push(...shortestThroughPairs);
-  // Existing reciprocal assignments retain their directions. Complete only
-  // unmatched pairs whose attachment spans a source-proven mainline split.
+  // Complete unmatched pairs only across a source-proven mainline split.
   pairs.push(
     ...findReciprocalMainlineContinuations({
       osm,
@@ -4205,56 +4409,53 @@ export function buildRampConnectors(
       continuationGraph,
     }),
   );
+  // Established, inferred, mixed and through-mainline candidates compete
+  // together. Auxiliary lanes are options for a movement, not extra highways
+  // or a reason to combine their distant entry/exit interchanges.
+  const allPairs = pairs;
+  pairs = selectShortestAuxiliaryRampOptions(
+    selectShortestReciprocalMovements(allPairs, groupByPartIndex),
+    groupByPartIndex,
+    { parts, chains, connectorWays, osm },
+  );
+  const selectedPairs = new Set(pairs);
+  const establishedPairs = new Set(established.pairs);
+  alternativeMixedPaths.push(
+    ...allPairs.filter((pair) => !selectedPairs.has(pair)).flat(),
+  );
   let mixedMainlineConnectorCount = 0;
   let throughMainlineConnectorCount = 0;
-  for (const [pairIndex, [forward, reverse]] of pairs.entries()) {
-    if (shareDirectedSourceEdges(forward, reverse)) continue;
-    const isInferred = pairIndex >= established.pairs.length;
-    const startAttachment = outerReciprocalAttachment(
-      forward.firstAttachment,
-      reverse.secondAttachment,
-      parts,
-      true,
-    );
-    const endAttachment = outerReciprocalAttachment(
-      forward.secondAttachment,
-      reverse.firstAttachment,
-      parts,
-      false,
-    );
+  let restoredConnectorCount = 0;
+  const prepared = prepareRampMidpointMovements(pairs, {
+    osm,
+    parts,
+    continuationGraph,
+    chainById,
+  });
+  const shared = sharedRampMidpoints(prepared, averageReciprocalPathCoordinates);
+  for (const [
+    preparedIndex,
+    { pairIndex, forward, reverse, startAttachment, endAttachment },
+  ] of prepared.entries()) {
+    if (pairIndex % 500 === 0)
+      onProgress({
+        phase: 'ramp-midpoints',
+        pairsDone: pairIndex,
+        pairsTotal: pairs.length,
+      });
+    const isInferred = !establishedPairs.has(pairs[pairIndex]);
     const startPartIndex = startAttachment.partIndex;
     const endPartIndex = endAttachment.partIndex;
-    const coordinates = averageReciprocalPathCoordinates(
-      extendReciprocalPath(
-        osm,
-        forward,
-        startAttachment.coordinate,
-        endAttachment.coordinate,
-        parts,
-        continuationGraph,
-      ),
-      extendReciprocalPath(
-        osm,
-        reverse,
-        endAttachment.coordinate,
-        startAttachment.coordinate,
-        parts,
-        continuationGraph,
-      ).reverse(),
-      startAttachment.coordinate,
-      endAttachment.coordinate,
-    );
+    const { coordinates, sharedSections } = shared.results[preparedIndex];
     if (lineLengthMeters(coordinates) < 5) continue;
     if (
       isInferred &&
-      (rampBendMetrics(coordinates).backwards ||
-        hasProperSelfIntersection(coordinates) ||
-        (reverse.throughMainline &&
-          !throughConnectionExtendsMainline(
-            coordinates,
-            parts[startPartIndex],
-            parts[endPartIndex],
-          )))
+      !validInferredRampGeometry(
+        coordinates,
+        reverse.throughMainline,
+        parts[startPartIndex],
+        parts[endPartIndex],
+      )
     ) {
       rejectedInferredConnectorCount += 1;
       continue;
@@ -4276,6 +4477,7 @@ export function buildRampConnectors(
     const endTopologyKey = `osm-ramp-pair:${connectorIndex}:end`;
     const connector = {
       coordinates,
+      sharedMidpointSections: sharedSections,
       startMainlineDirection:
         rampAttachmentTravelDirection(parts[startPartIndex], startAttachment) *
         (startAttachment === forward.firstAttachment ? 1 : -1),
@@ -4304,6 +4506,7 @@ export function buildRampConnectors(
       throughMainlineConnectorCount += 1;
     }
     connectors.push(connector);
+    if (isInferred) restoredConnectorCount += 1;
     for (const [attachment, topologyKey] of [
       [startAttachment, startTopologyKey],
       [endAttachment, endTopologyKey],
@@ -4338,12 +4541,15 @@ export function buildRampConnectors(
     connectors,
     attachmentRepairs,
     statistics: {
+      sharedRampMidpointSectionCount: shared.statistics.sharedSections,
+      sharedRampMidpointReuseCount: shared.statistics.reusedMovements,
+      conflictingSharedRampSectionCount: shared.statistics.conflictingSections,
       mixedMainlineConnectorCount,
       throughMainlineConnectorCount,
       candidateRampAttachmentCount: resolver.repairs.length,
       repairedRampAttachmentCount: attachmentRepairs.length,
       rejectedInferredConnectorCount,
-      restoredConnectorCount: connectors.length - established.pairs.length,
+      restoredConnectorCount,
       alternativeConnectorPathCount: alternativePathCount,
       connectorComponentCount: components.length,
       directedConnectorPathCount: directedPathCount,
@@ -4357,7 +4563,17 @@ export function buildRampConnectors(
 export function buildOsmHighwayCenterlines(osm, onProgress = () => {}) {
   const prepared = prepareWays(osm);
   const chains = traceMotorwayChains(prepared.mainlines);
-  const averaged = buildAveragedMainlines(chains);
+  onProgress({ phase: 'pair-mainlines', chains: chains.length });
+  const averaged = buildAveragedMainlines(chains, onProgress);
+  // Eligibility sampling is finished. The ramp stage needs the original source
+  // chains, not millions of sample objects retained by the diagnostic result.
+  averaged.chains = chains;
+  globalThis.gc?.();
+  onProgress({
+    phase: 'attach-mainlines',
+    parts: averaged.parts.length,
+    vertices: averaged.parts.reduce((n, part) => n + part.coordinates.length, 0),
+  });
   const originalParts = structuredClone(averaged.parts);
   let mainlineTopology = connectMainlinePartsAtSourceNodes(
     osm,
@@ -4372,12 +4588,14 @@ export function buildOsmHighwayCenterlines(osm, onProgress = () => {}) {
     (part) => part.orderedContinuation,
   );
   averaged.parts = averaged.parts.filter((part) => !part.orderedContinuation);
+  onProgress({ phase: 'pair-ramps' });
   let ramps = buildRampConnectors(
     osm,
     prepared.mainlines,
     averaged.parts,
     prepared.connectors,
     chains,
+    onProgress,
   );
   let coveredMerges = coveredMainlineMergePairs(
     originalParts,
@@ -4412,6 +4630,7 @@ export function buildOsmHighwayCenterlines(osm, onProgress = () => {}) {
       averaged.parts,
       prepared.connectors,
       chains,
+      onProgress,
     );
     const supported = coveredMerges.filter((merge) =>
       ramps.connectors.some(
@@ -4456,7 +4675,7 @@ export function buildOsmHighwayCenterlines(osm, onProgress = () => {}) {
   onProgress({ terminalContinuationCount: terminalContinuations.additions.length });
   return {
     ...averaged,
-    parts: completedParts,
+    parts: finalizeMidpointTopology(completedParts),
     terminalContinuationAudit: terminalContinuations.audit,
     statistics: {
       ...averaged.statistics,

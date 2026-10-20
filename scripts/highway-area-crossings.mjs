@@ -1,16 +1,27 @@
 // Grade-separated crossings remain separate graph edges. A simple boundary
 // cannot select both geometries; this never creates a junction at a crossing.
-function findCrossings(edges, edgeIndices, firstIntersectionOnly = false) {
+function findCrossings(
+  edges,
+  edgeIndices,
+  firstIntersectionOnly = false,
+  check = () => {},
+) {
+  let segmentCount = 0;
   const cells = new Map(),
     pairs = new Map();
   const orientation = (a, b, c) => orient2d(...a, ...b, ...c);
   for (const i of edgeIndices) {
     const points = edges[i].coordinates;
     for (let j = 1; j < points.length; j++) {
+      if ((segmentCount++ & 255) === 0) check();
       const a = points[j - 1],
         b = points[j],
         checked = new Set();
-      const segment = { i, j, a, b };
+      const minX = Math.min(a[0], b[0]),
+        maxX = Math.max(a[0], b[0]);
+      const minY = Math.min(a[1], b[1]),
+        maxY = Math.max(a[1], b[1]);
+      const segment = { i, j, a, b, minX, maxX, minY, maxY };
       for (
         let x = Math.floor(Math.min(a[0], b[0]) * 100);
         x <= Math.floor(Math.max(a[0], b[0]) * 100);
@@ -24,6 +35,15 @@ function findCrossings(edges, edgeIndices, firstIntersectionOnly = false) {
           const key = `${x},${y}`,
             cell = cells.get(key) ?? [];
           for (const other of cell) {
+            // Sharing a coarse spatial cell does not imply overlapping segments.
+            // Reject disjoint boxes before set/string allocation and predicates.
+            if (
+              maxX < other.minX ||
+              minX > other.maxX ||
+              maxY < other.minY ||
+              minY > other.maxY
+            )
+              continue;
             if (checked.has(other) || (i === other.i && Math.abs(j - other.j) <= 1))
               continue;
             checked.add(other);
@@ -47,8 +67,8 @@ function findCrossings(edges, edgeIndices, firstIntersectionOnly = false) {
   return firstIntersectionOnly ? null : [...pairs.values()];
 }
 
-export function highwayCrossingEdgePairs(edges, edgeIndices) {
-  return findCrossings(edges, edgeIndices);
+export function highwayCrossingEdgePairs(edges, edgeIndices, { check } = {}) {
+  return findCrossings(edges, edgeIndices, false, check);
 }
 
 export function properHighwayBoundaryIntersection(coordinates) {

@@ -29,7 +29,8 @@ test('published mainline merges omit crossed pairs and keep the clean continuing
   );
   assert.ok(audit.merges.some((merge) => merge.removedId === 'osm-mainline-6512'));
   const handle = await open(
-    new URL('../data/north-america-highways.pmtiles', import.meta.url),
+    process.env['HIGHWAY_AUDIT_TILES'] ??
+      new URL('../data/north-america-highways.pmtiles', import.meta.url),
   );
   try {
     const archive = new PMTiles({
@@ -107,7 +108,8 @@ test('published tiles contain all four source-verified terminal merges', async (
   const { averageReciprocalPathCoordinates } =
     await import('./osm-highway-network.mjs');
   const handle = await open(
-    new URL('../data/north-america-highways.pmtiles', import.meta.url),
+    process.env['HIGHWAY_AUDIT_TILES'] ??
+      new URL('../data/north-america-highways.pmtiles', import.meta.url),
   );
   try {
     const archive = new PMTiles({
