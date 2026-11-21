@@ -26,9 +26,9 @@ line-specific platform in its official agency color. The shared weekday/time set
 filters each city's operating lines and selects the proven maximum-area boundary for
 that service period. Atlanta's branched rail network has no closed loop.
 
-Choose **Road** or **Transit** and the segment grades the circle may use. Both networks
-include **Unclassified** by default to keep existing coverage. See the
-[grade rules and available coverage](docs/circumference-grades.md).
+Choose **Road** or **Transit** and the segment grades the circle may use. Only reviewed
+segments qualify. See the
+[grade rules, coverage and review process](docs/circumference-grades.md).
 
 The controlled-access criterion displays the contiguous North American divided freeway
 and tollway network. Mainlines and direct ramp-only interchange connectors are distinct

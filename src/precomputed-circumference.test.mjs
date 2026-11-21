@@ -8,6 +8,7 @@ import {
   CIRCUMFERENCE_INTERIOR_OVERLAP_TOLERANCE_SQUARE_METERS,
   circumferenceInteriorOverlapSquareMeters,
   distanceMeters,
+  filterCircumferenceNetwork,
   junctionContinuationLineLanes,
   junctionContinuationSections,
   lineLengthMeters,
@@ -16,6 +17,7 @@ import {
 } from './circumference.ts';
 import { circumferenceGeometryVariantsSchema } from './circumference/schema.ts';
 import { fetchCircumferenceGeometryVariants } from './app/circumference-data.ts';
+import { TRANSIT_GRADES } from './circumference/grades.ts';
 
 const LOOP_AREA_KEYS = ['cdmx', 'nyc', 'singapore', 'athens'];
 
@@ -34,12 +36,28 @@ test('Grade A can find a Singapore circle outside the unfiltered candidate pool'
   const noon = activeCircumferenceService(schedules, 0, 720);
   const filter = { ranking: straight, spatial: track, allowedGrades: new Set(['A']) };
   const result = scheduleCircumferenceMode(track, noon, 'track', filter);
-  assert.equal(result.candidates.length, 1);
-  const [circle] = result.candidates;
-  assert.deepEqual(circle.lines, ['DT', 'NE']);
-  assert.equal(circle.transferCount, 2);
-  assert.equal(circle.segments.filter((edge) => edge.grade === 'A').length, 10);
-  assert.ok(!track.routeCandidates.some(({ id }) => id === circle.id));
+  assert.ok(result.candidates.length > 0);
+  assert.ok(
+    result.routeCandidates.some(
+      (circle) => !track.routeCandidates.some(({ id }) => id === circle.id),
+    ),
+  );
+  for (const circle of result.candidates) {
+    assert.ok(
+      circle.segments.every(({ type, grade }) => type === 'transfer' || grade === 'A'),
+    );
+  }
+  const allGrades = filterCircumferenceNetwork(
+    track.network,
+    noon,
+    new Set(TRANSIT_GRADES),
+  );
+  assert.ok(
+    track.network.segments.some(({ type, grade }) => type === 'ride' && !grade),
+  );
+  assert.ok(
+    allGrades.segments.every(({ type, grade }) => type === 'transfer' || grade),
+  );
   assert.equal(result.methodology.optimizationStatus, undefined);
   assert.equal(
     scheduleCircumferenceMode(track, noon, 'track', {

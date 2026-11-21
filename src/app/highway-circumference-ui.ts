@@ -1,3 +1,5 @@
+import { z } from 'zod';
+import rawGradeReviews from '../../data/north-america-highway-grade-reviews.json';
 import { syncGovernmentSeats } from './government-seats-ui.js';
 import {
   EMPTY_CIRCUMFERENCE_GRADIENT_URL,
@@ -15,7 +17,6 @@ import {
   highwayCircumferenceSummarySchema,
   highwayMapFeaturePropertiesSchema,
   type HighwayCircumferenceSummary,
-  type HighwayFeatureProperties,
 } from '../highway-circumference.js';
 import { fetchParsed } from '../parse.js';
 import { gradientRenderer } from './gradient-rendering.js';
@@ -52,13 +53,30 @@ import {
   allowedCircumferenceGrades,
   circumferenceNetworkMode,
 } from './circumference-criteria.js';
-import { gradeLabel } from '../circumference/grades.js';
+import { roadGradeSchema, type RoadGrade } from '../circumference/grades.js';
 
 const HIGHWAY_DATA_URL =
   'data/north-america-highway-circumference-summary.json?v=20260921b';
 const HIGHWAY_GEOMETRY_URL =
   'data/north-america-highway-circumference.json?v=20260921b';
 let highwayData: HighwayCircumferenceSummary | null = null;
+const reviews = z
+  .object({
+    areaSquareMeters: z.number().positive(),
+    sourceVersion: z.string(),
+    segments: z.array(roadGradeSchema.nullable()),
+  })
+  .parse(rawGradeReviews);
+
+function reviewedRoadGrades(
+  data: HighwayCircumferenceSummary,
+): readonly (RoadGrade | null)[] {
+  return data.route.areaSquareMeters === reviews.areaSquareMeters &&
+    data.route.boundaryCorridorCount === reviews.segments.length &&
+    data.source_version === reviews.sourceVersion
+    ? reviews.segments
+    : [];
+}
 let highwayPromise: Promise<HighwayCircumferenceSummary> | null = null;
 const HIGHWAY_GRADIENT_SOURCE_ID = 'highway-circumference-gradient';
 
@@ -90,12 +108,12 @@ export function highwayCriterionActive(): boolean {
 }
 
 function highwayRouteEligible(): boolean {
+  if (!highwayData) return false;
+  const sections = reviewedRoadGrades(highwayData);
   const grades = allowedCircumferenceGrades();
   return (
-    highwayData !== null &&
-    (highwayData.route.segmentGrades ?? ['unclassified']).every((grade) =>
-      grades.has(grade),
-    )
+    sections.length > 0 &&
+    sections.every((grade) => grade !== null && grades.has(grade))
   );
 }
 
@@ -106,14 +124,11 @@ function setLayerVisibility(id: string, visible: boolean): void {
 }
 
 export function syncHighwayLayerVisibility(): void {
-  syncGovernmentSeats(
-    runtime.activeProduct === 'circumference' && highwayCriterionActive(),
-  );
-  const visible =
-    runtime.activeProduct === 'circumference' &&
-    highwayCriterionActive() &&
-    highwayData !== null;
+  const roadMode =
+    runtime.activeProduct === 'circumference' && highwayCriterionActive();
+  const visible = roadMode && highwayData !== null;
   const routeVisible = visible && highwayRouteEligible();
+  syncGovernmentSeats(roadMode, routeVisible);
   setLayerVisibility(
     HIGHWAY_GRADIENT_SOURCE_ID,
     routeVisible && routeGradientToggle.checked,
@@ -122,14 +137,29 @@ export function syncHighwayLayerVisibility(): void {
     'highway-circumference-area',
     routeVisible && routeAreaToggle.checked,
   );
-  setLayerVisibility('highway-circumference-network-casing', visible);
-  setLayerVisibility('highway-circumference-network-line', visible);
-  setLayerVisibility('highway-circumference-network-connector-casing', visible);
-  setLayerVisibility('highway-circumference-network-connector-line', visible);
-  setLayerVisibility('highway-circumference-route-casing', routeVisible);
-  setLayerVisibility('highway-circumference-route-line', routeVisible);
-  setLayerVisibility('highway-circumference-route-connector-casing', routeVisible);
-  setLayerVisibility('highway-circumference-route-connector-line', routeVisible);
+  const grades = allowedCircumferenceGrades();
+  const eligibleIds =
+    visible && highwayData
+      ? reviewedRoadGrades(highwayData).flatMap((grade, index) =>
+          grade !== null && grades.has(grade) ? [index + 1] : [],
+        )
+      : [];
+  for (const [layerId, kind] of [
+    ['highway-circumference-route-casing', 'highway-route-mainline'],
+    ['highway-circumference-route-line', 'highway-route-mainline'],
+    ['highway-circumference-route-connector-casing', 'highway-route-connector'],
+    ['highway-circumference-route-connector-line', 'highway-route-connector'],
+  ]) {
+    if (!layerId || !kind || !map.getLayer(layerId)) continue;
+    if (eligibleIds.length > 0) {
+      map.setFilter(layerId, [
+        'all',
+        ['==', ['get', 'kind'], kind],
+        ['in', ['get', 'segment_id'], ['literal', eligibleIds]],
+      ]);
+    }
+    setLayerVisibility(layerId, eligibleIds.length > 0);
+  }
   refreshHighwayGradient();
 }
 
@@ -163,7 +193,7 @@ export function syncCircumferenceCriterionControls(): void {
     ? 'Highway details'
     : 'Line or transfer details';
   circumferenceMethodNoteEl.textContent = highwayMode
-    ? 'Solid lines are separated 2+ lane general-purpose mainlines; dashed lines join closest-tangent midpoints of opposing ramps, continuing along the mainline where their joins are staggered. Separated express lanes and collector/distributor roads use the same two-way ramp rules. One-way-only ramps are excluded. Only explicit paired endpoints form graph junctions—grade-separated crossings do not. The thick route is the largest validated detailed simple boundary.'
+    ? 'Highlighted road sections have a reviewed grade. A complete circle requires a permitted grade on every boundary section.'
     : 'Eligible metro segments stay visible even if they form no circle. Station transfers connect eligible rides. Each result card focuses the map on an independent circle.';
 }
 
@@ -252,7 +282,7 @@ function highwayResultCard(data: HighwayCircumferenceSummary): HTMLElement {
 
   const summary = document.createElement('p');
   summary.className = 'result-summary';
-  summary.textContent = `Segment grades: ${(data.route.segmentGrades ?? ['unclassified']).map(gradeLabel).join(', ')} · mainlines plus reciprocal ramp pairs · WGS84 ellipsoidal area`;
+  summary.textContent = `Segment grades: ${[...new Set(reviewedRoadGrades(data))].join(', ')} · WGS84 ellipsoidal area`;
   result.append(summary);
   return result;
 }
@@ -264,9 +294,18 @@ export function renderHighwayResults(): void {
   }
   const loading = document.createElement('p');
   loading.className = 'result-empty';
-  loading.textContent = highwayData
-    ? 'No published road circle matches the allowed grades.'
-    : 'Loading the North American highway network…';
+  if (highwayData) {
+    const reviewedCount = reviewedRoadGrades(highwayData).filter(
+      (grade) => grade !== null,
+    ).length;
+    const total = highwayData.route.boundaryCorridorCount;
+    loading.textContent =
+      reviewedCount < total
+        ? `${reviewedCount.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} road boundary sections have a grade. A complete road circle is pending review.`
+        : 'No published road circle matches the allowed grades.';
+  } else {
+    loading.textContent = 'Loading North American road grade coverage…';
+  }
   circumferenceResultsEl.replaceChildren(loading);
 }
 
@@ -332,7 +371,7 @@ export function refreshHighwayGradient(): void {
 export function fitHighwayCircumference({
   animate = true,
 }: { readonly animate?: boolean } = {}): void {
-  if (!highwayData || !highwayRouteEligible()) return;
+  if (!highwayData) return;
   map.fitBounds(highwayData.route.bounds, {
     padding: compactPanelQuery.matches ? 30 : 56,
     duration: animate ? 620 : 0,
@@ -351,8 +390,9 @@ function renderHighwayCircumference({
     circumferenceSelectionTypeEl.textContent = 'Nothing selected';
     circumferenceNameEl.textContent = 'No matching road circle';
     circumferenceSummaryEl.textContent =
-      'The visible motorway network provides map context.';
+      'Select a highlighted road section to inspect its grade.';
     circumferenceMetadataEl.replaceChildren();
+    if (fit && runtime.activeProduct === 'circumference') fitHighwayCircumference();
     updateStatus('No matching road circle');
     return;
   }
@@ -412,10 +452,12 @@ function renderHighwayCircumference({
   updateStatus('Highway route ready');
 }
 
-export function showHighwayFeature(properties: HighwayFeatureProperties): void {
+export function showHighwayFeature(
+  properties: z.infer<typeof highwayMapFeaturePropertiesSchema>,
+): void {
   const data = highwayData;
   if (!data) return;
-  const boundary = properties.id === data.route.id;
+  const boundary = highwayRouteEligible() && properties.id === data.route.id;
   const connector = properties.role === 'connector';
   const seam = properties.role === 'source-seam';
   circumferenceSelectionTypeEl.textContent = boundary
@@ -442,6 +484,10 @@ export function showHighwayFeature(properties: HighwayFeatureProperties): void {
         .filter(Boolean)
         .join(' · ');
   replaceMetadata([
+    {
+      label: 'Grade',
+      value: reviewedRoadGrades(data)[(properties.segment_id ?? 0) - 1],
+    },
     { label: 'Road class', value: properties.class },
     { label: 'Type', value: properties.type },
     { label: 'Route', value: properties.number || properties.name },
@@ -449,7 +495,7 @@ export function showHighwayFeature(properties: HighwayFeatureProperties): void {
     { label: 'Country', value: properties.country },
     {
       label: 'Boundary area',
-      value: formatArea(data.route.containedLandAreaSquareMeters),
+      value: boundary ? formatArea(data.route.containedLandAreaSquareMeters) : null,
     },
     { label: 'Dataset feature', value: properties.id },
   ]);

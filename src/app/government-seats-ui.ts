@@ -43,6 +43,7 @@ const toggleLabel = document.querySelector<HTMLElement>(
 );
 const select = document.querySelector<HTMLSelectElement>('#government-seat-select');
 let active = false;
+let connectionVisible = false;
 let installed = false;
 let popup: Popup | null = null;
 
@@ -66,7 +67,9 @@ function showSeat(seat: Seat, anchor: [number, number] = seatPosition(seat)): vo
   const description = document.createElement('p');
   description.textContent = `${seat.role}. Circle: 10 km diameter (5 km radius).`;
   content.append(heading, place, description);
-  const connection = connectionRecords.find((entry) => entry.id === seat.id);
+  const connection = connectionVisible
+    ? connectionRecords.find((entry) => entry.id === seat.id)
+    : undefined;
   if (connection) {
     const status = document.createElement('p');
     status.textContent =
@@ -239,21 +242,30 @@ function install(): void {
   });
 }
 
-export function syncGovernmentSeats(highwayMode: boolean): void {
+export function syncGovernmentSeats(
+  highwayMode: boolean,
+  showConnections: boolean,
+): void {
   active = highwayMode;
+  connectionVisible = showConnections;
   if (controls) controls.hidden = !active;
   if (toggleLabel) toggleLabel.hidden = !active;
   const visible = active && (toggle?.checked ?? true);
   if (visible && map.getLayer('highway-circumference-route-line')) install();
-  for (const layer of Object.values(LAYERS)) {
+  for (const [kind, layer] of Object.entries(LAYERS)) {
+    const route = kind.startsWith('route') || kind.startsWith('ramp');
     if (map.getLayer(layer))
-      map.setLayoutProperty(layer, 'visibility', visible ? 'visible' : 'none');
+      map.setLayoutProperty(
+        layer,
+        'visibility',
+        visible && (!route || connectionVisible) ? 'visible' : 'none',
+      );
   }
   if (!visible) popup?.remove();
 }
 
 toggle?.addEventListener('change', () => {
-  syncGovernmentSeats(active);
+  syncGovernmentSeats(active, connectionVisible);
 });
 if (select) {
   for (const country of ['Canada', 'United States', 'Mexico', 'China']) {
@@ -273,7 +285,7 @@ if (select) {
     const seat = seats.find((entry) => entry.id === select.value);
     if (!seat || !active) return;
     if (toggle) toggle.checked = true;
-    syncGovernmentSeats(active);
+    syncGovernmentSeats(active, connectionVisible);
     const [longitude, latitude] = seatPosition(seat);
     // View bounds only; the rendered circles use precomputed WGS84 geometry.
     const latitudePadding = 5000 / 110000;

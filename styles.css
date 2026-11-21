@@ -1492,10 +1492,6 @@ body {
   font-weight: 600;
 }
 
-.grade-control .toggles label:last-child {
-  grid-column: 1 / -1;
-}
-
 .grade-key {
   color: var(--muted);
   font-size: 0.72rem;

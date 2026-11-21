@@ -36,8 +36,10 @@ import type {
 } from '../circumference/types.js';
 import type { LandmassArea } from '../domain.js';
 import { lineColor } from '../line-colors.js';
-import { gradeLabel } from '../circumference/grades.js';
-import { allowedCircumferenceGrades } from './circumference-criteria.js';
+import {
+  allowedCircumferenceGrades,
+  showTransitGradeCoverage,
+} from './circumference-criteria.js';
 import type { AreaKey } from './types.js';
 import {
   AREAS,
@@ -570,8 +572,7 @@ export function routeFeatureCollection(
           primary_line: primaryLine,
           segment_id: segment.id,
           segment_type: segment.type,
-          grade:
-            segment.type === 'ride' ? gradeLabel(segment.grade ?? 'unclassified') : '',
+          grade: segment.grade ?? '',
           distance_m: segment.distanceMeters,
           transfer_source: segment.transferSource ?? '',
           transfer_minutes: segment.transferMinutes ?? '',
@@ -702,7 +703,7 @@ function createCircumferenceResult({
   const grades = [
     ...new Set(
       candidate.segments.flatMap((segment) =>
-        segment.type === 'ride' ? [gradeLabel(segment.grade ?? 'unclassified')] : [],
+        segment.type === 'ride' && segment.grade !== undefined ? [segment.grade] : [],
       ),
     ),
   ].sort();
@@ -916,7 +917,8 @@ function prepareCircumferenceArea(
   const grades = allowedCircumferenceGrades();
   const restrictGrades = baseResult.network.segments.some(
     (segment) =>
-      segment.type === 'ride' && !grades.has(segment.grade ?? 'unclassified'),
+      segment.type === 'ride' &&
+      (segment.grade === undefined || !grades.has(segment.grade)),
   );
   const scheduleKey = `${[...grades].sort().join(',')}|${scheduleLineStateKey(baseResult.network, activeService)}`;
   if (
@@ -1037,6 +1039,7 @@ export function prepareCircumferenceRoute(
   const geometryMode: CircumferenceGeometryMode = routeTrackGeometryToggle.checked
     ? 'track'
     : 'straight';
+  showTransitGradeCoverage();
   let changed = false;
   for (const areaKey of AREA_KEYS) {
     changed = prepareCircumferenceArea(areaKey, geometryMode) || changed;

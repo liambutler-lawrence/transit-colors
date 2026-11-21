@@ -1,12 +1,13 @@
 import {
   gradeDescription,
-  gradeLabel,
   gradeOptions,
   readGradeOptions,
   type CircumferenceNetworkMode,
   type GradeOption,
 } from '../circumference/grades.js';
 import {
+  AREA_KEYS,
+  circumferenceStates,
   initialCircumferenceCriterion,
   initialSearchParams,
   requiredElement,
@@ -31,6 +32,16 @@ export function circumferenceNetworkMode(): CircumferenceNetworkMode {
 
 export function allowedCircumferenceGrades(): ReadonlySet<GradeOption> {
   return selections[circumferenceNetworkMode()];
+}
+
+export function showTransitGradeCoverage(): void {
+  const rides = AREA_KEYS.flatMap((areaKey) =>
+    (
+      circumferenceStates[areaKey].geometryVariants?.track.network.segments ?? []
+    ).filter((segment) => segment.type === 'ride'),
+  );
+  const reviewed = rides.filter((segment) => segment.grade !== undefined).length;
+  coverage.textContent = `${reviewed.toLocaleString('en-US')} of ${rides.length.toLocaleString('en-US')} transit ride segments have a grade. The search uses reviewed segments only.`;
 }
 
 export function writeCircumferenceCriteria(url: URL): void {
@@ -61,12 +72,12 @@ export function installCircumferenceCriteria(onChange: () => void): void {
       input.type = 'checkbox';
       input.checked = grades.has(grade);
       const text = document.createElement('span');
-      text.textContent = gradeLabel(grade);
+      text.textContent = grade;
       label.append(input, text);
       gradeInputs.append(label);
 
       const term = document.createElement('dt');
-      term.textContent = gradeLabel(grade);
+      term.textContent = grade;
       const definition = document.createElement('dd');
       definition.textContent = description;
       gradeKey.append(term, definition);
@@ -78,8 +89,8 @@ export function installCircumferenceCriteria(onChange: () => void): void {
     }
     coverage.textContent =
       mode === 'road'
-        ? 'The published motorway circle has unclassified segments. Road grade coverage is incomplete.'
-        : 'Grade coverage starts with parts of Singapore. Include Unclassified to use other mapped metro segments.';
+        ? 'Road circles require a grade for every segment on the boundary.'
+        : 'Only reviewed ride segments enter the search. Coverage expands as tracks are classified.';
   }
 
   routeCriterionSelect.addEventListener('change', () => {

@@ -166,7 +166,8 @@ export function filterCircumferenceNetwork(
   const activeRideSegments = network.segments.flatMap((segment) => {
     if (
       segment.type !== 'ride' ||
-      (allowedGrades && !allowedGrades.has(segment.grade ?? 'unclassified'))
+      (allowedGrades &&
+        (segment.grade === undefined || !allowedGrades.has(segment.grade)))
     ) {
       return [];
     }

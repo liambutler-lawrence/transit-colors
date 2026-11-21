@@ -1,10 +1,9 @@
 # Circumference grades
 
-The network and allowed grades are independent. A circle is eligible when every graded
-travel segment belongs to the chosen set. Each segment carries one grade. Road
-interchanges and transit stations define the ends of a travel segment. The grade
-requirements must hold across its full length, so even a short narrowing or level
-crossing can lower the grade.
+The network and allowed grades are independent. A circle is eligible when every travel
+segment in it has a grade in the chosen set. Road interchanges and transit stations
+define the ends of a travel segment. The grade requirements must hold across its full
+length.
 
 Road grades use marked permanent through lanes in each direction. C starts at 1×1 and B
 at 2×2. A− adds full grade separation to C. For A, A+ and A++, the entire segment must
@@ -18,30 +17,49 @@ and A respectively. BX and AX apply the B and A rules to a dedicated busway. Con
 passenger movements across different corridors count as level crossings. Depot leads
 restricted to empty trains, same-corridor crossover switches used to change tracks, and
 joins or splits without a crossing do not lower the grade. Existing walking transfers
-are links at stations and have no infrastructure grade.
+connect eligible ride segments.
 
-## Coverage
+## Transit reviews
 
-- **Transit.** Initial Grade A coverage follows the two underground, two-track passenger
-  corridors from Little India to Chinatown in Singapore. This inference uses the
-  [Downtown Line construction profile][dt], [North East Line profile][ne], [Clarke Quay
-  construction record][cq], and [North East Line contract C706][c706]. Remaining
-  existing metro segments are unclassified. The current circle graph contains metro
-  services. A grade choice does not add busways or rail services to that graph.
-  Grade-filtered transit results consider still-eligible precomputed circles and cycles
-  found on the reduced graph. They have no proof of optimality.
-- **Road.** The published continental motorway loop uses a controlled-access dataset
-  that predates these grades. Its ramps and mainlines remain unclassified. The selector
-  can screen the published result. Finding alternative road loops requires a graded road
-  graph and a new offline solve.
+[The review catalog](../data/circumference-transit-grades.json) records the grade,
+sources and exact published network segment IDs for each reviewed corridor. A line name
+describes the review and never assigns a grade to later extensions or other segments.
+Published ride geometry and schedules remain intact for future reviews. To add coverage,
+add the reviewed segment IDs from the area's `*-circumference.json` network, with the
+sources for the whole segment. The tests check every catalog ID against both geometry
+variants. Shared services on the same physical edge get one infrastructure grade.
 
-An unknown grade means the available evidence does not establish a grade for the whole
-segment. Include **Unclassified** to admit these segments. A missing result may reflect
-incomplete coverage.
+The selector excludes ride segments without evidence. Track data currently covers metro
+services. Busways and other passenger rail need to be added to the graph before their
+grades can be used. Filtered transit circles use eligible precomputed candidates and
+cycles discovered in the reduced network, without a proof of optimality.
 
-[dt]:
-  https://www.lta.gov.sg/content/ltagov/en/getting_around/public_transport/rail_network/downtown_line.html
-[ne]:
-  https://www.lta.gov.sg/content/ltagov/en/getting_around/public_transport/rail_network/north_east_line.html
-[cq]: https://www.lumchang.com.sg/projects_uri/clarke-quay-station/
-[c706]: https://ic-group.org/fileadmin/Magazin_PDFs/Atzl_Sigl_ICRT99-LININGa_02.pdf
+## Road reviews
+
+[The road review file](../data/north-america-highway-grade-reviews.json) is indexed by
+the sections of the existing North American boundary. Its checksum ties it to the
+boundary snapshot. A null entry requires further review. The map draws only reviewed
+sections with permitted grades. It displays area, gradient, and feeder routes only when
+the complete boundary qualifies.
+
+The first pass uses the July 2026 [OpenStreetMap motorway extract][motorway] and the
+cached paired centerlines. It requires exact geometry matches across a whole boundary
+section, two opposing mapped motorway carriageways, and usable [explicit lane
+tags][lanes] for those carriageways over the interval. It takes the weakest supported
+tier and excludes ambiguous lane-use tags, mapped at-grade crossing indicators, and
+reciprocal ramps pending review. The separation evidence for this pass is the OSM
+motorway classification on the paired source ways, so these grades reflect the map
+snapshot. The road mode screens the existing boundary. Finding alternative road circles
+requires graded network-wide topology and a new solve.
+
+Reproduce the data with the same OSM extract and paired-network cache used by the
+highway builder:
+
+```sh
+node --max-old-space-size=6000 --import tsx scripts/audit-highway-grades.mjs \
+  data/.osm-highway-cache/north-america-motorways.osm.pbf \
+  data/.osm-highway-cache/north-america-derived-network.bin
+```
+
+[motorway]: https://wiki.openstreetmap.org/wiki/Tag:highway%3Dmotorway
+[lanes]: https://wiki.openstreetmap.org/wiki/Key:lanes
