@@ -1,8 +1,9 @@
 # Representative districts
 
-The map starts with Connecticut and five districts, matching the study area and district
-count in the paper's worked example. Counts from two to eight can be compared using the
-same statewide population.
+The map covers all 50 states. It starts with Connecticut and five districts, matching
+the study area and district count in the paper's worked example. Each state supports two
+to eight districts for comparing the algorithms. The selected state, algorithm and
+district count can be shared in the page URL.
 [Brams, Bai and Patel](https://doi.org/10.1007/s11127-025-01335-9)
 
 **Moving knife** evaluates 36 orientations spaced 10° apart. Each cut walks through
@@ -32,16 +33,40 @@ All three methods assign whole 2020 Census tabulation blocks and count each bloc
 population at its Census interior point. The Connecticut study area covers 49,926
 blocks, including water blocks. The ideal population is the statewide total divided by
 the requested number of districts. Whole-block assignments can differ from that target.
-The urban share uses each block's Census urban/rural classification.
+The urban share uses each block's Census urban/rural classification. The nationwide
+build checks each state's block count and resident population against the published 2020
+Census totals.
+[Block tallies](https://www.census.gov/geographies/reference-files/2020/geo/tallies.html)
+·
+[2020 resident population by state](https://www2.census.gov/programs-surveys/decennial/2020/data/apportionment/apportionment-2020-table02.pdf)
 
-After assignment, the map removes coastal water from the displayed district polygons and
-statewide outline using 2020 TIGER/Line area hydrography. It removes bays, estuaries,
-gulfs, sounds, and ocean water. For waterways that open into the coast, the Census
-cartographic shoreline marks where to stop clipping at the mouth. Inland waters keep
-their district shading. Assignments, area calculations, and scores use the full blocks.
+After assignment, the map clips coastal water in the displayed district polygons and
+statewide outline. Connecticut uses its detailed 2020 TIGER/Line hydrography mask. The
+other coastal and Great Lakes states remove water outside the Census Bureau's 1:500,000
+cartographic shoreline. Dry blocks and inland waters keep their district shading.
+Assignments, area calculations, and scores use the full blocks.
 [Census hydrography codes](https://www2.census.gov/geo/pdfs/maps-data/data/tiger/tgrshp2020/TGRSHP2020_TechDoc_E.pdf)
+·
+[2020 Cartographic Boundary Files](https://www.census.gov/geographies/mapping-files/2020/geo/carto-boundary-file.html)
 
 ## Rebuild the plans
+
+The district data workflow builds one bundle per state from the versioned
+[2020 TIGER/Line block archives](https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/)
+and the nationwide cartographic shoreline. It runs when a `districts-2020-v*` tag is
+pushed. The deployment installs those bundles before building the site. For local
+development, run `GH_TOKEN=… node --import tsx scripts/install-state-district-data.mjs`
+or build an individual state with the project's Node dependencies, `pyogrio`, and
+Shapely 2.1 or newer. For example, to build Delaware from the downloaded Census ZIPs:
+
+```sh
+python3 scripts/build-state-district-data.py 10 tl_2020_10_tabblock20.zip \
+  cb_2020_us_state_500k.zip public/district-plans/districts-2020-v1/10
+```
+
+The browser loads only the selected plan and its state outline.
+
+### Connecticut study area
 
 Pass the Connecticut block archive, the directory of coastal county hydrography
 archives, and the cartographic tracts archive to the build script. The hydrography

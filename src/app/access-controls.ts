@@ -48,6 +48,7 @@ import {
 import { activeAccessTransitTimes, setLayerVisibility } from './map-ui-utils.js';
 import {
   positionDistrictLayers,
+  selectedDistrictStateName,
   syncDistrictVisibility,
   writeDistrictSettings,
 } from './representative-districts-ui.js';
@@ -987,7 +988,7 @@ export function updateAreaChrome(
     runtime.activeProduct === 'watersheds'
       ? 'Watersheds — Maps'
       : runtime.activeProduct === 'districts'
-        ? 'Representative districts — Connecticut · Maps'
+        ? `Representative districts — ${selectedDistrictStateName()} · Maps`
         : runtime.activeProduct === 'timezone'
           ? 'Clock skew — Maps'
           : runtime.activeProduct === 'landuse'
@@ -1000,7 +1001,7 @@ export function updateAreaChrome(
     runtime.activeProduct === 'watersheds'
       ? 'Interactive worldwide watershed boundaries and terrain map'
       : runtime.activeProduct === 'districts'
-        ? 'Interactive map of representative districts in Connecticut'
+        ? `Interactive map of representative districts in ${selectedDistrictStateName()}`
         : runtime.activeProduct === 'timezone'
           ? 'Interactive world map of clock time compared with mean solar time'
           : runtime.activeProduct === 'landuse'

@@ -35,6 +35,12 @@ jobs:
       - name: Audit production dependencies
         run: npm audit --omit=dev
 
+      - name: Install nationwide district assets
+        if: github.ref == 'refs/heads/main' && github.event_name != 'pull_request'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node --import tsx scripts/install-state-district-data.mjs
+
       - name: Validate and build
         run: npm run check
 
