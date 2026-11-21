@@ -150,7 +150,7 @@ def write_plan(directory, blocks, outline, coastal_water, assignment):
         file.write("\n")
 
 
-def build(blocks_path, hydrography, shoreline):
+def build(blocks_path, hydrography, shoreline, method):
     root = Path(__file__).resolve().parent.parent
     blocks = load_blocks(blocks_path)
     coastal_water = load_coastal_water(hydrography, shoreline)
@@ -163,10 +163,13 @@ def build(blocks_path, hydrography, shoreline):
         block_file = directory / "blocks.json"
         assignment_file = directory / "assignments.json"
         write_blocks(block_file, blocks)
-        subprocess.run([
+        command = [
             "node", "--import", "tsx", str(root / "scripts/build-connecticut-district-assignments.mjs"),
             str(block_file), str(assignment_file),
-        ], cwd=root, check=True)
+        ]
+        if method:
+            command.append(method)
+        subprocess.run(command, cwd=root, check=True)
         assignments = json.loads(assignment_file.read_text(encoding="utf-8"))
         generated = directory / "plans"
         generated.mkdir()
@@ -182,5 +185,6 @@ if __name__ == "__main__":
     parser.add_argument("blocks")
     parser.add_argument("hydrography", type=Path, help="Directory containing coastal AREAWATER ZIP files")
     parser.add_argument("shoreline", help="2020 Connecticut cartographic tract ZIP file")
+    parser.add_argument("--method", help="Rebuild only the selected district method")
     args = parser.parse_args()
-    build(args.blocks, args.hydrography, args.shoreline)
+    build(args.blocks, args.hydrography, args.shoreline, args.method)

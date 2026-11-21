@@ -1,6 +1,6 @@
 import type { Coordinate } from './domain.js';
 
-interface Circle {
+export interface Circle {
   readonly center: Coordinate;
   readonly radius: number;
 }
@@ -238,4 +238,31 @@ export function minimumPopulationCircle(
     else low = radius;
   }
   return best;
+}
+
+/** Reuse the population index when testing different centers for the same quota. */
+export function fixedCenterPopulationSearch(
+  points: readonly PopulationPoint[],
+  target: number,
+): { readonly bounds: Bounds; readonly circleAt: (center: Coordinate) => Circle } {
+  const index = indexPopulation([...points]);
+  const { west, east, south, north } = index.bounds;
+  return {
+    bounds: index.bounds,
+    circleAt(center) {
+      const [x, y] = center;
+      const point = { west: x, east: x, south: y, north: y };
+      let low = 0;
+      let high = Math.hypot(
+        Math.max(Math.abs(x - west), Math.abs(x - east)),
+        Math.max(Math.abs(y - south), Math.abs(y - north)),
+      );
+      while (high - low > 0.01) {
+        const radius = (low + high) / 2;
+        if (populationNear(index, point, radius ** 2) >= target) high = radius;
+        else low = radius;
+      }
+      return { center, radius: high };
+    },
+  };
 }

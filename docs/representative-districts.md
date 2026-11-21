@@ -20,7 +20,15 @@ interior points lie in the winning circle. The last circle encloses the remainin
 populated block points, and the last district also gets any remaining unpopulated
 blocks. The reported circle areas include overlap, water and portions outside the state.
 
-Both methods assign whole 2020 Census tabulation blocks and count each block's
+**Reock circles** uses the same population quota and whole-block selection rule as
+Smallest circles. Each round tests the minimum-radius circle and also grows circles to
+the quota from centers on a grid over the remaining population. It refines the
+highest-scoring center at progressively smaller steps. The round takes the candidate
+with the highest district Reock score, calculated from the full block boundaries using
+the same formula as Moving Knife. A tie goes to the smaller selection circle. The final
+district takes the remaining blocks and receives a Reock score too.
+
+All three methods assign whole 2020 Census tabulation blocks and count each block's
 population at its Census interior point. The Connecticut study area covers 49,926
 blocks, including water blocks. The ideal population is the statewide total divided by
 the requested number of districts. Whole-block assignments can differ from that target.
@@ -52,4 +60,5 @@ python3 scripts/build-connecticut-district-data.py tl_2020_09_tabblock20.zip pat
 With the project's Node dependencies, `pyshp`, and Shapely 2.1 or newer installed, the
 script assigns blocks, dissolves shared edges, and clips the displayed polygons. It
 checks the statewide population and verifies that each plan assigns every block exactly
-once. The browser loads only the published plan selected by the user.
+once. Pass `--method reock-circles` to rebuild only the Reock circles plans. The browser
+loads only the published plan selected by the user.

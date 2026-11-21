@@ -1,9 +1,10 @@
 import { LngLatBounds, type ExpressionSpecification } from 'maplibre-gl';
 
-import type {
-  DistrictPlan,
-  DistrictRequest,
-  DistrictResponse,
+import {
+  districtRequestSchema,
+  type DistrictPlan,
+  type DistrictRequest,
+  type DistrictResponse,
 } from '../representative-districts.js';
 import {
   compactPanelQuery,
@@ -60,23 +61,27 @@ let worker: Worker | undefined;
 let requestId = 0;
 let plan: DistrictPlan | undefined;
 
-if (initialSearchParams.get('district-method') === 'circles')
-  methodSelect.value = 'circles';
+const methodSchema = districtRequestSchema.shape.method;
+const initialMethod = methodSchema.safeParse(
+  initialSearchParams.get('district-method'),
+);
+if (initialMethod.success) methodSelect.value = initialMethod.data;
 const initialSeats = initialSearchParams.get('district-seats');
 if (Array.from(seatsSelect.options).some((option) => option.value === initialSeats)) {
   seatsSelect.value = initialSeats ?? seatsSelect.value;
 }
 
 function settings(): DistrictRequest {
+  const method = methodSchema.safeParse(methodSelect.value);
   return {
-    method: methodSelect.value === 'circles' ? 'circles' : 'knife',
+    method: method.success ? method.data : 'knife',
     seats: Number(seatsSelect.value),
   };
 }
 
 export function writeDistrictSettings(url: URL): void {
   const { method, seats } = settings();
-  if (runtime.activeProduct === 'districts' && method === 'circles') {
+  if (runtime.activeProduct === 'districts' && method !== 'knife') {
     url.searchParams.set('district-method', method);
   } else {
     url.searchParams.delete('district-method');
@@ -106,7 +111,7 @@ function renderResults(result: DistrictPlan, method: DistrictRequest['method']):
   requiredElement('#district-population', HTMLElement).textContent =
     formatInteger(totalPopulation);
   requiredElement('#district-area-label', HTMLElement).textContent =
-    method === 'circles' ? 'Sum of circle areas' : 'Total district area';
+    method === 'knife' ? 'Total district area' : 'Sum of circle areas';
   requiredElement('#district-area', HTMLElement).textContent =
     formatArea(totalAreaSquareMeters);
 
@@ -136,10 +141,12 @@ function renderResults(result: DistrictPlan, method: DistrictRequest['method']):
     const area = formatArea(areaSquareMeters);
     geography.textContent = `${area}${radiusMeters === null ? '' : ' circle'} · ${percent.format(urbanPopulation / population)} urban`;
     const metric = document.createElement('span');
-    metric.textContent =
-      radiusMeters !== null
-        ? `${formatDistance(radiusMeters)} radius`
-        : `Reock ${reock?.toFixed(3) ?? '–'}`;
+    metric.textContent = [
+      reock === null ? '' : `Reock ${reock.toFixed(3)}`,
+      radiusMeters === null ? '' : `${formatDistance(radiusMeters)} radius`,
+    ]
+      .filter(Boolean)
+      .join(' · ');
     button.append(swatch, label, people, geography, metric);
     return button;
   });
@@ -203,9 +210,10 @@ function createWorker(): Worker {
 
 function loadDistrictPlan(): void {
   const request = settings();
-  const circles = request.method === 'circles';
-  requiredElement('#district-knife-method', HTMLElement).hidden = circles;
-  requiredElement('#district-circles-method', HTMLElement).hidden = !circles;
+  for (const method of methodSchema.options) {
+    requiredElement(`#district-${method}-method`, HTMLElement).hidden =
+      method !== request.method;
+  }
   status.textContent = 'Loading district plan…';
   overview.hidden = true;
   retry.hidden = true;
