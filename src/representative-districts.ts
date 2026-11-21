@@ -68,8 +68,7 @@ interface ProjectedTract extends Tract {
   readonly vertices: readonly Coordinate[];
 }
 
-const { project, unproject } = localEqualAreaProjection([-72.7, 41.6]);
-const CIRCLE_SIDES = 180;
+const { project } = localEqualAreaProjection([-72.7, 41.6]);
 
 function polygons(geometry: Geometry): Coordinate[][][] {
   return geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
@@ -160,6 +159,18 @@ function reockScore(tracts: readonly ProjectedTract[]): number {
   return Math.min(1, knifeArea(tracts) / (Math.PI * radius ** 2));
 }
 
+function districtGeometry(tracts: readonly Tract[]): Geometry {
+  const [first, ...rest] = tracts;
+  if (!first) throw new Error('A district must contain at least one tract');
+  return {
+    type: 'MultiPolygon',
+    coordinates: polygonClipping.union(
+      first.geometry.coordinates,
+      ...rest.map((tract) => tract.geometry.coordinates),
+    ),
+  };
+}
+
 function knifeDistricts(
   tracts: readonly Tract[],
   seats: number,
@@ -170,15 +181,9 @@ function knifeDistricts(
   for (let number = 1; number <= seats; number += 1) {
     const assigned =
       number === seats ? remaining : knifeCut(remaining, target, seats - number + 1);
-    const [first, ...rest] = assigned;
-    if (!first) throw new Error('The moving knife returned an empty district');
-    const coordinates = polygonClipping.union(
-      first.geometry.coordinates,
-      ...rest.map((tract) => tract.geometry.coordinates),
-    );
     features.push({
       type: 'Feature',
-      geometry: { type: 'MultiPolygon', coordinates },
+      geometry: districtGeometry(assigned),
       properties: {
         number,
         population: totalPopulation(assigned),
@@ -202,31 +207,22 @@ function circleDistricts(
   seats: number,
   target: number,
 ): DistrictPlan['districts'] {
-  let remaining = tracts
-    .filter(({ population }) => population > 0)
-    .map((tract) => ({ ...tract, point: project(tract.center) }));
+  let remaining = tracts.map((tract) => ({ ...tract, point: project(tract.center) }));
   const features: DistrictPlan['districts']['features'] = [];
-  const earlierDisks: Coordinate[][][] = [];
   for (let number = 1; number <= seats; number += 1) {
-    const quota = number === seats ? totalPopulation(remaining) : Math.ceil(target);
-    const circle = minimumPopulationCircle(remaining, quota);
-    const assigned = remaining.filter(({ point }) => circleContains(circle, point));
+    const isLast = number === seats;
+    const quota = isLast ? totalPopulation(remaining) : Math.ceil(target);
+    const populated = remaining.filter(({ population }) => population > 0);
+    const circle = minimumPopulationCircle(populated, quota);
+    const assigned = isLast
+      ? remaining
+      : remaining.filter(({ point }) => circleContains(circle, point));
     const population = totalPopulation(assigned);
     if (population < quota)
       throw new Error('The circle did not reach its population target');
-    const ring = Array.from({ length: CIRCLE_SIDES + 1 }, (_, index) => {
-      const angle = ((index % CIRCLE_SIDES) * 2 * Math.PI) / CIRCLE_SIDES;
-      return unproject([
-        circle.center[0] + circle.radius * Math.cos(angle),
-        circle.center[1] + circle.radius * Math.sin(angle),
-      ]);
-    });
-    const disk = [ring];
-    const visibleArea = polygonClipping.difference(disk, ...earlierDisks);
-    earlierDisks.push(disk);
     features.push({
       type: 'Feature',
-      geometry: { type: 'MultiPolygon', coordinates: visibleArea },
+      geometry: districtGeometry(assigned),
       properties: {
         number,
         population,

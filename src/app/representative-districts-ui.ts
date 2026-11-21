@@ -133,7 +133,8 @@ function renderResults(result: DistrictPlan, method: DistrictRequest['method']):
     const people = document.createElement('span');
     people.textContent = `${formatInteger(population)} residents · ${deviation.format((population - target) / target)} vs. target`;
     const geography = document.createElement('span');
-    geography.textContent = `${formatArea(areaSquareMeters)} · ${percent.format(urbanPopulation / population)} urban`;
+    const area = formatArea(areaSquareMeters);
+    geography.textContent = `${area}${radiusMeters === null ? '' : ' circle'} · ${percent.format(urbanPopulation / population)} urban`;
     const metric = document.createElement('span');
     metric.textContent =
       radiusMeters !== null

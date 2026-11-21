@@ -16,12 +16,12 @@ boundaries in place of the paper's voting precincts.
 **Smallest circles** searches all possible circle centers in a local equal-area
 projection. An angular sweep tests whether a radius can enclose enough unassigned
 population, and a binary search minimizes the radius to within one metre. Each round
-takes the remaining tracts whose interior points lie in the winning circle. The final
-circle is the smallest one enclosing all remaining populated tract points. The map cuts
-earlier circles out of each later circle, so each spot is shown in the first district
-that reaches it. Population and urban population are assigned once, in the same order.
-Each district reports its full disk area, including overlap, water and portions outside
-the state.
+takes the remaining tracts whose interior points lie in the winning circle. Both methods
+draw districts along the boundaries of the whole tracts they assign. The last circle is
+the smallest one enclosing the remaining populated tract points, and the last district
+also gets any remaining unpopulated tracts. Circle area and radius describe the
+selection disk. The reported areas include overlap, water and portions outside the
+state.
 
 Both methods treat each tract's population as a unit at its Census interior point. The
 ideal population is the statewide total divided by the requested number of districts.
