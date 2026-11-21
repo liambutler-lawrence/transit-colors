@@ -46,6 +46,10 @@ import {
 } from './access-controls.js';
 import { fetchCircumferenceGeometryVariants } from './circumference-data.js';
 import {
+  circumferenceNetworkMode,
+  installCircumferenceCriteria,
+} from './circumference-criteria.js';
+import {
   focusCircumferenceArea,
   prepareCircumferenceRoute,
   renderCircumferenceCandidate,
@@ -106,7 +110,6 @@ import {
   routeAvoidSegmentButton,
   routeChoiceSelect,
   routeClearSegmentsButton,
-  routeCriterionSelect,
   routeGradientToggle,
   routeRequireSegmentButton,
   routeStationsToggle,
@@ -560,6 +563,7 @@ export async function initialize(): Promise<void> {
             areaKey,
             geometryVariants: await fetchCircumferenceGeometryVariants(
               AREAS[areaKey].circumference,
+              areaKey,
             ),
             schedules: await fetchParsed(
               AREAS[areaKey].schedules,
@@ -761,9 +765,9 @@ circumferenceResultsEl.addEventListener('click', (event) => {
   routeChoiceSelect.dispatchEvent(new Event('change'));
 });
 
-routeCriterionSelect.addEventListener('change', () => {
+installCircumferenceCriteria(() => {
   resetCircumferenceItemDetails(
-    routeCriterionSelect.value === 'motorway'
+    circumferenceNetworkMode() === 'road'
       ? 'Loading controlled-access highways'
       : 'Click a line or walking link',
   );

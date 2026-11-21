@@ -9,6 +9,7 @@ import type {
 import { z } from 'zod';
 
 import { coordinateSchema, type Coordinate, type LandmassArea } from './domain.js';
+import { roadGradeSchema } from './circumference/grades.js';
 import {
   circumferenceGradientBounds,
   circumferenceGradientDistanceForArea,
@@ -90,6 +91,7 @@ export const highwayCircumferenceDataSchema = z.object({
       .array(
         z.object({
           coordinates: z.array(coordinateSchema).min(2),
+          grade: roadGradeSchema.optional(),
           id: z.string().min(1),
           role: z.enum(['mainline', 'connector']),
         }),
@@ -114,6 +116,10 @@ export const highwayCircumferenceSummarySchema = highwayCircumferenceDataSchema
       .extend({
         bounds: z.tuple([coordinateSchema, coordinateSchema]),
         gradientBounds: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+        segmentGrades: z
+          .array(roadGradeSchema.or(z.literal('unclassified')))
+          .min(1)
+          .optional(),
       }),
   });
 export type HighwayCircumferenceSummary = z.infer<
@@ -128,6 +134,11 @@ export function highwayCircumferenceSummary(
     route: {
       ...data.route,
       bounds: highwayBounds(data.route.coordinates),
+      segmentGrades: [
+        ...new Set(
+          data.route.segments.map((segment) => segment.grade ?? 'unclassified'),
+        ),
+      ],
       gradientBounds: circumferenceGradientBounds(
         data.route.coordinates,
         circumferenceGradientDistanceForArea(data.route.areaSquareMeters),

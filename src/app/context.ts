@@ -20,7 +20,6 @@ import {
   type AppState,
   type AreaConfig,
   type AreaKey,
-  type CircumferenceCriterion,
   type CircumferenceState,
   type DistanceProperties,
   type LoadingOperation,
@@ -133,8 +132,12 @@ export const initialProduct: Product =
   requestedProduct === 'districts'
     ? requestedProduct
     : 'access';
-export const initialCircumferenceCriterion: CircumferenceCriterion =
-  initialSearchParams.get('criterion') === 'motorway' ? 'motorway' : 'metro';
+const requestedNetwork = initialSearchParams.get('network');
+export const initialCircumferenceCriterion =
+  requestedNetwork === 'road' ||
+  (requestedNetwork === null && initialSearchParams.get('criterion') === 'motorway')
+    ? 'road'
+    : 'transit';
 
 export const COLORS = {
   near: '#006837',

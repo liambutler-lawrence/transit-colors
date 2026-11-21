@@ -1,4 +1,5 @@
 import type { Coordinate, Mode } from '../domain.js';
+import type { TransitGrade } from './grades.js';
 
 export type NodeId = string;
 export type EdgeKey = string;
@@ -28,6 +29,7 @@ export interface CircumferenceSegment {
   readonly coordinates: Coordinate[];
   readonly distanceMeters: number;
   readonly from: CircumferenceNode;
+  readonly grade?: TransitGrade | undefined;
   readonly id: string;
   readonly lines: readonly string[];
   readonly primaryLine: string | null;
@@ -57,6 +59,7 @@ export interface CircumferenceNetworkSegment {
   readonly display?: boolean | undefined;
   readonly distanceMeters?: number | undefined;
   readonly from: CircumferenceNode;
+  readonly grade?: TransitGrade | undefined;
   readonly id: string;
   readonly lines: readonly string[];
   readonly lineServiceEdges?:

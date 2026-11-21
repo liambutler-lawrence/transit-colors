@@ -41,7 +41,6 @@ import {
   routeChoiceSelect,
   routeChoiceSummaryEl,
   routeClearSegmentsButton,
-  routeCriterionSelect,
   routeGradientToggle,
   routeRequireSegmentButton,
   routeStationsToggle,
@@ -49,6 +48,11 @@ import {
   runtime,
   updateStatus,
 } from './context.js';
+import {
+  allowedCircumferenceGrades,
+  circumferenceNetworkMode,
+} from './circumference-criteria.js';
+import { gradeLabel } from '../circumference/grades.js';
 
 const HIGHWAY_DATA_URL =
   'data/north-america-highway-circumference-summary.json?v=20260921b';
@@ -82,11 +86,17 @@ export function installHighwayGradient(): void {
 }
 
 export function highwayCriterionActive(): boolean {
-  return routeCriterionSelect.value === 'motorway';
+  return circumferenceNetworkMode() === 'road';
 }
 
-export function highwayDataLoaded(): boolean {
-  return highwayData !== null;
+function highwayRouteEligible(): boolean {
+  const grades = allowedCircumferenceGrades();
+  return (
+    highwayData !== null &&
+    (highwayData.route.segmentGrades ?? ['unclassified']).every((grade) =>
+      grades.has(grade),
+    )
+  );
 }
 
 function setLayerVisibility(id: string, visible: boolean): void {
@@ -102,20 +112,24 @@ export function syncHighwayLayerVisibility(): void {
   const visible =
     runtime.activeProduct === 'circumference' &&
     highwayCriterionActive() &&
-    highwayDataLoaded();
+    highwayData !== null;
+  const routeVisible = visible && highwayRouteEligible();
   setLayerVisibility(
     HIGHWAY_GRADIENT_SOURCE_ID,
-    visible && routeGradientToggle.checked,
+    routeVisible && routeGradientToggle.checked,
   );
-  setLayerVisibility('highway-circumference-area', visible && routeAreaToggle.checked);
+  setLayerVisibility(
+    'highway-circumference-area',
+    routeVisible && routeAreaToggle.checked,
+  );
   setLayerVisibility('highway-circumference-network-casing', visible);
   setLayerVisibility('highway-circumference-network-line', visible);
   setLayerVisibility('highway-circumference-network-connector-casing', visible);
   setLayerVisibility('highway-circumference-network-connector-line', visible);
-  setLayerVisibility('highway-circumference-route-casing', visible);
-  setLayerVisibility('highway-circumference-route-line', visible);
-  setLayerVisibility('highway-circumference-route-connector-casing', visible);
-  setLayerVisibility('highway-circumference-route-connector-line', visible);
+  setLayerVisibility('highway-circumference-route-casing', routeVisible);
+  setLayerVisibility('highway-circumference-route-line', routeVisible);
+  setLayerVisibility('highway-circumference-route-connector-casing', routeVisible);
+  setLayerVisibility('highway-circumference-route-connector-line', routeVisible);
   refreshHighwayGradient();
 }
 
@@ -127,7 +141,7 @@ function setParentControlHidden(control: Element, hidden: boolean): void {
 export function syncCircumferenceCriterionControls(): void {
   const highwayMode = highwayCriterionActive();
   const distance =
-    highwayMode && highwayData
+    highwayMode && highwayData && highwayRouteEligible()
       ? circumferenceGradientDistanceForArea(highwayData.route.areaSquareMeters)
       : CIRCUMFERENCE_GRADIENT_MAX_DISTANCE_METERS;
   const legend = document.querySelector('.circumference-legend');
@@ -150,7 +164,7 @@ export function syncCircumferenceCriterionControls(): void {
     : 'Line or transfer details';
   circumferenceMethodNoteEl.textContent = highwayMode
     ? 'Solid lines are separated 2+ lane general-purpose mainlines; dashed lines join closest-tangent midpoints of opposing ramps, continuing along the mainline where their joins are staggered. Separated express lanes and collector/distributor roads use the same two-way ramp rules. One-way-only ramps are excluded. Only explicit paired endpoints form graph junctions—grade-separated crossings do not. The thick route is the largest validated detailed simple boundary.'
-    : 'All metro networks stay visible, including metros without a circle. Each result card is the largest circle that does not reuse another result’s rail segments and focuses it on the map; clicking any visible line, platform, transfer, street, or station updates this final section directly.';
+    : 'Eligible metro segments stay visible even if they form no circle. Station transfers connect eligible rides. Each result card focuses the map on an independent circle.';
 }
 
 function replaceMetadata(details: readonly MetadataDetail[]): void {
@@ -238,20 +252,21 @@ function highwayResultCard(data: HighwayCircumferenceSummary): HTMLElement {
 
   const summary = document.createElement('p');
   summary.className = 'result-summary';
-  summary.textContent =
-    'Largest validated continental cycle expanded through explicit paired-centerline topology · mainlines plus reciprocal ramp pairs · WGS84 ellipsoidal area';
+  summary.textContent = `Segment grades: ${(data.route.segmentGrades ?? ['unclassified']).map(gradeLabel).join(', ')} · mainlines plus reciprocal ramp pairs · WGS84 ellipsoidal area`;
   result.append(summary);
   return result;
 }
 
 export function renderHighwayResults(): void {
-  if (highwayData) {
+  if (highwayData && highwayRouteEligible()) {
     circumferenceResultsEl.replaceChildren(highwayResultCard(highwayData));
     return;
   }
   const loading = document.createElement('p');
   loading.className = 'result-empty';
-  loading.textContent = 'Loading the North American highway network…';
+  loading.textContent = highwayData
+    ? 'No published road circle matches the allowed grades.'
+    : 'Loading the North American highway network…';
   circumferenceResultsEl.replaceChildren(loading);
 }
 
@@ -271,6 +286,7 @@ export function refreshHighwayGradient(): void {
   if (
     !data ||
     !highwayCriterionActive() ||
+    !highwayRouteEligible() ||
     runtime.activeProduct !== 'circumference' ||
     !routeGradientToggle.checked
   ) {
@@ -316,7 +332,7 @@ export function refreshHighwayGradient(): void {
 export function fitHighwayCircumference({
   animate = true,
 }: { readonly animate?: boolean } = {}): void {
-  if (!highwayData) return;
+  if (!highwayData || !highwayRouteEligible()) return;
   map.fitBounds(highwayData.route.bounds, {
     padding: compactPanelQuery.matches ? 30 : 56,
     duration: animate ? 620 : 0,
@@ -330,6 +346,16 @@ function renderHighwayCircumference({
   if (!data) return;
   syncCircumferenceCriterionControls();
   renderHighwayResults();
+  syncHighwayLayerVisibility();
+  if (!highwayRouteEligible()) {
+    circumferenceSelectionTypeEl.textContent = 'Nothing selected';
+    circumferenceNameEl.textContent = 'No matching road circle';
+    circumferenceSummaryEl.textContent =
+      'The visible motorway network provides map context.';
+    circumferenceMetadataEl.replaceChildren();
+    updateStatus('No matching road circle');
+    return;
+  }
   circumferenceSelectionTypeEl.textContent = 'Selected highway circle';
   circumferenceNameEl.textContent = 'North America controlled-access maximum';
   circumferenceSummaryEl.textContent =
@@ -380,7 +406,6 @@ function renderHighwayCircumference({
   routeAvoidSegmentButton.disabled = true;
   routeClearSegmentsButton.disabled = true;
   positionHighwayGradient();
-  syncHighwayLayerVisibility();
   if (fit && runtime.activeProduct === 'circumference') {
     fitHighwayCircumference();
   }
@@ -449,11 +474,12 @@ export async function prepareHighwayCircumference({
   }
   try {
     await loadHighwayCircumference();
-    if (!highwayCriterionActive()) return;
+    if (!highwayCriterionActive() || runtime.activeProduct !== 'circumference') return;
     renderHighwayCircumference({ fit });
   } catch (error) {
     console.error(error);
     highwayPromise = null;
+    if (!highwayCriterionActive() || runtime.activeProduct !== 'circumference') return;
     const empty = document.createElement('p');
     empty.className = 'result-empty';
     empty.textContent = 'The North American highway network could not be loaded.';

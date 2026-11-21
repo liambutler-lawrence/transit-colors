@@ -1478,6 +1478,49 @@ body {
   gap: 8px;
 }
 
+.grade-control {
+  min-width: 0;
+  margin: 6px 0 0;
+  padding: 0;
+  border: 0;
+}
+
+.grade-control legend {
+  margin-bottom: 6px;
+  padding: 0;
+  font-size: 0.78rem;
+  font-weight: 600;
+}
+
+.grade-control .toggles label:last-child {
+  grid-column: 1 / -1;
+}
+
+.grade-key {
+  color: var(--muted);
+  font-size: 0.72rem;
+  line-height: 1.42;
+}
+
+.grade-key summary {
+  cursor: pointer;
+}
+
+.grade-key dl {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 5px 8px;
+  margin: 6px 0 0;
+}
+
+.grade-key dt {
+  font-weight: 600;
+}
+
+.grade-key dd {
+  margin: 0;
+}
+
 .geometry-toggle {
   display: flex;
   align-items: flex-start;

@@ -401,13 +401,20 @@
               </div>
 
               <div class="route-control criterion-control">
-                <label for="route-criterion">Circumference criterion</label>
+                <label for="route-criterion">Network</label>
                 <select id="route-criterion">
-                  <option value="metro">Metro · free transfers</option>
-                  <option value="passenger-rail" disabled>Passenger rail · next</option>
-                  <option value="motorway">Controlled-access divided highways</option>
-                  <option value="four-lane" disabled>4-lane roads · next</option>
+                  <option value="transit">Transit</option>
+                  <option value="road">Road</option>
                 </select>
+                <fieldset class="grade-control" aria-describedby="route-grade-coverage">
+                  <legend>Allowed segment grades</legend>
+                  <div class="toggles" id="route-grades"></div>
+                </fieldset>
+                <p id="route-grade-coverage"></p>
+                <details class="grade-key">
+                  <summary>Grade definitions</summary>
+                  <dl id="route-grade-key"></dl>
+                </details>
                 <label class="geometry-toggle">
                   <input id="toggle-track-geometry" type="checkbox" checked />
                   <span>
@@ -508,11 +515,9 @@
               </div>
 
               <p id="circumference-method-note" class="method-note">
-                All metro networks stay visible, including metros without a circle. Each
-                result card is the largest circle that does not reuse another result's
-                rail segments and focuses it on the map; clicking any visible line,
-                platform, transfer, street, or station updates this final section
-                directly.
+                Eligible metro segments stay visible even if they form no circle.
+                Station transfers connect eligible rides. Each result card focuses the
+                map on an independent circle.
               </p>
             </section>
           </div>
