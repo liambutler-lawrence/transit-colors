@@ -350,6 +350,17 @@
       ]
     },
     {
+      "corridor": "Line 3 Deportivo 18 de Marzo to Indios Verdes, with grade-separated road and station pedestrian access",
+      "grade": "A",
+      "sources": [
+        "https://almacenfica.blob.core.windows.net/imagenes-fundacion-ica-org-mx/FICA-IMAGENES/Libro_Digitales/Revista%20ICA/REVISTA_NUM%209.pdf",
+        "https://www.obras.cdmx.gob.mx/storage/app/media/cetram/CETRAM%20INDIOS%20VERDES.pdf",
+        "https://www.openstreetmap.org/way/1126581929/history",
+        "https://www.openstreetmap.org/changeset/149922030"
+      ],
+      "segmentIds": ["network-pd9qkz"]
+    },
+    {
       "corridor": "Line 4 paired passenger running tracks",
       "grade": "A",
       "sources": [

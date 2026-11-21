@@ -40,6 +40,15 @@ rail and road crossings against the structures and access described by the sourc
 Where the sources document a single regular passenger track at a terminal throat, that
 section sets the segment's grade even if the corridor widens farther from the station.
 
+At Indios Verdes, the mapped crossing marker originated in an old station footway that
+was documented as a pedestrian tunnel before it was removed during entrance remapping.
+The city plans show the underground station access, and the Line 3 construction record
+documents the separated road crossings on the approach.
+[OpenStreetMap footway history](https://www.openstreetmap.org/way/1126581929/history) ·
+[CETRAM project plans](https://www.obras.cdmx.gob.mx/storage/app/media/cetram/CETRAM%20INDIOS%20VERDES.pdf)
+·
+[COMETRO construction report](https://almacenfica.blob.core.windows.net/imagenes-fundacion-ica-org-mx/FICA-IMAGENES/Libro_Digitales/Revista%20ICA/REVISTA_NUM%209.pdf)
+
 The selector excludes ride segments without evidence. Track data currently covers metro
 services. Busways and other passenger rail need to be added to the graph before their
 grades can be used. Filtered transit circles use eligible precomputed candidates and

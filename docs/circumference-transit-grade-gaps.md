@@ -3,15 +3,6 @@
 This list covers every ride in the published transit graph awaiting a grade.
 Circumference searches exclude these rides until their grades can be verified.
 
-## Mexico City
-
-- **Deportivo 18 de Marzo – Indios Verdes, Line 3** (`network-pd9qkz`). OpenStreetMap
-  tags a pedestrian crossing on the running track but shows no intersecting path. STC
-  documents describe the two tracks in this part of Line 3. The crossing's existence,
-  grade separation, and access still need verification.
-  [OpenStreetMap crossing node](https://www.openstreetmap.org/node/10301412251) ·
-  [STC track maintenance report](https://www.metro.cdmx.gob.mx/comunicacion/nota/avanza-en-50-los-trabajos-de-mantenimiento-en-la-zona-de-vias-en-la-interestacion-potrero-deportivo-18-de-marzo-de-la-linea-3-del-metro)
-
 ## New York City metro
 
 - **145 St (A/C level) – 145 St (B/D level), D train** (`network-skzn4j`). The mapped
