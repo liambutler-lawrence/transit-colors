@@ -794,6 +794,16 @@
       ]
     },
     {
+      "corridor": "D express from 125 St to the lower level at 145 St via the IND flying junction",
+      "grade": "A",
+      "sources": [
+        "https://www.mta.info/schedules/subway/d-train",
+        "https://www.nytransitmuseum.org/wp-content/uploads/2026/03/DEEP-DIVE-REVISED-IND-100-years-3-22-26.pdf#page=11",
+        "https://images.cf.nycsubway.org/images/trackmap/detail-135.png"
+      ],
+      "segmentIds": ["network-3ow1vv"]
+    },
+    {
       "corridor": "Franklin Avenue Shuttle single regular passenger track at Prospect Park",
       "grade": "A-",
       "sources": [

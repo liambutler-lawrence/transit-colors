@@ -461,6 +461,36 @@ assert.ok(
       ),
   ),
 );
+
+const shortcutWithTransfer = buildCircumferenceCandidates(shortcutStations, {
+  routes: {
+    local: { mode: 'subway', name: 'L' },
+    express: { mode: 'subway', name: 'E' },
+  },
+  graph: {
+    e: {
+      start: [
+        ['local-1', 1, 'local/0'],
+        ['end', 1, 'express/0'],
+      ],
+      'local-2': [['end', 1, 'local/0']],
+    },
+    t: { 'local-1': [['local-2', 3]] },
+  },
+});
+assert.deepEqual(
+  shortcutWithTransfer.network.segments
+    .filter((segment) => segment.lines.includes('E'))
+    .map(({ from, to, type }) => [from.id, to.id, type]),
+  [['end', 'start', 'ride']],
+);
+assert.deepEqual(
+  shortcutWithTransfer.network.segments
+    .filter(({ from, to }) => from.id === 'local-1' && to.id === 'local-2')
+    .map(({ type }) => type),
+  ['transfer'],
+);
+
 const curvedSquareSchedules = structuredClone(squareSchedules);
 curvedSquareSchedules.graph.g = {
   a: [
@@ -530,7 +560,10 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
   const winner = result.candidates[0];
 
   assert.ok(winner);
-  assert.ok(winner.areaSquareMeters / 1_000_000 > expectedMinimumAreaKm2);
+  assert.ok(
+    winner.areaSquareMeters / 1_000_000 > expectedMinimumAreaKm2,
+    `${areaKey}: expected a candidate over ${expectedMinimumAreaKm2} km², got ${winner.areaSquareMeters / 1_000_000}`,
+  );
   assert.equal(new Set(winner.nodeIds).size, winner.nodeIds.length);
   assert.ok(winner.coordinates.length > winner.nodeIds.length + 1);
   assert.ok(winner.lines.length > 1);
@@ -664,6 +697,15 @@ for (const [areaKey, expectedMinimumAreaKm2] of [
       mondayNoonRideLines('gtfs/mta-subway/246', 'gtfs/mta-subway/247'),
       ['2', '5'],
     );
+    assert.deepEqual(
+      mondayNoonRideLines('gtfs/mta-subway/A15', 'gtfs/mta-subway/D13'),
+      ['D'],
+    );
+    assert.equal(
+      networkRideSegment('gtfs/mta-subway/A12', 'gtfs/mta-subway/D13'),
+      undefined,
+    );
+    assert.ok(hasNetworkTransfer('gtfs/mta-subway/A12', 'gtfs/mta-subway/D13'));
     assert.equal(
       mondayNoonNetwork.stations.find((station) => station.id === 'gtfs/mta-subway/250')
         ?.label,

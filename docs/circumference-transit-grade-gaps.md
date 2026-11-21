@@ -5,12 +5,6 @@ Circumference searches exclude these rides until their grades can be verified.
 
 ## New York City metro
 
-- **145 St (A/C level) – 145 St (B/D level), D train** (`network-skzn4j`). The mapped
-  ride has zero length and connects two levels of the same station. The associated D
-  service data describes 125 St – 145 St. The graph needs a corrected track link before
-  this ride can be graded.
-  [NYC Subway track map](https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/)
-  · [NYCT engineering drawings](https://map.subs.nyc/)
 - **Harrison – Journal Square, PATH Newark–World Trade Center** (`network-1o200yb`). FRA
   crossing 969865J and OpenStreetMap show a private road crossing an active PATH main
   track at grade. Whether the road is exclusively for railroad maintenance remains
