@@ -16,6 +16,7 @@ import { PolygonHitIndex } from './polygon-hit-index.ts';
 import {
   calculateDistrictAssignments,
   districtPlanSchema,
+  districtRequestSchema,
   prepareDistrictBlocks,
 } from './representative-districts.ts';
 
@@ -114,12 +115,55 @@ test('nested circles assign whole blocks and report their full selection areas',
   }
 });
 
+test('Reock circles can choose a larger circle for a more compact district', () => {
+  const { unproject } = localEqualAreaProjection([-72.7, 41.6]);
+  const blocks = prepareDistrictBlocks(
+    [
+      [-50, 5, 5],
+      [50, 5, 5],
+      [1000, 100, 150],
+      [1200, 100, 150],
+    ].map(([x, halfWidth, halfHeight]) => ({
+      center: unproject([x, 0]),
+      population: 2,
+      urbanPopulation: 2,
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [x - halfWidth, -halfHeight],
+            [x + halfWidth, -halfHeight],
+            [x + halfWidth, halfHeight],
+            [x - halfWidth, halfHeight],
+            [x - halfWidth, -halfHeight],
+          ].map(unproject),
+        ],
+      },
+    })),
+  );
+  const [smallest] = calculateDistrictAssignments(blocks, {
+    method: 'circles',
+    seats: 2,
+  });
+  const [compact] = calculateDistrictAssignments(blocks, {
+    method: 'reock-circles',
+    seats: 2,
+  });
+  assert.deepEqual(smallest.blocks, [0, 1]);
+  assert.deepEqual(compact.blocks, [2, 3]);
+  assert.equal(compact.properties.population, 4);
+  assert.ok(compact.properties.radiusMeters > smallest.properties.radiusMeters);
+  const expectedReock = (400 * 300) / (Math.PI * 250 ** 2);
+  assert.ok(Math.abs(compact.properties.reock - expectedReock) < 1e-6);
+});
+
 test('published Connecticut plans clip the coast and count every resident once', () => {
   // Clipping shared edges can leave sub-metre floating-point slivers when a
   // second geometry engine overlays the GeoJSON.
   const exteriorArea = (polygons) =>
     polygons.reduce((sum, [outer]) => sum + geodesicPolygonAreaSquareMeters(outer), 0);
-  for (const method of ['knife', 'circles']) {
+  for (const method of districtRequestSchema.shape.method.options) {
+    const maximumDeviation = method === 'reock-circles' ? 0.0025 : 0.001;
     for (let seats = 2; seats <= 8; seats += 1) {
       const file = new URL(
         `../data/connecticut-district-plans/${method}-${seats}.json`,
@@ -178,9 +222,11 @@ test('published Connecticut plans clip the coast and count every resident once',
         'The outline still covers the isolated Barkhamsted Reservoir',
       );
       for (const { population, reock, radiusMeters, areaSquareMeters } of districts) {
-        assert.ok(Math.abs(population - plan.target) / plan.target < 0.001);
+        assert.ok(Math.abs(population - plan.target) / plan.target < maximumDeviation);
         assert.ok(areaSquareMeters > 0);
-        if (method === 'knife') assert.ok(reock > 0 && reock <= 1);
+        if (method === 'circles') assert.equal(reock, null);
+        else assert.ok(reock > 0 && reock <= 1);
+        if (method === 'knife') assert.equal(radiusMeters, null);
         else assert.ok(radiusMeters > 0);
       }
       const geometries = plan.districts.features.map(

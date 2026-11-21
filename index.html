@@ -973,6 +973,7 @@
                 <select id="district-method">
                   <option value="knife">Moving knife</option>
                   <option value="circles">Smallest circles</option>
+                  <option value="reock-circles">Reock circles</option>
                 </select>
                 <label for="district-seats">Districts</label>
                 <select id="district-seats">
@@ -994,6 +995,11 @@
                   Each round finds the smallest circle that reaches the population
                   target using unassigned blocks. The map follows the boundaries of
                   those blocks. Reported areas measure the full selection circles.
+                </p>
+                <p id="district-reock-circles-method" hidden>
+                  Grow circles from multiple centers to reach the population target.
+                  Each round takes the candidate whose assigned blocks have the highest
+                  Reock compactness score.
                 </p>
               </div>
             </section>
