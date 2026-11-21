@@ -1,22 +1,49 @@
+import { z } from 'zod';
+import rawReviews from '../../data/circumference-transit-grades.json';
+import { transitGradeSchema } from '../circumference/grades.js';
 import { circumferenceGeometryVariantsSchema } from '../circumference/schema.js';
-import type { CircumferenceGeometryVariants } from '../circumference/types.js';
+import type {
+  CircumferenceGeometryVariants,
+  CircumferenceModeResult,
+} from '../circumference/types.js';
 import type { AreaKey } from './types.js';
 
-// Singapore's two central passenger corridors between Little India and Chinatown.
-// Downtown Line DT12–DT19 and North East Line NE4–NE7 use separate running
-// tracks in underground alignments (LTA line profiles and contract C706).
-const singaporeGradeAPairs = new Set([
-  'network-1ej1vm7', // Little India – Rochor
-  'network-b4iaz1', // Rochor – Bugis
-  'network-ufupkj', // Bugis – Promenade
-  'network-184h9vj', // Promenade – Bayfront
-  'network-pohz23', // Bayfront – Downtown
-  'network-1l43n9n', // Downtown – Telok Ayer
-  'network-l487db', // Telok Ayer – Chinatown
-  'network-1x71smj', // Chinatown – Clarke Quay
-  'network-19x2tmx', // Clarke Quay – Dhoby Ghaut
-  'network-177w2xr', // Dhoby Ghaut – Little India
-]);
+const reviewSchema = z.object({
+  corridor: z.string().min(1),
+  grade: transitGradeSchema,
+  sources: z.array(z.url()).min(1),
+  segmentIds: z.array(z.string().min(1)).min(1),
+});
+const reviews = z
+  .partialRecord(
+    z.enum(['cdmx', 'nyc', 'singapore', 'atlanta', 'athens']),
+    z.array(reviewSchema),
+  )
+  .parse(rawReviews);
+
+export function applyTransitGradeReviews(
+  variants: CircumferenceGeometryVariants,
+  areaKey: AreaKey,
+): CircumferenceGeometryVariants {
+  const gradeById = new Map(
+    reviews[areaKey]?.flatMap(({ grade, segmentIds }) =>
+      segmentIds.map((id): [string, z.infer<typeof transitGradeSchema>] => [id, grade]),
+    ),
+  );
+  const annotate = (variant: CircumferenceModeResult): CircumferenceModeResult => ({
+    ...variant,
+    network: {
+      ...variant.network,
+      segments: variant.network.segments.map((segment) => {
+        const grade = gradeById.get(segment.id);
+        return segment.type === 'ride' && grade !== undefined
+          ? { ...segment, grade }
+          : segment;
+      }),
+    },
+  });
+  return { straight: annotate(variants.straight), track: annotate(variants.track) };
+}
 
 export async function fetchCircumferenceGeometryVariants(
   url: string,
@@ -28,16 +55,8 @@ export async function fetchCircumferenceGeometryVariants(
       `Failed to load precomputed circumference data: ${response.status} ${response.statusText}`,
     );
   }
-  const variants = circumferenceGeometryVariantsSchema.parse(await response.json());
-  if (areaKey !== 'singapore') return variants;
-  for (const { network } of Object.values(variants)) {
-    network.segments = network.segments.map((segment) =>
-      segment.type === 'ride' &&
-      segment.grade === undefined &&
-      singaporeGradeAPairs.has(segment.id)
-        ? { ...segment, grade: 'A' }
-        : segment,
-    );
-  }
-  return variants;
+  return applyTransitGradeReviews(
+    circumferenceGeometryVariantsSchema.parse(await response.json()),
+    areaKey,
+  );
 }

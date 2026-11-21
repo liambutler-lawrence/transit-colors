@@ -116,10 +116,6 @@ export const highwayCircumferenceSummarySchema = highwayCircumferenceDataSchema
       .extend({
         bounds: z.tuple([coordinateSchema, coordinateSchema]),
         gradientBounds: z.tuple([z.number(), z.number(), z.number(), z.number()]),
-        segmentGrades: z
-          .array(roadGradeSchema.or(z.literal('unclassified')))
-          .min(1)
-          .optional(),
       }),
   });
 export type HighwayCircumferenceSummary = z.infer<
@@ -134,11 +130,6 @@ export function highwayCircumferenceSummary(
     route: {
       ...data.route,
       bounds: highwayBounds(data.route.coordinates),
-      segmentGrades: [
-        ...new Set(
-          data.route.segments.map((segment) => segment.grade ?? 'unclassified'),
-        ),
-      ],
       gradientBounds: circumferenceGradientBounds(
         data.route.coordinates,
         circumferenceGradientDistanceForArea(data.route.areaSquareMeters),
@@ -149,6 +140,7 @@ export function highwayCircumferenceSummary(
 export type HighwayFeatureProperties = z.infer<typeof highwayFeaturePropertiesSchema>;
 
 export const highwayMapFeaturePropertiesSchema = highwayFeaturePropertiesSchema.extend({
+  segment_id: z.number().int().positive().optional(),
   kind: z
     .enum([
       'highway-network-mainline',

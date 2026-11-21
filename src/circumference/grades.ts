@@ -8,10 +8,10 @@ export const TRANSIT_GRADES = transitGradeSchema.options;
 export type CircumferenceNetworkMode = 'road' | 'transit';
 export type RoadGrade = (typeof ROAD_GRADES)[number];
 export type TransitGrade = (typeof TRANSIT_GRADES)[number];
-export type GradeOption = RoadGrade | TransitGrade | 'unclassified';
+export type GradeOption = RoadGrade | TransitGrade;
 
 export function gradeOptions(mode: CircumferenceNetworkMode): readonly GradeOption[] {
-  return [...(mode === 'road' ? ROAD_GRADES : TRANSIT_GRADES), 'unclassified'];
+  return mode === 'road' ? ROAD_GRADES : TRANSIT_GRADES;
 }
 
 export function readGradeOptions(
@@ -53,11 +53,5 @@ export function gradeDescription(
       return 'Grade separated busway with a dedicated lane each way';
     case 'BX':
       return 'Dedicated busway lane each way, at-grade crossings allowed';
-    case 'unclassified':
-      return 'Existing segments without a verified grade';
   }
-}
-
-export function gradeLabel(grade: GradeOption): string {
-  return grade === 'unclassified' ? 'Unclassified' : grade;
 }

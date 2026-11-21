@@ -1,0 +1,684 @@
+{
+  "atlanta": [
+    {
+      "corridor": "MARTA heavy rail running lines",
+      "grade": "A",
+      "sources": [
+        "https://itsmarta.com/wayside-docs/Track-Safety-Standards-OCT-2025.pdf",
+        "https://www.wmata.com/content/dam/wmata-com/migrated-assets/initiatives/plans/upload/2015-metrorail-capacity-white-paper.pdf",
+        "https://nara-media.s3.amazonaws.com/electronic-records/rg-399/FRA_Pubs/DOT-FRA-ORD-03-16.pdf",
+        "https://www.nycsubway.org/wiki/MARTA_Track_Map"
+      ],
+      "segmentIds": [
+        "network-12ol2bf",
+        "network-13ncdnz",
+        "network-14agn4j",
+        "network-1511wuj",
+        "network-16pdtbv",
+        "network-19lg8b",
+        "network-1fbx4lb",
+        "network-1l9a8db",
+        "network-1q4tyd7",
+        "network-1rlp6kb",
+        "network-1rn0nx7",
+        "network-1sgw2ib",
+        "network-1vu6jyz",
+        "network-65x7qj",
+        "network-6cgvdf",
+        "network-6thi8n",
+        "network-7frf87",
+        "network-7gkim7",
+        "network-a22153",
+        "network-bhcdg7",
+        "network-cvgpc3",
+        "network-d17m8v",
+        "network-eumjtn",
+        "network-fb7s7r",
+        "network-ia600f",
+        "network-j952gf",
+        "network-kug9b3",
+        "network-lqx2j",
+        "network-njn31z",
+        "network-odgh17",
+        "network-qllkfj",
+        "network-r4pgt7",
+        "network-tny3pv",
+        "network-v1on8f",
+        "network-vspgh7",
+        "network-vz93ln",
+        "network-yt3fu7"
+      ]
+    }
+  ],
+  "athens": [
+    {
+      "corridor": "Line 1 underground trunk between Monastiraki and Attiki",
+      "grade": "A",
+      "sources": [
+        "https://www.emetro.gr/?lang=en&page_id=4449",
+        "https://commons.wikimedia.org/wiki/File:Omonoia_signalbox.jpg"
+      ],
+      "segmentIds": [
+        "network-135tfcf",
+        "network-1zny8r",
+        "network-o4hu6n"
+      ]
+    },
+    {
+      "corridor": "Line 2 underground passenger mainline",
+      "grade": "A",
+      "sources": [
+        "https://www.emetro.gr/?lang=en&page_id=4340",
+        "https://www.emetro.gr/?lang=en&p=5185",
+        "https://www.academia.edu/100955157/Analysis_of_failures_of_guardrail_base_plates_in_scissors_crossovers_of_the_Athens_Metro_The_role_of_foundation_structure_interaction"
+      ],
+      "segmentIds": [
+        "network-18s8wfr",
+        "network-1agohez",
+        "network-1jfs17z",
+        "network-1nqp3w9",
+        "network-1og5j4l",
+        "network-1psgq57",
+        "network-1rnf543",
+        "network-1sag8ob",
+        "network-1ws4lpz",
+        "network-2o7ar3",
+        "network-4v9cxv",
+        "network-d7iok7",
+        "network-igy7ll",
+        "network-ky827f",
+        "network-swfhxj",
+        "network-tpomgl",
+        "network-u7epbb",
+        "network-v4jn1v",
+        "network-ytmcjd"
+      ]
+    },
+    {
+      "corridor": "Line 3 underground passenger mainline to Doukissis Plakentias",
+      "grade": "A",
+      "sources": [
+        "https://www.emetro.gr/?lang=en&page_id=4182",
+        "https://www.emetro.gr/?lang=en&page_id=4340"
+      ],
+      "segmentIds": [
+        "network-10ao5l9",
+        "network-11vq2cb",
+        "network-12xeo67",
+        "network-1dh25hf",
+        "network-1djtsu3",
+        "network-1f59go3",
+        "network-1k15txf",
+        "network-1l0m74x",
+        "network-1lmu6v",
+        "network-1qqw6or",
+        "network-1vgsct7",
+        "network-2vio7v",
+        "network-6l2u77",
+        "network-ege3mj",
+        "network-jhi1an",
+        "network-kpeath",
+        "network-mbdlrv",
+        "network-nn81zv",
+        "network-o8i7i7",
+        "network-s667zv",
+        "network-wi30m3",
+        "network-zx78xn"
+      ]
+    }
+  ],
+  "cdmx": [
+    {
+      "corridor": "Line 1 passenger running tracks",
+      "grade": "A",
+      "sources": [
+        "https://metro.cdmx.gob.mx/storage/app/media/Banners/aclaraciones170920/bases/anexo%20I/anexo-i-17-sept.pdf",
+        "https://www.metro.cdmx.gob.mx/la-red/linea-1"
+      ],
+      "segmentIds": [
+        "network-11f3aed",
+        "network-12iq9ff",
+        "network-12r9jcr",
+        "network-1a3b9xp",
+        "network-1cr32ql",
+        "network-1hh3a4b",
+        "network-1la4qw1",
+        "network-1n5kpkp",
+        "network-1nsme2v",
+        "network-1phjfwf",
+        "network-1sfprzz",
+        "network-1t54lsz",
+        "network-1tf8c53",
+        "network-1xp9nsb",
+        "network-exgoth",
+        "network-nh9av",
+        "network-qfz4wx",
+        "network-v39kgr"
+      ]
+    },
+    {
+      "corridor": "Line 7 underground running tracks",
+      "grade": "A",
+      "sources": [
+        "https://www.metro.cdmx.gob.mx/la-red/linea-7",
+        "https://www.congresocdmx.gob.mx/media/documentos/7a3ba6e97e334562537dfa315411c241096ba4c7.pdf"
+      ],
+      "segmentIds": [
+        "network-18re9a3",
+        "network-18yvf2v",
+        "network-1ayberr",
+        "network-1nxpacv",
+        "network-1ou0j1p",
+        "network-1ozz9j3",
+        "network-1qohgy9",
+        "network-7yybsz",
+        "network-hhv9db",
+        "network-n6skyd",
+        "network-nj0fej",
+        "network-sseouz"
+      ]
+    },
+    {
+      "corridor": "Line 9 tunnel and elevated passenger running tracks",
+      "grade": "A",
+      "sources": [
+        "https://www.metro.cdmx.gob.mx/la-red/linea-9",
+        "https://www.congresocdmx.gob.mx/media/documentos/25927f850ed9cb27a52dcbf44a8dd25e50ddd2a4.pdf"
+      ],
+      "segmentIds": [
+        "network-11wd7z7",
+        "network-168mojl",
+        "network-1cb03yz",
+        "network-1cexb0z",
+        "network-1fws2yj",
+        "network-1khknrv",
+        "network-1pf3f0f",
+        "network-29e819",
+        "network-g6ojrr",
+        "network-mk0vhb",
+        "network-pev8fh"
+      ]
+    },
+    {
+      "corridor": "Line 12 passenger running tracks",
+      "grade": "A",
+      "sources": [
+        "https://metro.cdmx.gob.mx/storage/app/media/Informacion%20L12/Rehabilitacion%20y%20Reforzamiento/2.IMT/21-imt-levantamiento-alta-tecnologia-subterraneo-atlalilco-mixcoac-r.pdf",
+        "https://metro.cdmx.gob.mx/storage/app/media/Informacion%20L12/Antecedentes%20Linea%2012/Linea%20Segura/Acciones%20coordinadas%20para%20garantizar%20operacion%20segura.pdf"
+      ],
+      "segmentIds": [
+        "network-10b2d93",
+        "network-19uh8e3",
+        "network-1aovfzv",
+        "network-1hbxkxz",
+        "network-1kbsgud",
+        "network-1qzxold",
+        "network-1sw6o4t",
+        "network-1wucr45",
+        "network-3pbjsr",
+        "network-4poe53",
+        "network-925s7f",
+        "network-9simg3",
+        "network-czoxn",
+        "network-mdkzer",
+        "network-poaqaj",
+        "network-rbej7b",
+        "network-sfbhmj",
+        "network-uo7wvr",
+        "network-w6urnh"
+      ]
+    }
+  ],
+  "nyc": [
+    {
+      "corridor": "Independent Canarsie and Flushing running tracks",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://www.mta.info/document/87261"
+      ],
+      "segmentIds": [
+        "network-14k18g3",
+        "network-15ayxcr",
+        "network-15qrx57",
+        "network-15qwzwb",
+        "network-1811mx7",
+        "network-18xx8vb",
+        "network-19rsruj",
+        "network-1hxa80j",
+        "network-1hxp25v",
+        "network-1m02xcz",
+        "network-1m4fj8z",
+        "network-1m7jj8b",
+        "network-1mhq02r",
+        "network-1pk2juj",
+        "network-1smg29f",
+        "network-1th71qb",
+        "network-1u6h8yb",
+        "network-1v3xbgz",
+        "network-1vfh3e3",
+        "network-1vt8t7v",
+        "network-1wd79kb",
+        "network-3j0pcb",
+        "network-5oktv7",
+        "network-6utzln",
+        "network-953iw3",
+        "network-95u24z",
+        "network-9qii2b",
+        "network-bvsl97",
+        "network-ctr43f",
+        "network-d2ywej",
+        "network-d550dv",
+        "network-ghlbij",
+        "network-gniz4z",
+        "network-he7e5n",
+        "network-m0a65f",
+        "network-mfdnkb",
+        "network-mrm2r",
+        "network-n7eirn",
+        "network-nt512b",
+        "network-o623bv",
+        "network-pst9aj",
+        "network-qspzlv",
+        "network-tvrk7f",
+        "network-umjupn",
+        "network-wjdrbf",
+        "network-xxpx23"
+      ]
+    },
+    {
+      "corridor": "Broadway local running tracks north of the shared IRT corridor",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/"
+      ],
+      "segmentIds": [
+        "network-108bctv",
+        "network-115gxtf",
+        "network-16qc3kj",
+        "network-173dd9n",
+        "network-17nak63",
+        "network-18v4akr",
+        "network-1cpybfv",
+        "network-1feu5i3",
+        "network-1gxwfar",
+        "network-1pb3idn",
+        "network-1wxs0bv",
+        "network-8m099n",
+        "network-9hrv",
+        "network-g5wl2f",
+        "network-ioqf5v",
+        "network-j7aaz",
+        "network-qzecuj",
+        "network-rgol7r",
+        "network-tkdgkz",
+        "network-wm0d7n"
+      ]
+    },
+    {
+      "corridor": "Seventh Avenue trunk between 86th Street and Chambers Street",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/"
+      ],
+      "segmentIds": [
+        "network-12vst57",
+        "network-16gv83n",
+        "network-16pf45f",
+        "network-17kwkd7",
+        "network-180b7yj",
+        "network-1gueh2b",
+        "network-1k6iyrf",
+        "network-1l9tiaz",
+        "network-1t5zcj",
+        "network-1ulm30b",
+        "network-1yrv7qf",
+        "network-2a9ge3",
+        "network-4kwcbv",
+        "network-bqlsqj",
+        "network-dia0dn",
+        "network-dvi59v"
+      ]
+    },
+    {
+      "corridor": "Eighth Avenue and Fulton Street trunks between 42nd Street and Shepherd Avenue",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/"
+      ],
+      "segmentIds": [
+        "network-1083gbv",
+        "network-11i08kb",
+        "network-1agn017",
+        "network-1dbdvcb",
+        "network-1f31dhv",
+        "network-1flkiyr",
+        "network-1gcbkjv",
+        "network-1gs0sm3",
+        "network-1hkcdyb",
+        "network-1kudrm3",
+        "network-1qkgtzf",
+        "network-1qv7jc7",
+        "network-1ragjxn",
+        "network-1rlbcnn",
+        "network-1sr7mib",
+        "network-1u0ajbn",
+        "network-1yvezff",
+        "network-3q0gxn",
+        "network-8346zf",
+        "network-dvjsor",
+        "network-gbtxvf",
+        "network-hdij7f",
+        "network-n5xndf"
+      ]
+    },
+    {
+      "corridor": "Crosstown mainline from Court Square to Hoyt–Schermerhorn",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/"
+      ],
+      "segmentIds": [
+        "network-136xftf",
+        "network-13cwgd3",
+        "network-13woptn",
+        "network-1g6bl1v",
+        "network-1izy5ej",
+        "network-1onlnwj",
+        "network-1r6f9s7",
+        "network-1vi84e3",
+        "network-565nmj",
+        "network-l0i2sb",
+        "network-ynbucj",
+        "network-zeef9f"
+      ]
+    },
+    {
+      "corridor": "Staten Island Railway passenger line",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://en.wikipedia.org/wiki/History_of_the_Staten_Island_Railway#Grade_crossing_elimination"
+      ],
+      "segmentIds": [
+        "network-11gucj7",
+        "network-15q41hn",
+        "network-16ws4hn",
+        "network-18r6qnf",
+        "network-1915j0b",
+        "network-19luhob",
+        "network-1aond7f",
+        "network-1bltnlf",
+        "network-1gcuo6b",
+        "network-1h6oba3",
+        "network-1ip3epf",
+        "network-1jhljvf",
+        "network-1kizvw3",
+        "network-2vr0jr",
+        "network-b00rub",
+        "network-chrbg3",
+        "network-jt62gz",
+        "network-ksy4x7",
+        "network-p6vvcr",
+        "network-w5enn"
+      ]
+    },
+    {
+      "corridor": "Single-track end of Franklin Avenue Shuttle",
+      "grade": "A-",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://erausa.org/pdf/bulletin/1990s/1999/1999-09-bulletin.pdf"
+      ],
+      "segmentIds": [
+        "network-z63h57",
+        "network-zwqkur"
+      ]
+    },
+    {
+      "corridor": "Rogers and Lenox passenger junction approaches",
+      "grade": "B",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/"
+      ],
+      "segmentIds": [
+        "network-10rmekr",
+        "network-1811zen",
+        "network-ok2boz",
+        "network-u4mgwz"
+      ]
+    },
+    {
+      "corridor": "PATH Manhattan trunk and Downtown Hudson Tubes",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://www.panynj.gov/path/en/schedules-maps.html"
+      ],
+      "segmentIds": [
+        "network-1obu2b7",
+        "network-1ql6na3",
+        "network-1w9pxtn",
+        "network-764xff",
+        "network-cbap1f",
+        "network-w4ppzn"
+      ]
+    }
+  ],
+  "singapore": [
+    {
+      "corridor": "Downtown and North East running tracks",
+      "grade": "A",
+      "sources": [
+        "https://www.lta.gov.sg/content/ltagov/en/getting_around/public_transport/rail_network/downtown_line.html",
+        "https://www.lta.gov.sg/content/ltagov/en/getting_around/public_transport/rail_network/north_east_line.html",
+        "https://www.lumchang.com.sg/projects_uri/clarke-quay-station/",
+        "https://ic-group.org/fileadmin/Magazin_PDFs/Atzl_Sigl_ICRT99-LININGa_02.pdf"
+      ],
+      "segmentIds": [
+        "network-10exiu3",
+        "network-111mbpv",
+        "network-147iwgr",
+        "network-177w2xr",
+        "network-1782no3",
+        "network-17doneb",
+        "network-184h9vj",
+        "network-19x2tmx",
+        "network-1bliyor",
+        "network-1d3m38b",
+        "network-1d4x8dv",
+        "network-1duo5bz",
+        "network-1e240pv",
+        "network-1ej1vm7",
+        "network-1ey1gof",
+        "network-1l43n9n",
+        "network-1lkqwnv",
+        "network-1mt1hzf",
+        "network-1pnct3n",
+        "network-1t0xcv3",
+        "network-1u3pz27",
+        "network-1uhhf4b",
+        "network-1vh1l4b",
+        "network-1wjpscb",
+        "network-1x71smj",
+        "network-1xz9pul",
+        "network-1y4fowb",
+        "network-1yqauqb",
+        "network-6gpuh1",
+        "network-73ddpf",
+        "network-789eif",
+        "network-8cku77",
+        "network-b4iaz1",
+        "network-cw50iz",
+        "network-dt4ojv",
+        "network-eih9n1",
+        "network-ep3tjz",
+        "network-i9vbfv",
+        "network-l487db",
+        "network-mfw65n",
+        "network-pohz23",
+        "network-sd5o6n",
+        "network-szpb5r",
+        "network-tw071t",
+        "network-u30fdv",
+        "network-ufupkj",
+        "network-uvvop7",
+        "network-x53u2b",
+        "network-xln98j",
+        "network-y1w25l"
+      ]
+    },
+    {
+      "corridor": "Thomson–East Coast running tracks",
+      "grade": "A",
+      "sources": [
+        "https://www.lta.gov.sg/content/ltagov/en/getting_around/public_transport/rail_network/thomson_east_coast_line.html",
+        "https://www.lta.gov.sg/content/dam/ltagov/tender/doc/9367/1%20%20T307%20-%202nd%20PQ.pdf",
+        "https://www.lta.gov.sg/content/dam/ltagov/tender/doc/9746/T253A_PQ%20Notice.pdf"
+      ],
+      "segmentIds": [
+        "network-12hz40b",
+        "network-14vle47",
+        "network-161lnp7",
+        "network-1c6891n",
+        "network-1cengmr",
+        "network-1cv764r",
+        "network-1hxm7o3",
+        "network-1io18b3",
+        "network-1ip4k4r",
+        "network-1j8qdh7",
+        "network-1jz5w23",
+        "network-1o8xcb7",
+        "network-1oeoasr",
+        "network-1snbryz",
+        "network-1u9rfaz",
+        "network-1w2tlcr",
+        "network-4hz3sd",
+        "network-5kxoe9",
+        "network-akl2zd",
+        "network-de3pgz",
+        "network-e0qikb",
+        "network-hwuy7b",
+        "network-jueo9b",
+        "network-qe6lxb",
+        "network-w3klhv",
+        "network-x0u34r"
+      ]
+    },
+    {
+      "corridor": "Circle Line underground corridors away from the Promenade junction",
+      "grade": "A",
+      "sources": [
+        "https://www.lta.gov.sg/content/ltagov/en/getting_around/public_transport/rail_network/circle_line.html",
+        "https://www.lta.gov.sg/content/dam/ltagov/who_we_are/statistics_and_publications/books/pdf/Circle_Line_Book.pdf",
+        "https://www.lta.gov.sg/content/dam/ltagov/Interactive_map/pdf/CCL_Service_Adjustment_Brochure.pdf"
+      ],
+      "segmentIds": [
+        "network-10jljyz",
+        "network-10qu2gr",
+        "network-123s46z",
+        "network-13qck9d",
+        "network-17bf857",
+        "network-19qt4s3",
+        "network-1a6b69b",
+        "network-1hd958z",
+        "network-1q0nrl7",
+        "network-1uq8evf",
+        "network-1uu9fuf",
+        "network-1wuuu4b",
+        "network-1xrrm4d",
+        "network-1ybv61d",
+        "network-7a3efz",
+        "network-98ge6b",
+        "network-ci1de7",
+        "network-fxr6k9",
+        "network-gzaf9f",
+        "network-hf1j3f",
+        "network-mc1s23",
+        "network-ne5rnf",
+        "network-pbsgn",
+        "network-r7tff",
+        "network-s3bc3t",
+        "network-stghf7",
+        "network-txlwlz",
+        "network-z06ca3"
+      ]
+    },
+    {
+      "corridor": "North–South and East–West running tracks away from Tanah Merah",
+      "grade": "A",
+      "sources": [
+        "https://www.lta.gov.sg/content/ltagov/en/getting_around/public_transport/rail_network/north_south_line.html",
+        "https://www.lta.gov.sg/content/ltagov/en/getting_around/public_transport/rail_network/east_west_line.html",
+        "https://www.lta.gov.sg/content/dam/ltagov/industry_innovations/industry_matters/development_construction_resources/Building_Works_Restricted_Activities_in_Railway_Protection_Zone/Codes_of_Practice_Standards_Specifications_Guides_Forms/Code_of_Practice_for_Railway_Protection.pdf",
+        "https://www.lta.gov.sg/content/dam/ltagov/who_we_are/statistics_and_publications/Publications/PDF/LTA%20Connect_Feb2019_FA.pdf"
+      ],
+      "segmentIds": [
+        "network-10rhxb7",
+        "network-15x4ziz",
+        "network-19e47qj",
+        "network-1ara0k3",
+        "network-1awchod",
+        "network-1cnmu7",
+        "network-1fuhqvv",
+        "network-1gu7wcb",
+        "network-1henr0z",
+        "network-1hgl6wr",
+        "network-1i4wu3f",
+        "network-1kbyvyb",
+        "network-1kmdn5f",
+        "network-1nf0k4z",
+        "network-1o6mivn",
+        "network-1r5hdvf",
+        "network-1rc8dxf",
+        "network-1rwmocb",
+        "network-1rxf79h",
+        "network-1svi5jb",
+        "network-1vjv5kz",
+        "network-1vzq0fv",
+        "network-1x11n6z",
+        "network-1ytb3al",
+        "network-2pq66j",
+        "network-2wvd23",
+        "network-2wvpib",
+        "network-4mi51v",
+        "network-6oy7fj",
+        "network-708y1b",
+        "network-76eya3",
+        "network-8ewb3",
+        "network-9pr11b",
+        "network-9rti3j",
+        "network-azgbwz",
+        "network-e6p9nf",
+        "network-hf9ejf",
+        "network-hfdxfv",
+        "network-hrqeyz",
+        "network-i98mmz",
+        "network-idchpn",
+        "network-iijvuj",
+        "network-kul6jz",
+        "network-lalssz",
+        "network-lvttn",
+        "network-m5wiw9",
+        "network-n4pmuf",
+        "network-rgxb1r",
+        "network-tdhekr",
+        "network-v81gqz",
+        "network-v89gor",
+        "network-w1wkdf",
+        "network-zmgd6n"
+      ]
+    },
+    {
+      "corridor": "Expo–Changi Airport running tracks",
+      "grade": "A",
+      "sources": [
+        "https://www.lta.gov.sg/content/ltagov/en/getting_around/public_transport/rail_network/east_west_line.html",
+        "https://www.lta.gov.sg/content/dam/ltagov/industry_innovations/industry_matters/development_construction_resources/Building_Works_Restricted_Activities_in_Railway_Protection_Zone/Codes_of_Practice_Standards_Specifications_Guides_Forms/Code_of_Practice_for_Railway_Protection.pdf"
+      ],
+      "segmentIds": [
+        "network-1mqpph7"
+      ]
+    }
+  ]
+}
