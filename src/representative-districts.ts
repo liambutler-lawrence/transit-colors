@@ -206,6 +206,7 @@ function circleDistricts(
     .filter(({ population }) => population > 0)
     .map((tract) => ({ ...tract, point: project(tract.center) }));
   const features: DistrictPlan['districts']['features'] = [];
+  const earlierDisks: Coordinate[][][] = [];
   for (let number = 1; number <= seats; number += 1) {
     const quota = number === seats ? totalPopulation(remaining) : Math.ceil(target);
     const circle = minimumPopulationCircle(remaining, quota);
@@ -220,9 +221,12 @@ function circleDistricts(
         circle.center[1] + circle.radius * Math.sin(angle),
       ]);
     });
+    const disk = [ring];
+    const visibleArea = polygonClipping.difference(disk, ...earlierDisks);
+    earlierDisks.push(disk);
     features.push({
       type: 'Feature',
-      geometry: { type: 'Polygon', coordinates: [ring] },
+      geometry: { type: 'MultiPolygon', coordinates: visibleArea },
       properties: {
         number,
         population,

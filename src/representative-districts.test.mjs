@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 import test from 'node:test';
+import polygonClipping from 'polygon-clipping';
 
 import { minimumPopulationCircle } from './district-circles.ts';
 import { localEqualAreaProjection } from './geodesy.ts';
@@ -21,7 +22,7 @@ test('the smallest population circle can be centered between three tracts', () =
   assert.ok(Math.hypot(center[0], center[1] - 75) < 2);
 });
 
-test('nested circles each count their full area and only newly assigned residents', () => {
+test('nested circles cut a hole in the outer footprint and keep their full reported areas', () => {
   const { unproject } = localEqualAreaProjection([-72.7, 41.6]);
   const polygon = (x, y, halfSize) => ({
     type: 'Polygon',
@@ -50,7 +51,13 @@ test('nested circles each count their full area and only newly assigned resident
   }));
   const study = { outline: polygon(0, 0, 1100), tracts };
   const plan = calculateDistrictPlan(study, { method: 'circles', seats: 2 });
-  const [inner, outer] = plan.districts.features.map(({ properties }) => properties);
+  const [innerDistrict, outerDistrict] = plan.districts.features;
+  assert.deepEqual(
+    outerDistrict.geometry.coordinates.map((polygon) => polygon.length),
+    [2],
+  );
+  const inner = innerDistrict.properties;
+  const outer = outerDistrict.properties;
   assert.ok(Math.abs(inner.radiusMeters - 100) <= 1);
   assert.ok(Math.abs(outer.radiusMeters - 1000) < 0.001);
   assert.deepEqual([inner.population, outer.population], [4, 4]);
@@ -62,7 +69,7 @@ test('nested circles each count their full area and only newly assigned resident
   assert.ok(plan.totalAreaSquareMeters > outer.areaSquareMeters);
 });
 
-test('the Connecticut methods assign all 2020 Census residents once', () => {
+test('Connecticut plans assign every resident once and render disjoint circle districts', () => {
   const study = districtStudySchema.parse(
     JSON.parse(
       readFileSync(
@@ -89,6 +96,20 @@ test('the Connecticut methods assign all 2020 Census residents once', () => {
         assert.ok(areaSquareMeters > 0);
         if (method === 'knife') assert.ok(reock > 0 && reock <= 1);
         else assert.ok(radiusMeters > 0);
+      }
+      if (method === 'circles') {
+        for (const [index, { geometry }] of plan.districts.features.entries()) {
+          for (const later of plan.districts.features.slice(index + 1)) {
+            assert.deepEqual(
+              polygonClipping.intersection(
+                geometry.coordinates,
+                later.geometry.coordinates,
+              ),
+              [],
+              `Visible districts ${index + 1} and ${later.properties.number} overlap`,
+            );
+          }
+        }
       }
     }
   }
