@@ -2,7 +2,12 @@ name: Build representative district data
 
 on:
   push:
-    tags: ['districts-2020-v*', 'districts-2020-area-knife-v*']
+    tags:
+      [
+        'districts-2020-v*',
+        'districts-2020-area-knife-v*',
+        'districts-2020-apportioned-v*',
+      ]
 
 permissions:
   contents: read
@@ -12,6 +17,8 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.matrix.outputs.value }}
+      jobs: ${{ steps.matrix.outputs.jobs }}
+      state-count: ${{ steps.matrix.outputs.states }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -19,16 +26,33 @@ jobs:
       - name: List states to build
         id: matrix
         run: |
-          node -e 'console.log("value=" + JSON.stringify(require("./src/district-states.json").filter(({ code }) => code !== "CT").sort((a, b) => b.blocks - a.blocks).map(({ fips }) => fips)))' >> "$GITHUB_OUTPUT"
+          node <<'JS' >> "$GITHUB_OUTPUT"
+          const apportioned = process.env.GITHUB_REF_NAME.startsWith('districts-2020-apportioned-');
+          const builds = require('./src/district-states.json')
+            .filter(({ code }) => code !== 'CT')
+            .flatMap(({ fips, houseSeats, blocks }) => {
+              const counts = apportioned
+                ? [houseSeats - 1, houseSeats, houseSeats + 1].filter(
+                    (count) => count === 1 || count > 8
+                  )
+                : [0];
+              return counts.map((seats) => ({ fips, seats, priority: blocks * Math.max(seats, 1) }));
+            })
+            .sort((a, b) => b.priority - a.priority)
+            .map(({ fips, seats }) => ({ fips, seats }));
+          console.log('value=' + JSON.stringify(builds));
+          console.log('jobs=' + builds.length);
+          console.log('states=' + new Set(builds.map(({ fips }) => fips)).size);
+          JS
 
   build:
     needs: states
     runs-on: ubuntu-latest
-    timeout-minutes: 70
+    timeout-minutes: 120
     strategy:
       fail-fast: false
       matrix:
-        fips: ${{ fromJSON(needs.states.outputs.matrix) }}
+        include: ${{ fromJSON(needs.states.outputs.matrix) }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -55,8 +79,12 @@ jobs:
       - name: Build and package the state plans
         env:
           FIPS: ${{ matrix.fips }}
+          SEATS: ${{ matrix.seats }}
         run: |
-          if [[ "$GITHUB_REF_NAME" == districts-2020-area-knife-v* ]]; then
+          if [[ "$SEATS" != 0 ]]; then
+            methods=(--method knife --method area-knife --method circles --method reock-circles --plans-only --seats "$SEATS")
+            count=4
+          elif [[ "$GITHUB_REF_NAME" == districts-2020-area-knife-v* ]]; then
             methods=(--method area-knife --plans-only)
             count=7
           else
@@ -65,17 +93,17 @@ jobs:
           fi
           python scripts/build-state-district-data.py "$FIPS" blocks.zip shoreline.zip "built/$FIPS" "${methods[@]}"
           test "$(find "built/$FIPS" -type f -name '*.json.gz' | wc -l)" -eq "$count"
-          tar -C built -cf "districts-$FIPS.tar" "$FIPS"
+          tar -C built -cf "districts-$FIPS-$SEATS.tar" "$FIPS"
       - uses: actions/upload-artifact@v7
         with:
-          name: districts-${{ matrix.fips }}
-          path: districts-${{ matrix.fips }}.tar
+          name: districts-${{ matrix.fips }}-${{ matrix.seats }}
+          path: districts-${{ matrix.fips }}-${{ matrix.seats }}.tar
           if-no-files-found: error
           compression-level: 0
           retention-days: 7
 
   publish:
-    needs: build
+    needs: [states, build]
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -88,9 +116,20 @@ jobs:
       - name: Publish versioned state plans
         env:
           GH_TOKEN: ${{ github.token }}
+          EXPECTED_JOBS: ${{ needs.states.outputs.jobs }}
+          EXPECTED_STATES: ${{ needs.states.outputs.state-count }}
         run: |
-          test "$(find packages -type f -name '*.tar' | wc -l)" -eq 49
-          gh release create "$GITHUB_REF_NAME" packages/*.tar \
+          test "$(find packages -type f -name '*.tar' | wc -l)" -eq "$EXPECTED_JOBS"
+          mkdir -p assembled release
+          for archive in packages/*.tar; do
+            tar -xf "$archive" -C assembled
+          done
+          for state in assembled/*; do
+            fips="${state##*/}"
+            tar -C assembled -cf "release/districts-$fips.tar" "$fips"
+          done
+          test "$(find release -type f -name '*.tar' | wc -l)" -eq "$EXPECTED_STATES"
+          gh release create "$GITHUB_REF_NAME" release/*.tar \
             --repo "$GITHUB_REPOSITORY" --verify-tag --latest=false \
             --title "2020 Census representative districts ($GITHUB_REF_NAME)" \
-            --notes "Precomputed whole-block plans for the 49 states served by the nationwide data bundles."
+            --notes "Precomputed whole-block plans from the 2020 Census for the selected states and district counts."

@@ -1,10 +1,12 @@
 # Representative districts
 
-The map covers all 50 states. It starts with Connecticut and five districts, matching
-the study area and district count in the paper's worked example. Each state supports two
-to eight districts for comparing the algorithms. The selected state, algorithm and
-district count can be shared in the page URL.
-[Brams, Bai and Patel](https://doi.org/10.1007/s11127-025-01335-9)
+The map covers all 50 states and defaults to each state's 2020 U.S. House apportionment.
+The district selector also offers one fewer or one more district, with a minimum of one.
+It starts with Connecticut and five districts, matching the study area and district
+count in the paper's worked example. The selected state, algorithm and district count
+can be shared in the page URL.
+[2020 House apportionment](https://www2.census.gov/programs-surveys/decennial/2020/data/apportionment/apportionment-2020-table01.pdf)
+· [Brams, Bai and Patel](https://doi.org/10.1007/s11127-025-01335-9)
 
 **Moving knife** evaluates 36 orientations spaced 10° apart. Each cut walks through
 remaining Census blocks by the projection of their interior points. It keeps the last
@@ -60,9 +62,10 @@ The district data workflow builds one bundle per state from the versioned
 [2020 TIGER/Line block archives](https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/)
 and the nationwide cartographic shoreline. A `districts-2020-v*` tag builds the Moving
 knife, Smallest circles, and Reock circles plans with their state outlines. A
-`districts-2020-area-knife-v*` tag builds the Smallest-area knife plans. Those plans
-reuse the existing outlines. The deployment installs both bundles before building the
-site. For local development, run
+`districts-2020-area-knife-v*` tag builds the original Smallest-area knife plans. A
+`districts-2020-apportioned-v*` tag builds the available seat counts beyond the original
+2–8 range, for all four methods. The deployment installs the relevant plans and state
+outlines before building the site. For local development, run
 `GH_TOKEN=… node --import tsx scripts/install-state-district-data.mjs` or build an
 individual state with the project's Node dependencies, `pyogrio`, and Shapely 2.1 or
 newer. For example, to build Delaware from the downloaded Census ZIPs:
@@ -75,6 +78,11 @@ python3 scripts/build-state-district-data.py 10 tl_2020_10_tabblock20.zip \
 python3 scripts/build-state-district-data.py 10 tl_2020_10_tabblock20.zip \
   cb_2020_us_state_500k.zip public/district-plans/districts-2020-area-knife-v1/10 \
   --method area-knife --plans-only
+
+python3 scripts/build-state-district-data.py 10 tl_2020_10_tabblock20.zip \
+  cb_2020_us_state_500k.zip public/district-plans/districts-2020-apportioned-v1/10 \
+  --method knife --method area-knife --method circles --method reock-circles \
+  --seats 1 --plans-only
 ```
 
 The browser loads only the selected plan and its state outline.

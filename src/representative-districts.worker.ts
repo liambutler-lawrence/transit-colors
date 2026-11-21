@@ -1,6 +1,8 @@
 import { z } from 'zod';
 
 import {
+  availableDistrictCounts,
+  baselineDistrictCounts,
   defaultDistrictState,
   districtDataBundles,
   districtOutlineVersion,
@@ -65,15 +67,21 @@ async function fetchPlan(
   baseUrl: string,
   { method, seats }: DistrictRequest,
 ): Promise<DistrictPlan> {
+  const selected = districtState(state);
+  if (!selected || !availableDistrictCounts(selected).includes(seats)) {
+    throw new Error('The requested state or district count is unknown');
+  }
   const filename = `${method}-${seats}.json`;
   if (state === defaultDistrictState) {
     const url = urls[`../data/connecticut-district-plans/${filename}`];
     if (!url) throw new Error('The requested Connecticut district plan is missing');
     return fetchParsed(url, districtPlanSchema);
   }
-  const selected = districtState(state);
-  if (!selected) throw new Error('The requested state is unknown');
-  const bundle = districtDataBundles.find(({ methods }) => methods.includes(method));
+  const needsSupplement = !baselineDistrictCounts.includes(seats);
+  const bundle = districtDataBundles.find(
+    ({ methods, supplemental }) =>
+      supplemental === needsSupplement && methods.includes(method),
+  );
   if (!bundle) throw new Error('The requested algorithm has no district data bundle');
   const outlineBase = new URL(
     `district-plans/${districtOutlineVersion}/${selected.fips}/`,

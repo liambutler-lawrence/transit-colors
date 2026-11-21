@@ -100,16 +100,18 @@ interface Bounds {
   readonly north: number;
 }
 
-interface PopulationNode {
+interface PopulationNode<Point extends PopulationPoint = PopulationPoint> {
   readonly bounds: Bounds;
   readonly population: number;
-  readonly children: readonly PopulationNode[];
-  readonly points: readonly PopulationPoint[];
+  readonly children: readonly PopulationNode<Point>[];
+  readonly points: readonly Point[];
 }
 
 const CENTER_SEARCH_TOLERANCE_METERS = 0.25;
 
-function indexPopulation(points: PopulationPoint[]): PopulationNode {
+function indexPopulation<Point extends PopulationPoint>(
+  points: Point[],
+): PopulationNode<Point> {
   let west = Infinity;
   let south = Infinity;
   let east = -Infinity;
@@ -136,6 +138,30 @@ function indexPopulation(points: PopulationPoint[]): PopulationNode {
     indexPopulation(points.slice(middle)),
   ];
   return { bounds, population, children, points: [] };
+}
+
+/** Reuse a point index across circle candidates, including zero-population blocks. */
+export function circlePointSelector<Point extends PopulationPoint>(
+  points: readonly Point[],
+): (circle: Circle) => Point[] {
+  const index = indexPopulation([...points]);
+  return (circle) => {
+    const [x, y] = circle.center;
+    const radiusSquared = (circle.radius + EDGE_TOLERANCE_METERS) ** 2;
+    const covered: Point[] = [];
+    function visit(node: PopulationNode<Point>): void {
+      const { west, east, south, north } = node.bounds;
+      const dx = Math.max(0, x - east, west - x);
+      const dy = Math.max(0, y - north, south - y);
+      if (dx ** 2 + dy ** 2 > radiusSquared) return;
+      for (const child of node.children) visit(child);
+      for (const point of node.points) {
+        if (circleContains(circle, point.point)) covered.push(point);
+      }
+    }
+    visit(index);
+    return covered;
+  };
 }
 
 // Count the population at most radius away from the region of possible centers.

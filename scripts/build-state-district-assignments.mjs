@@ -39,9 +39,10 @@ const blocks = prepareDistrictBlocks(readBlocks(blocksPath), [
   Number(latitude),
 ]);
 console.info(`Prepared ${blocks.length} blocks.`);
-const knifeOrders = methods.some(isKnifeMethod)
-  ? prepareKnifeOrders(blocks)
-  : undefined;
+const knifeOrders =
+  methods.some(isKnifeMethod) && districtCounts.some((seats) => seats > 1)
+    ? prepareKnifeOrders(blocks)
+    : undefined;
 for (const method of methods) {
   for (const seats of districtCounts) {
     const request = districtRequestSchema.parse({ method, seats });

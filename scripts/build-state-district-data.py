@@ -186,7 +186,7 @@ def build(args):
         ]
         if args.method:
             command.append(",".join(args.method))
-        if args.seats:
+        if args.seats is not None:
             command.append(str(args.seats))
         subprocess.run(command, cwd=ROOT, check=True)
         for assignment in sorted(directory.glob("*.json")):
@@ -202,9 +202,9 @@ if __name__ == "__main__":
     parser.add_argument("shoreline", type=Path)
     parser.add_argument("output", type=Path)
     parser.add_argument("--method", action="append", choices=["knife", "circles", "reock-circles", "area-knife"])
-    parser.add_argument("--seats", type=int, choices=range(2, 9))
+    parser.add_argument("--seats", type=int)
     parser.add_argument("--plans-only", action="store_true", help="Reuse a previously built state outline")
     args = parser.parse_args()
-    if args.seats and not args.method:
+    if args.seats is not None and not args.method:
         parser.error("--seats requires --method")
     build(args)

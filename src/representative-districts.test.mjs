@@ -5,10 +5,12 @@ import polygonClipping from 'polygon-clipping';
 
 import {
   circleContains,
+  circlePointSelector,
   minimumEnclosingCircle,
   minimumPopulationCircle,
 } from './district-circles.ts';
 import {
+  availableDistrictCounts,
   districtState,
   districtStateBounds,
   districtStates,
@@ -25,6 +27,43 @@ import {
   isKnifeMethod,
   prepareDistrictBlocks,
 } from './representative-districts.ts';
+
+test('district count choices use the 435 apportioned House seats', () => {
+  assert.equal(
+    districtStates.reduce((sum, state) => sum + state.houseSeats, 0),
+    435,
+  );
+  assert.deepEqual(availableDistrictCounts(districtState('AK')), [1, 2]);
+  assert.deepEqual(availableDistrictCounts(districtState('CT')), [4, 5, 6]);
+  assert.deepEqual(availableDistrictCounts(districtState('CA')), [51, 52, 53]);
+  assert.ok(districtRequestSchema.safeParse({ method: 'knife', seats: 53 }).success);
+  assert.ok(!districtRequestSchema.safeParse({ method: 'knife', seats: 54 }).success);
+});
+
+test('indexed circle candidates retain blocks on the edge and blocks with no residents', () => {
+  const points = Array.from({ length: 81 }, (_, index) => ({
+    index,
+    point: [(index % 9) - 4, Math.floor(index / 9) - 4],
+    population: index % 2,
+  }));
+  const select = circlePointSelector(points);
+  for (const [center, radius] of [
+    [[0, 0], 3],
+    [[4, -3], 5],
+    [[-12, 1], 8],
+    [[0, 0], 0],
+  ]) {
+    const circle = { center, radius };
+    assert.deepEqual(
+      select(circle)
+        .map(({ index }) => index)
+        .sort((a, b) => a - b),
+      points
+        .filter(({ point }) => circleContains(circle, point))
+        .map(({ index }) => index),
+    );
+  }
+});
 
 test('the 50-state selector and Alaska projection span the antimeridian', () => {
   assert.equal(districtStates.length, 50);
