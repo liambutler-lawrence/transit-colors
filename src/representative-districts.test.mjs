@@ -3,14 +3,19 @@ import { readFileSync } from 'node:fs';
 import test from 'node:test';
 import polygonClipping from 'polygon-clipping';
 
-import { minimumPopulationCircle } from './district-circles.ts';
+import {
+  circleContains,
+  minimumEnclosingCircle,
+  minimumPopulationCircle,
+} from './district-circles.ts';
 import { localEqualAreaProjection } from './geodesy.ts';
 import {
-  calculateDistrictPlan,
-  districtStudySchema,
+  calculateDistrictAssignments,
+  districtPlanSchema,
+  prepareDistrictBlocks,
 } from './representative-districts.ts';
 
-test('the smallest population circle can be centered between three tracts', () => {
+test('the smallest population circle can be centered between three block points', () => {
   const points = [
     { point: [-100, 0], population: 2 },
     { point: [100, 0], population: 2 },
@@ -22,21 +27,55 @@ test('the smallest population circle can be centered between three tracts', () =
   assert.ok(Math.hypot(center[0], center[1] - 75) < 2);
 });
 
-test('nested circles draw their assigned tracts and report their full selection areas', () => {
+test('the population circle search agrees with an exhaustive search on small weighted inputs', () => {
+  let seed = 8910;
+  const next = (maximum) => {
+    seed = (Math.imul(1_664_525, seed) + 1_013_904_223) >>> 0;
+    return Math.floor((seed / 2 ** 32) * maximum);
+  };
+  for (let trial = 0; trial < 40; trial += 1) {
+    const points = Array.from({ length: 7 }, () => ({
+      point: [next(80) * 10 - 400, next(80) * 10 - 400],
+      population: next(10) + 1,
+    }));
+    const target =
+      1 + next(points.reduce((sum, { population }) => sum + population, 0));
+    let exact = Infinity;
+    for (let mask = 1; mask < 2 ** points.length; mask += 1) {
+      const subset = points.filter((_, index) => (mask & (1 << index)) !== 0);
+      if (subset.reduce((sum, { population }) => sum + population, 0) >= target) {
+        exact = Math.min(
+          exact,
+          minimumEnclosingCircle(subset.map(({ point }) => point)).radius,
+        );
+      }
+    }
+    const circle = minimumPopulationCircle(points, target);
+    const covered = points.reduce(
+      (sum, { point, population }) =>
+        sum + (circleContains(circle, point) ? population : 0),
+      0,
+    );
+    assert.ok(covered >= target);
+    assert.ok(circle.radius >= exact - 1e-6 && circle.radius <= exact + 1);
+  }
+});
+
+test('nested circles assign whole blocks and report their full selection areas', () => {
   const { unproject } = localEqualAreaProjection([-72.7, 41.6]);
-  const polygon = (x, y, halfSize) => ({
+  const polygon = (x, y) => ({
     type: 'Polygon',
     coordinates: [
       [
-        [x - halfSize, y - halfSize],
-        [x + halfSize, y - halfSize],
-        [x + halfSize, y + halfSize],
-        [x - halfSize, y + halfSize],
-        [x - halfSize, y - halfSize],
+        [x - 10, y - 10],
+        [x + 10, y - 10],
+        [x + 10, y + 10],
+        [x - 10, y + 10],
+        [x - 10, y - 10],
       ].map(unproject),
     ],
   });
-  const tracts = [
+  const blocks = [
     [-100, 0, 2, 2],
     [100, 0, 2, 2],
     [0, 0, 0, 0],
@@ -49,84 +88,62 @@ test('nested circles draw their assigned tracts and report their full selection 
     center: unproject([x, y]),
     population,
     urbanPopulation,
-    geometry: polygon(x, y, 10),
+    geometry: polygon(x, y),
   }));
-  const study = { outline: polygon(0, 0, 1600), tracts };
-  const plan = calculateDistrictPlan(study, { method: 'circles', seats: 2 });
-  const [innerDistrict, outerDistrict] = plan.districts.features;
-  for (const [district, assigned] of [
-    [innerDistrict, tracts.slice(0, 3)],
-    [outerDistrict, tracts.slice(3)],
-  ]) {
-    assert.deepEqual(
-      polygonClipping.xor(
-        district.geometry.coordinates,
-        ...assigned.map(({ geometry }) => geometry.coordinates),
-      ),
-      [],
-    );
-  }
+  const [innerDistrict, outerDistrict] = calculateDistrictAssignments(
+    prepareDistrictBlocks(blocks),
+    {
+      method: 'circles',
+      seats: 2,
+    },
+  );
+  assert.deepEqual(innerDistrict.blocks, [0, 1, 2]);
+  assert.deepEqual(outerDistrict.blocks, [3, 4, 5, 6, 7]);
   const inner = innerDistrict.properties;
   const outer = outerDistrict.properties;
   assert.ok(Math.abs(inner.radiusMeters - 100) <= 1);
   assert.ok(Math.abs(outer.radiusMeters - 1000) < 0.001);
   assert.deepEqual([inner.population, outer.population], [4, 4]);
   assert.deepEqual([inner.urbanPopulation, outer.urbanPopulation], [4, 0]);
-  assert.equal(
-    plan.totalAreaSquareMeters,
-    inner.areaSquareMeters + outer.areaSquareMeters,
-  );
-  assert.ok(plan.totalAreaSquareMeters > outer.areaSquareMeters);
+  for (const district of [inner, outer]) {
+    assert.equal(district.areaSquareMeters, Math.PI * district.radiusMeters ** 2);
+  }
 });
 
-test('Connecticut plans assign every resident once and render disjoint circle districts', () => {
-  const study = districtStudySchema.parse(
-    JSON.parse(
-      readFileSync(
-        new URL('../data/connecticut-districts.json', import.meta.url),
-        'utf8',
-      ),
-    ),
-  );
+test('published Connecticut plans cover the study area and count every resident once', () => {
   for (const method of ['knife', 'circles']) {
-    for (const seats of [2, 5, 8]) {
-      const plan = calculateDistrictPlan(study, { method, seats });
+    for (let seats = 2; seats <= 8; seats += 1) {
+      const file = new URL(
+        `../data/connecticut-district-plans/${method}-${seats}.json`,
+        import.meta.url,
+      );
+      const plan = districtPlanSchema.parse(JSON.parse(readFileSync(file, 'utf8')));
       const districts = plan.districts.features.map(({ properties }) => properties);
       assert.equal(districts.length, seats);
+      assert.equal(plan.totalPopulation, 3_605_944);
+      assert.equal(plan.target, plan.totalPopulation / seats);
       assert.equal(
-        districts.reduce((sum, district) => sum + district.population, 0),
-        3_605_944,
+        districts.reduce((sum, { population }) => sum + population, 0),
+        plan.totalPopulation,
       );
       assert.equal(
-        districts.reduce((sum, district) => sum + district.urbanPopulation, 0),
+        districts.reduce((sum, { urbanPopulation }) => sum + urbanPopulation, 0),
         3_110_153,
       );
       for (const { population, reock, radiusMeters, areaSquareMeters } of districts) {
-        assert.ok(Math.abs(population - plan.target) / plan.target < 0.03);
+        assert.ok(Math.abs(population - plan.target) / plan.target < 0.001);
         assert.ok(areaSquareMeters > 0);
         if (method === 'knife') assert.ok(reock > 0 && reock <= 1);
         else assert.ok(radiusMeters > 0);
       }
-      if (method === 'circles') {
-        assert.deepEqual(
-          polygonClipping.xor(
-            study.outline.coordinates,
-            ...plan.districts.features.map(({ geometry }) => geometry.coordinates),
-          ),
-          [],
-          'The circle districts cover the study area',
-        );
-        for (const [index, { geometry }] of plan.districts.features.entries()) {
-          for (const later of plan.districts.features.slice(index + 1)) {
-            assert.deepEqual(
-              polygonClipping.intersection(
-                geometry.coordinates,
-                later.geometry.coordinates,
-              ),
-              [],
-              `Visible districts ${index + 1} and ${later.properties.number} overlap`,
-            );
-          }
+      const geometries = plan.districts.features.map(
+        ({ geometry }) => geometry.coordinates,
+      );
+      const union = polygonClipping.union(...geometries);
+      assert.deepEqual(polygonClipping.xor(plan.outline.coordinates, union), []);
+      for (const [index, geometry] of geometries.entries()) {
+        for (const later of geometries.slice(index + 1)) {
+          assert.deepEqual(polygonClipping.intersection(geometry, later), []);
         }
       }
     }

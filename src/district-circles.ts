@@ -10,7 +10,6 @@ export interface PopulationPoint {
   readonly population: number;
 }
 
-const TAU = 2 * Math.PI;
 const EDGE_TOLERANCE_METERS = 1e-6;
 
 export function circleContains(circle: Circle, point: Coordinate): boolean {
@@ -94,51 +93,131 @@ export function minimumEnclosingCircle(points: readonly Coordinate[]): Circle {
   return circle;
 }
 
-function angleAroundCircle(angle: number): number {
-  return (angle + TAU) % TAU;
+interface Bounds {
+  readonly west: number;
+  readonly south: number;
+  readonly east: number;
+  readonly north: number;
 }
 
-// Any feasible disk can move until it touches a covered point. For each such
-// point, sweep the possible center bearings. Each neighboring point contributes
-// its population over the angles at which it lies within the disk.
-function findCenter(
-  points: readonly PopulationPoint[],
+interface PopulationNode {
+  readonly bounds: Bounds;
+  readonly population: number;
+  readonly children: readonly PopulationNode[];
+  readonly points: readonly PopulationPoint[];
+}
+
+const CENTER_SEARCH_TOLERANCE_METERS = 0.25;
+
+function indexPopulation(points: PopulationPoint[]): PopulationNode {
+  let west = Infinity;
+  let south = Infinity;
+  let east = -Infinity;
+  let north = -Infinity;
+  let population = 0;
+  for (const {
+    point: [x, y],
+    population: count,
+  } of points) {
+    west = Math.min(west, x);
+    south = Math.min(south, y);
+    east = Math.max(east, x);
+    north = Math.max(north, y);
+    population += count;
+  }
+  const bounds = { west, south, east, north };
+  if (points.length <= 32) return { bounds, population, children: [], points };
+
+  const axis = east - west >= north - south ? 0 : 1;
+  points.sort((a, b) => a.point[axis] - b.point[axis]);
+  const middle = points.length >>> 1;
+  const children = [
+    indexPopulation(points.slice(0, middle)),
+    indexPopulation(points.slice(middle)),
+  ];
+  return { bounds, population, children, points: [] };
+}
+
+// Count the population at most radius away from the region of possible centers.
+// This bounds what any individual center in the region can enclose.
+function populationNear(
+  { bounds, population, children, points }: PopulationNode,
+  centers: Bounds,
+  radiusSquared: number,
+): number {
+  const nearestX = Math.max(0, centers.west - bounds.east, bounds.west - centers.east);
+  const nearestY = Math.max(
+    0,
+    centers.south - bounds.north,
+    bounds.south - centers.north,
+  );
+  if (nearestX ** 2 + nearestY ** 2 > radiusSquared) return 0;
+  const farthestX = Math.max(0, centers.west - bounds.west, bounds.east - centers.east);
+  const farthestY = Math.max(
+    0,
+    centers.south - bounds.south,
+    bounds.north - centers.north,
+  );
+  if (farthestX ** 2 + farthestY ** 2 <= radiusSquared) return population;
+
+  let covered = 0;
+  for (const child of children)
+    covered += populationNear(child, centers, radiusSquared);
+  for (const {
+    point: [x, y],
+    population: count,
+  } of points) {
+    const dx = Math.max(0, centers.west - x, x - centers.east);
+    const dy = Math.max(0, centers.south - y, y - centers.north);
+    if (dx ** 2 + dy ** 2 <= radiusSquared) covered += count;
+  }
+  return covered;
+}
+
+function findCircle(
+  index: PopulationNode,
   target: number,
   radius: number,
-): Coordinate | undefined {
-  const reachSquared = (2 * radius) ** 2;
-  for (const anchor of points) {
-    const [x, y] = anchor.point;
-    let covered = 0;
-    const events: { angle: number; change: number }[] = [];
-    for (const other of points) {
-      const dx = other.point[0] - x;
-      const dy = other.point[1] - y;
-      const distanceSquared = dx * dx + dy * dy;
-      if (distanceSquared === 0) {
-        covered += other.population;
-      } else if (distanceSquared <= reachSquared) {
-        const bearing = Math.atan2(dy, dx);
-        const span = Math.acos(Math.min(1, Math.sqrt(distanceSquared) / (2 * radius)));
-        const start = angleAroundCircle(bearing - span);
-        const end = angleAroundCircle(bearing + span);
-        if (start > end) covered += other.population;
-        events.push(
-          { angle: start, change: other.population },
-          { angle: end, change: -other.population },
-        );
-      }
+): Circle | undefined {
+  const radiusSquared = radius ** 2;
+
+  function search(region: Bounds, possible: number): Circle | undefined {
+    if (possible < target) return undefined;
+    const { west, south, east, north } = region;
+    const x = (west + east) / 2;
+    const y = (south + north) / 2;
+    const point = { west: x, east: x, south: y, north: y };
+    if (populationNear(index, point, radiusSquared) >= target) {
+      return { center: [x, y], radius };
     }
-    if (covered >= target) return [x + radius, y];
-    events.sort((a, b) => a.angle - b.angle || b.change - a.change);
-    for (const { angle, change } of events) {
-      covered += change;
-      if (covered >= target) {
-        return [x + radius * Math.cos(angle), y + radius * Math.sin(angle)];
-      }
+
+    const halfDiagonal = Math.hypot(east - x, north - y);
+    // Every point counted by the region's bound is within this enlarged disk
+    // around its midpoint, even if some have different nearest centers.
+    if (halfDiagonal <= CENTER_SEARCH_TOLERANCE_METERS) {
+      return { center: [x, y], radius: radius + halfDiagonal };
     }
+
+    const [first, second] =
+      east - west >= north - south
+        ? [
+            { ...region, east: x },
+            { ...region, west: x },
+          ]
+        : [
+            { ...region, north: y },
+            { ...region, south: y },
+          ];
+    const firstCount = populationNear(index, first, radiusSquared);
+    const secondCount = populationNear(index, second, radiusSquared);
+    return firstCount >= secondCount
+      ? (search(first, firstCount) ?? search(second, secondCount))
+      : (search(second, secondCount) ?? search(first, firstCount));
   }
-  return undefined;
+
+  // Moving a center into the bounding rectangle cannot increase its distance
+  // to any demand point.
+  return search(index.bounds, index.population);
 }
 
 /** Minimize the disk radius over all possible centers, to within one metre. */
@@ -149,14 +228,13 @@ export function minimumPopulationCircle(
   const all = minimumEnclosingCircle(points.map(({ point }) => point));
   if (target === points.reduce((total, { population }) => total + population, 0))
     return all;
-  const coincident = findCenter(points, target, 0);
-  if (coincident) return { center: coincident, radius: 0 };
+  const index = indexPopulation([...points]);
   let low = 0;
   let best = all;
   while (best.radius - low > 1) {
     const radius = (low + best.radius) / 2;
-    const center = findCenter(points, target, radius);
-    if (center) best = { center, radius };
+    const candidate = findCircle(index, target, radius);
+    if (candidate) best = candidate;
     else low = radius;
   }
   return best;

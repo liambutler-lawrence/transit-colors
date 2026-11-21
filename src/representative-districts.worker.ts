@@ -1,24 +1,33 @@
 import { z } from 'zod';
 
-import studyUrl from '../data/connecticut-districts.json?url';
 import { fetchParsed } from './parse.js';
 import {
-  calculateDistrictPlan,
+  districtPlanSchema,
   districtRequestSchema,
-  districtStudySchema,
+  type DistrictPlan,
+  type DistrictRequest,
   type DistrictResponse,
 } from './representative-districts.js';
 
 const messageSchema = districtRequestSchema.extend({ id: z.int().positive() });
-let study: ReturnType<typeof loadStudy> | undefined;
+const urls = import.meta.glob<string>('../data/connecticut-district-plans/*.json', {
+  eager: true,
+  import: 'default',
+  query: '?url',
+});
+const plans = new Map<string, Promise<DistrictPlan>>();
 
-function loadStudy(): ReturnType<
-  typeof fetchParsed<z.infer<typeof districtStudySchema>>
-> {
-  return fetchParsed(studyUrl, districtStudySchema).catch((error: unknown) => {
-    study = undefined;
+function loadPlan({ method, seats }: DistrictRequest): Promise<DistrictPlan> {
+  const url = urls[`../data/connecticut-district-plans/${method}-${seats}.json`];
+  if (!url) throw new Error('The requested district plan is missing');
+  const cached = plans.get(url);
+  if (cached) return cached;
+  const pending = fetchParsed(url, districtPlanSchema).catch((error: unknown) => {
+    plans.delete(url);
     throw error;
   });
+  plans.set(url, pending);
+  return pending;
 }
 
 globalThis.onmessage = async (event: MessageEvent<unknown>): Promise<void> => {
@@ -26,13 +35,13 @@ globalThis.onmessage = async (event: MessageEvent<unknown>): Promise<void> => {
   if (!request.success) return;
   const { id } = request.data;
   try {
-    const plan = calculateDistrictPlan(await (study ??= loadStudy()), request.data);
+    const plan = await loadPlan(request.data);
     globalThis.postMessage({ id, plan } satisfies DistrictResponse);
   } catch (error) {
-    console.error('Representative districts could not be calculated.', error);
+    console.error('Representative district map could not be loaded.', error);
     globalThis.postMessage({
       id,
-      error: 'Districts could not be calculated.',
+      error: 'Districts could not be loaded.',
     } satisfies DistrictResponse);
   }
 };

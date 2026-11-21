@@ -1,5 +1,3 @@
-import polygonClipping from 'polygon-clipping';
-import type { FeatureCollection } from 'geojson';
 import { z } from 'zod';
 
 import {
@@ -19,53 +17,67 @@ const districtGeometrySchema = z.discriminatedUnion('type', [
     coordinates: z.array(polygonSchema).min(1),
   }),
 ]);
-const tractSchema = z
-  .object({
-    center: coordinateSchema,
-    population: z.int().nonnegative(),
-    urbanPopulation: z.int().nonnegative(),
-    geometry: districtGeometrySchema,
-  })
-  .refine((tract) => tract.urbanPopulation <= tract.population);
-export const districtStudySchema = z.object({
-  outline: districtGeometrySchema,
-  tracts: z.array(tractSchema).min(2),
-});
 export const districtRequestSchema = z.object({
   method: z.enum(['knife', 'circles']),
   seats: z.int().min(2).max(8),
 });
 
+const districtPropertiesSchema = z.object({
+  number: z.int().min(1).max(8),
+  population: z.int().nonnegative(),
+  urbanPopulation: z.int().nonnegative(),
+  areaSquareMeters: z.number().nonnegative(),
+  radiusMeters: z.number().nonnegative().nullable(),
+  reock: z.number().min(0).max(1).nullable(),
+});
+export const districtPlanSchema = z.object({
+  outline: districtGeometrySchema,
+  districts: z.object({
+    type: z.literal('FeatureCollection'),
+    features: z
+      .array(
+        z.object({
+          type: z.literal('Feature'),
+          geometry: districtGeometrySchema,
+          properties: districtPropertiesSchema,
+        }),
+      )
+      .min(2)
+      .max(8),
+  }),
+  target: z.number().positive(),
+  totalPopulation: z.int().positive(),
+  totalAreaSquareMeters: z.number().positive(),
+});
+
 type Geometry = z.infer<typeof districtGeometrySchema>;
-type Tract = z.infer<typeof tractSchema>;
-type Study = z.infer<typeof districtStudySchema>;
 export type DistrictRequest = z.infer<typeof districtRequestSchema>;
-
-export interface DistrictProperties {
-  readonly number: number;
-  readonly population: number;
-  readonly urbanPopulation: number;
-  readonly areaSquareMeters: number;
-  readonly radiusMeters: number | null;
-  readonly reock: number | null;
-}
-
-export interface DistrictPlan {
-  readonly outline: Geometry;
-  readonly districts: FeatureCollection<Geometry, DistrictProperties>;
-  readonly target: number;
-  readonly totalPopulation: number;
-  readonly totalAreaSquareMeters: number;
-}
+export type DistrictPlan = z.infer<typeof districtPlanSchema>;
+type DistrictProperties = z.infer<typeof districtPropertiesSchema>;
 
 export type DistrictResponse = { id: number } & (
   { plan: DistrictPlan } | { error: string }
 );
 
-interface ProjectedTract extends Tract {
+interface Block {
+  readonly center: Coordinate;
+  readonly population: number;
+  readonly urbanPopulation: number;
+  readonly geometry: Geometry;
+}
+
+interface ProjectedBlock {
+  readonly index: number;
   readonly point: Coordinate;
+  readonly population: number;
+  readonly urbanPopulation: number;
   readonly area: number;
   readonly vertices: readonly Coordinate[];
+}
+
+interface DistrictAssignment {
+  readonly blocks: readonly number[];
+  readonly properties: DistrictProperties;
 }
 
 const { project } = localEqualAreaProjection([-72.7, 41.6]);
@@ -74,8 +86,8 @@ function polygons(geometry: Geometry): Coordinate[][][] {
   return geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
 }
 
-function totalPopulation(tracts: readonly Tract[]): number {
-  return tracts.reduce((sum, tract) => sum + tract.population, 0);
+function totalPopulation(blocks: readonly ProjectedBlock[]): number {
+  return blocks.reduce((sum, block) => sum + block.population, 0);
 }
 
 function ringArea(ring: readonly Coordinate[]): number {
@@ -88,57 +100,93 @@ function ringArea(ring: readonly Coordinate[]): number {
   return Math.abs(twiceArea) / 2;
 }
 
-function projectTract(tract: Tract): ProjectedTract {
-  const vertices: Coordinate[] = [];
-  let area = 0;
-  for (const polygon of polygons(tract.geometry)) {
-    for (const [index, ring] of polygon.entries()) {
-      const projected = ring.map(project);
-      const size = ringArea(projected);
-      if (index === 0) {
-        vertices.push(...projected.slice(0, -1));
-        area += size;
-      } else {
-        area -= size;
+// Interior vertices of a block's convex hull cannot affect the Reock circle.
+function hullVertices(points: Coordinate[]): Coordinate[] {
+  points.sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+  function chain(ordered: Iterable<Coordinate>): Coordinate[] {
+    const result: Coordinate[] = [];
+    for (const point of ordered) {
+      let previous = result.at(-1);
+      let before = result.at(-2);
+      while (
+        before &&
+        previous &&
+        (previous[0] - before[0]) * (point[1] - before[1]) <=
+          (previous[1] - before[1]) * (point[0] - before[0])
+      ) {
+        result.pop();
+        previous = result.at(-1);
+        before = result.at(-2);
+      }
+      result.push(point);
+    }
+    return result;
+  }
+  const lower = chain(points);
+  const upper = chain(points.reverse());
+  return [...lower.slice(0, -1), ...upper.slice(0, -1)];
+}
+
+export function prepareDistrictBlocks(blocks: readonly Block[]): ProjectedBlock[] {
+  return blocks.map(({ center, population, urbanPopulation, geometry }, index) => {
+    const vertices: Coordinate[] = [];
+    let area = 0;
+    for (const polygon of polygons(geometry)) {
+      for (const [ringIndex, ring] of polygon.entries()) {
+        const projected = ring.map(project);
+        const size = ringArea(projected);
+        if (ringIndex === 0) {
+          vertices.push(...projected.slice(0, -1));
+          area += size;
+        } else {
+          area -= size;
+        }
       }
     }
-  }
-  return { ...tract, point: project(tract.center), vertices, area };
+    return {
+      index,
+      point: project(center),
+      population,
+      urbanPopulation,
+      vertices: hullVertices(vertices),
+      area,
+    };
+  });
 }
 
 function knifeCut(
-  remaining: readonly ProjectedTract[],
+  remaining: readonly ProjectedBlock[],
   target: number,
   seatsLeft: number,
-): ProjectedTract[] {
+): ProjectedBlock[] {
   let bestScore = -1;
-  let best: ProjectedTract[] = [];
+  let best: ProjectedBlock[] = [];
   const populated = remaining.filter(({ population }) => population > 0).length;
   for (let angle = 0; angle < 360; angle += 10) {
     const radians = (angle * Math.PI) / 180;
     const east = Math.sin(radians);
     const north = Math.cos(radians);
     const ordered = remaining
-      .map((tract) => ({
-        tract,
-        projection: tract.point[0] * east + tract.point[1] * north,
+      .map((block) => ({
+        block,
+        projection: block.point[0] * east + block.point[1] * north,
       }))
       .sort((a, b) => b.projection - a.projection);
-    const slice: ProjectedTract[] = [];
+    const slice: ProjectedBlock[] = [];
     let population = 0;
     let populatedLeft = populated;
-    for (const { tract } of ordered) {
+    for (const { block } of ordered) {
       if (
-        tract.population > 0 &&
+        block.population > 0 &&
         population > 0 &&
         (populatedLeft === seatsLeft - 1 ||
-          Math.abs(population + tract.population - target) >
+          Math.abs(population + block.population - target) >
             Math.abs(population - target))
       )
         break;
-      slice.push(tract);
-      population += tract.population;
-      if (tract.population > 0) populatedLeft -= 1;
+      slice.push(block);
+      population += block.population;
+      if (block.population > 0) populatedLeft -= 1;
       if (population >= target) break;
     }
     const score = reockScore(slice);
@@ -150,45 +198,32 @@ function knifeCut(
   return best;
 }
 
-function knifeArea(tracts: readonly ProjectedTract[]): number {
-  return tracts.reduce((sum, tract) => sum + tract.area, 0);
+function knifeArea(blocks: readonly ProjectedBlock[]): number {
+  return blocks.reduce((sum, block) => sum + block.area, 0);
 }
 
-function reockScore(tracts: readonly ProjectedTract[]): number {
-  const { radius } = minimumEnclosingCircle(tracts.flatMap((tract) => tract.vertices));
-  return Math.min(1, knifeArea(tracts) / (Math.PI * radius ** 2));
-}
-
-function districtGeometry(tracts: readonly Tract[]): Geometry {
-  const [first, ...rest] = tracts;
-  if (!first) throw new Error('A district must contain at least one tract');
-  return {
-    type: 'MultiPolygon',
-    coordinates: polygonClipping.union(
-      first.geometry.coordinates,
-      ...rest.map((tract) => tract.geometry.coordinates),
-    ),
-  };
+function reockScore(blocks: readonly ProjectedBlock[]): number {
+  const { radius } = minimumEnclosingCircle(blocks.flatMap((block) => block.vertices));
+  return Math.min(1, knifeArea(blocks) / (Math.PI * radius ** 2));
 }
 
 function knifeDistricts(
-  tracts: readonly Tract[],
+  blocks: readonly ProjectedBlock[],
   seats: number,
   target: number,
-): DistrictPlan['districts'] {
-  let remaining = tracts.map(projectTract);
-  const features: DistrictPlan['districts']['features'] = [];
+): DistrictAssignment[] {
+  let remaining = [...blocks];
+  const districts: DistrictAssignment[] = [];
   for (let number = 1; number <= seats; number += 1) {
     const assigned =
       number === seats ? remaining : knifeCut(remaining, target, seats - number + 1);
-    features.push({
-      type: 'Feature',
-      geometry: districtGeometry(assigned),
+    districts.push({
+      blocks: assigned.map(({ index }) => index),
       properties: {
         number,
         population: totalPopulation(assigned),
         urbanPopulation: assigned.reduce(
-          (sum, tract) => sum + tract.urbanPopulation,
+          (sum, block) => sum + block.urbanPopulation,
           0,
         ),
         areaSquareMeters: knifeArea(assigned),
@@ -196,19 +231,19 @@ function knifeDistricts(
         reock: reockScore(assigned),
       },
     });
-    const assignedTracts = new Set(assigned);
-    remaining = remaining.filter((tract) => !assignedTracts.has(tract));
+    const assignedBlocks = new Set(assigned);
+    remaining = remaining.filter((block) => !assignedBlocks.has(block));
   }
-  return { type: 'FeatureCollection', features };
+  return districts;
 }
 
 function circleDistricts(
-  tracts: readonly Tract[],
+  blocks: readonly ProjectedBlock[],
   seats: number,
   target: number,
-): DistrictPlan['districts'] {
-  let remaining = tracts.map((tract) => ({ ...tract, point: project(tract.center) }));
-  const features: DistrictPlan['districts']['features'] = [];
+): DistrictAssignment[] {
+  let remaining = [...blocks];
+  const districts: DistrictAssignment[] = [];
   for (let number = 1; number <= seats; number += 1) {
     const isLast = number === seats;
     const quota = isLast ? totalPopulation(remaining) : Math.ceil(target);
@@ -220,14 +255,13 @@ function circleDistricts(
     const population = totalPopulation(assigned);
     if (population < quota)
       throw new Error('The circle did not reach its population target');
-    features.push({
-      type: 'Feature',
-      geometry: districtGeometry(assigned),
+    districts.push({
+      blocks: assigned.map(({ index }) => index),
       properties: {
         number,
         population,
         urbanPopulation: assigned.reduce(
-          (sum, tract) => sum + tract.urbanPopulation,
+          (sum, block) => sum + block.urbanPopulation,
           0,
         ),
         areaSquareMeters: Math.PI * circle.radius ** 2,
@@ -235,30 +269,18 @@ function circleDistricts(
         reock: null,
       },
     });
-    const assignedTracts = new Set(assigned);
-    remaining = remaining.filter((tract) => !assignedTracts.has(tract));
+    const assignedBlocks = new Set(assigned);
+    remaining = remaining.filter((block) => !assignedBlocks.has(block));
   }
-  return { type: 'FeatureCollection', features };
+  return districts;
 }
 
-export function calculateDistrictPlan(
-  study: Study,
+export function calculateDistrictAssignments(
+  blocks: readonly ProjectedBlock[],
   { method, seats }: DistrictRequest,
-): DistrictPlan {
-  const population = totalPopulation(study.tracts);
-  const target = population / seats;
-  const districts =
-    method === 'knife'
-      ? knifeDistricts(study.tracts, seats, target)
-      : circleDistricts(study.tracts, seats, target);
-  return {
-    outline: study.outline,
-    districts,
-    target,
-    totalPopulation: population,
-    totalAreaSquareMeters: districts.features.reduce(
-      (total, { properties }) => total + properties.areaSquareMeters,
-      0,
-    ),
-  };
+): DistrictAssignment[] {
+  const target = totalPopulation(blocks) / seats;
+  return method === 'knife'
+    ? knifeDistricts(blocks, seats, target)
+    : circleDistricts(blocks, seats, target);
 }

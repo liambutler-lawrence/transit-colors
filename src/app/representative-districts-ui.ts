@@ -45,7 +45,7 @@ const percent = new Intl.NumberFormat('en-US', {
 });
 const deviation = new Intl.NumberFormat('en-US', {
   style: 'percent',
-  maximumFractionDigits: 1,
+  maximumFractionDigits: 3,
   signDisplay: 'exceptZero',
 });
 
@@ -196,17 +196,17 @@ function createWorker(): Worker {
   instance.onerror = () => {
     instance.terminate();
     worker = undefined;
-    showFailure('The district calculation could not start.');
+    showFailure('The district map could not load.');
   };
   return instance;
 }
 
-function calculateDistricts(): void {
+function loadDistrictPlan(): void {
   const request = settings();
   const circles = request.method === 'circles';
   requiredElement('#district-knife-method', HTMLElement).hidden = circles;
   requiredElement('#district-circles-method', HTMLElement).hidden = !circles;
-  status.textContent = 'Calculating districts…';
+  status.textContent = 'Loading district plan…';
   overview.hidden = true;
   retry.hidden = true;
   results.replaceChildren();
@@ -217,7 +217,7 @@ function calculateDistricts(): void {
     worker ??= createWorker();
     worker.postMessage({ ...request, id: ++requestId });
   } catch {
-    showFailure('The district calculation could not start.');
+    showFailure('The district map could not load.');
   }
 }
 
@@ -275,7 +275,7 @@ function installDistrictMap(): void {
     if (typeof number === 'number') selectDistrict(number);
   });
   void map.once('remove', () => worker?.terminate());
-  calculateDistricts();
+  loadDistrictPlan();
 }
 
 export function syncDistrictVisibility({ fit }: { readonly fit: boolean }): void {
@@ -304,7 +304,7 @@ for (const select of [methodSelect, seatsSelect]) {
     const url = new URL(window.location.href);
     writeDistrictSettings(url);
     window.history.replaceState({}, '', url);
-    calculateDistricts();
+    loadDistrictPlan();
   });
 }
 results.addEventListener('click', (event) => {
@@ -314,4 +314,4 @@ results.addEventListener('click', (event) => {
       : null;
   if (button) selectDistrict(Number(button.dataset['district']));
 });
-retry.addEventListener('click', calculateDistricts);
+retry.addEventListener('click', loadDistrictPlan);
