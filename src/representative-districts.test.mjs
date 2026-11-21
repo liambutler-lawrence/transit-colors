@@ -22,6 +22,7 @@ import {
   calculateDistrictAssignments,
   districtPlanSchema,
   districtRequestSchema,
+  isKnifeMethod,
   prepareDistrictBlocks,
 } from './representative-districts.ts';
 
@@ -196,6 +197,48 @@ test('Reock circles can choose a larger circle for a more compact district', () 
   assert.ok(Math.abs(compact.properties.reock - expectedReock) < 1e-6);
 });
 
+test('smallest-area knife takes the smaller cut even when its Reock score is lower', () => {
+  const { unproject } = localEqualAreaProjection([-72.7, 41.6]);
+  const blocks = prepareDistrictBlocks(
+    [
+      [-1_200, 10, 1],
+      [-1_000, 10, 1],
+      [1_000, 20, 2],
+    ].map(([x, halfWidth, population]) => ({
+      center: unproject([x, 0]),
+      population,
+      urbanPopulation: population,
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [x - halfWidth, -halfWidth],
+            [x + halfWidth, -halfWidth],
+            [x + halfWidth, halfWidth],
+            [x - halfWidth, halfWidth],
+            [x - halfWidth, -halfWidth],
+          ].map(unproject),
+        ],
+      },
+    })),
+  );
+  const [smallest, remainder] = calculateDistrictAssignments(blocks, {
+    method: 'area-knife',
+    seats: 2,
+  });
+  const [compact] = calculateDistrictAssignments(blocks, { method: 'knife', seats: 2 });
+  assert.deepEqual(
+    smallest.blocks.toSorted((a, b) => a - b),
+    [0, 1],
+  );
+  assert.deepEqual(remainder.blocks, [2]);
+  assert.equal(smallest.properties.population, 2);
+  assert.equal(remainder.properties.population, 2);
+  assert.ok(smallest.properties.areaSquareMeters < compact.properties.areaSquareMeters);
+  assert.ok(smallest.properties.reock < compact.properties.reock);
+  assert.equal(smallest.properties.radiusMeters, null);
+});
+
 test('published Connecticut plans clip the coast and count every resident once', () => {
   // Clipping shared edges can leave sub-metre floating-point slivers when a
   // second geometry engine overlays the GeoJSON.
@@ -265,7 +308,7 @@ test('published Connecticut plans clip the coast and count every resident once',
         assert.ok(areaSquareMeters > 0);
         if (method === 'circles') assert.equal(reock, null);
         else assert.ok(reock > 0 && reock <= 1);
-        if (method === 'knife') assert.equal(radiusMeters, null);
+        if (isKnifeMethod(method)) assert.equal(radiusMeters, null);
         else assert.ok(radiusMeters > 0);
       }
       const geometries = plan.districts.features.map(

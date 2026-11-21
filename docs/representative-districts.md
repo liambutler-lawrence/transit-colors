@@ -13,6 +13,11 @@ highest Reock score wins each round. The score divides the area of the chosen bl
 the area of the smallest circle that encloses their boundaries. The final district takes
 the remainder. The paper uses voting precincts as its assignment units.
 
+**Smallest-area knife** uses the same 36 orientations and population rule. Each round
+takes the cut whose assigned blocks have the smallest total area in the local equal-area
+projection. The final district takes the remainder. Each district also shows its Reock
+score for comparison.
+
 **Smallest circles** searches for the smallest disk that reaches the quota in a local
 equal-area projection. For a given radius, the search subdivides regions of possible
 centers and rules out regions that cannot reach the population target. A binary search
@@ -29,7 +34,7 @@ with the highest district Reock score, calculated from the full block boundaries
 the same formula as Moving Knife. A tie goes to the smaller selection circle. The final
 district takes the remaining blocks and receives a Reock score too.
 
-All three methods assign whole 2020 Census tabulation blocks and count each block's
+All four methods assign whole 2020 Census tabulation blocks and count each block's
 population at its Census interior point. The Connecticut study area covers 49,926
 blocks, including water blocks. The ideal population is the statewide total divided by
 the requested number of districts. Whole-block assignments can differ from that target.
@@ -53,15 +58,23 @@ Assignments, area calculations, and scores use the full blocks.
 
 The district data workflow builds one bundle per state from the versioned
 [2020 TIGER/Line block archives](https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/)
-and the nationwide cartographic shoreline. It runs when a `districts-2020-v*` tag is
-pushed. The deployment installs those bundles before building the site. For local
-development, run `GH_TOKEN=… node --import tsx scripts/install-state-district-data.mjs`
-or build an individual state with the project's Node dependencies, `pyogrio`, and
-Shapely 2.1 or newer. For example, to build Delaware from the downloaded Census ZIPs:
+and the nationwide cartographic shoreline. A `districts-2020-v*` tag builds the Moving
+knife, Smallest circles, and Reock circles plans with their state outlines. A
+`districts-2020-area-knife-v*` tag builds the Smallest-area knife plans. Those plans
+reuse the existing outlines. The deployment installs both bundles before building the
+site. For local development, run
+`GH_TOKEN=… node --import tsx scripts/install-state-district-data.mjs` or build an
+individual state with the project's Node dependencies, `pyogrio`, and Shapely 2.1 or
+newer. For example, to build Delaware from the downloaded Census ZIPs:
 
 ```sh
 python3 scripts/build-state-district-data.py 10 tl_2020_10_tabblock20.zip \
-  cb_2020_us_state_500k.zip public/district-plans/districts-2020-v1/10
+  cb_2020_us_state_500k.zip public/district-plans/districts-2020-v1/10 \
+  --method knife --method circles --method reock-circles
+
+python3 scripts/build-state-district-data.py 10 tl_2020_10_tabblock20.zip \
+  cb_2020_us_state_500k.zip public/district-plans/districts-2020-area-knife-v1/10 \
+  --method area-knife --plans-only
 ```
 
 The browser loads only the selected plan and its state outline.

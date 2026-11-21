@@ -2,7 +2,8 @@ import { z } from 'zod';
 
 import {
   defaultDistrictState,
-  districtDataVersion,
+  districtDataBundles,
+  districtOutlineVersion,
   districtState,
 } from './district-states.js';
 import { fetchParsed } from './parse.js';
@@ -72,13 +73,19 @@ async function fetchPlan(
   }
   const selected = districtState(state);
   if (!selected) throw new Error('The requested state is unknown');
-  const base = new URL(
-    `district-plans/${districtDataVersion}/${selected.fips}/`,
+  const bundle = districtDataBundles.find(({ methods }) => methods.includes(method));
+  if (!bundle) throw new Error('The requested algorithm has no district data bundle');
+  const outlineBase = new URL(
+    `district-plans/${districtOutlineVersion}/${selected.fips}/`,
+    baseUrl,
+  );
+  const planBase = new URL(
+    `district-plans/${bundle.version}/${selected.fips}/`,
     baseUrl,
   );
   const [outline, plan] = await Promise.all([
-    loadOutline(base),
-    fetchCompressed(new URL(`${filename}.gz`, base).href, statewidePlanSchema),
+    loadOutline(outlineBase),
+    fetchCompressed(new URL(`${filename}.gz`, planBase).href, statewidePlanSchema),
   ]);
   if (
     plan.totalPopulation !== selected.population ||

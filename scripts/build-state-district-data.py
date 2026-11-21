@@ -169,10 +169,11 @@ def build(args):
     print(f"{state['name']} has {len(geoms)} verified blocks.", flush=True)
     water = coastal_water(args.shoreline, state, geoms[wet])
     print(f"Prepared {state['name']}'s shoreline.", flush=True)
-    outline = display_geometry(dissolve(geoms), water)
     args.output.mkdir(parents=True, exist_ok=True)
-    with gzip.open(args.output / "outline.json.gz", "wt", compresslevel=5, encoding="utf8") as file:
-        file.write(to_geojson(outline))
+    if not args.plans_only:
+        outline = display_geometry(dissolve(geoms), water)
+        with gzip.open(args.output / "outline.json.gz", "wt", compresslevel=5, encoding="utf8") as file:
+            file.write(to_geojson(outline))
     west, south, east, north = state["bounds"]
     with TemporaryDirectory() as temporary:
         directory = Path(temporary)
@@ -184,7 +185,7 @@ def build(args):
             str(blocks), str(directory), str((west + east) / 2), str((south + north) / 2),
         ]
         if args.method:
-            command.append(args.method)
+            command.append(",".join(args.method))
         if args.seats:
             command.append(str(args.seats))
         subprocess.run(command, cwd=ROOT, check=True)
@@ -200,8 +201,9 @@ if __name__ == "__main__":
     parser.add_argument("blocks", type=Path)
     parser.add_argument("shoreline", type=Path)
     parser.add_argument("output", type=Path)
-    parser.add_argument("--method", choices=["knife", "circles", "reock-circles"])
+    parser.add_argument("--method", action="append", choices=["knife", "circles", "reock-circles", "area-knife"])
     parser.add_argument("--seats", type=int, choices=range(2, 9))
+    parser.add_argument("--plans-only", action="store_true", help="Reuse a previously built state outline")
     args = parser.parse_args()
     if args.seats and not args.method:
         parser.error("--seats requires --method")

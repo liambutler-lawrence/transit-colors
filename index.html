@@ -973,6 +973,7 @@
                   <option value="knife">Moving knife</option>
                   <option value="circles">Smallest circles</option>
                   <option value="reock-circles">Reock circles</option>
+                  <option value="area-knife">Smallest-area knife</option>
                 </select>
                 <label for="district-seats">Districts</label>
                 <select id="district-seats">
@@ -999,6 +1000,11 @@
                   Grow circles from multiple centers to reach the population target.
                   Each round takes the candidate whose assigned blocks have the highest
                   Reock compactness score.
+                </p>
+                <p id="district-area-knife-method" hidden>
+                  Each round compares 36 cuts near the population target and chooses the
+                  one whose assigned blocks cover the smallest area. The final district
+                  takes the remaining blocks.
                 </p>
               </div>
             </section>
