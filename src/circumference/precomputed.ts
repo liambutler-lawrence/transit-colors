@@ -11,6 +11,7 @@ import {
   lineLengthMeters,
   polygonAreaSquareMeters,
   stableCandidateId,
+  stableSegmentId,
 } from './graph.js';
 import type {
   CircumferenceCandidate,
@@ -62,7 +63,7 @@ export function candidateFromNetworkPath(
             [to.coordinate[0], to.coordinate[1]],
           ];
       return {
-        id: stableCandidateId([fromId, toId]).replace('route-', 'segment-'),
+        id: stableSegmentId(fromId, toId),
         from,
         grade: networkSegment.grade,
         to,

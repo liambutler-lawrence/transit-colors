@@ -540,12 +540,13 @@ export function installHighwayHover(): void {
     readonly source: 'highway-circumference' | 'highway-network';
     readonly sourceLayer?: 'highways' | 'boundary';
   } | null = null;
-  for (const layerId of [
+  const layerIds = [
     'highway-circumference-route-connector-line',
     'highway-circumference-route-line',
     'highway-circumference-network-connector-line',
     'highway-circumference-network-line',
-  ]) {
+  ];
+  for (const layerId of layerIds) {
     map.on('mousemove', layerId, (event) => {
       const feature = event.features?.[0];
       if (!feature || feature.id === undefined) return;
@@ -554,10 +555,6 @@ export function installHighwayHover(): void {
         ? 'highway-network'
         : 'highway-circumference';
       const sourceLayer = networkFeature ? 'highways' : 'boundary';
-      const properties = highwayMapFeaturePropertiesSchema.safeParse(
-        feature.properties,
-      );
-      if (!properties.success) return;
       if (hovered !== null) {
         map.setFeatureState(
           {
@@ -581,7 +578,6 @@ export function installHighwayHover(): void {
         },
         { hover: true },
       );
-      showHighwayFeature(properties.data);
       map.getCanvas().style.cursor = 'pointer';
     });
     map.on('mouseleave', layerId, () => {
@@ -598,11 +594,11 @@ export function installHighwayHover(): void {
       hovered = null;
       map.getCanvas().style.cursor = '';
     });
-    map.on('click', layerId, (event) => {
-      const properties = highwayMapFeaturePropertiesSchema.safeParse(
-        event.features?.[0]?.properties,
-      );
-      if (properties.success) showHighwayFeature(properties.data);
-    });
   }
+  map.on('click', layerIds, (event) => {
+    const properties = highwayMapFeaturePropertiesSchema.safeParse(
+      event.features?.[0]?.properties,
+    );
+    if (properties.success) showHighwayFeature(properties.data);
+  });
 }

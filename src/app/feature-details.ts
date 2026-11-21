@@ -520,20 +520,20 @@ export function selectDestination(stationId: string): void {
 
 export function showCircumferenceSegment(properties: SegmentProperties): void {
   const routeState = circumferenceStates[properties.area_key];
-  if (!routeState.selected) return;
+  const segmentId = properties.segment_id;
   const isTransfer = properties.segment_type === 'transfer';
   const isFocusedArea = properties.area_key === runtime.activeAreaKey;
-  circumferenceState.inspectedSegmentId = isFocusedArea
-    ? properties.segment_id || ''
-    : '';
+  const isInRankedRoute = routeState.candidates.some((candidate) =>
+    candidate.segments.some(({ id }) => id === segmentId),
+  );
+  circumferenceState.inspectedSegmentId =
+    isFocusedArea && isInRankedRoute ? segmentId : '';
   routeRequireSegmentButton.disabled =
-    !isFocusedArea ||
     !circumferenceState.inspectedSegmentId ||
-    circumferenceState.requiredSegmentIds.has(circumferenceState.inspectedSegmentId);
+    routeState.requiredSegmentIds.has(segmentId);
   routeAvoidSegmentButton.disabled =
-    !isFocusedArea ||
     !circumferenceState.inspectedSegmentId ||
-    circumferenceState.avoidedSegmentIds.has(circumferenceState.inspectedSegmentId);
+    routeState.avoidedSegmentIds.has(segmentId);
   circumferenceSelectionTypeEl.textContent = isTransfer
     ? 'Selected walking transfer'
     : 'Selected route segment';
@@ -567,17 +567,21 @@ export function showCircumferenceSegment(properties: SegmentProperties): void {
     { label: 'Grade', value: properties.grade },
     {
       label: 'Loop area',
-      value: formatArea(routeState.selected.areaSquareMeters),
+      value: routeState.selected?.segments.some(({ id }) => id === segmentId)
+        ? formatArea(routeState.selected.areaSquareMeters)
+        : undefined,
     },
     {
       label: 'Override',
-      value: !isFocusedArea
-        ? `Focus on ${AREAS[properties.area_key].label} to edit`
-        : circumferenceState.requiredSegmentIds.has(properties.segment_id)
-          ? 'Required'
-          : circumferenceState.avoidedSegmentIds.has(properties.segment_id)
-            ? 'Avoided'
-            : 'None',
+      value: isInRankedRoute
+        ? !isFocusedArea
+          ? `Focus on ${AREAS[properties.area_key].label} to edit`
+          : routeState.requiredSegmentIds.has(segmentId)
+            ? 'Required'
+            : routeState.avoidedSegmentIds.has(segmentId)
+              ? 'Avoided'
+              : 'None'
+        : undefined,
     },
   ]);
 }

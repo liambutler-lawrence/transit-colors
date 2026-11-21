@@ -6,6 +6,7 @@ import type {
 import { z } from 'zod';
 import type { TransitAreaData } from '../transit-atlas.js';
 
+import { transitGradeSchema } from '../circumference/grades.js';
 import type {
   CircumferenceCandidate,
   CircumferenceGeometryMode,
@@ -128,11 +129,10 @@ export const segmentPropertiesSchema = z.object({
   distance_m: z.number(),
   from: z.string(),
   from_label: z.string(),
-  grade: z.string().optional(),
-  kind: z.string(),
+  grade: transitGradeSchema.optional(),
   lines: z.string(),
   segment_id: z.string(),
-  segment_type: z.enum(['segment', 'transfer']),
+  segment_type: z.enum(['ride', 'transfer']),
   to: z.string(),
   to_label: z.string(),
   transfer_minutes: z.union([z.number(), z.literal('')]),
