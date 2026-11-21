@@ -129,7 +129,8 @@ export const initialProduct: Product =
   requestedProduct === 'circumference' ||
   requestedProduct === 'timezone' ||
   requestedProduct === 'landuse' ||
-  requestedProduct === 'watersheds'
+  requestedProduct === 'watersheds' ||
+  requestedProduct === 'districts'
     ? requestedProduct
     : 'access';
 export const initialCircumferenceCriterion: CircumferenceCriterion =
@@ -375,6 +376,11 @@ export const watershedProductButton = requiredElement(
   HTMLButtonElement,
 );
 export const watershedProductEl = requiredElement('#watershed-product', HTMLElement);
+export const districtsProductButton = requiredElement(
+  '#product-districts',
+  HTMLButtonElement,
+);
+export const districtsProductEl = requiredElement('#districts-product', HTMLElement);
 export const landUseColorsToggle = requiredElement(
   '#toggle-land-use-colors',
   HTMLInputElement,

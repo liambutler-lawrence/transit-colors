@@ -12,7 +12,12 @@ York City, Singapore, Atlanta, and Athens. It includes:
   redevelopment plans, building age, and historic districts; and
 - a [World Watersheds map](https://maps.liambutlerlawrence.com/?product=watersheds) with
   primary drainage systems derived from 30 m terrain, receiving-sea colors, terrain
-  shading, and terminal-outlet inspection. See [data and methods](docs/watersheds.md).
+  shading, and terminal-outlet inspection. See [data and methods](docs/watersheds.md);
+  and
+- a
+  [Representative Districts map](https://maps.liambutlerlawrence.com/?product=districts)
+  comparing moving-knife and smallest-circle districting in Connecticut. See
+  [data and methods](docs/representative-districts.md).
 
 Circumference routes follow averaged centerlines from official GTFS track shapes by
 default where shape data is published, with an option to compare straight

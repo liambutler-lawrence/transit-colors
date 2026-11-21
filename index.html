@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1" />
     <meta
       name="description"
-      content="A different way to look at the places we live. Explore transit access, city geometry, time zones, land use, and watersheds on an interactive globe."
+      content="A different way to look at the places we live. Explore transit access, city geometry, time zones, land use, watersheds, and representative districts on an interactive globe."
     />
     <title>Maps</title>
     <meta name="theme-color" content="#f3efe5" />
@@ -103,6 +103,16 @@
               aria-controls="watershed-product"
             >
               Watersheds
+            </button>
+            <button
+              id="product-districts"
+              type="button"
+              tabindex="-1"
+              role="menuitemradio"
+              aria-checked="false"
+              aria-controls="districts-product"
+            >
+              Representative districts
             </button>
           </div>
         </div>
@@ -938,6 +948,80 @@
                   rel="noreferrer"
                   >Mapzen / Tilezen</a
                 >.
+              </p>
+            </section>
+          </div>
+
+          <div
+            id="districts-product"
+            class="product-panel"
+            role="region"
+            aria-labelledby="product-districts"
+            hidden
+          >
+            <section class="sidebar-section">
+              <div class="section-heading compact-heading">
+                <h2>Connecticut</h2>
+              </div>
+              <div class="route-control">
+                <label for="district-method">Algorithm</label>
+                <select id="district-method">
+                  <option value="knife">Moving knife</option>
+                  <option value="circles">Smallest circles</option>
+                </select>
+                <label for="district-seats">Districts</label>
+                <select id="district-seats">
+                  <option>2</option>
+                  <option>3</option>
+                  <option>4</option>
+                  <option selected>5</option>
+                  <option>6</option>
+                  <option>7</option>
+                  <option>8</option>
+                </select>
+                <p id="district-knife-method">
+                  Compare 36 straight cuts and keep the one with the highest Reock
+                  compactness score, then repeat on the remaining tracts.
+                  <a href="https://doi.org/10.1007/s11127-025-01335-9">Read the paper</a
+                  >.
+                </p>
+                <p id="district-circles-method" hidden>
+                  Each round finds the smallest circle that reaches the population
+                  target. Circles may overlap or share a center. Each circle contributes
+                  its full area and counts only residents still unassigned.
+                </p>
+              </div>
+            </section>
+            <section class="sidebar-section">
+              <div class="section-heading compact-heading">
+                <h2>District results</h2>
+              </div>
+              <p id="district-status" class="results-intro" role="status"></p>
+              <div id="district-overview" class="result-metrics" hidden>
+                <div class="result-metric">
+                  <span>Target per district</span>
+                  <strong id="district-target"></strong>
+                </div>
+                <div class="result-metric">
+                  <span>Total population</span>
+                  <strong id="district-population"></strong>
+                </div>
+                <div class="result-metric">
+                  <span id="district-area-label">Total area</span>
+                  <strong id="district-area"></strong>
+                </div>
+              </div>
+              <div id="district-results" class="district-results"></div>
+              <button id="district-retry" class="watershed-action" type="button" hidden>
+                Retry calculation
+              </button>
+              <p class="method-note">
+                Population and urban shares use
+                <a
+                  href="https://www.census.gov/geographies/mapping-files/time-series/geo/tiger-line-file.2020.html"
+                  >2020 U.S. Census data</a
+                >. Each tract’s residents are counted together at its Census interior
+                point.
               </p>
             </section>
           </div>
