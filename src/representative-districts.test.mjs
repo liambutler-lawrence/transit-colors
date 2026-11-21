@@ -9,6 +9,11 @@ import {
   minimumPopulationCircle,
 } from './district-circles.ts';
 import {
+  districtState,
+  districtStateBounds,
+  districtStates,
+} from './district-states.ts';
+import {
   geodesicPolygonAreaSquareMeters,
   localEqualAreaProjection,
 } from './geodesy.ts';
@@ -19,6 +24,40 @@ import {
   districtRequestSchema,
   prepareDistrictBlocks,
 } from './representative-districts.ts';
+
+test('the 50-state selector and Alaska projection span the antimeridian', () => {
+  assert.equal(districtStates.length, 50);
+  assert.equal(new Set(districtStates.map(({ fips }) => fips)).size, 50);
+  assert.equal(new Set(districtStates.map(({ code }) => code)).size, 50);
+  assert.equal(districtState('DC'), undefined);
+
+  const alaska = districtState('ak');
+  assert.equal(alaska.population, 733_391);
+  const [[west, south], [east, north]] = districtStateBounds(alaska);
+  assert.ok(west < -180 && east > -180 && east - west < 60);
+
+  const origin = [(west + east) / 2, (south + north) / 2];
+  const prepared = prepareDistrictBlocks(
+    [179.9, -179.9].map((longitude) => ({
+      center: [longitude, 52],
+      population: 1,
+      urbanPopulation: 0,
+      geometry: {
+        type: 'Polygon',
+        coordinates: [
+          [
+            [longitude - 0.01, 52],
+            [longitude + 0.01, 52],
+            [longitude, 52.01],
+            [longitude - 0.01, 52],
+          ],
+        ],
+      },
+    })),
+    origin,
+  );
+  assert.ok(Math.abs(prepared[0].point[0] - prepared[1].point[0]) < 25_000);
+});
 
 test('the smallest population circle can be centered between three block points', () => {
   const points = [

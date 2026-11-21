@@ -12,7 +12,7 @@ import { localEqualAreaProjection } from './geodesy.js';
 
 const ringSchema = z.array(coordinateSchema).min(4);
 const polygonSchema = z.array(ringSchema).min(1);
-const districtGeometrySchema = z.discriminatedUnion('type', [
+export const districtGeometrySchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('Polygon'), coordinates: polygonSchema }),
   z.object({
     type: z.literal('MultiPolygon'),
@@ -83,7 +83,6 @@ interface DistrictAssignment {
   readonly properties: DistrictProperties;
 }
 
-const { project } = localEqualAreaProjection([-72.7, 41.6]);
 const reockDirections: readonly Coordinate[] = [
   [1, 0],
   [-1, 0],
@@ -154,8 +153,13 @@ function extremeVertex(points: Iterable<Coordinate>, [dx, dy]: Coordinate): Coor
   return furthest;
 }
 
-export function prepareDistrictBlocks(blocks: readonly Block[]): ProjectedBlock[] {
-  return blocks.map(({ center, population, urbanPopulation, geometry }, index) => {
+export function prepareDistrictBlocks(
+  blocks: Iterable<Block>,
+  origin: Coordinate = [-72.7, 41.6],
+): ProjectedBlock[] {
+  const { project } = localEqualAreaProjection(origin);
+  const prepared: ProjectedBlock[] = [];
+  for (const { center, population, urbanPopulation, geometry } of blocks) {
     const vertices: Coordinate[] = [];
     let area = 0;
     for (const polygon of polygons(geometry)) {
@@ -163,7 +167,10 @@ export function prepareDistrictBlocks(blocks: readonly Block[]): ProjectedBlock[
         const projected = ring.map(project);
         const size = ringArea(projected);
         if (ringIndex === 0) {
-          vertices.push(...projected.slice(0, -1));
+          for (let index = 0; index < projected.length - 1; index += 1) {
+            const vertex = projected[index];
+            if (vertex) vertices.push(vertex);
+          }
           area += size;
         } else {
           area -= size;
@@ -171,8 +178,8 @@ export function prepareDistrictBlocks(blocks: readonly Block[]): ProjectedBlock[
       }
     }
     const hull = hullVertices(vertices);
-    return {
-      index,
+    prepared.push({
+      index: prepared.length,
       point: project(center),
       population,
       urbanPopulation,
@@ -181,32 +188,48 @@ export function prepareDistrictBlocks(blocks: readonly Block[]): ProjectedBlock[
         extremeVertex(hull, direction),
       ),
       area,
-    };
-  });
+    });
+  }
+  return prepared;
 }
 
-function knifeCut(
-  remaining: readonly ProjectedBlock[],
-  target: number,
-  seatsLeft: number,
-): ProjectedBlock[] {
-  let bestScore = -1;
-  let best: ProjectedBlock[] = [];
-  const populated = remaining.filter(({ population }) => population > 0).length;
+export function prepareKnifeOrders(blocks: readonly ProjectedBlock[]): Uint32Array[] {
+  const orders: Uint32Array[] = [];
+  const projections = new Float64Array(blocks.length);
   for (let angle = 0; angle < 360; angle += 10) {
     const radians = (angle * Math.PI) / 180;
     const east = Math.sin(radians);
     const north = Math.cos(radians);
-    const ordered = remaining
-      .map((block) => ({
-        block,
-        projection: block.point[0] * east + block.point[1] * north,
-      }))
-      .sort((a, b) => b.projection - a.projection);
+    for (const block of blocks) {
+      projections[block.index] = block.point[0] * east + block.point[1] * north;
+    }
+    orders.push(
+      Uint32Array.from(blocks, ({ index }) => index).sort(
+        (a, b) => (projections[b] ?? 0) - (projections[a] ?? 0),
+      ),
+    );
+  }
+  return orders;
+}
+
+function knifeCut(
+  blocks: readonly ProjectedBlock[],
+  remaining: readonly ProjectedBlock[],
+  orders: readonly Uint32Array[],
+  assigned: Uint8Array,
+  target: number,
+  seatsLeft: number,
+): ProjectedBlock[] {
+  let bestScore = 0;
+  let best: ProjectedBlock[] = [];
+  const populated = remaining.filter(({ population }) => population > 0).length;
+  for (const ordered of orders) {
     const slice: ProjectedBlock[] = [];
     let population = 0;
     let populatedLeft = populated;
-    for (const { block } of ordered) {
+    for (const index of ordered) {
+      const block = blocks[index];
+      if (!block || assigned[index]) continue;
       if (
         block.population > 0 &&
         population > 0 &&
@@ -220,8 +243,8 @@ function knifeCut(
       if (block.population > 0) populatedLeft -= 1;
       if (population >= target) break;
     }
-    const score = reockScore(slice);
-    if (score > bestScore) {
+    const score = candidateReockScore(slice, bestScore);
+    if (score !== undefined && (!best.length || score > bestScore)) {
       bestScore = score;
       best = slice;
     }
@@ -234,8 +257,9 @@ function districtArea(blocks: readonly ProjectedBlock[]): number {
 }
 
 function reockScore(blocks: readonly ProjectedBlock[]): number {
-  const { radius } = minimumEnclosingCircle(blocks.flatMap((block) => block.vertices));
-  return Math.min(1, districtArea(blocks) / (Math.PI * radius ** 2));
+  const score = candidateReockScore(blocks, 0);
+  if (score === undefined) throw new Error('Could not compute a district Reock score');
+  return score;
 }
 
 function candidateReockScore(
@@ -243,7 +267,8 @@ function candidateReockScore(
   scoreToBeat: number,
 ): number | undefined {
   const area = districtArea(blocks);
-  const maximumRadius = Math.sqrt(area / (Math.PI * scoreToBeat));
+  const maximumRadius =
+    scoreToBeat > 0 ? Math.sqrt(area / (Math.PI * scoreToBeat)) : Infinity;
   const seeds = reockDirections.map((direction, index) => {
     function* vertices(): Iterable<Coordinate> {
       for (const block of blocks) {
@@ -257,15 +282,24 @@ function candidateReockScore(
   // bounds the best possible score. Add constraints only where needed.
   let enclosing = minimumEnclosingCircle(seeds);
   while (enclosing.radius <= maximumRadius + 1e-6) {
-    const previousCount = seeds.length;
+    let farthest: Coordinate | undefined;
+    let farthestSquared = (enclosing.radius + 1e-6) ** 2;
+    const [x, y] = enclosing.center;
     for (const { vertices } of blocks) {
       for (const vertex of vertices) {
-        if (!circleContains(enclosing, vertex)) seeds.push(vertex);
+        const distance = (vertex[0] - x) ** 2 + (vertex[1] - y) ** 2;
+        if (distance > farthestSquared) {
+          farthest = vertex;
+          farthestSquared = distance;
+        }
       }
     }
-    if (seeds.length === previousCount) {
-      return Math.min(1, area / (Math.PI * enclosing.radius ** 2));
+    if (!farthest) {
+      return enclosing.radius
+        ? Math.min(1, area / (Math.PI * enclosing.radius ** 2))
+        : 0;
     }
+    seeds.push(farthest);
     enclosing = minimumEnclosingCircle(seeds);
   }
   return undefined;
@@ -324,14 +358,18 @@ function reockCircleCut(
 
 function knifeDistricts(
   blocks: readonly ProjectedBlock[],
+  orders: readonly Uint32Array[],
   seats: number,
   target: number,
 ): DistrictAssignment[] {
   let remaining = [...blocks];
+  const assignment = new Uint8Array(blocks.length);
   const districts: DistrictAssignment[] = [];
   for (let number = 1; number <= seats; number += 1) {
     const assigned =
-      number === seats ? remaining : knifeCut(remaining, target, seats - number + 1);
+      number === seats
+        ? remaining
+        : knifeCut(blocks, remaining, orders, assignment, target, seats - number + 1);
     districts.push({
       blocks: assigned.map(({ index }) => index),
       properties: {
@@ -346,8 +384,8 @@ function knifeDistricts(
         reock: reockScore(assigned),
       },
     });
-    const assignedBlocks = new Set(assigned);
-    remaining = remaining.filter((block) => !assignedBlocks.has(block));
+    for (const { index } of assigned) assignment[index] = 1;
+    remaining = remaining.filter(({ index }) => !assignment[index]);
   }
   return districts;
 }
@@ -400,9 +438,10 @@ function circleDistricts(
 export function calculateDistrictAssignments(
   blocks: readonly ProjectedBlock[],
   { method, seats }: DistrictRequest,
+  knifeOrders?: readonly Uint32Array[],
 ): DistrictAssignment[] {
   const target = totalPopulation(blocks) / seats;
   return method === 'knife'
-    ? knifeDistricts(blocks, seats, target)
+    ? knifeDistricts(blocks, knifeOrders ?? prepareKnifeOrders(blocks), seats, target)
     : circleDistricts(blocks, seats, target, method === 'reock-circles');
 }

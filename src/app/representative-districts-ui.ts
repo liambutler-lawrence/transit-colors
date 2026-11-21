@@ -1,6 +1,12 @@
 import { LngLatBounds, type ExpressionSpecification } from 'maplibre-gl';
 
 import {
+  defaultDistrictState,
+  districtState,
+  districtStateBounds,
+  districtStates,
+} from '../district-states.js';
+import {
   districtRequestSchema,
   type DistrictPlan,
   type DistrictRequest,
@@ -50,6 +56,7 @@ const deviation = new Intl.NumberFormat('en-US', {
   signDisplay: 'exceptZero',
 });
 
+const stateSelect = requiredElement('#district-state', HTMLSelectElement);
 const methodSelect = requiredElement('#district-method', HTMLSelectElement);
 const seatsSelect = requiredElement('#district-seats', HTMLSelectElement);
 const status = requiredElement('#district-status', HTMLElement);
@@ -59,9 +66,14 @@ const retry = requiredElement('#district-retry', HTMLButtonElement);
 
 let worker: Worker | undefined;
 let requestId = 0;
-let plan: DistrictPlan | undefined;
 
 const methodSchema = districtRequestSchema.shape.method;
+stateSelect.replaceChildren(
+  ...districtStates.map(({ code, name }) => new Option(name, code)),
+);
+stateSelect.value =
+  districtState(initialSearchParams.get('district-state'))?.code ??
+  defaultDistrictState;
 const initialMethod = methodSchema.safeParse(
   initialSearchParams.get('district-method'),
 );
@@ -79,8 +91,20 @@ function settings(): DistrictRequest {
   };
 }
 
+export function selectedDistrictStateName(): string {
+  return districtState(stateSelect.value)?.name ?? 'Connecticut';
+}
+
 export function writeDistrictSettings(url: URL): void {
   const { method, seats } = settings();
+  if (
+    runtime.activeProduct === 'districts' &&
+    stateSelect.value !== defaultDistrictState
+  ) {
+    url.searchParams.set('district-state', stateSelect.value);
+  } else {
+    url.searchParams.delete('district-state');
+  }
   if (runtime.activeProduct === 'districts' && method !== 'knife') {
     url.searchParams.set('district-method', method);
   } else {
@@ -139,7 +163,11 @@ function renderResults(result: DistrictPlan, method: DistrictRequest['method']):
     people.textContent = `${formatInteger(population)} residents · ${deviation.format((population - target) / target)} vs. target`;
     const geography = document.createElement('span');
     const area = formatArea(areaSquareMeters);
-    geography.textContent = `${area}${radiusMeters === null ? '' : ' circle'} · ${percent.format(urbanPopulation / population)} urban`;
+    geography.textContent =
+      `${area}${radiusMeters === null ? '' : ' circle'}` +
+      (population === 0
+        ? ''
+        : ` · ${percent.format(urbanPopulation / population)} urban`);
     const metric = document.createElement('span');
     metric.textContent = [
       reock === null ? '' : `Reock ${reock.toFixed(3)}`,
@@ -156,17 +184,12 @@ function renderResults(result: DistrictPlan, method: DistrictRequest['method']):
 }
 
 function focusDistrictPlan(): void {
-  const bounds = new LngLatBounds([
-    [-73.73, 40.98],
-    [-71.78, 42.06],
-  ]);
-  for (const { geometry } of plan?.districts.features ?? []) {
-    const polygons =
-      geometry.type === 'Polygon' ? [geometry.coordinates] : geometry.coordinates;
-    for (const [outer] of polygons) {
-      for (const point of outer ?? []) bounds.extend(point);
-    }
-  }
+  const state = districtState(stateSelect.value);
+  if (!state) return;
+  const bounds = new LngLatBounds(districtStateBounds(state));
+  // At these longitudes the statewide viewport can straddle the antimeridian.
+  const projection = bounds.getWest() < -170 ? 'mercator' : 'globe';
+  if (map.getProjection()?.type !== projection) map.setProjection({ type: projection });
   map.setMaxBounds(null);
   map.fitBounds(bounds, {
     bearing: 0,
@@ -194,11 +217,10 @@ function createWorker(): Worker {
       showFailure(data.error);
       return;
     }
-    plan = data.plan;
+    const { plan } = data;
     geoJsonSource(OUTLINE)?.setData(plan.outline);
     geoJsonSource(SOURCE)?.setData(plan.districts);
     renderResults(plan, settings().method);
-    if (runtime.activeProduct === 'districts') focusDistrictPlan();
   };
   instance.onerror = () => {
     instance.terminate();
@@ -214,16 +236,22 @@ function loadDistrictPlan(): void {
     requiredElement(`#district-${method}-method`, HTMLElement).hidden =
       method !== request.method;
   }
-  status.textContent = 'Loading district plan…';
+  status.textContent = `Loading ${selectedDistrictStateName()} district plan…`;
   overview.hidden = true;
   retry.hidden = true;
   results.replaceChildren();
-  plan = undefined;
   selectDistrict(0);
   geoJsonSource(SOURCE)?.setData({ type: 'FeatureCollection', features: [] });
+  geoJsonSource(OUTLINE)?.setData({ type: 'FeatureCollection', features: [] });
   try {
     worker ??= createWorker();
-    worker.postMessage({ ...request, id: ++requestId });
+    const baseUrl = new URL(import.meta.env.BASE_URL, document.baseURI).href;
+    worker.postMessage({
+      ...request,
+      id: ++requestId,
+      state: stateSelect.value,
+      baseUrl,
+    });
   } catch {
     showFailure('The district map could not load.');
   }
@@ -283,6 +311,7 @@ function installDistrictMap(): void {
     if (typeof number === 'number') selectDistrict(number);
   });
   void map.once('remove', () => worker?.terminate());
+  focusDistrictPlan();
   loadDistrictPlan();
 }
 
@@ -306,13 +335,23 @@ export function positionDistrictLayers(): void {
   }
 }
 
-for (const select of [methodSelect, seatsSelect]) {
+for (const select of [stateSelect, methodSelect, seatsSelect]) {
   select.addEventListener('change', () => {
-    if (!map.getSource(SOURCE)) return;
     const url = new URL(window.location.href);
     writeDistrictSettings(url);
     window.history.replaceState({}, '', url);
-    loadDistrictPlan();
+    if (select === stateSelect) {
+      const name = selectedDistrictStateName();
+      document.title = `Representative districts — ${name} · Maps`;
+      map
+        .getContainer()
+        .setAttribute(
+          'aria-label',
+          `Interactive map of representative districts in ${name}`,
+        );
+      if (map.getSource(SOURCE)) focusDistrictPlan();
+    }
+    if (map.getSource(SOURCE)) loadDistrictPlan();
   });
 }
 results.addEventListener('click', (event) => {

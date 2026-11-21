@@ -1,0 +1,402 @@
+[
+  {
+    "code": "AL",
+    "fips": "01",
+    "name": "Alabama",
+    "blocks": 185976,
+    "population": 5024279,
+    "bounds": [-88.4732, 30.2233, -84.8891, 35.008]
+  },
+  {
+    "code": "AK",
+    "fips": "02",
+    "name": "Alaska",
+    "blocks": 28568,
+    "population": 733391,
+    "bounds": [-187.5383, 51.2156, -129.9742, 71.3878]
+  },
+  {
+    "code": "AZ",
+    "fips": "04",
+    "name": "Arizona",
+    "blocks": 155444,
+    "population": 7151502,
+    "bounds": [-114.8165, 31.3322, -109.0452, 37.0043]
+  },
+  {
+    "code": "AR",
+    "fips": "05",
+    "name": "Arkansas",
+    "blocks": 136422,
+    "population": 3011524,
+    "bounds": [-94.6179, 33.0043, -89.641, 36.4996]
+  },
+  {
+    "code": "CA",
+    "fips": "06",
+    "name": "California",
+    "blocks": 519723,
+    "population": 39538223,
+    "bounds": [-124.4096, 32.5344, -114.1312, 42.0095]
+  },
+  {
+    "code": "CO",
+    "fips": "08",
+    "name": "Colorado",
+    "blocks": 140345,
+    "population": 5773714,
+    "bounds": [-109.0603, 36.9924, -102.0415, 41.0034]
+  },
+  {
+    "code": "CT",
+    "fips": "09",
+    "name": "Connecticut",
+    "blocks": 49926,
+    "population": 3605944,
+    "bounds": [-73.7278, 40.9801, -71.787, 42.0506]
+  },
+  {
+    "code": "DE",
+    "fips": "10",
+    "name": "Delaware",
+    "blocks": 20198,
+    "population": 989948,
+    "bounds": [-75.7887, 38.4512, -75.0489, 39.839]
+  },
+  {
+    "code": "FL",
+    "fips": "12",
+    "name": "Florida",
+    "blocks": 390066,
+    "population": 21538187,
+    "bounds": [-87.6349, 24.5213, -80.0314, 31.0009]
+  },
+  {
+    "code": "GA",
+    "fips": "13",
+    "name": "Georgia",
+    "blocks": 232717,
+    "population": 10711908,
+    "bounds": [-85.6052, 30.3579, -80.8404, 35.0012]
+  },
+  {
+    "code": "HI",
+    "fips": "15",
+    "name": "Hawaii",
+    "blocks": 14732,
+    "population": 1455271,
+    "bounds": [-178.3347, 18.9104, -154.8068, 28.4021]
+  },
+  {
+    "code": "ID",
+    "fips": "16",
+    "name": "Idaho",
+    "blocks": 81879,
+    "population": 1839106,
+    "bounds": [-117.243, 41.9882, -111.0436, 49.0009]
+  },
+  {
+    "code": "IL",
+    "fips": "17",
+    "name": "Illinois",
+    "blocks": 369978,
+    "population": 12812508,
+    "bounds": [-91.5131, 36.9703, -87.4952, 42.5085]
+  },
+  {
+    "code": "IN",
+    "fips": "18",
+    "name": "Indiana",
+    "blocks": 204568,
+    "population": 6785528,
+    "bounds": [-88.0979, 37.7717, -84.7846, 41.7606]
+  },
+  {
+    "code": "IA",
+    "fips": "19",
+    "name": "Iowa",
+    "blocks": 175199,
+    "population": 3190369,
+    "bounds": [-96.6386, 40.3757, -90.1401, 43.5012]
+  },
+  {
+    "code": "KS",
+    "fips": "20",
+    "name": "Kansas",
+    "blocks": 172529,
+    "population": 2937880,
+    "bounds": [-102.0517, 36.993, -94.5884, 40.0032]
+  },
+  {
+    "code": "KY",
+    "fips": "21",
+    "name": "Kentucky",
+    "blocks": 132662,
+    "population": 4505836,
+    "bounds": [-89.5715, 36.4971, -81.965, 39.1475]
+  },
+  {
+    "code": "LA",
+    "fips": "22",
+    "name": "Louisiana",
+    "blocks": 142874,
+    "population": 4657757,
+    "bounds": [-94.0431, 28.9286, -88.817, 33.0195]
+  },
+  {
+    "code": "ME",
+    "fips": "23",
+    "name": "Maine",
+    "blocks": 47138,
+    "population": 1362359,
+    "bounds": [-71.0839, 42.9778, -66.9499, 47.4597]
+  },
+  {
+    "code": "MD",
+    "fips": "24",
+    "name": "Maryland",
+    "blocks": 83827,
+    "population": 6177224,
+    "bounds": [-79.4877, 37.9117, -75.0489, 39.723]
+  },
+  {
+    "code": "MA",
+    "fips": "25",
+    "name": "Massachusetts",
+    "blocks": 107278,
+    "population": 7029917,
+    "bounds": [-73.5081, 41.238, -69.9284, 42.8866]
+  },
+  {
+    "code": "MI",
+    "fips": "26",
+    "name": "Michigan",
+    "blocks": 254730,
+    "population": 10077331,
+    "bounds": [-90.4181, 41.6961, -82.4135, 48.2388]
+  },
+  {
+    "code": "MN",
+    "fips": "27",
+    "name": "Minnesota",
+    "blocks": 198705,
+    "population": 5706494,
+    "bounds": [-97.2392, 43.4994, -89.494, 49.3844]
+  },
+  {
+    "code": "MS",
+    "fips": "28",
+    "name": "Mississippi",
+    "blocks": 112241,
+    "population": 2961279,
+    "bounds": [-91.655, 30.1754, -88.0979, 34.9961]
+  },
+  {
+    "code": "MO",
+    "fips": "29",
+    "name": "Missouri",
+    "blocks": 253632,
+    "population": 6154913,
+    "bounds": [-95.7747, 35.9957, -89.0988, 40.6136]
+  },
+  {
+    "code": "MT",
+    "fips": "30",
+    "name": "Montana",
+    "blocks": 88417,
+    "population": 1084225,
+    "bounds": [-116.0492, 44.358, -104.0396, 49.0014]
+  },
+  {
+    "code": "NE",
+    "fips": "31",
+    "name": "Nebraska",
+    "blocks": 119103,
+    "population": 1961504,
+    "bounds": [-104.0535, 40.0, -95.3083, 43.0017]
+  },
+  {
+    "code": "NV",
+    "fips": "32",
+    "name": "Nevada",
+    "blocks": 57409,
+    "population": 3104614,
+    "bounds": [-120.0065, 35.0019, -114.0396, 42.0022]
+  },
+  {
+    "code": "NH",
+    "fips": "33",
+    "name": "New Hampshire",
+    "blocks": 31948,
+    "population": 1377529,
+    "bounds": [-72.5572, 42.697, -70.6106, 45.3055]
+  },
+  {
+    "code": "NJ",
+    "fips": "34",
+    "name": "New Jersey",
+    "blocks": 137972,
+    "population": 9288994,
+    "bounds": [-75.5595, 38.9285, -73.8936, 41.3574]
+  },
+  {
+    "code": "NM",
+    "fips": "35",
+    "name": "New Mexico",
+    "blocks": 107215,
+    "population": 2117522,
+    "bounds": [-109.0502, 31.3323, -103.002, 37.0002]
+  },
+  {
+    "code": "NY",
+    "fips": "36",
+    "name": "New York",
+    "blocks": 288819,
+    "population": 20201249,
+    "bounds": [-79.7622, 40.4961, -71.8562, 45.0159]
+  },
+  {
+    "code": "NC",
+    "fips": "37",
+    "name": "North Carolina",
+    "blocks": 236638,
+    "population": 10439388,
+    "bounds": [-84.3219, 33.8423, -75.4606, 36.5881]
+  },
+  {
+    "code": "ND",
+    "fips": "38",
+    "name": "North Dakota",
+    "blocks": 84566,
+    "population": 779094,
+    "bounds": [-104.0489, 45.9351, -96.5545, 49.0006]
+  },
+  {
+    "code": "OH",
+    "fips": "39",
+    "name": "Ohio",
+    "blocks": 276428,
+    "population": 11799448,
+    "bounds": [-84.8202, 38.4032, -80.5187, 41.9772]
+  },
+  {
+    "code": "OK",
+    "fips": "40",
+    "name": "Oklahoma",
+    "blocks": 180154,
+    "population": 3959353,
+    "bounds": [-103.0026, 33.6158, -94.4307, 37.0022]
+  },
+  {
+    "code": "OR",
+    "fips": "41",
+    "name": "Oregon",
+    "blocks": 130807,
+    "population": 4237256,
+    "bounds": [-124.5662, 41.9918, -116.4635, 46.2908]
+  },
+  {
+    "code": "PA",
+    "fips": "42",
+    "name": "Pennsylvania",
+    "blocks": 336985,
+    "population": 13002700,
+    "bounds": [-80.5199, 39.7198, -74.6895, 42.2699]
+  },
+  {
+    "code": "RI",
+    "fips": "44",
+    "name": "Rhode Island",
+    "blocks": 25649,
+    "population": 1097379,
+    "bounds": [-71.8628, 41.1463, -71.1206, 42.0188]
+  },
+  {
+    "code": "SC",
+    "fips": "45",
+    "name": "South Carolina",
+    "blocks": 146844,
+    "population": 5118425,
+    "bounds": [-83.3539, 32.0376, -78.5473, 35.2154]
+  },
+  {
+    "code": "SD",
+    "fips": "46",
+    "name": "South Dakota",
+    "blocks": 71383,
+    "population": 886667,
+    "bounds": [-104.0579, 42.4796, -96.4366, 45.9455]
+  },
+  {
+    "code": "TN",
+    "fips": "47",
+    "name": "Tennessee",
+    "blocks": 179717,
+    "population": 6910840,
+    "bounds": [-90.3105, 34.983, -81.6469, 36.6781]
+  },
+  {
+    "code": "TX",
+    "fips": "48",
+    "name": "Texas",
+    "blocks": 668757,
+    "population": 29145505,
+    "bounds": [-106.6456, 25.8374, -93.5083, 36.5007]
+  },
+  {
+    "code": "UT",
+    "fips": "49",
+    "name": "Utah",
+    "blocks": 71207,
+    "population": 3271616,
+    "bounds": [-114.053, 36.998, -109.0411, 42.0017]
+  },
+  {
+    "code": "VT",
+    "fips": "50",
+    "name": "Vermont",
+    "blocks": 24611,
+    "population": 643077,
+    "bounds": [-73.4377, 42.7269, -71.4646, 45.0167]
+  },
+  {
+    "code": "VA",
+    "fips": "51",
+    "name": "Virginia",
+    "blocks": 163491,
+    "population": 8631393,
+    "bounds": [-83.6754, 36.5407, -75.2425, 39.466]
+  },
+  {
+    "code": "WA",
+    "fips": "53",
+    "name": "Washington",
+    "blocks": 158093,
+    "population": 7705281,
+    "bounds": [-124.7631, 45.5435, -116.916, 49.0025]
+  },
+  {
+    "code": "WV",
+    "fips": "54",
+    "name": "West Virginia",
+    "blocks": 72558,
+    "population": 1793716,
+    "bounds": [-82.6447, 37.2015, -77.7195, 40.6388]
+  },
+  {
+    "code": "WI",
+    "fips": "55",
+    "name": "Wisconsin",
+    "blocks": 203059,
+    "population": 5893718,
+    "bounds": [-92.8881, 42.492, -86.8054, 47.0806]
+  },
+  {
+    "code": "WY",
+    "fips": "56",
+    "name": "Wyoming",
+    "blocks": 53769,
+    "population": 576851,
+    "bounds": [-111.0546, 40.9947, -104.0522, 45.0058]
+  }
+]

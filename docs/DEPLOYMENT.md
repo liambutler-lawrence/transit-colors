@@ -2,9 +2,10 @@
 
 Vercel is the production host for
 [`maps.liambutlerlawrence.com`](https://maps.liambutlerlawrence.com). GitHub Actions is
-the sole deployment path. Pull requests run the same checks and create the same static
-artifact, but only a push to `main` or an intentional manual run from `main` can deploy.
-Automatic Vercel Git deployments remain disabled.
+the sole deployment path. Pull requests run the application checks and build a static
+artifact. Production runs add the published nationwide district assets before running
+the checks and building the deployable artifact. A push to `main` or an intentional
+manual run from `main` can deploy. Automatic Vercel Git deployments remain disabled.
 
 ## Artifact boundary
 
