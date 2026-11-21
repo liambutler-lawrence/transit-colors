@@ -164,6 +164,12 @@ export function edgeKey(firstId: NodeId, secondId: NodeId): EdgeKey {
   return [firstId, secondId].sort().join(EDGE_KEY_SEPARATOR);
 }
 
+// At 135 St the D uses the inner express tracks, then takes the flying junction
+// to the lower level at 145 St. The local platforms are on the same map alignment.
+const distinctExpressRideEdges = new Set<EdgeKey>([
+  edgeKey('gtfs/mta-subway/A15', 'gtfs/mta-subway/D13'),
+]);
+
 function copyCoordinate(coordinate: Coordinate): Coordinate {
   return [coordinate[0], coordinate[1]];
 }
@@ -402,7 +408,14 @@ export function removeServiceShortcuts(
   for (const [fromId, neighbors] of adjacency) {
     for (const toId of neighbors) {
       const key = edgeKey(fromId, toId);
-      if (shortcuts.has(key) || fromId > toId) continue;
+      if (shortcuts.has(key) || fromId > toId || !linesByEdge.has(key)) continue;
+
+      if (distinctExpressRideEdges.has(key)) {
+        // Avoid parallel chords in the heuristic cycle search. Preserve the
+        // actual ride and its service in the published and exact-solver graph.
+        shortcuts.add(key);
+        continue;
+      }
 
       const directDistance = distanceMeters(
         getRequired(nodes, fromId).coordinate,
@@ -521,7 +534,15 @@ export function removeServiceShortcuts(
       const averageWidth = (2 * polygonAreaSquareMeters(ring)) / directDistance;
       if (averageWidth <= CORRIDOR_AVERAGE_WIDTH_M) {
         shortcuts.add(key);
-        if (followsStations !== false) {
+        // A walk can connect a loop but cannot carry train service. Keep the
+        // original ride when the apparent shortcut follows a walking transfer.
+        const isRidePath = corridorPath.nodeIds.slice(1).every((nodeId, index) => {
+          const previousId = corridorPath.nodeIds[index];
+          return (
+            previousId !== undefined && linesByEdge.has(edgeKey(previousId, nodeId))
+          );
+        });
+        if (followsStations !== false && isRidePath) {
           normalizeLinesOntoPath(
             corridorPath.nodeIds,
             directLineNames,

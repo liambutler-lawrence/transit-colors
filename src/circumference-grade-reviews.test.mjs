@@ -56,10 +56,26 @@ test('both geometry variants account for every transit ride with a grade or docu
 });
 
 test('transit line and transfer features expose the properties accepted by the inspector', async () => {
-  const { track } = applyTransitGradeReviews(
+  const { track, straight } = applyTransitGradeReviews(
     JSON.parse(await data('nyc-circumference')),
     'nyc',
   );
+  const express = track.network.segments.find(({ id }) => id === 'network-3ow1vv');
+  assert.ok(express);
+  assert.ok(express.coordinates.length > 2);
+  assert.equal(
+    straight.network.segments.find(({ id }) => id === express.id)?.coordinates.length,
+    2,
+  );
+  const expressProperties = segmentPropertiesSchema.parse(
+    transitSegmentProperties('nyc', express),
+  );
+  assert.equal(expressProperties.from, '125 St');
+  assert.equal(expressProperties.to, '145 St');
+  assert.equal(expressProperties.lines, 'D');
+  assert.equal(expressProperties.grade, 'A');
+  assert.ok(expressProperties.distance_m > 1_000);
+
   const ride = track.network.segments.find((segment) => segment.grade === 'A-');
   assert.ok(ride);
   const properties = segmentPropertiesSchema.parse(
