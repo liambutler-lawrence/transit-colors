@@ -282,7 +282,7 @@ test('map selection precedes the sidebar mode, results, and selection hierarchy'
   assert.doesNotMatch(shell, /<span>Focus on…<\/span>/);
 });
 
-test('circle result cards focus an always-visible global network', async () => {
+test('circle result cards focus the eligible global network', async () => {
   const shell = await readFile(new URL('../index.html', import.meta.url), 'utf8');
   const lifecycle = await readFile(
     new URL('./app/map-lifecycle.ts', import.meta.url),
@@ -293,12 +293,10 @@ test('circle result cards focus an always-visible global network', async () => {
     'utf8',
   );
 
-  assert.match(shell, /All metro networks stay visible/);
   assert.match(shell, /Largest independent circles/);
-  assert.match(
-    shell,
-    /<option value="motorway">Controlled-access divided highways<\/option>/,
-  );
+  assert.match(shell, /<option value="road">Road<\/option>/);
+  assert.match(shell, /<option value="transit">Transit<\/option>/);
+  assert.match(shell, /id="route-grades"/);
   assert.match(shell, /id="circumference-results-heading"/);
   assert.match(lifecycle, /AREA_KEYS\.map\(async \(areaKey\)/);
   assert.match(lifecycle, /circumference-gradient-\$\{areaKey\}/);

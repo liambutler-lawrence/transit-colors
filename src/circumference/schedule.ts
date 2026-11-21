@@ -1,9 +1,11 @@
 import type { Schedule } from '../domain.js';
-import { routeIdForService } from './graph.js';
+import { fundamentalCycles, routeIdForService } from './graph.js';
+import type { GradeOption } from './grades.js';
 import { selectIndependentCircumferenceCandidates } from './independent.js';
 import { candidateFromNetworkPath } from './precomputed.js';
 import type {
   CircumferenceCandidate,
+  Adjacency,
   CircumferenceGeometryMode,
   CircumferenceModeResult,
   CircumferenceNetwork,
@@ -157,12 +159,20 @@ function activeSegmentLines(
 export function filterCircumferenceNetwork(
   network: CircumferenceNetwork,
   activeService: ActiveCircumferenceService | null,
+  allowedGrades?: ReadonlySet<GradeOption>,
 ): CircumferenceNetwork {
-  if (activeService === null) return network;
+  if (activeService === null && allowedGrades === undefined) return network;
 
   const activeRideSegments = network.segments.flatMap((segment) => {
-    if (segment.type !== 'ride') return [];
-    const lines = activeSegmentLines(segment, activeService);
+    if (
+      segment.type !== 'ride' ||
+      (allowedGrades && !allowedGrades.has(segment.grade ?? 'unclassified'))
+    ) {
+      return [];
+    }
+    const lines = activeService
+      ? activeSegmentLines(segment, activeService)
+      : segment.lines;
     return lines.length > 0 ? [{ segment, lines }] : [];
   });
   const activeLinesByNode = new Map<string, Set<string>>();
@@ -192,7 +202,7 @@ export function filterCircumferenceNetwork(
       to:
         nodeById.get(segment.to.id) ??
         filteredNode(segment.to, activeLinesByNode.get(segment.to.id) ?? new Set()),
-      lines,
+      lines: [...lines],
     }),
   );
   for (const segment of network.segments) {
@@ -221,19 +231,16 @@ export function filterCircumferenceNetwork(
   };
 }
 
-function networkPathExists(
-  network: CircumferenceNetwork,
-  path: readonly string[],
-): boolean {
-  const edgeKeys = new Set(
-    network.segments.map((segment) =>
-      [segment.from.id, segment.to.id].sort().join('\u0000'),
-    ),
-  );
-  return path.every((fromId, index) => {
-    const toId = path[(index + 1) % path.length];
-    return toId !== undefined && edgeKeys.has([fromId, toId].sort().join('\u0000'));
-  });
+function networkAdjacency(network: CircumferenceNetwork): Adjacency {
+  const adjacency: Adjacency = new Map();
+  for (const { from, to } of network.segments) {
+    for (const first of [from, to]) {
+      const neighbors = adjacency.get(first.id) ?? new Set<string>();
+      neighbors.add(first === from ? to.id : from.id);
+      adjacency.set(first.id, neighbors);
+    }
+  }
+  return adjacency;
 }
 
 export function scheduleLineStateKey(
@@ -254,9 +261,9 @@ export function scheduleLineStateKey(
 }
 
 /**
- * Rebuilds every still-valid precomputed route against the filtered network.
- * This updates shared-segment line choices and all geodesic length/area values
- * without running a combinatorial route search in the browser.
+ * Rebuilds precomputed routes against operating service. Grade filters also
+ * generate a basis of cycles in the reduced graph, since the published
+ * candidates can all depend on segments the filter removes.
  */
 export function scheduleCircumferenceMode(
   result: CircumferenceModeResult,
@@ -265,6 +272,7 @@ export function scheduleCircumferenceMode(
   referenceResults: {
     readonly ranking?: CircumferenceModeResult;
     readonly spatial?: CircumferenceModeResult;
+    readonly allowedGrades?: ReadonlySet<GradeOption>;
   } = {},
 ): CircumferenceModeResult {
   const buildScheduledPool = (
@@ -275,12 +283,21 @@ export function scheduleCircumferenceMode(
     readonly routeCandidates: CircumferenceCandidate[];
     readonly scheduleCandidates: CircumferenceCandidate[];
   } => {
-    const network = filterCircumferenceNetwork(sourceResult.network, activeService);
+    const network = filterCircumferenceNetwork(
+      sourceResult.network,
+      activeService,
+      referenceResults.allowedGrades,
+    );
+    const adjacency = networkAdjacency(network);
     const rebuildCandidates = (
       candidates: readonly CircumferenceCandidate[],
     ): CircumferenceCandidate[] =>
       candidates
-        .filter((candidate) => networkPathExists(network, candidate.nodeIds))
+        .filter(({ nodeIds }) =>
+          nodeIds.every((id, index) =>
+            adjacency.get(id)?.has(nodeIds[(index + 1) % nodeIds.length] ?? ''),
+          ),
+        )
         .map((candidate) =>
           candidateFromNetworkPath(network, candidate.nodeIds, {
             independentCircleKind: candidate.independentCircleKind,
@@ -293,8 +310,33 @@ export function scheduleCircumferenceMode(
         ? sourceResult.scheduleCandidates
         : sourceResult.routeCandidates,
     );
-    const winner = validScheduleCandidates[0] ?? validRouteCandidates[0];
-    const alternatives = [...validRouteCandidates, ...validScheduleCandidates]
+    const newCandidates =
+      referenceResults.allowedGrades === undefined
+        ? []
+        : fundamentalCycles(
+            networkAdjacency({
+              ...network,
+              segments: network.segments.filter((segment) => segment.display !== false),
+            }),
+          )
+            .map((path) =>
+              candidateFromNetworkPath(network, path, {
+                useTrackGeometry: sourceGeometryMode === 'track',
+              }),
+            )
+            .filter(
+              (candidate) =>
+                candidate.rideLengthMeters > 0 && candidate.areaSquareMeters > 0,
+            );
+    const winner =
+      referenceResults.allowedGrades === undefined
+        ? (validScheduleCandidates[0] ?? validRouteCandidates[0])
+        : undefined;
+    const alternatives = [
+      ...validRouteCandidates,
+      ...validScheduleCandidates,
+      ...newCandidates,
+    ]
       .filter((candidate) => candidate.id !== winner?.id)
       .filter(
         (candidate, index, candidates) =>
@@ -303,7 +345,7 @@ export function scheduleCircumferenceMode(
       .sort((first, second) => second.areaSquareMeters - first.areaSquareMeters);
     return {
       network,
-      routeCandidates: winner === undefined ? [] : [winner, ...alternatives],
+      routeCandidates: winner === undefined ? alternatives : [winner, ...alternatives],
       scheduleCandidates: validScheduleCandidates,
     };
   };
@@ -343,7 +385,10 @@ export function scheduleCircumferenceMode(
 
   return {
     candidates,
-    methodology: result.methodology,
+    methodology:
+      referenceResults.allowedGrades === undefined
+        ? result.methodology
+        : { ...result.methodology, optimizationStatus: undefined },
     network: currentPool.network,
     routeCandidates,
     scheduleCandidates: currentPool.scheduleCandidates,

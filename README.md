@@ -22,11 +22,13 @@ York City, Singapore, Atlanta, and Athens. It includes:
 Circumference routes follow averaged centerlines from official GTFS track shapes by
 default where shape data is published, with an option to compare straight
 platform-to-platform geometry. The map also shows every eligible metro line and
-line-specific platform in its official agency color. All five networks and their
-selected boundaries stay visible together. The shared weekday/time setting filters each
-city's operating lines and selects the proven maximum-area boundary for that service
-period. Atlanta correctly reports that its branched rail network has no closed loop,
-rather than manufacturing one from concurrent services.
+line-specific platform in its official agency color. The shared weekday/time setting
+filters each city's operating lines and selects the proven maximum-area boundary for
+that service period. Atlanta's branched rail network has no closed loop.
+
+Choose **Road** or **Transit** and the segment grades the circle may use. Both networks
+include **Unclassified** by default to keep existing coverage. See the
+[grade rules and available coverage](docs/circumference-grades.md).
 
 The controlled-access criterion displays the contiguous North American divided freeway
 and tollway network. Mainlines and direct ramp-only interchange connectors are distinct

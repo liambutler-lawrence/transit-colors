@@ -25,7 +25,6 @@ import type {
 import type { TransitGraph, TransitTimes, WaitResult } from '../routing/types.js';
 
 export type AreaKey = 'cdmx' | 'nyc' | 'singapore' | 'atlanta' | 'athens';
-export type CircumferenceCriterion = 'metro' | 'motorway';
 export type Product =
   'access' | 'circumference' | 'timezone' | 'landuse' | 'watersheds' | 'districts';
 
@@ -129,6 +128,7 @@ export const segmentPropertiesSchema = z.object({
   distance_m: z.number(),
   from: z.string(),
   from_label: z.string(),
+  grade: z.string().optional(),
   kind: z.string(),
   lines: z.string(),
   segment_id: z.string(),

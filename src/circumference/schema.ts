@@ -1,6 +1,7 @@
 import { z } from 'zod';
 
 import { coordinateSchema } from '../domain.js';
+import { transitGradeSchema } from './grades.js';
 
 const transferSourceSchema = z.enum(['inferred', 'published']);
 const circumferenceNodeSchema = z.object({
@@ -16,6 +17,7 @@ const networkSegmentSchema = z.object({
   distanceMeters: z.number().nonnegative().optional(),
   display: z.boolean().optional(),
   from: circumferenceNodeSchema,
+  grade: transitGradeSchema.optional(),
   id: z.string().min(1),
   lines: z.array(z.string()),
   lineServiceEdges: z

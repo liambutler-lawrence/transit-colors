@@ -114,7 +114,6 @@ import {
   openStationFilter,
   openStationLayers,
   routeBreakdownEl,
-  routeCriterionSelect,
   runtime,
   scheduleSummaryEl,
   selectionTypeEl,
@@ -132,6 +131,7 @@ import {
   timezoneProductEl,
   updateStatus,
 } from './context.js';
+import { writeCircumferenceCriteria } from './circumference-criteria.js';
 
 function requestLiveStreetRefresh(): void {
   window.dispatchEvent(new Event('transit:refresh-live-roads'));
@@ -209,15 +209,15 @@ export function setActiveProduct(
     });
     window.dispatchEvent(new Event('transit:load-active-area'));
   } else if (circumferenceActive) {
+    if (!runtime.circumferenceLandmasses) {
+      updateStatus('Loading routes', { isLoading: true });
+    }
     prepareCircumferenceRoute();
     if (fit && highwayCriterionActive()) {
       fitHighwayCircumference();
     } else if (fit && circumferenceState.selected) {
       fitCircumferenceCandidate(circumferenceState.selected);
     }
-    updateStatus(circumferenceState.selected ? 'Route ready' : 'Loading routes', {
-      isLoading: !circumferenceState.selected,
-    });
   } else if (accessActive) {
     if (fit && state.metadata) applyMapBounds(state.metadata);
     if (AREAS[runtime.activeAreaKey].liveRoads) requestLiveStreetRefresh();
@@ -1023,25 +1023,17 @@ export function updateAreaChrome(
   if (runtime.activeProduct === 'watersheds' || runtime.activeProduct === 'districts') {
     url.searchParams.set('product', runtime.activeProduct);
     url.searchParams.delete('area');
-    url.searchParams.delete('criterion');
   } else if (runtime.activeProduct === 'timezone') {
     url.searchParams.set('product', 'timezone');
-    url.searchParams.delete('criterion');
   } else if (runtime.activeProduct === 'landuse') {
     url.searchParams.set('product', 'landuse');
     url.searchParams.delete('area');
-    url.searchParams.delete('criterion');
   } else if (runtime.activeProduct === 'circumference') {
     url.searchParams.set('product', 'circumference');
-    if (routeCriterionSelect.value === 'motorway') {
-      url.searchParams.set('criterion', 'motorway');
-    } else {
-      url.searchParams.delete('criterion');
-    }
   } else {
     url.searchParams.delete('product');
-    url.searchParams.delete('criterion');
   }
   writeDistrictSettings(url);
+  writeCircumferenceCriteria(url);
   window.history.replaceState({}, '', url);
 }

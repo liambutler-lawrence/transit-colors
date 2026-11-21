@@ -64,6 +64,7 @@ export function candidateFromNetworkPath(
       return {
         id: stableCandidateId([fromId, toId]).replace('route-', 'segment-'),
         from,
+        grade: networkSegment.grade,
         to,
         type: networkSegment.type,
         lines: [...networkSegment.lines].sort(sortLineNames),

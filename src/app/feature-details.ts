@@ -564,6 +564,7 @@ export function showCircumferenceSegment(properties: SegmentProperties): void {
       label: 'Distance',
       value: formatDistance(properties.distance_m),
     },
+    { label: 'Grade', value: properties.grade },
     {
       label: 'Loop area',
       value: formatArea(routeState.selected.areaSquareMeters),

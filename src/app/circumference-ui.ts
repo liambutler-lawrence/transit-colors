@@ -36,6 +36,8 @@ import type {
 } from '../circumference/types.js';
 import type { LandmassArea } from '../domain.js';
 import { lineColor } from '../line-colors.js';
+import { gradeLabel } from '../circumference/grades.js';
+import { allowedCircumferenceGrades } from './circumference-criteria.js';
 import type { AreaKey } from './types.js';
 import {
   AREAS,
@@ -71,14 +73,12 @@ import {
 } from './context.js';
 import {
   highwayCriterionActive,
-  highwayDataLoaded,
-  refreshHighwayGradient,
   prepareHighwayCircumference,
   renderHighwayResults,
   syncCircumferenceCriterionControls,
+  syncHighwayLayerVisibility,
 } from './highway-circumference-ui.js';
 import { setLayerVisibility } from './map-ui-utils.js';
-import { syncGovernmentSeats } from './government-seats-ui.js';
 
 export function positionCircumferenceGradient(): void {
   // Keep the overlay below the detailed basemap water polygons. The stored
@@ -97,7 +97,6 @@ export function positionCircumferenceGradient(): void {
 
 export function syncCircumferenceVisibility(): void {
   const highwayMode = highwayCriterionActive();
-  syncGovernmentSeats(runtime.activeProduct === 'circumference' && highwayMode);
   const networkVisible =
     runtime.activeProduct === 'circumference' &&
     !highwayMode &&
@@ -108,8 +107,6 @@ export function syncCircumferenceVisibility(): void {
     runtime.activeProduct === 'circumference' &&
     !highwayMode &&
     AREA_KEYS.some((areaKey) => Boolean(circumferenceStates[areaKey].selected));
-  const highwayVisible =
-    runtime.activeProduct === 'circumference' && highwayMode && highwayDataLoaded();
   for (const areaKey of AREA_KEYS) {
     setLayerVisibility(
       `circumference-gradient-${areaKey}`,
@@ -122,24 +119,8 @@ export function syncCircumferenceVisibility(): void {
       updateCircumferenceGradient(areaKey, selected);
     } else gradientRenderer.cancel(`circumference-gradient-${areaKey}`);
   }
-  refreshHighwayGradient();
-  setLayerVisibility(
-    'highway-circumference-gradient',
-    highwayVisible && routeGradientToggle.checked,
-  );
+  syncHighwayLayerVisibility();
   setLayerVisibility('circumference-area', routeVisible && routeAreaToggle.checked);
-  setLayerVisibility(
-    'highway-circumference-area',
-    highwayVisible && routeAreaToggle.checked,
-  );
-  setLayerVisibility('highway-circumference-network-casing', highwayVisible);
-  setLayerVisibility('highway-circumference-network-line', highwayVisible);
-  setLayerVisibility('highway-circumference-network-connector-casing', highwayVisible);
-  setLayerVisibility('highway-circumference-network-connector-line', highwayVisible);
-  setLayerVisibility('highway-circumference-route-casing', highwayVisible);
-  setLayerVisibility('highway-circumference-route-line', highwayVisible);
-  setLayerVisibility('highway-circumference-route-connector-casing', highwayVisible);
-  setLayerVisibility('highway-circumference-route-connector-line', highwayVisible);
   setLayerVisibility('circumference-network-casing', networkVisible);
   setLayerVisibility('circumference-network-line', networkVisible);
   setLayerVisibility('circumference-network-transfer-line', networkVisible);
@@ -589,6 +570,8 @@ export function routeFeatureCollection(
           primary_line: primaryLine,
           segment_id: segment.id,
           segment_type: segment.type,
+          grade:
+            segment.type === 'ride' ? gradeLabel(segment.grade ?? 'unclassified') : '',
           distance_m: segment.distanceMeters,
           transfer_source: segment.transferSource ?? '',
           transfer_minutes: segment.transferMinutes ?? '',
@@ -716,7 +699,14 @@ function createCircumferenceResult({
   const name = document.createElement('h3');
   name.textContent = `${AREAS[areaKey].label} · Circle ${areaRank}`;
   const description = document.createElement('small');
-  description.textContent = `${candidate.lines.length} lines · ${candidate.stations.length} platform nodes`;
+  const grades = [
+    ...new Set(
+      candidate.segments.flatMap((segment) =>
+        segment.type === 'ride' ? [gradeLabel(segment.grade ?? 'unclassified')] : [],
+      ),
+    ),
+  ].sort();
+  description.textContent = `${candidate.lines.length} lines · ${candidate.stations.length} platform nodes · ${grades.join(', ')}`;
   const focusAction = document.createElement('span');
   focusAction.className = 'focus-action';
   focusAction.textContent = isFocused ? 'Focused' : 'Focus map';
@@ -800,7 +790,7 @@ export function renderCircumferenceResults(): void {
   if (circles.length === 0) {
     const empty = document.createElement('p');
     empty.className = 'result-empty';
-    empty.textContent = 'No valid circles operate at this day and time.';
+    empty.textContent = 'No circles match the selected grades and operating schedule.';
     circumferenceResultsEl.replaceChildren(empty);
     return;
   }
@@ -923,7 +913,12 @@ function prepareCircumferenceArea(
     state.scheduleWeekday,
     state.scheduleMinute,
   );
-  const scheduleKey = scheduleLineStateKey(baseResult.network, activeService);
+  const grades = allowedCircumferenceGrades();
+  const restrictGrades = baseResult.network.segments.some(
+    (segment) =>
+      segment.type === 'ride' && !grades.has(segment.grade ?? 'unclassified'),
+  );
+  const scheduleKey = `${[...grades].sort().join(',')}|${scheduleLineStateKey(baseResult.network, activeService)}`;
   if (
     routeState.areaKey === areaKey &&
     routeState.geometryMode === geometryMode &&
@@ -939,6 +934,7 @@ function prepareCircumferenceArea(
     {
       ranking: routeState.geometryVariants.straight,
       spatial: routeState.geometryVariants.track,
+      ...(restrictGrades ? { allowedGrades: grades } : {}),
     },
   );
   routeState.areaKey = areaKey;
@@ -983,11 +979,11 @@ function renderFocusedCircumferenceArea({ fit = false } = {}): void {
   if (!candidate) {
     const noService = circumferenceState.activeLineNames.length === 0;
     circumferenceNameEl.textContent = noService
-      ? 'No scheduled metro service'
-      : 'No closed metro loop found';
+      ? 'No matching metro segments'
+      : 'No matching metro circle';
     circumferenceSummaryEl.textContent = noService
-      ? `${AREAS[runtime.activeAreaKey].label} has no eligible metro lines operating ${departureLabel()}.`
-      : 'The scheduled lines at this time do not produce a valid simple route.';
+      ? `${AREAS[runtime.activeAreaKey].label} has no segments matching these grades at ${departureLabel()}.`
+      : 'The eligible segments do not produce a closed route.';
     routeChoiceSummaryEl.textContent = noService
       ? 'No eligible lines are active in this metro for this schedule period.'
       : 'The operating lines remain visible, but no closed route exists.';
@@ -995,7 +991,7 @@ function renderFocusedCircumferenceArea({ fit = false } = {}): void {
     syncCircumferenceVisibility();
     if (fit) fitCircumferenceCandidate(null);
     if (runtime.activeProduct === 'circumference') {
-      updateStatus(noService ? 'No scheduled service' : 'No loop');
+      updateStatus(noService ? 'No matching segments' : 'No loop');
     }
     return;
   }
@@ -1049,7 +1045,7 @@ export function prepareCircumferenceRoute(
     (areaKey) => {
       const lineCount = circumferenceStates[areaKey].activeLineNames.length;
       return `${AREAS[areaKey].label}: ${
-        lineCount === 0 ? 'no service' : `${lineCount} lines`
+        lineCount === 0 ? 'no eligible lines' : `${lineCount} eligible lines`
       }`;
     },
   ).join(' · ')}`;

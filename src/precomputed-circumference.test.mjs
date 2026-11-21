@@ -15,8 +15,45 @@ import {
   selectIndependentCircumferenceCandidates,
 } from './circumference.ts';
 import { circumferenceGeometryVariantsSchema } from './circumference/schema.ts';
+import { fetchCircumferenceGeometryVariants } from './app/circumference-data.ts';
 
 const LOOP_AREA_KEYS = ['cdmx', 'nyc', 'singapore', 'athens'];
+
+test('Grade A can find a Singapore circle outside the unfiltered candidate pool', async (t) => {
+  const [data, schedules] = await Promise.all([
+    readFile(new URL('../data/singapore-circumference.json', import.meta.url), 'utf8'),
+    readFile(new URL('../data/singapore-schedules.json', import.meta.url), 'utf8').then(
+      JSON.parse,
+    ),
+  ]);
+  t.mock.method(globalThis, 'fetch', async () => new Response(data));
+  const { track, straight } = await fetchCircumferenceGeometryVariants(
+    'singapore-circumference.json',
+    'singapore',
+  );
+  const noon = activeCircumferenceService(schedules, 0, 720);
+  const filter = { ranking: straight, spatial: track, allowedGrades: new Set(['A']) };
+  const result = scheduleCircumferenceMode(track, noon, 'track', filter);
+  assert.equal(result.candidates.length, 1);
+  const [circle] = result.candidates;
+  assert.deepEqual(circle.lines, ['DT', 'NE']);
+  assert.equal(circle.transferCount, 2);
+  assert.equal(circle.segments.filter((edge) => edge.grade === 'A').length, 10);
+  assert.ok(!track.routeCandidates.some(({ id }) => id === circle.id));
+  assert.equal(result.methodology.optimizationStatus, undefined);
+  assert.equal(
+    scheduleCircumferenceMode(track, noon, 'track', {
+      ...filter,
+      allowedGrades: new Set(['B']),
+    }).candidates.length,
+    0,
+  );
+  const closed = activeCircumferenceService(schedules, 0, 180);
+  assert.equal(
+    scheduleCircumferenceMode(track, closed, 'track', filter).candidates.length,
+    0,
+  );
+});
 
 test('precomputed circumference winners are validated and topology-stable', async () => {
   for (const areaKey of LOOP_AREA_KEYS) {
