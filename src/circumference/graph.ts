@@ -657,6 +657,10 @@ export function stableCandidateId(nodeIds: readonly NodeId[]): string {
   return `route-${(hash >>> 0).toString(36)}`;
 }
 
+export function stableSegmentId(fromId: NodeId, toId: NodeId): string {
+  return stableCandidateId([fromId, toId]).replace('route-', 'segment-');
+}
+
 export function cycleEdgeKeys(path: readonly NodeId[]): Set<EdgeKey> {
   return new Set(
     path.flatMap((nodeId, index) => {

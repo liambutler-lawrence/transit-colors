@@ -3,7 +3,13 @@ import { createHash } from 'node:crypto';
 import { readFile } from 'node:fs/promises';
 import test from 'node:test';
 
+import {
+  applyTransitGradeReviews,
+  transitSegmentProperties,
+} from './app/circumference-data.ts';
+import { segmentPropertiesSchema } from './app/types.ts';
 import { roadGradeSchema } from './circumference/grades.ts';
+import { candidateFromNetworkPath } from './circumference/precomputed.ts';
 
 function data(file) {
   return readFile(new URL(`../data/${file}.json`, import.meta.url), 'utf8');
@@ -24,6 +30,39 @@ test('transit reviews match both geometry variants and identify unique ride segm
       for (const id of ids) assert.ok(rideIds.has(id), `${area}/${mode}: ${id}`);
     }
   }
+});
+
+test('transit line and transfer features expose the properties accepted by the inspector', async () => {
+  const { track } = applyTransitGradeReviews(
+    JSON.parse(await data('nyc-circumference')),
+    'nyc',
+  );
+  const ride = track.network.segments.find((segment) => segment.grade === 'A-');
+  assert.ok(ride);
+  const properties = segmentPropertiesSchema.parse(
+    transitSegmentProperties('nyc', ride),
+  );
+  assert.equal(properties.segment_type, 'ride');
+  assert.equal(properties.grade, 'A-');
+  assert.ok(properties.distance_m > 0);
+
+  const candidate = candidateFromNetworkPath(track.network, [ride.to.id, ride.from.id]);
+  const reversed = segmentPropertiesSchema.parse(
+    transitSegmentProperties('nyc', candidate.segments[0]),
+  );
+  assert.equal(reversed.from, properties.to);
+  assert.equal(reversed.segment_id, properties.segment_id);
+  assert.equal(reversed.grade, properties.grade);
+
+  const transfer = track.network.segments.find(
+    (segment) => segment.type === 'transfer' && segment.display !== false,
+  );
+  assert.ok(transfer);
+  const walking = segmentPropertiesSchema.parse(
+    transitSegmentProperties('nyc', transfer),
+  );
+  assert.equal(walking.segment_type, 'transfer');
+  assert.equal(walking.grade, undefined);
 });
 
 test('reviewed road indices belong to the published boundary snapshot', async () => {

@@ -28,6 +28,7 @@ import {
   serviceFamily,
   spanningTreeCycles,
   stableCandidateId,
+  stableSegmentId,
   trackGeometryByEdge,
 } from './graph.js';
 import {
@@ -520,7 +521,7 @@ function buildGeometryVariant({
               );
           return [
             {
-              id: stableCandidateId([nodeId, nextId]).replace('route-', 'segment-'),
+              id: stableSegmentId(nodeId, nextId),
               from,
               to,
               type: transfer ? 'transfer' : 'ride',

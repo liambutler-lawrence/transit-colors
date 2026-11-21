@@ -190,57 +190,57 @@ export function installHover(): void {
 
   let hoveredCircumferenceSegmentId: string | number | null = null;
   const circumferenceSegmentLayerIds = [
+    'circumference-network-line',
+    'circumference-network-transfer-line',
     'circumference-route-alternative-line',
     'circumference-route-line',
     'circumference-transfer-line',
   ];
-  for (const layerId of circumferenceSegmentLayerIds) {
-    map.on('mousemove', layerId, (event) => {
-      const feature = event.features?.[0];
-      if (!feature || feature.id === undefined) return;
-      const properties = segmentPropertiesSchema.safeParse(feature.properties);
-      if (!properties.success) return;
-      if (hoveredCircumferenceSegmentId !== null) {
-        map.setFeatureState(
-          {
-            source: 'circumference-route',
-            id: hoveredCircumferenceSegmentId,
-          },
-          { hover: false },
-        );
-      }
-      hoveredCircumferenceSegmentId = feature.id;
+  const clearCircumferenceHover = (): void => {
+    if (hoveredCircumferenceSegmentId !== null) {
       map.setFeatureState(
-        { source: 'circumference-route', id: feature.id },
-        { hover: true },
+        { source: 'circumference-route', id: hoveredCircumferenceSegmentId },
+        { hover: false },
       );
-      showCircumferenceSegment(properties.data);
-      map.getCanvas().style.cursor = 'pointer';
-    });
-    map.on('mouseleave', layerId, () => {
-      if (hoveredCircumferenceSegmentId !== null) {
-        map.setFeatureState(
-          {
-            source: 'circumference-route',
-            id: hoveredCircumferenceSegmentId,
-          },
-          { hover: false },
-        );
-      }
       hoveredCircumferenceSegmentId = null;
-      map.getCanvas().style.cursor = '';
-    });
-    map.on('click', layerId, (event) => {
-      const feature = event.features?.[0];
-      const properties = segmentPropertiesSchema.safeParse(feature?.properties);
-      if (!properties.success) return;
-      if (properties.data.area_key !== runtime.activeAreaKey) {
-        areaSelect.value = properties.data.area_key;
-        areaSelect.dispatchEvent(new Event('change'));
-      }
+    }
+  };
+  map.on('mousemove', circumferenceSegmentLayerIds, (event) => {
+    const id = event.features?.[0]?.id;
+    if (id === undefined) return;
+    if (id !== hoveredCircumferenceSegmentId) {
+      clearCircumferenceHover();
+      map.setFeatureState({ source: 'circumference-route', id }, { hover: true });
+      hoveredCircumferenceSegmentId = id;
+    }
+    map.getCanvas().style.cursor = 'pointer';
+  });
+  map.on('mouseleave', circumferenceSegmentLayerIds, () => {
+    clearCircumferenceHover();
+  });
+  let circumferenceClickSequence = 0;
+  map.on('click', circumferenceSegmentLayerIds, (event) => {
+    const properties = segmentPropertiesSchema.safeParse(
+      event.features?.[0]?.properties,
+    );
+    if (!properties.success) return;
+    const sequence = ++circumferenceClickSequence;
+    const areaKey = properties.data.area_key;
+    if (areaKey === runtime.activeAreaKey) {
       showCircumferenceSegment(properties.data);
+      return;
+    }
+    void loadArea(areaKey, { fit: false }).then(() => {
+      if (
+        sequence === circumferenceClickSequence &&
+        runtime.activeAreaKey === areaKey &&
+        runtime.activeProduct === 'circumference' &&
+        circumferenceNetworkMode() === 'transit'
+      ) {
+        showCircumferenceSegment(properties.data);
+      }
     });
-  }
+  });
 
   installHighwayHover();
 }
@@ -270,6 +270,7 @@ export function installMapData(stations: StationCollection): void {
   map.addSource('circumference-route', {
     type: 'geojson',
     data: { type: 'FeatureCollection', features: [] },
+    promoteId: 'segment_id',
   });
 
   map.addSource('highway-circumference', {

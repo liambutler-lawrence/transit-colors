@@ -40,6 +40,7 @@ import {
   allowedCircumferenceGrades,
   showTransitGradeCoverage,
 } from './circumference-criteria.js';
+import { transitSegmentProperties } from './circumference-data.js';
 import type { AreaKey } from './types.js';
 import {
   AREAS,
@@ -344,7 +345,6 @@ export function routeFeatureCollection(
     ? [
         {
           type: 'Feature',
-          id: `${areaKey}:inside`,
           geometry: {
             type: 'Polygon',
             coordinates: [candidate.coordinates],
@@ -354,7 +354,6 @@ export function routeFeatureCollection(
       ]
     : [];
   const candidateSegments = candidate?.segments ?? [];
-  let featureId = 0;
   const boundaryRideKeys = new Set(
     candidateSegments
       .filter((segment) => segment.type === 'ride')
@@ -407,6 +406,7 @@ export function routeFeatureCollection(
     ) {
       continue;
     }
+    const details = transitSegmentProperties(areaKey, segment);
     const displayedLines = segment.type === 'transfer' ? [''] : segment.lines;
     const continuationLanes: ReadonlyMap<string, JunctionContinuationLane> =
       segment.type === 'ride'
@@ -464,12 +464,12 @@ export function routeFeatureCollection(
         );
         const feature: Feature<LineString, GeoJsonProperties> = {
           type: 'Feature',
-          id: `${areaKey}:${featureId}`,
           geometry: {
             type: 'LineString',
             coordinates: [...section.coordinates],
           },
           properties: {
+            ...details,
             kind:
               segment.type === 'transfer'
                 ? 'network-transfer'
@@ -479,7 +479,6 @@ export function routeFeatureCollection(
                   : 'network-segment',
             line: lineName,
             color: segment.type === 'transfer' ? '' : lineColor(areaKey, lineName),
-            area_key: areaKey,
             line_position: continuationLane?.index ?? normalPosition,
             line_side: continuationLane?.side ?? 1,
             junction_continuation: continuationLane !== undefined,
@@ -488,7 +487,6 @@ export function routeFeatureCollection(
           },
         };
         features.push(feature);
-        featureId += 1;
       }
     }
   }
@@ -499,7 +497,6 @@ export function routeFeatureCollection(
     if (firstLine === undefined) continue;
     const feature: Feature<Point, GeoJsonProperties> = {
       type: 'Feature',
-      id: `${areaKey}:${featureId}`,
       geometry: {
         type: 'Point',
         coordinates: station.coordinate,
@@ -514,10 +511,10 @@ export function routeFeatureCollection(
       },
     };
     features.push(feature);
-    featureId += 1;
   }
 
   for (const segment of candidateSegments) {
+    const details = transitSegmentProperties(areaKey, segment);
     const displayedLines =
       segment.type === 'transfer'
         ? ['']
@@ -546,40 +543,27 @@ export function routeFeatureCollection(
         : boundaryAlternativeLineOffsets(linePosition, 1);
       const feature: Feature<LineString, GeoJsonProperties> = {
         type: 'Feature',
-        id: `${areaKey}:${featureId}`,
         geometry: {
           type: 'LineString',
           coordinates: segment.coordinates,
         },
         properties: {
+          ...details,
           kind:
             segment.type === 'transfer'
               ? 'transfer'
               : isPrimaryLine
                 ? 'segment'
                 : 'segment-alternative',
-          from: segment.from.name,
-          to: segment.to.name,
-          from_label: segment.from.label ?? '',
-          to_label: segment.to.label ?? '',
           line: lineName,
-          lines: segment.lines.join(', '),
-          area_key: areaKey,
           color: lineColor(areaKey, lineName),
           line_position: linePosition,
           line_side: 1,
           ...lineOffsetProperties(offsets),
           primary_line: primaryLine,
-          segment_id: segment.id,
-          segment_type: segment.type,
-          grade: segment.grade ?? '',
-          distance_m: segment.distanceMeters,
-          transfer_source: segment.transferSource ?? '',
-          transfer_minutes: segment.transferMinutes ?? '',
         },
       };
       features.push(feature);
-      featureId += 1;
     }
   }
 
@@ -593,7 +577,6 @@ export function routeFeatureCollection(
       '';
     const feature: Feature<Point, GeoJsonProperties> = {
       type: 'Feature',
-      id: `${areaKey}:${featureId}`,
       geometry: {
         type: 'Point',
         coordinates: station.coordinate,
@@ -608,7 +591,6 @@ export function routeFeatureCollection(
       },
     };
     features.push(feature);
-    featureId += 1;
   }
 
   return {
@@ -1056,6 +1038,7 @@ export function prepareCircumferenceRoute(
     (areaKey) =>
       circumferenceStates[areaKey].methodology?.trackGeometryAvailable === true,
   );
+  if (changed) resetCircumferenceItemDetails();
   updateCombinedCircumferenceSource();
   renderFocusedCircumferenceArea({
     fit: changed && runtime.activeProduct === 'circumference',
