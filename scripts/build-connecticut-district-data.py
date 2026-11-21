@@ -1,4 +1,4 @@
-"""Generate the block-based plans from tl_2020_09_tabblock20.zip.
+"""Generate the block-based plans from 2020 TIGER/Line blocks and coastal waters.
 
 Requires pyshp, Shapely 2.1 or newer, and the repository's Node dependencies.
 """
@@ -11,9 +11,13 @@ import subprocess
 from tempfile import TemporaryDirectory
 
 import shapefile
-from shapely import coverage_is_valid, coverage_union_all, orient_polygons
+from shapely import coverage_is_valid, coverage_union_all, get_parts, orient_polygons, union_all
 from shapely.geometry import mapping, shape
 from shapely.geometry.base import BaseGeometry
+
+
+COASTAL_COUNTIES = ("09001", "09007", "09009", "09011")
+COASTAL_WATER_TYPES = {"H2051", "H2053"}
 
 
 @dataclass(frozen=True)
@@ -54,6 +58,40 @@ def load_blocks(blocks_path):
     return blocks
 
 
+def load_coastal_water(directory, shoreline):
+    waters = []
+    sea = []
+    for county in COASTAL_COUNTIES:
+        path = directory / f"tl_2020_{county}_areawater.zip"
+        with shapefile.Reader(str(path)) as reader:
+            for row in reader.iterShapeRecords(fields=["MTFCC"]):
+                water = shape(row.shape.__geo_interface__)
+                waters.append(water)
+                if row.record["MTFCC"] in COASTAL_WATER_TYPES:
+                    sea.append(water)
+    marine_water = union_all(sea)
+    # Some river polygons extend out into the Sound. Use the cartographic
+    # shoreline to trim their offshore sections while keeping inland rivers.
+    connected_water = union_all([
+        part for part in get_parts(union_all(waters)) if part.intersects(marine_water)
+    ])
+    with shapefile.Reader(str(shoreline)) as reader:
+        land = coverage_union_all([shape(tract.__geo_interface__) for tract in reader.iterShapes()])
+    if land.is_empty or not land.is_valid:
+        raise ValueError("Cartographic tracts did not form a valid shoreline")
+    coastal_water = marine_water.union(connected_water.difference(land))
+    if coastal_water.is_empty or not coastal_water.is_valid:
+        raise ValueError("Coastal hydrography did not form a valid water mask")
+    return coastal_water
+
+
+def display_geometry(geometry, coastal_water):
+    clipped = orient_polygons(geometry.difference(coastal_water))
+    if clipped.is_empty or not clipped.is_valid:
+        raise ValueError("Coastal clipping produced invalid display geometry")
+    return clipped
+
+
 def write_blocks(path, blocks):
     with path.open("w", encoding="utf-8") as file:
         file.write("[")
@@ -69,7 +107,7 @@ def write_blocks(path, blocks):
         file.write("]")
 
 
-def write_plan(directory, blocks, outline, assignment):
+def write_plan(directory, blocks, outline, coastal_water, assignment):
     method = assignment["method"]
     seats = assignment["seats"]
     assigned = set()
@@ -86,10 +124,14 @@ def write_plan(directory, blocks, outline, assignment):
             or sum(block.urban_population for block in members) != properties["urbanPopulation"]
         ):
             raise ValueError(f"Incorrect reported population for {method}, {seats} districts")
-        geometry = orient_polygons(coverage_union_all([block.geometry for block in members]))
+        geometry = coverage_union_all([block.geometry for block in members])
         if not geometry.is_valid:
             raise ValueError(f"Invalid district geometry for {method}, {seats} districts")
-        districts.append({"type": "Feature", "properties": properties, "geometry": mapping(geometry)})
+        districts.append({
+            "type": "Feature",
+            "properties": properties,
+            "geometry": mapping(display_geometry(geometry, coastal_water)),
+        })
     if len(districts) != seats or assigned != set(range(len(blocks))):
         raise ValueError(f"Incomplete block partition for {method}, {seats} districts")
 
@@ -108,10 +150,13 @@ def write_plan(directory, blocks, outline, assignment):
         file.write("\n")
 
 
-def build(blocks_path):
+def build(blocks_path, hydrography, shoreline):
     root = Path(__file__).resolve().parent.parent
     blocks = load_blocks(blocks_path)
-    outline = orient_polygons(coverage_union_all([block.geometry for block in blocks]))
+    coastal_water = load_coastal_water(hydrography, shoreline)
+    outline = display_geometry(
+        coverage_union_all([block.geometry for block in blocks]), coastal_water
+    )
     output = root / "data/connecticut-district-plans"
     with TemporaryDirectory(dir=output.parent) as temporary:
         directory = Path(temporary)
@@ -126,7 +171,7 @@ def build(blocks_path):
         generated = directory / "plans"
         generated.mkdir()
         for assignment in assignments:
-            write_plan(generated, blocks, outline, assignment)
+            write_plan(generated, blocks, outline, coastal_water, assignment)
         output.mkdir(exist_ok=True)
         for plan in generated.iterdir():
             plan.replace(output / plan.name)
@@ -135,4 +180,7 @@ def build(blocks_path):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("blocks")
-    build(parser.parse_args().blocks)
+    parser.add_argument("hydrography", type=Path, help="Directory containing coastal AREAWATER ZIP files")
+    parser.add_argument("shoreline", help="2020 Connecticut cartographic tract ZIP file")
+    args = parser.parse_args()
+    build(args.blocks, args.hydrography, args.shoreline)
