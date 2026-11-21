@@ -24,10 +24,30 @@ connect eligible ride segments.
 [The review catalog](../data/circumference-transit-grades.json) records the grade,
 sources and exact published network segment IDs for each reviewed corridor. A line name
 describes the review and never assigns a grade to later extensions or other segments.
-Published ride geometry and schedules remain intact for future reviews. To add coverage,
-add the reviewed segment IDs from the area's `*-circumference.json` network, with the
-sources for the whole segment. The tests check every catalog ID against both geometry
-variants. Shared services on the same physical edge get one infrastructure grade.
+The [outstanding segment list](circumference-transit-grade-gaps.md) gives the station
+pair, services, and missing evidence for every ride without a grade. To add coverage,
+record the exact ride IDs from the area's `*-circumference.json` network and the sources
+for the whole segment. Update the outstanding list to reflect those grades. Tests check
+that every ride in both geometry variants has either a grade or an entry in that list.
+Shared services on the same physical edge get one infrastructure grade.
+
+The November 2026 review compared passenger track diagrams, operator infrastructure and
+service documents, and OpenStreetMap track and crossing data. The OpenStreetMap extracts
+date from November 14 for Mexico City, New York, and Singapore and November 20 for
+Athens. Track diagrams distinguish one-way merges, parallel approaches, and crossings
+that cut across a second passenger route. For surface track, the review checked mapped
+rail and road crossings against the structures and access described by the sources.
+Where the sources document a single regular passenger track at a terminal throat, that
+section sets the segment's grade even if the corridor widens farther from the station.
+
+At Indios Verdes, the mapped crossing marker originated in an old station footway that
+was documented as a pedestrian tunnel before it was removed during entrance remapping.
+The city plans show the underground station access, and the Line 3 construction record
+documents the separated road crossings on the approach.
+[OpenStreetMap footway history](https://www.openstreetmap.org/way/1126581929/history) ·
+[CETRAM project plans](https://www.obras.cdmx.gob.mx/storage/app/media/cetram/CETRAM%20INDIOS%20VERDES.pdf)
+·
+[COMETRO construction report](https://almacenfica.blob.core.windows.net/imagenes-fundacion-ica-org-mx/FICA-IMAGENES/Libro_Digitales/Revista%20ICA/REVISTA_NUM%209.pdf)
 
 The selector excludes ride segments without evidence. Track data currently covers metro
 services. Busways and other passenger rail need to be added to the graph before their

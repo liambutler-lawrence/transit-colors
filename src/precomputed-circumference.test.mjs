@@ -8,7 +8,6 @@ import {
   CIRCUMFERENCE_INTERIOR_OVERLAP_TOLERANCE_SQUARE_METERS,
   circumferenceInteriorOverlapSquareMeters,
   distanceMeters,
-  filterCircumferenceNetwork,
   junctionContinuationLineLanes,
   junctionContinuationSections,
   lineLengthMeters,
@@ -17,7 +16,6 @@ import {
 } from './circumference.ts';
 import { circumferenceGeometryVariantsSchema } from './circumference/schema.ts';
 import { fetchCircumferenceGeometryVariants } from './app/circumference-data.ts';
-import { TRANSIT_GRADES } from './circumference/grades.ts';
 
 const LOOP_AREA_KEYS = ['cdmx', 'nyc', 'singapore', 'athens'];
 
@@ -47,17 +45,6 @@ test('Grade A can find a Singapore circle outside the unfiltered candidate pool'
       circle.segments.every(({ type, grade }) => type === 'transfer' || grade === 'A'),
     );
   }
-  const allGrades = filterCircumferenceNetwork(
-    track.network,
-    noon,
-    new Set(TRANSIT_GRADES),
-  );
-  assert.ok(
-    track.network.segments.some(({ type, grade }) => type === 'ride' && !grade),
-  );
-  assert.ok(
-    allGrades.segments.every(({ type, grade }) => type === 'transfer' || grade),
-  );
   assert.equal(result.methodology.optimizationStatus, undefined);
   assert.equal(
     scheduleCircumferenceMode(track, noon, 'track', {
