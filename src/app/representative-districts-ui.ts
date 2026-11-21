@@ -187,6 +187,9 @@ function focusDistrictPlan(): void {
   const state = districtState(stateSelect.value);
   if (!state) return;
   const bounds = new LngLatBounds(districtStateBounds(state));
+  // At these longitudes the statewide viewport can straddle the antimeridian.
+  const projection = bounds.getWest() < -170 ? 'mercator' : 'globe';
+  if (map.getProjection()?.type !== projection) map.setProjection({ type: projection });
   map.setMaxBounds(null);
   map.fitBounds(bounds, {
     bearing: 0,
@@ -334,7 +337,6 @@ export function positionDistrictLayers(): void {
 
 for (const select of [stateSelect, methodSelect, seatsSelect]) {
   select.addEventListener('change', () => {
-    if (!map.getSource(SOURCE)) return;
     const url = new URL(window.location.href);
     writeDistrictSettings(url);
     window.history.replaceState({}, '', url);
@@ -347,9 +349,9 @@ for (const select of [stateSelect, methodSelect, seatsSelect]) {
           'aria-label',
           `Interactive map of representative districts in ${name}`,
         );
-      focusDistrictPlan();
+      if (map.getSource(SOURCE)) focusDistrictPlan();
     }
-    loadDistrictPlan();
+    if (map.getSource(SOURCE)) loadDistrictPlan();
   });
 }
 results.addEventListener('click', (event) => {
