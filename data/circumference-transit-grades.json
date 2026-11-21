@@ -125,6 +125,60 @@
         "network-wi30m3",
         "network-zx78xn"
       ]
+    },
+    {
+      "corridor": "Line 1 surface and elevated passenger tracks",
+      "grade": "A",
+      "sources": [
+        "https://stasy.gr/wp-content/uploads/2023/07/SUSTAINABLE-DEVELOPMENT_2021.pdf",
+        "https://www.openstreetmap.org/relation/445858",
+        "https://www.openstreetmap.org/relation/7963473",
+        "https://download.geofabrik.de/europe/greece.html",
+        "https://www.openstreetmap.org/way/924860198",
+        "https://www.openstreetmap.org/way/1051710971",
+        "https://www.openstreetmap.org/way/483246706",
+        "https://leoforeia.gr/photos/displayimage.php?album=1651&pid=9066"
+      ],
+      "segmentIds": [
+        "network-128oefp",
+        "network-1a6a8jj",
+        "network-1dwjvwf",
+        "network-1fhj6dl",
+        "network-1fleo1v",
+        "network-1gw8uff",
+        "network-1gzepmz",
+        "network-1py2pu3",
+        "network-1q7mbgl",
+        "network-1u2x5q3",
+        "network-1wtpjv",
+        "network-1ysmozf",
+        "network-7hfxsj",
+        "network-8kk4u7",
+        "network-cn66v7",
+        "network-k78ymn",
+        "network-ktx1e3",
+        "network-lsm0jv",
+        "network-owspkf",
+        "network-ssylu7"
+      ]
+    },
+    {
+      "corridor": "Line 3 shared, double-track airport railway and connecting tunnel",
+      "grade": "A",
+      "sources": [
+        "https://stasy.gr/wp-content/uploads/2023/07/SUSTAINABLE-DEVELOPMENT_2021.pdf",
+        "https://www.hellenicrailways.gr/erga/ska-aerodromio",
+        "https://www.hellenicparliament.gr/UserFiles/c8827c35-4399-4fbb-8ea6-aebdc768f4f7/10856751.pdf",
+        "https://www.openstreetmap.org/relation/445945",
+        "https://www.openstreetmap.org/relation/2473157",
+        "https://download.geofabrik.de/europe/greece.html"
+      ],
+      "segmentIds": [
+        "network-1ubha09",
+        "network-4fh1zp",
+        "network-lezbhn",
+        "network-pf48nn"
+      ]
     }
   ],
   "cdmx": [
@@ -226,6 +280,237 @@
         "network-sfbhmj",
         "network-uo7wvr",
         "network-w6urnh"
+      ]
+    },
+    {
+      "corridor": "Line 2 paired passenger running tracks",
+      "grade": "A",
+      "sources": [
+        "https://www.metro.cdmx.gob.mx/la-red/linea-2",
+        "https://download.bbbike.org/osm/bbbike/MexicoCity/",
+        "https://www.academia.edu/39407168/INSTITUTO_POLIT%C3%89CNICO_NACIONAL_ESCUELA_SUPERIOR_DE_INGENIER%C3%8DA_MEC%C3%81NICA_PROGRAMA_DE_MANTENIMIENTO_EN_LAS_V%C3%8DAS_SOBRE_NEUM%C3%81TICOS_DEL_METRO_DE_LA_CIUDAD_DE_M%C3%89XICO",
+        "https://www.smig.org.mx/archivos/revista-trimestral-smig/revista-geotecnia-smig-numero-226.pdf",
+        "https://www.openstreetmap.org/way/536525793"
+      ],
+      "segmentIds": [
+        "network-118pjzh",
+        "network-12rfnb7",
+        "network-12tgvvv",
+        "network-18hyp5r",
+        "network-18uqjr3",
+        "network-1bgepb7",
+        "network-1fuicox",
+        "network-1gffyun",
+        "network-1gtq5qj",
+        "network-1k0ccuv",
+        "network-1kw0u1n",
+        "network-1wzzv23",
+        "network-7pifa3",
+        "network-8jbsh5",
+        "network-9sjqlj",
+        "network-gwujz",
+        "network-noirg3",
+        "network-seuhzn",
+        "network-sjdw7z",
+        "network-wguf2j",
+        "network-xhc5u3",
+        "network-xnuft3",
+        "network-ylhjc3"
+      ]
+    },
+    {
+      "corridor": "Line 3 paired passenger running tracks",
+      "grade": "A",
+      "sources": [
+        "https://www.metro.cdmx.gob.mx/la-red/linea-3",
+        "https://download.bbbike.org/osm/bbbike/MexicoCity/",
+        "https://www.academia.edu/39407168/INSTITUTO_POLIT%C3%89CNICO_NACIONAL_ESCUELA_SUPERIOR_DE_INGENIER%C3%8DA_MEC%C3%81NICA_PROGRAMA_DE_MANTENIMIENTO_EN_LAS_V%C3%8DAS_SOBRE_NEUM%C3%81TICOS_DEL_METRO_DE_LA_CIUDAD_DE_M%C3%89XICO",
+        "https://www.metro.cdmx.gob.mx/comunicacion/nota/avanza-en-50-los-trabajos-de-mantenimiento-en-la-zona-de-vias-en-la-interestacion-potrero-deportivo-18-de-marzo-de-la-linea-3-del-metro"
+      ],
+      "segmentIds": [
+        "network-10ped4z",
+        "network-15n3ysb",
+        "network-19xnefp",
+        "network-1giqoi3",
+        "network-1gqjy0p",
+        "network-1nqxiz",
+        "network-1ssrcmr",
+        "network-1tapqfl",
+        "network-9j3gzr",
+        "network-bb5s7x",
+        "network-di2mk7",
+        "network-gellfj",
+        "network-gn3237",
+        "network-pdbbpf",
+        "network-q354dj",
+        "network-t7zmo5",
+        "network-u1dtqr",
+        "network-vpn79f",
+        "network-xvpa2z"
+      ]
+    },
+    {
+      "corridor": "Line 4 paired passenger running tracks",
+      "grade": "A",
+      "sources": [
+        "https://www.metro.cdmx.gob.mx/la-red/linea-4",
+        "https://download.bbbike.org/osm/bbbike/MexicoCity/",
+        "https://www.academia.edu/39407168/INSTITUTO_POLIT%C3%89CNICO_NACIONAL_ESCUELA_SUPERIOR_DE_INGENIER%C3%8DA_MEC%C3%81NICA_PROGRAMA_DE_MANTENIMIENTO_EN_LAS_V%C3%8DAS_SOBRE_NEUM%C3%81TICOS_DEL_METRO_DE_LA_CIUDAD_DE_M%C3%89XICO",
+        "https://www.metro.cdmx.gob.mx/acerca-del-metro/mas-informacion/licitaciones"
+      ],
+      "segmentIds": [
+        "network-169hu9n",
+        "network-16g2k5z",
+        "network-2oe7jf",
+        "network-3ez0nb",
+        "network-ac4bw1",
+        "network-j2tj9v",
+        "network-s4gh7v",
+        "network-utihjz",
+        "network-yswroz"
+      ]
+    },
+    {
+      "corridor": "Line 5 paired passenger running tracks",
+      "grade": "A",
+      "sources": [
+        "https://www.metro.cdmx.gob.mx/la-red/linea-5",
+        "https://download.bbbike.org/osm/bbbike/MexicoCity/",
+        "https://www.academia.edu/39407168/INSTITUTO_POLIT%C3%89CNICO_NACIONAL_ESCUELA_SUPERIOR_DE_INGENIER%C3%8DA_MEC%C3%81NICA_PROGRAMA_DE_MANTENIMIENTO_EN_LAS_V%C3%8DAS_SOBRE_NEUM%C3%81TICOS_DEL_METRO_DE_LA_CIUDAD_DE_M%C3%89XICO",
+        "https://tesiunamdocumentos.dgb.unam.mx/ppt2002/0318327/0318327.pdf",
+        "https://metro.cdmx.gob.mx/storage/app/media/FIMETRO/INFORME-TRIMESTRAL-FIMETRO/2025/Cuarto%20Informe%20Trimestral%202024.pdf"
+      ],
+      "segmentIds": [
+        "network-19h5bgb",
+        "network-1ow63vf",
+        "network-1qtun2j",
+        "network-1rvlyjb",
+        "network-3eixn7",
+        "network-7tbygb",
+        "network-942mdf",
+        "network-bdhkrp",
+        "network-eeh1n3",
+        "network-h3d3j5",
+        "network-oonsuv",
+        "network-rn6wez"
+      ]
+    },
+    {
+      "corridor": "Line 6 paired passenger running tracks",
+      "grade": "A",
+      "sources": [
+        "https://www.metro.cdmx.gob.mx/la-red/linea-6",
+        "https://download.bbbike.org/osm/bbbike/MexicoCity/",
+        "https://www.academia.edu/39407168/INSTITUTO_POLIT%C3%89CNICO_NACIONAL_ESCUELA_SUPERIOR_DE_INGENIER%C3%8DA_MEC%C3%81NICA_PROGRAMA_DE_MANTENIMIENTO_EN_LAS_V%C3%8DAS_SOBRE_NEUM%C3%81TICOS_DEL_METRO_DE_LA_CIUDAD_DE_M%C3%89XICO",
+        "https://dof.gob.mx/abrirPDF.php?anio=1986&archivo=21081986-MAT.pdf&repo=repositorio%2F",
+        "https://mexicocity.cdmx.gob.mx/venues/metro-el-rosario/"
+      ],
+      "segmentIds": [
+        "network-1d239xb",
+        "network-1kwm7sz",
+        "network-3grg3f",
+        "network-9gro2v",
+        "network-cqlua5",
+        "network-cw8vhj",
+        "network-oht4sz",
+        "network-qnt68r",
+        "network-w7lrbj"
+      ]
+    },
+    {
+      "corridor": "Line 7 paired passenger running tracks",
+      "grade": "A",
+      "sources": [
+        "https://www.metro.cdmx.gob.mx/la-red/linea-7",
+        "https://download.bbbike.org/osm/bbbike/MexicoCity/",
+        "https://www.academia.edu/39407168/INSTITUTO_POLIT%C3%89CNICO_NACIONAL_ESCUELA_SUPERIOR_DE_INGENIER%C3%8DA_MEC%C3%81NICA_PROGRAMA_DE_MANTENIMIENTO_EN_LAS_V%C3%8DAS_SOBRE_NEUM%C3%81TICOS_DEL_METRO_DE_LA_CIUDAD_DE_M%C3%89XICO",
+        "https://mexicocity.cdmx.gob.mx/venues/metro-el-rosario/",
+        "https://tesiunamdocumentos.dgb.unam.mx/ptd2024/jul_sep/0862691/0862691_A9.pdf"
+      ],
+      "segmentIds": [
+        "network-175myt7"
+      ]
+    },
+    {
+      "corridor": "Line 8 paired passenger running tracks",
+      "grade": "A",
+      "sources": [
+        "https://www.metro.cdmx.gob.mx/la-red/linea-8",
+        "https://download.bbbike.org/osm/bbbike/MexicoCity/",
+        "https://www.academia.edu/39407168/INSTITUTO_POLIT%C3%89CNICO_NACIONAL_ESCUELA_SUPERIOR_DE_INGENIER%C3%8DA_MEC%C3%81NICA_PROGRAMA_DE_MANTENIMIENTO_EN_LAS_V%C3%8DAS_SOBRE_NEUM%C3%81TICOS_DEL_METRO_DE_LA_CIUDAD_DE_M%C3%89XICO",
+        "https://www.openstreetmap.org/way/43782976"
+      ],
+      "segmentIds": [
+        "network-11s8a9v",
+        "network-12bwxdv",
+        "network-16bgue7",
+        "network-17jswkf",
+        "network-17tyo7b",
+        "network-1aka53",
+        "network-1ey8d27",
+        "network-1k17o3v",
+        "network-1mqkjfn",
+        "network-1nee7dz",
+        "network-1pg4vm3",
+        "network-1sk1le3",
+        "network-4r9gdv",
+        "network-6apeyz",
+        "network-lmoywt",
+        "network-ye6jqz"
+      ]
+    },
+    {
+      "corridor": "Line A paired passenger running tracks",
+      "grade": "A",
+      "sources": [
+        "https://www.metro.cdmx.gob.mx/la-red/linea-a",
+        "https://download.bbbike.org/osm/bbbike/MexicoCity/",
+        "https://www.academia.edu/39407168/INSTITUTO_POLIT%C3%89CNICO_NACIONAL_ESCUELA_SUPERIOR_DE_INGENIER%C3%8DA_MEC%C3%81NICA_PROGRAMA_DE_MANTENIMIENTO_EN_LAS_V%C3%8DAS_SOBRE_NEUM%C3%81TICOS_DEL_METRO_DE_LA_CIUDAD_DE_M%C3%89XICO",
+        "https://www.metro.cdmx.gob.mx/acerca-del-metro/mas-informacion/licitaciones"
+      ],
+      "segmentIds": [
+        "network-1dduqpn",
+        "network-1eeo90j",
+        "network-1kg5o1n",
+        "network-1lrpr29",
+        "network-3p2kaj",
+        "network-84s5hl",
+        "network-a79u8f",
+        "network-ffs73",
+        "network-xyhuyb"
+      ]
+    },
+    {
+      "corridor": "Line B paired passenger running tracks",
+      "grade": "A",
+      "sources": [
+        "https://www.metro.cdmx.gob.mx/la-red/linea-b",
+        "https://download.bbbike.org/osm/bbbike/MexicoCity/",
+        "https://www.academia.edu/39407168/INSTITUTO_POLIT%C3%89CNICO_NACIONAL_ESCUELA_SUPERIOR_DE_INGENIER%C3%8DA_MEC%C3%81NICA_PROGRAMA_DE_MANTENIMIENTO_EN_LAS_V%C3%8DAS_SOBRE_NEUM%C3%81TICOS_DEL_METRO_DE_LA_CIUDAD_DE_M%C3%89XICO",
+        "https://www.metro.cdmx.gob.mx/acerca-del-metro/mas-informacion/licitaciones",
+        "https://tesiunamdocumentos.dgb.unam.mx/ppt2002/0318327/0318327.pdf"
+      ],
+      "segmentIds": [
+        "network-15vlgn5",
+        "network-17z8ltv",
+        "network-18i72if",
+        "network-1clrvil",
+        "network-1enehqn",
+        "network-1hzimov",
+        "network-1lpvpeb",
+        "network-1oa5fy3",
+        "network-1xosbgj",
+        "network-2rt93r",
+        "network-7yqakf",
+        "network-86r5dp",
+        "network-9capcr",
+        "network-ah4l5f",
+        "network-apf2c1",
+        "network-bazinf",
+        "network-dstmhf",
+        "network-i4ckzv",
+        "network-ujmwr",
+        "network-v9zyf1"
       ]
     }
   ],
@@ -463,6 +748,593 @@
         "network-cbap1f",
         "network-w4ppzn"
       ]
+    },
+    {
+      "corridor": "Myrtle Avenue–Broadway diamond on the Jamaica and Myrtle branches",
+      "grade": "B",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://map.subs.nyc/",
+        "https://future.mta.info/documents/MTA%202050%20-%20Modernizing%20Signals-Making%20Service%20More%20Reliable.pdf",
+        "https://download.bbbike.org/osm/bbbike/NewYork/",
+        "https://www.openstreetmap.org/node/1905087706",
+        "https://secretsofthesubway.com/2020/08/26/jz-bmt-jamaica-line/"
+      ],
+      "segmentIds": [
+        "network-1sjrrdv",
+        "network-1ux6ryn"
+      ]
+    },
+    {
+      "corridor": "East 180 St north throat passenger express moves across White Plains mainline",
+      "grade": "B",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://map.subs.nyc/",
+        "https://future.mta.info/documents/MTA%202050%20-%20Modernizing%20Signals-Making%20Service%20More%20Reliable.pdf",
+        "https://download.bbbike.org/osm/bbbike/NewYork/",
+        "https://www.mta.info/document/13046",
+        "https://www.nerdynel.me/2019/02/nytip105bxirt/",
+        "https://www.nycsubway.org/wiki/IRT_White_Plains_Road_Line"
+      ],
+      "segmentIds": [
+        "network-m1pz1f",
+        "network-uwj25b"
+      ]
+    },
+    {
+      "corridor": "Franklin Avenue Shuttle single regular passenger track at Prospect Park",
+      "grade": "A-",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://www.mta.info/document/9541",
+        "https://erausa.org/pdf/bulletin/1990s/1999/1999-09-bulletin.pdf",
+        "https://www.youtube.com/watch?v=c3Pws5A5zlw"
+      ],
+      "segmentIds": [
+        "network-z7w2tb"
+      ]
+    },
+    {
+      "corridor": "Culver and Brighton scheduled approaches to Stillwell Avenue",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://map.subs.nyc/",
+        "https://future.mta.info/documents/MTA%202050%20-%20Modernizing%20Signals-Making%20Service%20More%20Reliable.pdf",
+        "https://download.bbbike.org/osm/bbbike/NewYork/",
+        "https://www.nycsubway.org/wiki/BMT_West_End_Line",
+        "https://erausa.org/pdf/bulletin/2000s/2009/2009-05-bulletin.pdf"
+      ],
+      "segmentIds": [
+        "network-gmfb6j"
+      ]
+    },
+    {
+      "corridor": "42nd Street Shuttle independent pair of passenger tracks",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://apps.cio.ny.gov/apps/mediaContact/public/view.cfm?parm=0A1E64E4-9271-2226-57243CB082BF7D7E"
+      ],
+      "segmentIds": [
+        "network-gbxhsj"
+      ]
+    },
+    {
+      "corridor": "PATH Dock Bridge and grade-separated Newark approach",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://www.nycsubway.org/wiki/PATH_Port_Authority_Trans-Hudson",
+        "https://images.cf.nycsubway.org/images/maps/pirmann-2003-path-track.gif",
+        "https://download.bbbike.org/osm/bbbike/NewYork/",
+        "https://railroads.dot.gov/sites/fra.dot.gov/files/2020-03/2020-02%20Sawtooth%20Bridges%20EA_Ch%201-2_PDFa.pdf"
+      ],
+      "segmentIds": [
+        "network-1rt992n"
+      ]
+    },
+    {
+      "corridor": "PATH paired tunnels and flying junctions at Grove Street and Newport",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://www.nycsubway.org/wiki/PATH_Port_Authority_Trans-Hudson",
+        "https://images.cf.nycsubway.org/images/maps/pirmann-2003-path-track.gif",
+        "https://download.bbbike.org/osm/bbbike/NewYork/"
+      ],
+      "segmentIds": [
+        "network-11lv8qf",
+        "network-1ry6eg7",
+        "network-1xkj6ub",
+        "network-1yhob03"
+      ]
+    },
+    {
+      "corridor": "PATH paired flying approaches to the Hoboken terminal",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://www.nycsubway.org/wiki/PATH_Port_Authority_Trans-Hudson",
+        "https://images.cf.nycsubway.org/images/maps/pirmann-2003-path-track.gif",
+        "https://download.bbbike.org/osm/bbbike/NewYork/",
+        "https://www.panynj.gov/port-authority/en/blogs/rail/meet-path-s-new-map.html"
+      ],
+      "segmentIds": [
+        "network-127772b",
+        "network-dq1j9z"
+      ]
+    },
+    {
+      "corridor": "IRT Broadway–Seventh, Lenox, White Plains, Dyre, Jerome, Pelham, Lexington, Eastern Parkway, Nostrand and New Lots mainlines outside flagged crossings",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://map.subs.nyc/",
+        "https://future.mta.info/documents/MTA%202050%20-%20Modernizing%20Signals-Making%20Service%20More%20Reliable.pdf",
+        "https://download.bbbike.org/osm/bbbike/NewYork/",
+        "https://www.mta.info/document/13046",
+        "https://www.nycsubway.org/wiki/Chapter_04._Design_of_Structure_and_Track"
+      ],
+      "segmentIds": [
+        "network-10eowhf",
+        "network-10hftqj",
+        "network-11yal6b",
+        "network-125vqnz",
+        "network-155rwqz",
+        "network-1674fcj",
+        "network-16r1983",
+        "network-17col17",
+        "network-17lutxv",
+        "network-17wn9pf",
+        "network-17zpubf",
+        "network-184iqz7",
+        "network-18be0b",
+        "network-18yp84r",
+        "network-19lltvb",
+        "network-1a0jfcb",
+        "network-1a2csoj",
+        "network-1ap0cyb",
+        "network-1atl3pv",
+        "network-1ccthrv",
+        "network-1ceujaz",
+        "network-1cr6grv",
+        "network-1d1gb7",
+        "network-1dcr3l7",
+        "network-1dh9qvf",
+        "network-1e975sr",
+        "network-1egxp47",
+        "network-1ex8hpn",
+        "network-1fhb8eb",
+        "network-1flghkz",
+        "network-1gciydv",
+        "network-1gwfexn",
+        "network-1hc9q3f",
+        "network-1ii5lvn",
+        "network-1jyxdw3",
+        "network-1k28gz7",
+        "network-1knuj",
+        "network-1l147er",
+        "network-1luad77",
+        "network-1mapm2j",
+        "network-1ob6eff",
+        "network-1opkqb",
+        "network-1qlhmln",
+        "network-1tc3n7v",
+        "network-1trr4fv",
+        "network-1u52qy3",
+        "network-1ujb9k3",
+        "network-1v22shf",
+        "network-1v3xjnf",
+        "network-1vgjpun",
+        "network-1wej1z7",
+        "network-1wioy63",
+        "network-1xle1nv",
+        "network-1y60xz7",
+        "network-2acamr",
+        "network-2qi3kb",
+        "network-2sif5f",
+        "network-379eqz",
+        "network-4jgmwz",
+        "network-4so5t7",
+        "network-58jmwb",
+        "network-59srhv",
+        "network-5k2j3n",
+        "network-5zg6wz",
+        "network-6ihu0j",
+        "network-6o3ymj",
+        "network-6p3ky3",
+        "network-766tlf",
+        "network-86m5gr",
+        "network-8ag4az",
+        "network-8swfaj",
+        "network-8tgb4f",
+        "network-a8dflv",
+        "network-alalob",
+        "network-atkf6j",
+        "network-b0gdob",
+        "network-c9z9k7",
+        "network-cyqxhr",
+        "network-df7yyj",
+        "network-di8bfv",
+        "network-dzhlnv",
+        "network-dzodx7",
+        "network-f87617",
+        "network-g1ou97",
+        "network-hbsq7n",
+        "network-i3yxcj",
+        "network-i6q12j",
+        "network-j90q5v",
+        "network-jubxkz",
+        "network-kegs0b",
+        "network-lgx7jn",
+        "network-mb3noz",
+        "network-mfw90z",
+        "network-ny863n",
+        "network-pxkba3",
+        "network-qrtnf",
+        "network-qyx4vv",
+        "network-rq82l7",
+        "network-seyft7",
+        "network-thy2pf",
+        "network-tnbwln",
+        "network-tpkaor",
+        "network-uwril7",
+        "network-vq2g2b",
+        "network-wpgskn",
+        "network-xad85n",
+        "network-xsm0g7",
+        "network-ylqrsb",
+        "network-ypgvej",
+        "network-z1kw97",
+        "network-zbf01f",
+        "network-zt9sqb"
+      ]
+    },
+    {
+      "corridor": "IND Liberty and Rockaway double-track passenger legs of Hammels Wye",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://map.subs.nyc/",
+        "https://future.mta.info/documents/MTA%202050%20-%20Modernizing%20Signals-Making%20Service%20More%20Reliable.pdf",
+        "https://download.bbbike.org/osm/bbbike/NewYork/",
+        "https://www.mta.info/document/87231",
+        "https://www.mta.info/document/10941",
+        "https://www.nycsubway.org/wiki/IND_Rockaway_Line"
+      ],
+      "segmentIds": [
+        "network-1atmvzf",
+        "network-1avn8zf",
+        "network-1ctu01f",
+        "network-1dpav5f",
+        "network-1f8oq1v",
+        "network-1i1elan",
+        "network-1meykcz",
+        "network-1nz8lgb",
+        "network-1p2r3ub",
+        "network-1srkjtn",
+        "network-1tf1qmb",
+        "network-bdwglv",
+        "network-esxqor",
+        "network-landd7",
+        "network-mmjecf",
+        "network-rwwva7",
+        "network-uawjyj",
+        "network-vo74oj"
+      ]
+    },
+    {
+      "corridor": "BMT Jamaica and Myrtle passenger tracks outside the Myrtle Avenue diamond",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://map.subs.nyc/",
+        "https://future.mta.info/documents/MTA%202050%20-%20Modernizing%20Signals-Making%20Service%20More%20Reliable.pdf",
+        "https://download.bbbike.org/osm/bbbike/NewYork/",
+        "https://www.nycsubway.org/wiki/New_York_City_Subway_Track_Maps"
+      ],
+      "segmentIds": [
+        "network-12iso5n",
+        "network-12ner2b",
+        "network-12r1otn",
+        "network-17juz7n",
+        "network-19cr86b",
+        "network-1dufd8z",
+        "network-1ebtgln",
+        "network-1ek00wj",
+        "network-1ez2g7r",
+        "network-1imynxf",
+        "network-1j4w62r",
+        "network-1jr7eqb",
+        "network-1lc7cr7",
+        "network-1lko69n",
+        "network-1ovpu0r",
+        "network-1qgllr7",
+        "network-1tzueoz",
+        "network-1u7wj0z",
+        "network-1vx9e9v",
+        "network-1wiq2gb",
+        "network-1xc8i5v",
+        "network-1xhldyz",
+        "network-1xlhmwr",
+        "network-1xr22bn",
+        "network-1xzslj",
+        "network-2brvub",
+        "network-7w05qz",
+        "network-9ws5av",
+        "network-adovaj",
+        "network-apupiz",
+        "network-e7meff",
+        "network-f3scab",
+        "network-fgafuv",
+        "network-gz44l7",
+        "network-kvij6j",
+        "network-laxvgj",
+        "network-m2zcb",
+        "network-m5v4ln",
+        "network-rvfs2b",
+        "network-vbaz6z",
+        "network-wenm5v",
+        "network-xy9h1v",
+        "network-xzghb7",
+        "network-yxkkpn"
+      ]
+    },
+    {
+      "corridor": "IND Queens Boulevard, 53rd Street and Archer Avenue junctions and mainlines",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://map.subs.nyc/",
+        "https://future.mta.info/documents/MTA%202050%20-%20Modernizing%20Signals-Making%20Service%20More%20Reliable.pdf",
+        "https://download.bbbike.org/osm/bbbike/NewYork/",
+        "https://www.nycsubway.org/wiki/New_York_City_Subway_Track_Maps"
+      ],
+      "segmentIds": [
+        "network-104t0gj",
+        "network-10t2vp7",
+        "network-14a1nln",
+        "network-15w24pf",
+        "network-17j4p1n",
+        "network-1c069ur",
+        "network-1c8qf83",
+        "network-1d2iw4b",
+        "network-1e4arcb",
+        "network-1hmtptf",
+        "network-1i7oc9n",
+        "network-1n6k53v",
+        "network-1usc59v",
+        "network-1vyifz7",
+        "network-1w07kkn",
+        "network-1xcwp8j",
+        "network-3ktvez",
+        "network-512lzf",
+        "network-5jngjn",
+        "network-7jz9iz",
+        "network-7no4gb",
+        "network-9iso6b",
+        "network-caqvbn",
+        "network-cvur7",
+        "network-g0073n",
+        "network-ki3ooj",
+        "network-ler6j7",
+        "network-ln4t4r",
+        "network-lnkscj",
+        "network-ms42ib",
+        "network-nehb",
+        "network-pkhgo3",
+        "network-rws4kz",
+        "network-uw7ng7",
+        "network-z6xd3n"
+      ]
+    },
+    {
+      "corridor": "IND Eighth Avenue and Concourse, Central Park West and Fulton passenger tracks",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://map.subs.nyc/",
+        "https://future.mta.info/documents/MTA%202050%20-%20Modernizing%20Signals-Making%20Service%20More%20Reliable.pdf",
+        "https://download.bbbike.org/osm/bbbike/NewYork/",
+        "https://erausa.org/pdf/bulletin/2000s/2007/2007-01-bulletin.pdf",
+        "https://www.nycsubway.org/wiki/IND_8th_Avenue_Line"
+      ],
+      "segmentIds": [
+        "network-10av9n7",
+        "network-14dlz7f",
+        "network-18nls6r",
+        "network-1932963",
+        "network-1alfu57",
+        "network-1b7mk37",
+        "network-1cbjhxn",
+        "network-1ccdyob",
+        "network-1hm5nf",
+        "network-1iwr8kv",
+        "network-1jcjqz7",
+        "network-1jd0hvf",
+        "network-1l1fomr",
+        "network-1n1x5uj",
+        "network-1nimtc3",
+        "network-1nxakej",
+        "network-1qmgjmr",
+        "network-1rnunfn",
+        "network-1rs94nf",
+        "network-1xyrliz",
+        "network-1ygg4sz",
+        "network-3vzho3",
+        "network-67xvbn",
+        "network-7g9qb",
+        "network-8biy8j",
+        "network-begvn7",
+        "network-bx5fm3",
+        "network-cspear",
+        "network-eondo3",
+        "network-g5ii6j",
+        "network-j1oo57",
+        "network-kvbb7v",
+        "network-l3vwyz",
+        "network-pnbuyj",
+        "network-qis7pv",
+        "network-qucn",
+        "network-rny0xn",
+        "network-vwiwsb",
+        "network-zgnayb"
+      ]
+    },
+    {
+      "corridor": "IND Sixth Avenue, Crosstown and Culver mainlines and junctions",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://map.subs.nyc/",
+        "https://future.mta.info/documents/MTA%202050%20-%20Modernizing%20Signals-Making%20Service%20More%20Reliable.pdf",
+        "https://download.bbbike.org/osm/bbbike/NewYork/",
+        "https://www.nysenate.gov/sites/default/files/G%20Line%20Review%20Final%207.10.13_0.pdf",
+        "https://www.mta.info/document/161361"
+      ],
+      "segmentIds": [
+        "network-10vddor",
+        "network-123grf",
+        "network-14u28mr",
+        "network-154mw4j",
+        "network-16gsk4r",
+        "network-16kmxnv",
+        "network-16n5btf",
+        "network-19xd60b",
+        "network-1aay4nf",
+        "network-1b5w6b3",
+        "network-1cjgyjv",
+        "network-1cptm9v",
+        "network-1ek6r2j",
+        "network-1kzc8oz",
+        "network-1l9sj",
+        "network-1s7nb2r",
+        "network-1v2lp1n",
+        "network-1v9x8jv",
+        "network-1w3e1fn",
+        "network-27qmjf",
+        "network-2yzv6j",
+        "network-37654z",
+        "network-4dfdjf",
+        "network-7i9rx7",
+        "network-7ptovb",
+        "network-9m7umr",
+        "network-d3q7oz",
+        "network-f1qb8r",
+        "network-jifmbr",
+        "network-kh3snb",
+        "network-m57iir",
+        "network-o0h2pv",
+        "network-rep7bv",
+        "network-s0qb9n",
+        "network-tomwxv",
+        "network-uq9uyj"
+      ]
+    },
+    {
+      "corridor": "BMT Broadway, Astoria, Second Avenue, Brighton, Fourth Avenue, West End and Sea Beach passenger mainlines",
+      "grade": "A",
+      "sources": [
+        "https://www.vanshnookenraggen.com/_index/2017/05/a-complete-and-geographically-accurate-nyc-subway-track-map/",
+        "https://map.subs.nyc/",
+        "https://future.mta.info/documents/MTA%202050%20-%20Modernizing%20Signals-Making%20Service%20More%20Reliable.pdf",
+        "https://download.bbbike.org/osm/bbbike/NewYork/",
+        "https://s3.amazonaws.com/nycsubway.org/images/pdf/nyct_annual_report_1959.pdf",
+        "https://www.nycsubway.org/wiki/BMT_4th_Avenue_Line",
+        "https://future.mta.info/next-twenty-years/bottleneck-report",
+        "https://www.nyc.gov/assets/planning/download/pdf/plans/transportation/deck04.pdf"
+      ],
+      "segmentIds": [
+        "network-1008q9n",
+        "network-10sp1gz",
+        "network-10zzi6n",
+        "network-11rzg1n",
+        "network-1257jkj",
+        "network-12of2jv",
+        "network-13gwwu3",
+        "network-149vzl3",
+        "network-151ydj7",
+        "network-16e7c4r",
+        "network-16ksvr7",
+        "network-19uq6b7",
+        "network-1cb97rv",
+        "network-1d9vzn7",
+        "network-1e0tk2z",
+        "network-1eijamr",
+        "network-1fgpfcj",
+        "network-1gdaegj",
+        "network-1gp2njf",
+        "network-1gs9utv",
+        "network-1k2d06b",
+        "network-1ljmxn7",
+        "network-1lzqh1f",
+        "network-1or6j9n",
+        "network-1p0doxn",
+        "network-1ps07p7",
+        "network-1q5nce3",
+        "network-1r43dx7",
+        "network-1sxkq0r",
+        "network-1tag2aj",
+        "network-1td36ur",
+        "network-1vo9pir",
+        "network-1voelkr",
+        "network-1vuji8r",
+        "network-1w4qzxn",
+        "network-1w5lcj7",
+        "network-1wefpur",
+        "network-1wfzpjn",
+        "network-1x6pze3",
+        "network-1xsv0hn",
+        "network-1xtvc1f",
+        "network-1yinpnn",
+        "network-4lsq1n",
+        "network-59h9gj",
+        "network-5b8rp7",
+        "network-5vf3rf",
+        "network-67ts7n",
+        "network-6pgq17",
+        "network-8ukwfn",
+        "network-91u11v",
+        "network-c1yup7",
+        "network-c7t4vn",
+        "network-cz0x23",
+        "network-d2rq97",
+        "network-d4f3r7",
+        "network-eikb7v",
+        "network-euwtsf",
+        "network-ev0b63",
+        "network-gqoe2b",
+        "network-ifzph7",
+        "network-j83v5r",
+        "network-ks8qpn",
+        "network-m3jfpv",
+        "network-m54kkz",
+        "network-mblyij",
+        "network-ndu1cz",
+        "network-nglwxn",
+        "network-o4y0r7",
+        "network-q15t6f",
+        "network-qa7l0b",
+        "network-r082rv",
+        "network-r3ukvf",
+        "network-rw2t4j",
+        "network-s6sp97",
+        "network-utlx17",
+        "network-vmsshf",
+        "network-vukywr",
+        "network-vwp16b",
+        "network-wke3ln",
+        "network-wkpkiz",
+        "network-xdp5t7",
+        "network-xjxr9n",
+        "network-xkw6tf",
+        "network-y65izf",
+        "network-yavdyb",
+        "network-ys3w0f",
+        "network-z2aulv"
+      ]
     }
   ],
   "singapore": [
@@ -678,6 +1550,78 @@
       ],
       "segmentIds": [
         "network-1mqpph7"
+      ]
+    },
+    {
+      "corridor": "Circle Line stacked approaches and loop connection at Promenade",
+      "grade": "A",
+      "sources": [
+        "https://www.lta.gov.sg/content/ltagov/en/getting_around/public_transport/rail_network/circle_line.html",
+        "https://www.lta.gov.sg/content/ltagov/en/newsroom/2023/5/news-releases/service_adjustments_for_seven_stations_along_CCL.html",
+        "https://landtransportguru.net/promenade-station/",
+        "https://download.bbbike.org/osm/bbbike/Singapore/"
+      ],
+      "segmentIds": [
+        "network-16cl9i3",
+        "network-1atdxa3",
+        "network-q6sn9z"
+      ]
+    },
+    {
+      "corridor": "Circle Line twin tunnels through Marina Bay",
+      "grade": "A",
+      "sources": [
+        "https://www.lta.gov.sg/content/ltagov/en/getting_around/public_transport/rail_network/circle_line.html",
+        "https://www.lta.gov.sg/content/ltagov/en/newsroom/2023/5/news-releases/service_adjustments_for_seven_stations_along_CCL.html",
+        "https://landtransportguru.net/promenade-station/",
+        "https://download.bbbike.org/osm/bbbike/Singapore/",
+        "https://www.lta.gov.sg/cclwayfinding/education",
+        "https://www.mot.gov.sg/news-resources/newsroom/opening-remarks-by-acting-minister-for-transport-jeffrey-siow-at-circle-line-6-public-preview/"
+      ],
+      "segmentIds": [
+        "network-1rcaljj",
+        "network-v3uq03"
+      ]
+    },
+    {
+      "corridor": "Jurong East separate North–South and East–West line approaches",
+      "grade": "A",
+      "sources": [
+        "https://www.lta.gov.sg/content/dam/ltagov/who_we_are/statistics_and_publications/Publications/PDF/LTA%20Connect_Feb2019_FA.pdf",
+        "https://landtransportguru.net/jurong-east-station/",
+        "https://download.bbbike.org/osm/bbbike/Singapore/"
+      ],
+      "segmentIds": [
+        "network-1dnd67v",
+        "network-a1j807",
+        "network-gnk28r"
+      ]
+    },
+    {
+      "corridor": "East–West passenger mainline viaducts through Tanah Merah",
+      "grade": "A",
+      "sources": [
+        "https://www.lta.gov.sg/content/ltagov/en/newsroom/2025/10/news-releases/train_service_adjustments_EWL_29Nov_to_8Dec25.html",
+        "https://www.lta.gov.sg/content/dam/ltagov/Interactive_map/pdf/Service%20Adjustment%20Brochure_EN.pdf",
+        "https://landtransportguru.net/tanah-merah-station/",
+        "https://download.bbbike.org/osm/bbbike/Singapore/"
+      ],
+      "segmentIds": [
+        "network-1mulogr",
+        "network-1r8jgz"
+      ]
+    },
+    {
+      "corridor": "Changi Airport branch single-track passenger throat at Tanah Merah",
+      "grade": "A-",
+      "sources": [
+        "https://www.lta.gov.sg/content/ltagov/en/newsroom/2025/10/news-releases/train_service_adjustments_EWL_29Nov_to_8Dec25.html",
+        "https://www.lta.gov.sg/content/dam/ltagov/Interactive_map/pdf/Service%20Adjustment%20Brochure_EN.pdf",
+        "https://landtransportguru.net/tanah-merah-station/",
+        "https://download.bbbike.org/osm/bbbike/Singapore/"
+      ],
+      "segmentIds": [
+        "network-1lmg0fb"
       ]
     }
   ]

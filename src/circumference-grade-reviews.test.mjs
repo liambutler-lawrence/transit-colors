@@ -8,28 +8,51 @@ import {
   transitSegmentProperties,
 } from './app/circumference-data.ts';
 import { segmentPropertiesSchema } from './app/types.ts';
-import { roadGradeSchema } from './circumference/grades.ts';
+import { roadGradeSchema, TRANSIT_GRADES } from './circumference/grades.ts';
 import { candidateFromNetworkPath } from './circumference/precomputed.ts';
+import { filterCircumferenceNetwork } from './circumference/schedule.ts';
 
 function data(file) {
   return readFile(new URL(`../data/${file}.json`, import.meta.url), 'utf8');
 }
 
-test('transit reviews match both geometry variants and identify unique ride segments', async () => {
+test('both geometry variants account for every transit ride with a grade or documented gap', async () => {
   const reviews = JSON.parse(await data('circumference-transit-grades'));
+  const gapReport = await readFile(
+    new URL('../docs/circumference-transit-grade-gaps.md', import.meta.url),
+    'utf8',
+  );
+  const flagged = Array.from(gapReport.matchAll(/`(network-[\w-]+)`/g), ([, id]) => id);
+  assert.equal(new Set(flagged).size, flagged.length, 'Duplicate review gaps');
+  const unresolved = { straight: new Set(), track: new Set() };
   for (const [area, groups] of Object.entries(reviews)) {
-    const graph = JSON.parse(await data(`${area}-circumference`));
+    const graph = applyTransitGradeReviews(
+      JSON.parse(await data(`${area}-circumference`)),
+      area,
+    );
     const ids = groups.flatMap((review) => review.segmentIds);
-    assert.equal(new Set(ids).size, ids.length, area);
+    const reviewed = new Set(ids);
+    assert.equal(reviewed.size, ids.length, area);
     for (const mode of ['straight', 'track']) {
-      const rideIds = new Set(
-        graph[mode].network.segments
-          .filter((segment) => segment.type === 'ride')
-          .map(({ id }) => id),
+      const { network } = graph[mode];
+      for (const { id, type, grade } of network.segments) {
+        if (type === 'ride' && grade === undefined) unresolved[mode].add(id);
+      }
+      const filtered = filterCircumferenceNetwork(
+        network,
+        null,
+        new Set(TRANSIT_GRADES),
       );
-      for (const id of ids) assert.ok(rideIds.has(id), `${area}/${mode}: ${id}`);
+      const searchable = filtered.segments.filter(({ type }) => type === 'ride');
+      assert.deepEqual(
+        new Set(searchable.map(({ id }) => id)),
+        reviewed,
+        `${area}/${mode}`,
+      );
     }
   }
+  assert.deepEqual(unresolved.straight, new Set(flagged));
+  assert.deepEqual(unresolved.track, new Set(flagged));
 });
 
 test('transit line and transfer features expose the properties accepted by the inspector', async () => {

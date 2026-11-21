@@ -42,6 +42,13 @@ export function showTransitGradeCoverage(): void {
   );
   const reviewed = rides.filter((segment) => segment.grade !== undefined).length;
   coverage.textContent = `${reviewed.toLocaleString('en-US')} of ${rides.length.toLocaleString('en-US')} transit ride segments have a grade. The search uses reviewed segments only.`;
+  if (reviewed < rides.length) {
+    const reviewGaps = document.createElement('a');
+    reviewGaps.href =
+      'https://github.com/liambutler-lawrence/transit-colors/blob/main/docs/circumference-transit-grade-gaps.md';
+    reviewGaps.textContent = 'See segments awaiting verification';
+    coverage.append(' ', reviewGaps);
+  }
 }
 
 export function writeCircumferenceCriteria(url: URL): void {
