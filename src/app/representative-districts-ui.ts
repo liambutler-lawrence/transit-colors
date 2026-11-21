@@ -1,10 +1,12 @@
 import { LngLatBounds, type ExpressionSpecification } from 'maplibre-gl';
 
 import {
+  availableDistrictCounts,
   defaultDistrictState,
   districtState,
   districtStateBounds,
   districtStates,
+  maximumDistrictCount,
 } from '../district-states.js';
 import {
   districtRequestSchema,
@@ -26,7 +28,7 @@ import {
 } from './context.js';
 import { firstSymbolLayerId, setLayerVisibility } from './map-ui-utils.js';
 
-const COLORS = [
+const BASE_COLORS = [
   '#b6405a',
   '#197b79',
   '#a05c09',
@@ -36,6 +38,11 @@ const COLORS = [
   '#9c468b',
   '#886243',
 ];
+const COLORS = Array.from({ length: maximumDistrictCount }, (_, index) => {
+  const hue = Math.round((index * 137.508) % 360);
+  const lightness = 35 + (index % 4) * 7;
+  return BASE_COLORS[index] ?? `hsl(${hue}, 52%, ${lightness}%)`;
+});
 const SOURCE = 'representative-districts';
 const OUTLINE = 'district-study-outline';
 const FILL = 'representative-district-fill';
@@ -79,10 +86,23 @@ const initialMethod = methodSchema.safeParse(
   initialSearchParams.get('district-method'),
 );
 if (initialMethod.success) methodSelect.value = initialMethod.data;
-const initialSeats = initialSearchParams.get('district-seats');
-if (Array.from(seatsSelect.options).some((option) => option.value === initialSeats)) {
-  seatsSelect.value = initialSeats ?? seatsSelect.value;
+
+function setDistrictCountOptions(requested = ''): void {
+  const state = districtState(stateSelect.value);
+  if (!state) return;
+  const counts = availableDistrictCounts(state);
+  seatsSelect.replaceChildren(
+    ...counts.map((count) => {
+      const label =
+        count === state.houseSeats ? `${count} (2020 House seats)` : String(count);
+      return new Option(label, String(count));
+    }),
+  );
+  seatsSelect.value = counts.some((count) => String(count) === requested)
+    ? requested
+    : String(state.houseSeats);
 }
+setDistrictCountOptions(initialSearchParams.get('district-seats') ?? '');
 
 function settings(): DistrictRequest {
   const method = methodSchema.safeParse(methodSelect.value);
@@ -111,7 +131,10 @@ export function writeDistrictSettings(url: URL): void {
   } else {
     url.searchParams.delete('district-method');
   }
-  if (runtime.activeProduct === 'districts' && seats !== 5) {
+  if (
+    runtime.activeProduct === 'districts' &&
+    seats !== districtState(stateSelect.value)?.houseSeats
+  ) {
     url.searchParams.set('district-seats', String(seats));
   } else {
     url.searchParams.delete('district-seats');
@@ -341,6 +364,7 @@ export function positionDistrictLayers(): void {
 
 for (const select of [stateSelect, methodSelect, seatsSelect]) {
   select.addEventListener('change', () => {
+    if (select === stateSelect) setDistrictCountOptions();
     const url = new URL(window.location.href);
     writeDistrictSettings(url);
     window.history.replaceState({}, '', url);

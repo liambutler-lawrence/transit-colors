@@ -3,11 +3,13 @@ import { z } from 'zod';
 import {
   type Circle,
   circleContains,
+  circlePointSelector,
   fixedCenterPopulationSearch,
   minimumEnclosingCircle,
   minimumPopulationCircle,
 } from './district-circles.js';
 import { coordinateSchema, type Coordinate } from './domain.js';
+import { maximumDistrictCount } from './district-states.js';
 import { localEqualAreaProjection } from './geodesy.js';
 
 const ringSchema = z.array(coordinateSchema).min(4);
@@ -21,11 +23,11 @@ export const districtGeometrySchema = z.discriminatedUnion('type', [
 ]);
 export const districtRequestSchema = z.object({
   method: z.enum(['knife', 'circles', 'reock-circles', 'area-knife']),
-  seats: z.int().min(2).max(8),
+  seats: z.int().min(1).max(maximumDistrictCount),
 });
 
 const districtPropertiesSchema = z.object({
-  number: z.int().min(1).max(8),
+  number: z.int().min(1).max(maximumDistrictCount),
   population: z.int().nonnegative(),
   urbanPopulation: z.int().nonnegative(),
   areaSquareMeters: z.number().nonnegative(),
@@ -44,8 +46,8 @@ export const districtPlanSchema = z.object({
           properties: districtPropertiesSchema,
         }),
       )
-      .min(2)
-      .max(8),
+      .min(1)
+      .max(maximumDistrictCount),
   }),
   target: z.number().positive(),
   totalPopulation: z.int().positive(),
@@ -280,14 +282,20 @@ function candidateReockScore(
   const area = districtArea(blocks);
   const maximumRadius =
     scoreToBeat > 0 ? Math.sqrt(area / (Math.PI * scoreToBeat)) : Infinity;
-  const seeds = reockDirections.map((direction, index) => {
-    function* vertices(): Iterable<Coordinate> {
-      for (const block of blocks) {
-        const vertex = block.extremeVertices[index];
-        if (vertex) yield vertex;
+  const seeds = reockDirections.map(([dx, dy], index) => {
+    let furthest: Coordinate | undefined;
+    let maximum = -Infinity;
+    for (const block of blocks) {
+      const vertex = block.extremeVertices[index];
+      if (!vertex) continue;
+      const distance = vertex[0] * dx + vertex[1] * dy;
+      if (distance > maximum) {
+        maximum = distance;
+        furthest = vertex;
       }
     }
-    return extremeVertex(vertices(), direction);
+    if (!furthest) throw new Error('A district must contain at least one vertex');
+    return furthest;
   });
   // Each circle encloses a subset of real district vertices and therefore
   // bounds the best possible score. Add constraints only where needed.
@@ -329,6 +337,7 @@ function reockCircleCut(
   smallest: Circle,
 ): CircleCut {
   const { bounds, circleAt } = fixedCenterPopulationSearch(populated, quota);
+  const selectBlocks = circlePointSelector(remaining);
   const divisions = 12;
   let stepX = (bounds.east - bounds.west) / divisions;
   let stepY = (bounds.north - bounds.south) / divisions;
@@ -337,7 +346,9 @@ function reockCircleCut(
 
   function consider(center: Coordinate): void {
     const circle = circleAt(center);
-    const assigned = remaining.filter(({ point }) => circleContains(circle, point));
+    const assigned = selectBlocks(circle);
+    // Preserve Census order for the area sum and enclosing-circle tie breaks.
+    assigned.sort((a, b) => a.index - b.index);
     const score = candidateReockScore(assigned, best.score);
     if (score === undefined) return;
     if (
@@ -464,7 +475,7 @@ export function calculateDistrictAssignments(
   return isKnifeMethod(method)
     ? knifeDistricts(
         blocks,
-        knifeOrders ?? prepareKnifeOrders(blocks),
+        knifeOrders ?? (seats === 1 ? [] : prepareKnifeOrders(blocks)),
         seats,
         target,
         method === 'area-knife',
