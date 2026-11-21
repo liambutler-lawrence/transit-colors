@@ -22,7 +22,7 @@ test('the smallest population circle can be centered between three tracts', () =
   assert.ok(Math.hypot(center[0], center[1] - 75) < 2);
 });
 
-test('nested circles cut a hole in the outer footprint and keep their full reported areas', () => {
+test('nested circles draw their assigned tracts and report their full selection areas', () => {
   const { unproject } = localEqualAreaProjection([-72.7, 41.6]);
   const polygon = (x, y, halfSize) => ({
     type: 'Polygon',
@@ -39,23 +39,33 @@ test('nested circles cut a hole in the outer footprint and keep their full repor
   const tracts = [
     [-100, 0, 2, 2],
     [100, 0, 2, 2],
+    [0, 0, 0, 0],
     [0, 1000, 1, 0],
     [1000, 0, 1, 0],
     [0, -1000, 1, 0],
     [-1000, 0, 1, 0],
+    [1500, 0, 0, 0],
   ].map(([x, y, population, urbanPopulation]) => ({
     center: unproject([x, y]),
     population,
     urbanPopulation,
     geometry: polygon(x, y, 10),
   }));
-  const study = { outline: polygon(0, 0, 1100), tracts };
+  const study = { outline: polygon(0, 0, 1600), tracts };
   const plan = calculateDistrictPlan(study, { method: 'circles', seats: 2 });
   const [innerDistrict, outerDistrict] = plan.districts.features;
-  assert.deepEqual(
-    outerDistrict.geometry.coordinates.map((polygon) => polygon.length),
-    [2],
-  );
+  for (const [district, assigned] of [
+    [innerDistrict, tracts.slice(0, 3)],
+    [outerDistrict, tracts.slice(3)],
+  ]) {
+    assert.deepEqual(
+      polygonClipping.xor(
+        district.geometry.coordinates,
+        ...assigned.map(({ geometry }) => geometry.coordinates),
+      ),
+      [],
+    );
+  }
   const inner = innerDistrict.properties;
   const outer = outerDistrict.properties;
   assert.ok(Math.abs(inner.radiusMeters - 100) <= 1);
@@ -98,6 +108,14 @@ test('Connecticut plans assign every resident once and render disjoint circle di
         else assert.ok(radiusMeters > 0);
       }
       if (method === 'circles') {
+        assert.deepEqual(
+          polygonClipping.xor(
+            study.outline.coordinates,
+            ...plan.districts.features.map(({ geometry }) => geometry.coordinates),
+          ),
+          [],
+          'The circle districts cover the study area',
+        );
         for (const [index, { geometry }] of plan.districts.features.entries()) {
           for (const later of plan.districts.features.slice(index + 1)) {
             assert.deepEqual(
