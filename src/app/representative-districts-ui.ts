@@ -106,7 +106,7 @@ function renderResults(result: DistrictPlan, method: DistrictRequest['method']):
   requiredElement('#district-population', HTMLElement).textContent =
     formatInteger(totalPopulation);
   requiredElement('#district-area-label', HTMLElement).textContent =
-    method === 'circles' ? 'Sum of circle areas' : 'Total mapped area';
+    method === 'circles' ? 'Sum of circle areas' : 'Total district area';
   requiredElement('#district-area', HTMLElement).textContent =
     formatArea(totalAreaSquareMeters);
 

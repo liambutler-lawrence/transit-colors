@@ -8,7 +8,11 @@ import {
   minimumEnclosingCircle,
   minimumPopulationCircle,
 } from './district-circles.ts';
-import { localEqualAreaProjection } from './geodesy.ts';
+import {
+  geodesicPolygonAreaSquareMeters,
+  localEqualAreaProjection,
+} from './geodesy.ts';
+import { PolygonHitIndex } from './polygon-hit-index.ts';
 import {
   calculateDistrictAssignments,
   districtPlanSchema,
@@ -110,7 +114,11 @@ test('nested circles assign whole blocks and report their full selection areas',
   }
 });
 
-test('published Connecticut plans cover the study area and count every resident once', () => {
+test('published Connecticut plans clip the coast and count every resident once', () => {
+  // Clipping shared edges can leave sub-metre floating-point slivers when a
+  // second geometry engine overlays the GeoJSON.
+  const exteriorArea = (polygons) =>
+    polygons.reduce((sum, [outer]) => sum + geodesicPolygonAreaSquareMeters(outer), 0);
   for (const method of ['knife', 'circles']) {
     for (let seats = 2; seats <= 8; seats += 1) {
       const file = new URL(
@@ -130,6 +138,45 @@ test('published Connecticut plans cover the study area and count every resident 
         districts.reduce((sum, { urbanPopulation }) => sum + urbanPopulation, 0),
         3_110_153,
       );
+      const outline = new PolygonHitIndex([
+        {
+          value: true,
+          polygons:
+            plan.outline.type === 'Polygon'
+              ? [plan.outline.coordinates]
+              : plan.outline.coordinates,
+        },
+      ]);
+      assert.equal(
+        outline.find(-73.1, 41.11),
+        null,
+        'Western Long Island Sound is clear',
+      );
+      assert.equal(
+        outline.find(-72.2, 41.25),
+        null,
+        'Eastern Long Island Sound is clear',
+      );
+      assert.equal(
+        outline.find(-72.98191, 41.2022),
+        null,
+        'The Housatonic mouth is clear',
+      );
+      assert.equal(
+        outline.find(-72.7, 41.76),
+        true,
+        'The outline still covers Hartford',
+      );
+      assert.equal(
+        outline.find(-72.663, 41.761),
+        true,
+        'The inland Connecticut River keeps its district shading',
+      );
+      assert.equal(
+        outline.find(-72.9554, 41.9405),
+        true,
+        'The outline still covers the isolated Barkhamsted Reservoir',
+      );
       for (const { population, reock, radiusMeters, areaSquareMeters } of districts) {
         assert.ok(Math.abs(population - plan.target) / plan.target < 0.001);
         assert.ok(areaSquareMeters > 0);
@@ -140,10 +187,10 @@ test('published Connecticut plans cover the study area and count every resident 
         ({ geometry }) => geometry.coordinates,
       );
       const union = polygonClipping.union(...geometries);
-      assert.deepEqual(polygonClipping.xor(plan.outline.coordinates, union), []);
+      assert.ok(exteriorArea(polygonClipping.xor(plan.outline.coordinates, union)) < 1);
       for (const [index, geometry] of geometries.entries()) {
         for (const later of geometries.slice(index + 1)) {
-          assert.deepEqual(polygonClipping.intersection(geometry, later), []);
+          assert.ok(exteriorArea(polygonClipping.intersection(geometry, later)) < 1);
         }
       }
     }
