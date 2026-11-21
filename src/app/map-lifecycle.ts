@@ -519,9 +519,8 @@ export async function loadArea(
     syncCircumferenceVisibility();
     updateViewportStatistics();
     if (
-      runtime.activeProduct !== 'timezone' &&
-      runtime.activeProduct !== 'landuse' &&
-      runtime.activeProduct !== 'watersheds'
+      runtime.activeProduct === 'access' ||
+      runtime.activeProduct === 'circumference'
     ) {
       prepareCircumferenceRoute(sequence);
     }
@@ -583,7 +582,8 @@ export async function initialize(): Promise<void> {
     if (
       runtime.activeProduct === 'timezone' ||
       runtime.activeProduct === 'landuse' ||
-      runtime.activeProduct === 'watersheds'
+      runtime.activeProduct === 'watersheds' ||
+      runtime.activeProduct === 'districts'
     ) {
       runtime.loadingCanFinish = true;
       requestAnimationFrame(() => requestAnimationFrame(finishLoading));

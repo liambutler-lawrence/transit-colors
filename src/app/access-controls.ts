@@ -47,6 +47,11 @@ import {
 } from './land-use-ui.js';
 import { activeAccessTransitTimes, setLayerVisibility } from './map-ui-utils.js';
 import {
+  positionDistrictLayers,
+  syncDistrictVisibility,
+  writeDistrictSettings,
+} from './representative-districts-ui.js';
+import {
   focusTimezoneWorld,
   positionTimezoneSkewLayers,
   syncTimezoneSkewVisibility,
@@ -76,6 +81,8 @@ import {
   destinationControlEl,
   destinationSelect,
   destinationSummaryEl,
+  districtsProductButton,
+  districtsProductEl,
   featureMetadataEl,
   featureNameEl,
   featureSummaryEl,
@@ -143,6 +150,7 @@ export function setActiveProduct(
   const timezoneActive = runtime.activeProduct === 'timezone';
   const landUseActive = runtime.activeProduct === 'landuse';
   const watershedActive = runtime.activeProduct === 'watersheds';
+  const districtsActive = runtime.activeProduct === 'districts';
   updateProductMenu(product);
   appShellEl.classList.toggle('watershed-active', watershedActive);
   watershedProductEl.hidden = !watershedActive;
@@ -153,6 +161,7 @@ export function setActiveProduct(
   circumferenceProductEl.hidden = !circumferenceActive;
   timezoneProductEl.hidden = !timezoneActive;
   landUseProductEl.hidden = !landUseActive;
+  districtsProductEl.hidden = !districtsActive;
 
   if (window.__transitPerformance.styleLoadedMs !== null) {
     if (landUseActive) map.setProjection({ type: 'mercator' });
@@ -165,6 +174,7 @@ export function setActiveProduct(
   syncTimezoneSkewVisibility();
   syncLandUseVisibility();
   syncWatershedVisibility();
+  syncDistrictVisibility({ fit });
   updateAreaChrome(runtime.activeAreaKey, { updateUrl });
 
   if (timezoneActive) {
@@ -179,6 +189,8 @@ export function setActiveProduct(
   } else if (watershedActive) {
     if (fit) focusWatersheds();
     updateStatus('Watershed map');
+  } else if (districtsActive) {
+    updateStatus('District map');
   } else if (landUseActive) {
     if (fit) focusJerseyCityLandUse();
     updateStatus(
@@ -224,6 +236,7 @@ const updateProductMenu = createProductMenu({
     [timezoneProductButton, 'timezone'],
     [landUseProductButton, 'landuse'],
     [watershedProductButton, 'watersheds'],
+    [districtsProductButton, 'districts'],
   ],
   onSelect: setActiveProduct,
 });
@@ -578,7 +591,9 @@ export function finishLoading(): void {
         ? 'Clock skew ready'
         : runtime.activeProduct === 'landuse'
           ? 'Land use ready'
-          : 'Ready',
+          : runtime.activeProduct === 'districts'
+            ? 'District map'
+            : 'Ready',
   );
   mapLoadingEl.hidden = true;
   mapEl.setAttribute('aria-busy', 'false');
@@ -626,6 +641,7 @@ export function installBasemap(): void {
     positionTimezoneSkewLayers();
     positionJerseyCityLandUseLayers();
     positionWatershedLayers();
+    positionDistrictLayers();
     if (AREAS[runtime.activeAreaKey].liveRoads) {
       requestLiveStreetRefresh();
       syncStreetVisibility();
@@ -970,24 +986,28 @@ export function updateAreaChrome(
   document.title =
     runtime.activeProduct === 'watersheds'
       ? 'Watersheds — Maps'
-      : runtime.activeProduct === 'timezone'
-        ? 'Clock skew — Maps'
-        : runtime.activeProduct === 'landuse'
-          ? 'Land use — Jersey City · Maps'
-          : runtime.activeProduct === 'circumference'
-            ? `Circumference routes — ${area.label} · Maps`
-            : `Transit heatmap — ${area.label} · Maps`;
+      : runtime.activeProduct === 'districts'
+        ? 'Representative districts — Connecticut · Maps'
+        : runtime.activeProduct === 'timezone'
+          ? 'Clock skew — Maps'
+          : runtime.activeProduct === 'landuse'
+            ? 'Land use — Jersey City · Maps'
+            : runtime.activeProduct === 'circumference'
+              ? `Circumference routes — ${area.label} · Maps`
+              : `Transit heatmap — ${area.label} · Maps`;
   mapEl.setAttribute(
     'aria-label',
     runtime.activeProduct === 'watersheds'
       ? 'Interactive worldwide watershed boundaries and terrain map'
-      : runtime.activeProduct === 'timezone'
-        ? 'Interactive world map of clock time compared with mean solar time'
-        : runtime.activeProduct === 'landuse'
-          ? 'Interactive Jersey City parcel map of land use, status, zoning, and historic districts'
-          : runtime.activeProduct === 'circumference'
-            ? `All maximum-area circumferential routes map, focused on ${area.label}`
-            : `All metro networks transit access map, destination metro ${area.label}`,
+      : runtime.activeProduct === 'districts'
+        ? 'Interactive map of representative districts in Connecticut'
+        : runtime.activeProduct === 'timezone'
+          ? 'Interactive world map of clock time compared with mean solar time'
+          : runtime.activeProduct === 'landuse'
+            ? 'Interactive Jersey City parcel map of land use, status, zoning, and historic districts'
+            : runtime.activeProduct === 'circumference'
+              ? `All maximum-area circumferential routes map, focused on ${area.label}`
+              : `All metro networks transit access map, destination metro ${area.label}`,
   );
   destinationControlEl.hidden = !area.supportsDestination;
   departureControlEl.hidden = !area.supportsDestination;
@@ -1000,8 +1020,8 @@ export function updateAreaChrome(
   } else {
     url.searchParams.set('area', areaKey);
   }
-  if (runtime.activeProduct === 'watersheds') {
-    url.searchParams.set('product', 'watersheds');
+  if (runtime.activeProduct === 'watersheds' || runtime.activeProduct === 'districts') {
+    url.searchParams.set('product', runtime.activeProduct);
     url.searchParams.delete('area');
     url.searchParams.delete('criterion');
   } else if (runtime.activeProduct === 'timezone') {
@@ -1022,5 +1042,6 @@ export function updateAreaChrome(
     url.searchParams.delete('product');
     url.searchParams.delete('criterion');
   }
+  writeDistrictSettings(url);
   window.history.replaceState({}, '', url);
 }
