@@ -857,6 +857,19 @@
       ]
     },
     {
+      "corridor": "PATH Harrison to Journal Square, with a private service crossing inside the Harrison Car Maintenance Facility",
+      "grade": "A",
+      "sources": [
+        "https://data.transportation.gov/resource/m2f8-22s6.json?crossingid=969865J",
+        "https://www.openstreetmap.org/way/220547655",
+        "https://services2.arcgis.com/XVOqAjTOJ5P6ngMu/arcgis/rest/services/Parcels_Composite_NJ_WM/FeatureServer/0",
+        "https://www.townofharrisonnj.com/DocumentCenter/View/767/Accordia-II-Site-Plans-May-2020#page=1",
+        "https://www.panynj.gov/content/dam/port-authority/pdfs/goods-and-services-pdfs/BIDDOC_61342.pdf#page=51",
+        "https://images.cf.nycsubway.org/images/maps/pirmann-2003-path-track.gif"
+      ],
+      "segmentIds": ["network-1o200yb"]
+    },
+    {
       "corridor": "PATH paired tunnels and flying junctions at Grove Street and Newport",
       "grade": "A",
       "sources": [

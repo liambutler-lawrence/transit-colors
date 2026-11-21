@@ -49,6 +49,21 @@ documents the separated road crossings on the approach.
 ·
 [COMETRO construction report](https://almacenfica.blob.core.windows.net/imagenes-fundacion-ica-org-mx/FICA-IMAGENES/Libro_Digitales/Revista%20ICA/REVISTA_NUM%209.pdf)
 
+For Harrison–Journal Square, the maintenance exception applies to crossing 969865J. The
+FRA records a private road with no public access at the rail yard. The mapped road stays
+within the Port Authority's Cape May Street parcel (Block 213, Lot 5.04) and ends inside
+the maintenance facility. The 2025 state aerial imagery shows the road ending in the
+track materials storage area. The facility contract describes controlled entry and
+railcar testing and repair infrastructure along the eastbound track.
+[FRA crossing record](https://data.transportation.gov/resource/m2f8-22s6.json?crossingid=969865J)
+· [Mapped service road](https://www.openstreetmap.org/way/220547655) ·
+[New Jersey parcel data](https://www.nj.gov/njgin/edata/parcels/) ·
+[Harrison parcel ownership plan](https://www.townofharrisonnj.com/DocumentCenter/View/767/Accordia-II-Site-Plans-May-2020#page=1)
+·
+[New Jersey 2025 aerial imagery catalog](https://nj.gov/njgin/edata/imagery/index.shtml)
+·
+[Port Authority maintenance contract](https://www.panynj.gov/content/dam/port-authority/pdfs/goods-and-services-pdfs/BIDDOC_61342.pdf#page=51)
+
 The selector excludes ride segments without evidence. Track data currently covers metro
 services. Busways and other passenger rail need to be added to the graph before their
 grades can be used. Filtered transit circles use eligible precomputed candidates and
