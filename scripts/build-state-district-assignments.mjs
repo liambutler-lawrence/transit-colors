@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import {
   calculateDistrictAssignments,
   districtRequestSchema,
+  isKnifeMethod,
   prepareDistrictBlocks,
   prepareKnifeOrders,
 } from '../src/representative-districts.ts';
@@ -28,7 +29,9 @@ function* readBlocks(path) {
 const [blocksPath, outputPath, longitude, latitude, methodArgument, seatsArgument] =
   process.argv.slice(2);
 const methods = methodArgument
-  ? [districtRequestSchema.shape.method.parse(methodArgument)]
+  ? methodArgument
+      .split(',')
+      .map((method) => districtRequestSchema.shape.method.parse(method))
   : districtRequestSchema.shape.method.options;
 const districtCounts = seatsArgument ? [Number(seatsArgument)] : [2, 3, 4, 5, 6, 7, 8];
 const blocks = prepareDistrictBlocks(readBlocks(blocksPath), [
@@ -36,8 +39,10 @@ const blocks = prepareDistrictBlocks(readBlocks(blocksPath), [
   Number(latitude),
 ]);
 console.info(`Prepared ${blocks.length} blocks.`);
+const knifeOrders = methods.some(isKnifeMethod)
+  ? prepareKnifeOrders(blocks)
+  : undefined;
 for (const method of methods) {
-  const knifeOrders = method === 'knife' ? prepareKnifeOrders(blocks) : undefined;
   for (const seats of districtCounts) {
     const request = districtRequestSchema.parse({ method, seats });
     const assignments = calculateDistrictAssignments(blocks, request, knifeOrders);

@@ -2,7 +2,7 @@ name: Build representative district data
 
 on:
   push:
-    tags: ['districts-2020-v*']
+    tags: ['districts-2020-v*', 'districts-2020-area-knife-v*']
 
 permissions:
   contents: read
@@ -19,7 +19,7 @@ jobs:
       - name: List states to build
         id: matrix
         run: |
-          node -e 'console.log("value=" + JSON.stringify(require("./src/district-states.json").filter(({ code }) => code !== "CT").map(({ fips }) => fips)))' >> "$GITHUB_OUTPUT"
+          node -e 'console.log("value=" + JSON.stringify(require("./src/district-states.json").filter(({ code }) => code !== "CT").sort((a, b) => b.blocks - a.blocks).map(({ fips }) => fips)))' >> "$GITHUB_OUTPUT"
 
   build:
     needs: states
@@ -52,12 +52,19 @@ jobs:
             --output blocks.zip "https://www2.census.gov/geo/tiger/TIGER2020/TABBLOCK20/tl_2020_${FIPS}_tabblock20.zip"
           curl --fail --location --retry 5 --retry-all-errors --silent --show-error \
             --output shoreline.zip https://www2.census.gov/geo/tiger/GENZ2020/shp/cb_2020_us_state_500k.zip
-      - name: Build and package all district counts and algorithms
+      - name: Build and package the state plans
         env:
           FIPS: ${{ matrix.fips }}
         run: |
-          python scripts/build-state-district-data.py "$FIPS" blocks.zip shoreline.zip "built/$FIPS"
-          test "$(find "built/$FIPS" -type f -name '*.json.gz' | wc -l)" -eq 22
+          if [[ "$GITHUB_REF_NAME" == districts-2020-area-knife-v* ]]; then
+            methods=(--method area-knife --plans-only)
+            count=7
+          else
+            methods=(--method knife --method circles --method reock-circles)
+            count=22
+          fi
+          python scripts/build-state-district-data.py "$FIPS" blocks.zip shoreline.zip "built/$FIPS" "${methods[@]}"
+          test "$(find "built/$FIPS" -type f -name '*.json.gz' | wc -l)" -eq "$count"
           tar -C built -cf "districts-$FIPS.tar" "$FIPS"
       - uses: actions/upload-artifact@v7
         with:
@@ -85,5 +92,5 @@ jobs:
           test "$(find packages -type f -name '*.tar' | wc -l)" -eq 49
           gh release create "$GITHUB_REF_NAME" packages/*.tar \
             --repo "$GITHUB_REPOSITORY" --verify-tag --latest=false \
-            --title "2020 Census representative districts" \
-            --notes "Precomputed whole-block plans for the 49 states added to the representative districts map."
+            --title "2020 Census representative districts ($GITHUB_REF_NAME)" \
+            --notes "Precomputed whole-block plans for the 49 states served by the nationwide data bundles."

@@ -20,7 +20,7 @@ export const districtGeometrySchema = z.discriminatedUnion('type', [
   }),
 ]);
 export const districtRequestSchema = z.object({
-  method: z.enum(['knife', 'circles', 'reock-circles']),
+  method: z.enum(['knife', 'circles', 'reock-circles', 'area-knife']),
   seats: z.int().min(2).max(8),
 });
 
@@ -54,12 +54,17 @@ export const districtPlanSchema = z.object({
 
 type Geometry = z.infer<typeof districtGeometrySchema>;
 export type DistrictRequest = z.infer<typeof districtRequestSchema>;
+export type DistrictMethod = DistrictRequest['method'];
 export type DistrictPlan = z.infer<typeof districtPlanSchema>;
 type DistrictProperties = z.infer<typeof districtPropertiesSchema>;
 
 export type DistrictResponse = { id: number } & (
   { plan: DistrictPlan } | { error: string }
 );
+
+export function isKnifeMethod(method: DistrictMethod): boolean {
+  return method === 'knife' || method === 'area-knife';
+}
 
 interface Block {
   readonly center: Coordinate;
@@ -219,8 +224,9 @@ function knifeCut(
   assigned: Uint8Array,
   target: number,
   seatsLeft: number,
+  minimizeArea: boolean,
 ): ProjectedBlock[] {
-  let bestScore = 0;
+  let bestScore = minimizeArea ? Infinity : 0;
   let best: ProjectedBlock[] = [];
   const populated = remaining.filter(({ population }) => population > 0).length;
   for (const ordered of orders) {
@@ -243,8 +249,13 @@ function knifeCut(
       if (block.population > 0) populatedLeft -= 1;
       if (population >= target) break;
     }
-    const score = candidateReockScore(slice, bestScore);
-    if (score !== undefined && (!best.length || score > bestScore)) {
+    const score = minimizeArea
+      ? districtArea(slice)
+      : candidateReockScore(slice, bestScore);
+    if (
+      score !== undefined &&
+      (!best.length || (minimizeArea ? score < bestScore : score > bestScore))
+    ) {
       bestScore = score;
       best = slice;
     }
@@ -361,6 +372,7 @@ function knifeDistricts(
   orders: readonly Uint32Array[],
   seats: number,
   target: number,
+  minimizeArea: boolean,
 ): DistrictAssignment[] {
   let remaining = [...blocks];
   const assignment = new Uint8Array(blocks.length);
@@ -369,7 +381,15 @@ function knifeDistricts(
     const assigned =
       number === seats
         ? remaining
-        : knifeCut(blocks, remaining, orders, assignment, target, seats - number + 1);
+        : knifeCut(
+            blocks,
+            remaining,
+            orders,
+            assignment,
+            target,
+            seats - number + 1,
+            minimizeArea,
+          );
     districts.push({
       blocks: assigned.map(({ index }) => index),
       properties: {
@@ -441,7 +461,13 @@ export function calculateDistrictAssignments(
   knifeOrders?: readonly Uint32Array[],
 ): DistrictAssignment[] {
   const target = totalPopulation(blocks) / seats;
-  return method === 'knife'
-    ? knifeDistricts(blocks, knifeOrders ?? prepareKnifeOrders(blocks), seats, target)
+  return isKnifeMethod(method)
+    ? knifeDistricts(
+        blocks,
+        knifeOrders ?? prepareKnifeOrders(blocks),
+        seats,
+        target,
+        method === 'area-knife',
+      )
     : circleDistricts(blocks, seats, target, method === 'reock-circles');
 }

@@ -8,6 +8,7 @@ import {
 } from '../district-states.js';
 import {
   districtRequestSchema,
+  isKnifeMethod,
   type DistrictPlan,
   type DistrictRequest,
   type DistrictResponse,
@@ -134,8 +135,11 @@ function renderResults(result: DistrictPlan, method: DistrictRequest['method']):
   );
   requiredElement('#district-population', HTMLElement).textContent =
     formatInteger(totalPopulation);
-  requiredElement('#district-area-label', HTMLElement).textContent =
-    method === 'knife' ? 'Total district area' : 'Sum of circle areas';
+  requiredElement('#district-area-label', HTMLElement).textContent = isKnifeMethod(
+    method,
+  )
+    ? 'Total district area'
+    : 'Sum of circle areas';
   requiredElement('#district-area', HTMLElement).textContent =
     formatArea(totalAreaSquareMeters);
 
