@@ -365,3 +365,28 @@ test('road mode shows the highway network independently of boundary grades', asy
   }
   assert.match(highwayUi, /setLayerVisibility\(layerId, eligibleIds\.length > 0\)/);
 });
+
+test('road inspection can reach boundary sections whose highlights are filtered out', async () => {
+  const highwayUi = await readFile(
+    new URL('./app/highway-circumference-ui.ts', import.meta.url),
+    'utf8',
+  );
+  const layers = await readFile(
+    new URL('./app/circumference-layers.ts', import.meta.url),
+    'utf8',
+  );
+  assert.match(
+    layers,
+    /id: 'highway-circumference-boundary-line',[\s\S]*'source-layer': 'boundary'/,
+  );
+  assert.ok(
+    highwayUi.includes(
+      "setLayerVisibility('highway-circumference-boundary-line', visible);",
+    ),
+  );
+  assert.match(
+    highwayUi,
+    /const layerIds = \[[\s\S]*'highway-circumference-boundary-line'/,
+  );
+  assert.match(highwayUi, /\{ label: 'Grade', value: grade \}/);
+});

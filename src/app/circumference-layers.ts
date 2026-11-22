@@ -108,6 +108,28 @@ export function installCircumferenceLayers(): void {
   });
 
   map.addLayer({
+    id: 'highway-circumference-boundary-line',
+    type: 'line',
+    source: 'highway-circumference',
+    'source-layer': 'boundary',
+    filter: [
+      'in',
+      ['get', 'kind'],
+      ['literal', ['highway-route-mainline', 'highway-route-connector']],
+    ],
+    layout: {
+      visibility: 'none',
+      'line-cap': 'round',
+      'line-join': 'round',
+    },
+    paint: {
+      'line-color': '#52616c',
+      'line-width': ['interpolate', ['linear'], ['zoom'], 3, 0.78, 7, 1.55, 12, 3],
+      'line-opacity': ['case', ['boolean', ['feature-state', 'hover'], false], 1, 0.55],
+    },
+  });
+
+  map.addLayer({
     id: 'highway-circumference-route-casing',
     type: 'line',
     source: 'highway-circumference',

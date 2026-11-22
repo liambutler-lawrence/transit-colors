@@ -88,6 +88,10 @@ first unresolved location in each pending section. Road mode shows the mapped hi
 network and highlights reviewed boundary sections with permitted grades. It displays the
 full road circle when every boundary section qualifies.
 
+The road inspector shows the grade for a reviewed boundary section even when its
+highlight is filtered out. It shows the review status for pending sections and roads
+outside the boundary.
+
 The audit uses the July 2026 [OpenStreetMap motorway extract][motorway]. It samples the
 published boundary at intervals of up to 15 metres and matches both directions to nearby
 source carriageways. It verifies that the two directions follow connected source ways,
