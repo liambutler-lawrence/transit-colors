@@ -64,6 +64,16 @@ railcar testing and repair infrastructure along the eastbound track.
 ·
 [Port Authority maintenance contract](https://www.panynj.gov/content/dam/port-authority/pdfs/goods-and-services-pdfs/BIDDOC_61342.pdf#page=51)
 
+For Journal Square–Grove Street, the review applies the maintenance exception to
+crossing 969866R. The FRA records a private pedestrian crossing with no public access
+over one main track and one siding. Station footage shows the gate at track level, and
+Port Authority plans identify a work platform and other staff facilities on that level.
+The grade treats the gated internal walkway as maintenance access.
+[FRA crossing record](https://data.transportation.gov/resource/m2f8-22s6.json?crossingid=969866R)
+·
+[Port Authority station plans](https://www.panynj.gov/content/dam/port-authority/pdfs/bid-proposal/RFIDOC_58339.pdf#page=13)
+· [Station footage](https://www.youtube.com/watch?v=WLyyMSa-uMw)
+
 The selector excludes ride segments without evidence. Track data currently covers metro
 services. Busways and other passenger rail need to be added to the graph before their
 grades can be used. Filtered transit circles use eligible precomputed candidates and
