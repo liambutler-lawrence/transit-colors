@@ -84,8 +84,9 @@ cycles discovered in the reduced network, without a proof of optimality.
 [The road review file](../data/north-america-highway-grade-reviews.json) is indexed by
 the sections of the existing North American boundary. Its checksum ties it to the
 boundary snapshot. The [road grade gaps](circumference-road-grade-gaps.md) list the
-first unresolved location in each pending section. The map draws reviewed sections with
-permitted grades and displays the full road circle when every section qualifies.
+first unresolved location in each pending section. Road mode shows the mapped highway
+network and highlights reviewed boundary sections with permitted grades. It displays the
+full road circle when every boundary section qualifies.
 
 The audit uses the July 2026 [OpenStreetMap motorway extract][motorway]. It samples the
 published boundary at intervals of up to 15 metres and matches both directions to nearby
