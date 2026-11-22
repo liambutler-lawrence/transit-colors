@@ -122,4 +122,17 @@ test('reviewed road indices belong to the published boundary snapshot', async ()
   assert.equal(reviews.segments.length, summary.route.boundaryCorridorCount);
   assert.ok(reviews.segments.some((grade) => roadGradeSchema.safeParse(grade).success));
   for (const grade of reviews.segments) roadGradeSchema.nullable().parse(grade);
+  const gapReport = await readFile(
+    new URL('../docs/circumference-road-grade-gaps.md', import.meta.url),
+    'utf8',
+  );
+  assert.deepEqual(
+    Array.from(
+      gapReport.matchAll(/\x60((?:mainline|connector)-boundary-\d+)\x60/g),
+      ([, id]) => id,
+    ),
+    route.segments.flatMap(({ id }, index) =>
+      reviews.segments[index] === null ? [id] : [],
+    ),
+  );
 });
