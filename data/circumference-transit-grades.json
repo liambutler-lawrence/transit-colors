@@ -870,6 +870,17 @@
       "segmentIds": ["network-1o200yb"]
     },
     {
+      "corridor": "PATH Journal Square to Grove Street, with restricted staff access at Journal Square",
+      "grade": "A",
+      "sources": [
+        "https://data.transportation.gov/resource/m2f8-22s6.json?crossingid=969866R",
+        "https://www.panynj.gov/content/dam/port-authority/pdfs/bid-proposal/RFIDOC_58339.pdf#page=13",
+        "https://www.youtube.com/watch?v=WLyyMSa-uMw",
+        "https://images.cf.nycsubway.org/images/maps/pirmann-2003-path-track.gif"
+      ],
+      "segmentIds": ["network-qddmk7"]
+    },
+    {
       "corridor": "PATH paired tunnels and flying junctions at Grove Street and Newport",
       "grade": "A",
       "sources": [
