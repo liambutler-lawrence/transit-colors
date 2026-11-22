@@ -129,6 +129,10 @@ export function syncHighwayLayerVisibility(): void {
   const visible = roadMode && highwayData !== null;
   const routeVisible = visible && highwayRouteEligible();
   syncGovernmentSeats(roadMode, routeVisible);
+  setLayerVisibility('highway-circumference-network-casing', visible);
+  setLayerVisibility('highway-circumference-network-line', visible);
+  setLayerVisibility('highway-circumference-network-connector-casing', visible);
+  setLayerVisibility('highway-circumference-network-connector-line', visible);
   setLayerVisibility(
     HIGHWAY_GRADIENT_SOURCE_ID,
     routeVisible && routeGradientToggle.checked,
@@ -193,7 +197,7 @@ export function syncCircumferenceCriterionControls(): void {
     ? 'Highway details'
     : 'Line or transfer details';
   circumferenceMethodNoteEl.textContent = highwayMode
-    ? 'Highlighted road sections have a reviewed grade. A complete circle requires a permitted grade on every boundary section.'
+    ? 'The road network shows mapped highways and connectors. Highlighted boundary sections match the allowed grades. A complete circle requires every boundary section to qualify.'
     : 'Eligible metro segments stay visible even if they form no circle. Station transfers connect eligible rides. Each result card focuses the map on an independent circle.';
 }
 
@@ -397,7 +401,7 @@ function renderHighwayCircumference({
     circumferenceSelectionTypeEl.textContent = 'Nothing selected';
     circumferenceNameEl.textContent = 'No matching road circle';
     circumferenceSummaryEl.textContent =
-      'Select a highlighted road section to inspect its grade.';
+      'Select a road for details or a highlighted section to see its grade.';
     circumferenceMetadataEl.replaceChildren();
     if (fit && runtime.activeProduct === 'circumference') fitHighwayCircumference();
     updateStatus('No matching road circle');

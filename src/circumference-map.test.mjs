@@ -352,3 +352,16 @@ test('metro and highway circumference networks are mutually exclusive', async ()
     'the outgoing criterion layers are hidden before the incoming network is prepared',
   );
 });
+
+test('road mode shows the highway network independently of boundary grades', async () => {
+  const highwayUi = await readFile(
+    new URL('./app/highway-circumference-ui.ts', import.meta.url),
+    'utf8',
+  );
+  assert.match(highwayUi, /const visible = roadMode && highwayData !== null/);
+  for (const suffix of ['casing', 'line', 'connector-casing', 'connector-line']) {
+    const layer = `highway-circumference-network-${suffix}`;
+    assert.ok(highwayUi.includes(`setLayerVisibility('${layer}', visible);`), layer);
+  }
+  assert.match(highwayUi, /setLayerVisibility\(layerId, eligibleIds\.length > 0\)/);
+});
