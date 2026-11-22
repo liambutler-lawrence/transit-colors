@@ -83,27 +83,31 @@ cycles discovered in the reduced network, without a proof of optimality.
 
 [The road review file](../data/north-america-highway-grade-reviews.json) is indexed by
 the sections of the existing North American boundary. Its checksum ties it to the
-boundary snapshot. A null entry requires further review. The map draws only reviewed
-sections with permitted grades. It displays area, gradient, and feeder routes only when
-the complete boundary qualifies.
+boundary snapshot. The [road grade gaps](circumference-road-grade-gaps.md) list the
+first unresolved location in each pending section. The map draws reviewed sections with
+permitted grades and displays the full road circle when every section qualifies.
 
-The first pass uses the July 2026 [OpenStreetMap motorway extract][motorway] and the
-cached paired centerlines. It requires exact geometry matches across a whole boundary
-section, two opposing mapped motorway carriageways, and usable [explicit lane
-tags][lanes] for those carriageways over the interval. It takes the weakest supported
-tier and excludes ambiguous lane-use tags, mapped at-grade crossing indicators, and
-reciprocal ramps pending review. The separation evidence for this pass is the OSM
-motorway classification on the paired source ways, so these grades reflect the map
-snapshot. The road mode screens the existing boundary. Finding alternative road circles
-requires graded network-wide topology and a new solve.
+The audit uses the July 2026 [OpenStreetMap motorway extract][motorway]. It samples the
+published boundary at intervals of up to 15 metres and matches both directions to nearby
+source carriageways. It verifies that the two directions follow connected source ways,
+including any short intervening way between samples. It also compares published
+connectors against reconstructed reciprocal paths from the same extract.
 
-Reproduce the data with the same OSM extract and paired-network cache used by the
-highway builder:
+The grade uses the fewest marked through lanes found in either direction. It excludes
+marked exit-only, merge-only, and bus-only lanes and checks for mapped crossings,
+ordinary traffic signals, and access exceptions. The motorway and reciprocal ramp
+geometry is evidence of grade separation in this snapshot. The audit retains the
+previously reviewed grades for the same boundary and uses the lower grade where both
+reviews establish different lane tiers. Zero-length junction records inherit the lower
+grade of their two neighbours when both have grades.
+
+Reproduce the audit with the OSM extract used by the highway builder. The audit
+reconstructs the road geometry near the published boundary and updates the grade file
+and gaps report:
 
 ```sh
-node --max-old-space-size=6000 --import tsx scripts/audit-highway-grades.mjs \
-  data/.osm-highway-cache/north-america-motorways.osm.pbf \
-  data/.osm-highway-cache/north-america-derived-network.bin
+node --expose-gc --max-old-space-size=5500 --import tsx scripts/audit-highway-grades.mjs \
+  data/.osm-highway-cache/north-america-motorways.osm.pbf
 ```
 
 [motorway]: https://wiki.openstreetmap.org/wiki/Tag:highway%3Dmotorway

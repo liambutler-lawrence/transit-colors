@@ -303,6 +303,13 @@ export function renderHighwayResults(): void {
       reviewedCount < total
         ? `${reviewedCount.toLocaleString('en-US')} of ${total.toLocaleString('en-US')} road boundary sections have a grade. A complete road circle is pending review.`
         : 'No published road circle matches the allowed grades.';
+    if (reviewedCount < total) {
+      const gaps = document.createElement('a');
+      gaps.href =
+        'https://github.com/liambutler-lawrence/transit-colors/blob/main/docs/circumference-road-grade-gaps.md';
+      gaps.textContent = 'See road sections awaiting verification';
+      loading.append(' ', gaps);
+    }
   } else {
     loading.textContent = 'Loading North American road grade coverage…';
   }
@@ -469,8 +476,11 @@ export function showHighwayFeature(
         : 'Selected controlled-access mainline';
   circumferenceNameEl.textContent =
     properties.name || properties.number || 'Unnamed controlled-access highway';
+  const completeBoundary = boundary && highwayRouteEligible();
   circumferenceSummaryEl.textContent = boundary
-    ? 'Highlighted maximum-area controlled-access highway circle'
+    ? completeBoundary
+      ? 'Highlighted maximum-area controlled-access highway circle'
+      : 'Reviewed section of the published road boundary'
     : [
         connector
           ? 'Closest-tangent midpoint between opposing ramps, with mainline continuation at staggered joins'
@@ -495,7 +505,9 @@ export function showHighwayFeature(
     { label: 'Country', value: properties.country },
     {
       label: 'Boundary area',
-      value: boundary ? formatArea(data.route.containedLandAreaSquareMeters) : null,
+      value: completeBoundary
+        ? formatArea(data.route.containedLandAreaSquareMeters)
+        : null,
     },
     { label: 'Dataset feature', value: properties.id },
   ]);
