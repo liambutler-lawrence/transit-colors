@@ -133,6 +133,7 @@ export function syncHighwayLayerVisibility(): void {
   setLayerVisibility('highway-circumference-network-line', visible);
   setLayerVisibility('highway-circumference-network-connector-casing', visible);
   setLayerVisibility('highway-circumference-network-connector-line', visible);
+  setLayerVisibility('highway-circumference-boundary-line', visible);
   setLayerVisibility(
     HIGHWAY_GRADIENT_SOURCE_ID,
     routeVisible && routeGradientToggle.checked,
@@ -400,8 +401,7 @@ function renderHighwayCircumference({
   if (!highwayRouteEligible()) {
     circumferenceSelectionTypeEl.textContent = 'Nothing selected';
     circumferenceNameEl.textContent = 'No matching road circle';
-    circumferenceSummaryEl.textContent =
-      'Select a road for details or a highlighted section to see its grade.';
+    circumferenceSummaryEl.textContent = 'Select a road to see its details and grade.';
     circumferenceMetadataEl.replaceChildren();
     if (fit && runtime.activeProduct === 'circumference') fitHighwayCircumference();
     updateStatus('No matching road circle');
@@ -468,7 +468,11 @@ export function showHighwayFeature(
 ): void {
   const data = highwayData;
   if (!data) return;
-  const boundary = highwayRouteEligible() && properties.id === data.route.id;
+  const segmentId = properties.id === data.route.id ? properties.segment_id : undefined;
+  const boundary = segmentId !== undefined;
+  const grade = boundary
+    ? (reviewedRoadGrades(data)[segmentId - 1] ?? 'Awaiting verification')
+    : 'Outside boundary review';
   const connector = properties.role === 'connector';
   const seam = properties.role === 'source-seam';
   circumferenceSelectionTypeEl.textContent = boundary
@@ -484,7 +488,7 @@ export function showHighwayFeature(
   circumferenceSummaryEl.textContent = boundary
     ? completeBoundary
       ? 'Highlighted maximum-area controlled-access highway circle'
-      : 'Reviewed section of the published road boundary'
+      : 'Section of the published road boundary'
     : [
         connector
           ? 'Closest-tangent midpoint between opposing ramps, with mainline continuation at staggered joins'
@@ -498,10 +502,7 @@ export function showHighwayFeature(
         .filter(Boolean)
         .join(' · ');
   replaceMetadata([
-    {
-      label: 'Grade',
-      value: reviewedRoadGrades(data)[(properties.segment_id ?? 0) - 1],
-    },
+    { label: 'Grade', value: grade },
     { label: 'Road class', value: properties.class },
     { label: 'Type', value: properties.type },
     { label: 'Route', value: properties.number || properties.name },
@@ -559,6 +560,7 @@ export function installHighwayHover(): void {
   const layerIds = [
     'highway-circumference-route-connector-line',
     'highway-circumference-route-line',
+    'highway-circumference-boundary-line',
     'highway-circumference-network-connector-line',
     'highway-circumference-network-line',
   ];
