@@ -22,7 +22,12 @@ const sum = (terms) =>
 export async function solveHighwayAreaCycle(
   nodes,
   edges,
-  { onIteration = () => {}, timeLimitSeconds = 300, solveModel = null } = {},
+  {
+    onIteration = () => {},
+    timeLimitSeconds = 300,
+    solveModel = null,
+    allowEmpty = false,
+  } = {},
 ) {
   const require = createRequire(import.meta.url);
   const highs = solveModel ? null : await require('highs')();
@@ -229,7 +234,14 @@ export async function solveHighwayAreaCycle(
       objectiveSquareKilometers: solution.ObjectiveValue,
       cuts: cuts.size,
     });
-    if (!cycles.length) throw new Error('No eligible highway cycle');
+    if (!cycles.length) {
+      if (allowEmpty && provenOptimal) return null;
+      throw new Error(
+        provenOptimal
+          ? 'No eligible highway cycle'
+          : 'Area solver stopped before finding an eligible cycle',
+      );
+    }
     let invalid = false,
       windingCutCount = 0;
     for (const cycle of cycles) {

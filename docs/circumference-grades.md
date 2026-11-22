@@ -81,39 +81,40 @@ cycles discovered in the reduced network, without a proof of optimality.
 
 ## Road reviews
 
-[The road review file](../data/north-america-highway-grade-reviews.json) is indexed by
-the sections of the existing North American boundary. Its checksum ties it to the
-boundary snapshot. The [road grade gaps](circumference-road-grade-gaps.md) list the
-first unresolved location in each pending section. Road mode shows the mapped highway
-network and highlights reviewed boundary sections with permitted grades. It displays the
-full road circle when every boundary section qualifies.
+Road mode reviews the existing North American motorway graph between junctions,
+including paired ramps and branches outside the former maximum-area boundary. It uses
+the July 2026 [OpenStreetMap motorway extract][motorway]. Mainlines are sampled at
+intervals of up to 15 metres and matched to connected, opposing source carriageways. For
+ramps, the review uses the source ways of both reciprocal movements. The lowest
+through-lane count across a segment governs its grade. The review also checks mapped
+crossings, access, and separation. Segments with inconclusive evidence stay visible and
+the inspector shows the first review issue. They cannot enter a circle.
 
-The road inspector shows the grade for a reviewed boundary section even when its
-highlight is filtered out. It shows the review status for pending sections and roads
-outside the boundary.
+An unexplained signal or pedestrian crossing marker on a motorway mainline requires
+verification. In Woodhaven, the markers on both I-75 carriageways attach to a path
+documented on the West Road bridge. The
+[crossing review catalog](../data/north-america-road-crossing-reviews.json) records the
+mapped feature and the sources for the grade separation.
 
-The audit uses the July 2026 [OpenStreetMap motorway extract][motorway]. It samples the
-published boundary at intervals of up to 15 metres and matches both directions to nearby
-source carriageways. It verifies that the two directions follow connected source ways,
-including any short intervening way between samples. It also compares published
-connectors against reconstructed reciprocal paths from the same extract.
+The [earlier boundary review](../data/north-america-highway-grade-reviews.json) supplies
+additional evidence for any segment whose geometry exactly matches a reviewed section.
+Its [gaps report](circumference-road-grade-gaps.md) documents that boundary review.
 
-The grade uses the fewest marked through lanes found in either direction. It excludes
-marked exit-only, merge-only, and bus-only lanes and checks for mapped crossings,
-ordinary traffic signals, and access exceptions. The motorway and reciprocal ramp
-geometry is evidence of grade separation in this snapshot. The audit retains the
-previously reviewed grades for the same boundary and uses the lower grade where both
-reviews establish different lane tiers. Zero-length junction records inherit the lower
-grade of their two neighbours when both have grades.
+The road builder solves for the largest simple loop over the verified segments in each
+allowed grade set. It applies the same interchange turn restrictions as the original
+highway solver and publishes the optimal result for each combination. Coincident graph
+joins preserve topology without adding a travel segment. The road inspector shows the
+grade regardless of which grades are selected.
 
-Reproduce the audit with the OSM extract used by the highway builder. The audit
-reconstructs the road geometry near the published boundary and updates the grade file
-and gaps report:
+Regenerate the reviews, circles and map tiles from the existing OSM extract with the
+data build command.
 
 ```sh
-node --expose-gc --max-old-space-size=5500 --import tsx scripts/audit-highway-grades.mjs \
-  data/.osm-highway-cache/north-america-motorways.osm.pbf
+npm run build:data:road-grades
 ```
+
+The optional native HiGHS solver is described in
+[Highway circumference area optimization](highway-area-optimization.md).
 
 [motorway]: https://wiki.openstreetmap.org/wiki/Tag:highway%3Dmotorway
 [lanes]: https://wiki.openstreetmap.org/wiki/Key:lanes

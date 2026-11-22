@@ -5,6 +5,14 @@ export const transitGradeSchema = z.enum(['A', 'A-', 'B', 'C', 'AX', 'BX']);
 export const ROAD_GRADES = roadGradeSchema.options;
 export const TRANSIT_GRADES = transitGradeSchema.options;
 
+export function roadGradeMask(grades: Iterable<string>): number {
+  const selected = new Set(grades);
+  return ROAD_GRADES.reduce(
+    (mask, grade, index) => (selected.has(grade) ? mask | (1 << index) : mask),
+    0,
+  );
+}
+
 export type CircumferenceNetworkMode = 'road' | 'transit';
 export type RoadGrade = (typeof ROAD_GRADES)[number];
 export type TransitGrade = (typeof TRANSIT_GRADES)[number];

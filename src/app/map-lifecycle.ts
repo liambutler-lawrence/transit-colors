@@ -275,8 +275,9 @@ export function installMapData(stations: StationCollection): void {
 
   map.addSource('highway-circumference', {
     type: 'vector',
-    url: `pmtiles://${new URL('data/north-america-highways-route.pmtiles?v=20260921b', window.location.href).href}`,
+    url: `pmtiles://${new URL('data/north-america-graded-roads.pmtiles?v=20261122', window.location.href).href}`,
     promoteId: 'segment_id',
+    attribution: '© OpenStreetMap contributors',
   });
 
   const highwayTilesUrl = new URL(
