@@ -120,26 +120,18 @@ export function throughLaneCount(tags, { connector = false } = {}) {
   return through || null;
 }
 
-function hasSeparationEvidence(tags, nodes, nodeIds) {
+function publicRoadEvidence(tags) {
   return (
     !tags.construction &&
     tags.access !== 'no' &&
     tags.access !== 'private' &&
     tags.motor_vehicle !== 'no' &&
     tags.motor_vehicle !== 'private' &&
-    tags.junction !== 'roundabout' &&
-    tags.junction !== 'circular' &&
-    tags.divider !== 'no' &&
-    tags.divided !== 'no' &&
-    (!tags.access_control || tags.access_control === 'full') &&
-    !tags['oneway:conditional'] &&
-    nodeIds.every(
-      (nodeId) => nodes.has(nodeId) && !isAtGradeConflict(nodes.get(nodeId).tags),
-    )
+    !tags['oneway:conditional']
   );
 }
 
-function sourceRoad(way, nodes) {
+function sourceRoad(way, nodes, gradeSeparatedNodes) {
   const { id, tags } = way;
   if (
     !motorwayClasses.has(tags.highway) ||
@@ -152,12 +144,40 @@ function sourceRoad(way, nodes) {
   if (coordinates.length < 2 || coordinates.some((coordinate) => !coordinate))
     return null;
   const connector = tags.highway === 'motorway_link';
+  const accessible = publicRoadEvidence(tags);
+  const divided = tags.divider !== 'no' && tags.divided !== 'no';
+  const confirmedJunction =
+    tags.junction === 'roundabout' || tags.junction === 'circular';
+  const conflicts = nodeIds
+    .filter((nodeId) => !gradeSeparatedNodes.has(nodeId))
+    .map((nodeId) => nodes.get(nodeId).tags)
+    .filter(isAtGradeConflict);
+  // A traffic control alone does not establish a crossing. A foot crossing
+  // tagged on a motorway mainline can also be a misattached overpass node.
+  const atGrade =
+    confirmedJunction ||
+    conflicts.some(
+      (node) =>
+        node.railway === 'level_crossing' ||
+        node.highway === 'mini_roundabout' ||
+        (connector &&
+          !(tags.foot === 'no' && tags.bicycle === 'no') &&
+          (node.highway === 'crossing' || (node.crossing && node.crossing !== 'no'))),
+    );
+  const separated =
+    !confirmedJunction &&
+    !conflicts.length &&
+    (!tags.access_control || tags.access_control === 'full');
   return {
     id,
     coordinates,
     firstNode: nodeIds[0],
     lastNode: nodeIds.at(-1),
-    separation: hasSeparationEvidence(tags, nodes, nodeIds),
+    accessible,
+    divided,
+    separated,
+    atGrade,
+    separation: accessible && divided && separated,
     lanes: throughLaneCount(tags, { connector }),
     connector,
     refs: new Set(
@@ -206,7 +226,7 @@ function gridKey(column, row) {
   return column * 1_000_000 + row;
 }
 
-export function roadEvidence(osm) {
+export function roadEvidence(osm, { gradeSeparatedNodes = new Set() } = {}) {
   const grid = new Map();
   const roads = new Map();
   const fromNode = new Map();
@@ -214,7 +234,7 @@ export function roadEvidence(osm) {
   const latitudeBuffer = 240 / metresPerDegree;
 
   for (const way of osm.ways) {
-    const road = sourceRoad(way, osm.nodes);
+    const road = sourceRoad(way, osm.nodes, gradeSeparatedNodes);
     if (!road) continue;
     roads.set(road.id, road);
     if (road.connector) continue;
@@ -356,8 +376,10 @@ function shortConnection(from, to, fromNode, remaining = maxUnobservedWayMetres)
   return matching;
 }
 
-export function reviewMainline(coordinates, evidence) {
+export function reviewMainline(coordinates, evidence, { fullRubric = false } = {}) {
   let minimum = Infinity;
+  let hasAtGrade = false;
+  let fullyDivided = true;
   let prior = null;
   let pending = null;
   let mileage = 0;
@@ -398,11 +420,14 @@ export function reviewMainline(coordinates, evidence) {
         crossed = [...pair, ...forward, ...reverse];
       }
       pending = null;
-      if (crossed.some((road) => !road.separation)) {
+      const exception = fullRubric
+        ? unresolvedRoadEvidence
+        : (road) => !road.separation;
+      if (crossed.some(exception)) {
         return {
           reason: 'Separation or access exception',
           point,
-          wayIds: crossed.filter((road) => !road.separation).map((road) => road.id),
+          wayIds: crossed.filter(exception).map((road) => road.id),
         };
       }
       if (crossed.some((road) => !road.lanes)) {
@@ -413,14 +438,55 @@ export function reviewMainline(coordinates, evidence) {
         };
       }
       minimum = Math.min(minimum, ...crossed.map((road) => road.lanes));
+      hasAtGrade ||= crossed.some((road) => road.atGrade);
+      fullyDivided &&= crossed.every((road) => road.divided);
       prior = pair;
     }
     mileage += length;
   }
   if (pending) return pending.issue;
   return Number.isFinite(minimum)
-    ? { grade: gradeForLaneCount(minimum) }
+    ? {
+        grade: fullRubric
+          ? roadGrade(minimum, fullyDivided, hasAtGrade)
+          : gradeForLaneCount(minimum),
+      }
     : { reason: 'No usable carriageway geometry', point: coordinates[0] };
+}
+
+function roadGrade(lanes, divided, atGrade) {
+  if (atGrade) return lanes >= 2 ? 'B' : 'C';
+  return divided ? gradeForLaneCount(lanes) : 'A-';
+}
+
+function unresolvedRoadEvidence(road) {
+  return !road?.accessible || (!road.separated && !road.atGrade);
+}
+
+export function reviewReciprocalWays(wayIds, roads, point) {
+  if (!wayIds.length) return { reason: 'Unverified reciprocal ramp paths', point };
+  const source = wayIds.map((id) => roads.get(id));
+  if (source.some(unresolvedRoadEvidence)) {
+    return {
+      reason: 'Separation or access exception',
+      point,
+      wayIds: wayIds.filter((id) => unresolvedRoadEvidence(roads.get(id))),
+    };
+  }
+  if (source.some((road) => !road.lanes)) {
+    return {
+      reason: 'Missing or ambiguous through lanes',
+      point,
+      wayIds: source.filter((road) => !road.lanes).map((road) => road.id),
+    };
+  }
+  return {
+    grade: roadGrade(
+      Math.min(...source.map((road) => road.lanes)),
+      source.every((road) => road.divided),
+      source.some((road) => road.atGrade),
+    ),
+  };
 }
 
 function distanceToLine(point, coordinates) {

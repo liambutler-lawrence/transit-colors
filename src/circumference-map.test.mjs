@@ -353,7 +353,7 @@ test('metro and highway circumference networks are mutually exclusive', async ()
   );
 });
 
-test('road mode shows the highway network independently of boundary grades', async () => {
+test('road mode keeps the network visible when a grade set yields no circle', async () => {
   const highwayUi = await readFile(
     new URL('./app/highway-circumference-ui.ts', import.meta.url),
     'utf8',
@@ -361,12 +361,13 @@ test('road mode shows the highway network independently of boundary grades', asy
   assert.match(highwayUi, /const visible = roadMode && highwayData !== null/);
   for (const suffix of ['casing', 'line', 'connector-casing', 'connector-line']) {
     const layer = `highway-circumference-network-${suffix}`;
-    assert.ok(highwayUi.includes(`setLayerVisibility('${layer}', visible);`), layer);
+    assert.ok(highwayUi.includes(`'${layer}',`), layer);
   }
-  assert.match(highwayUi, /setLayerVisibility\(layerId, eligibleIds\.length > 0\)/);
+  assert.match(highwayUi, /setLayerVisibility\(layer, visible\)/);
+  assert.match(highwayUi, /setLayerVisibility\(layer, circle !== null\)/);
 });
 
-test('road inspection can reach boundary sections whose highlights are filtered out', async () => {
+test('road inspection can reach graded segments outside the selected circle', async () => {
   const highwayUi = await readFile(
     new URL('./app/highway-circumference-ui.ts', import.meta.url),
     'utf8',
@@ -377,16 +378,12 @@ test('road inspection can reach boundary sections whose highlights are filtered 
   );
   assert.match(
     layers,
-    /id: 'highway-circumference-boundary-line',[\s\S]*'source-layer': 'boundary'/,
+    /id: 'highway-circumference-graded-line',[\s\S]*'source-layer': 'roads'/,
   );
-  assert.ok(
-    highwayUi.includes(
-      "setLayerVisibility('highway-circumference-boundary-line', visible);",
-    ),
-  );
+  assert.ok(highwayUi.includes("'highway-circumference-graded-line',"));
   assert.match(
     highwayUi,
-    /const layerIds = \[[\s\S]*'highway-circumference-boundary-line'/,
+    /const layerIds = \[[\s\S]*'highway-circumference-graded-line'/,
   );
-  assert.match(highwayUi, /\{ label: 'Grade', value: grade \}/);
+  assert.match(highwayUi, /label: 'Grade', value: properties\.grade/);
 });

@@ -1,0 +1,14 @@
+{
+  "gradeSeparatedCrossings": [
+    {
+      "nodeIds": ["8185608077", "8185608078"],
+      "location": "West Road over I-75, Woodhaven, Michigan",
+      "evidence": "The marked path follows the West Road bridge across both I-75 carriageways. Woodhaven documents the pedestrian pathway on the bridge and MDOT's contract specifies widening it for the sidewalk.",
+      "sources": [
+        "https://www.openstreetmap.org/way/1426838800",
+        "https://cms5.revize.com/revize/woodhavenmi/DDA/Woodhaven%20DDA%202025%20Adpoted%20Plan.pdf",
+        "https://mdotjboss.state.mi.us/BidLetting/getFileByName.htm?fileName=2016-12-02%2Fads.pdf"
+      ]
+    }
+  ]
+}

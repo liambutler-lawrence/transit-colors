@@ -114,10 +114,9 @@ export function highwayTwoCore(nodeIds, edges) {
 }
 
 export function compressHighwayCore(coordinateByNodeId, edges, core, options = {}) {
+  const degree = (nodeId) => core.incident.get(nodeId)?.size ?? 0;
   const junctions = new Set(
-    [...core.activeNodes].filter(
-      (nodeId) => (core.incident.get(nodeId)?.size ?? 0) !== 2,
-    ),
+    [...core.activeNodes].filter((nodeId) => degree(nodeId) !== 2),
   );
   const unvisitedNodes = new Set(core.activeNodes);
   while (unvisitedNodes.size > 0) {
@@ -140,60 +139,102 @@ export function compressHighwayCore(coordinateByNodeId, edges, core, options = {
     }
   }
 
-  const visitedEdges = new Set();
-  const corridors = [];
-  for (const startId of [...junctions].sort()) {
-    for (const startingEdgeIndex of core.incident.get(startId) ?? []) {
-      if (
-        !core.activeEdges.has(startingEdgeIndex) ||
-        visitedEdges.has(startingEdgeIndex)
-      ) {
-        continue;
-      }
-      const coordinates = [coordinateByNodeId.get(startId)];
-      const partIndices = new Set();
-      const sourceEdgeIndices = [];
-      const fromTurnPort = highwayTurnPort(edges[startingEdgeIndex], startId);
-      let toTurnPort;
-      let invalidTurn = false;
-      let currentId = startId;
-      let edgeIndex = startingEdgeIndex;
-      while (true) {
-        visitedEdges.add(edgeIndex);
-        if (options.includeSourceEdges) sourceEdgeIndices.push(edgeIndex);
-        const edge = edges[edgeIndex];
-        for (const partIndex of edge.partIndices) partIndices.add(partIndex);
-        const nextId = edge.fromId === currentId ? edge.toId : edge.fromId;
-        coordinates.push(coordinateByNodeId.get(nextId));
-        currentId = nextId;
-        if (junctions.has(currentId)) {
-          toTurnPort = highwayTurnPort(edge, currentId);
-          break;
-        }
-        const nextEdgeIndex = [...(core.incident.get(currentId) ?? [])].find(
-          (candidateIndex) =>
-            candidateIndex !== edgeIndex && core.activeEdges.has(candidateIndex),
-        );
-        if (nextEdgeIndex === undefined) {
-          throw new Error(
-            `Detailed highway corridor ends unexpectedly at ${currentId}.`,
-          );
-        }
-        if (!highwayTurnAllowed(edge, edges[nextEdgeIndex], currentId))
-          invalidTurn = true;
-        edgeIndex = nextEdgeIndex;
-      }
-      corridors.push({
-        coordinates,
-        fromId: startId,
-        partIndices,
-        toId: currentId,
-        ...(fromTurnPort ? { fromTurnPort } : {}),
-        ...(toTurnPort ? { toTurnPort } : {}),
-        ...(invalidTurn ? { invalidTurn: true } : {}),
-        ...(options.includeSourceEdges ? { sourceEdgeIndices } : {}),
-      });
+  return collectHighwayCorridors(
+    coordinateByNodeId,
+    edges,
+    core.incident,
+    junctions,
+    (index) => core.activeEdges.has(index),
+    options,
+  );
+}
+
+export function compressAllHighwayCorridors(graph) {
+  const { coordinateByNodeId, edges, parts } = graph;
+  const incident = new Map();
+  const connector = (edge) =>
+    [...edge.partIndices].some((index) => parts[index].role === 'connector');
+  for (const [index, edge] of edges.entries()) {
+    for (const id of [edge.fromId, edge.toId]) {
+      const entries = incident.get(id);
+      if (entries) entries.push(index);
+      else incident.set(id, [index]);
     }
+  }
+  const junctions = new Set();
+  for (const [id, indices] of incident) {
+    if (
+      indices.length !== 2 ||
+      connector(edges[indices[0]]) !== connector(edges[indices[1]])
+    ) {
+      junctions.add(id);
+    }
+  }
+  return collectHighwayCorridors(coordinateByNodeId, edges, incident, junctions);
+}
+
+function collectHighwayCorridors(
+  coordinateByNodeId,
+  edges,
+  incident,
+  junctions,
+  edgeIsActive = () => true,
+  options = {},
+) {
+  const visitedEdges = new Uint8Array(edges.length);
+  const corridors = [];
+  function walk(startId, startingEdgeIndex) {
+    if (!edgeIsActive(startingEdgeIndex) || visitedEdges[startingEdgeIndex]) return;
+    const coordinates = [coordinateByNodeId.get(startId)];
+    const partIndices = new Set();
+    const sourceEdgeIndices = [];
+    const fromTurnPort = highwayTurnPort(edges[startingEdgeIndex], startId);
+    let toTurnPort;
+    let invalidTurn = false;
+    let currentId = startId;
+    let edgeIndex = startingEdgeIndex;
+    while (true) {
+      visitedEdges[edgeIndex] = 1;
+      if (options.includeSourceEdges) sourceEdgeIndices.push(edgeIndex);
+      const edge = edges[edgeIndex];
+      for (const partIndex of edge.partIndices) partIndices.add(partIndex);
+      const nextId = edge.fromId === currentId ? edge.toId : edge.fromId;
+      coordinates.push(coordinateByNodeId.get(nextId));
+      currentId = nextId;
+      if (junctions.has(currentId)) {
+        toTurnPort = highwayTurnPort(edge, currentId);
+        break;
+      }
+      const nextEdgeIndex = [...(incident.get(currentId) ?? [])].find(
+        (candidateIndex) =>
+          candidateIndex !== edgeIndex && edgeIsActive(candidateIndex),
+      );
+      if (nextEdgeIndex === undefined) {
+        throw new Error(`Detailed highway corridor ends unexpectedly at ${currentId}.`);
+      }
+      if (!highwayTurnAllowed(edge, edges[nextEdgeIndex], currentId))
+        invalidTurn = true;
+      edgeIndex = nextEdgeIndex;
+    }
+    corridors.push({
+      coordinates,
+      fromId: startId,
+      partIndices,
+      toId: currentId,
+      ...(fromTurnPort ? { fromTurnPort } : {}),
+      ...(toTurnPort ? { toTurnPort } : {}),
+      ...(invalidTurn ? { invalidTurn: true } : {}),
+      ...(options.includeSourceEdges ? { sourceEdgeIndices } : {}),
+    });
+  }
+  for (const startId of [...junctions].sort()) {
+    for (const index of incident.get(startId) ?? []) walk(startId, index);
+  }
+  // A connected component with no junctions is itself a closed corridor.
+  for (const [index, edge] of edges.entries()) {
+    if (visitedEdges[index] || !edgeIsActive(index)) continue;
+    junctions.add(edge.fromId);
+    walk(edge.fromId, index);
   }
   return {
     edges: corridors,

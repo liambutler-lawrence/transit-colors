@@ -27,6 +27,7 @@ const MAX_RECIPROCAL_ENDPOINT_GAP_METERS = 2_500;
 const MAX_RAMP_CORRESPONDENCE_SAMPLES = 240;
 const RAMP_CORRESPONDENCE_SPACING_METERS = 25;
 const MIN_PAIRED_TANGENT_ALIGNMENT = 0.62;
+const emptyTags = Object.freeze({});
 
 function decodeOplString(value) {
   // OPL escapes Unicode code points between TWO percent signs; these are
@@ -38,7 +39,7 @@ function decodeOplString(value) {
 }
 
 function parseOplTags(value) {
-  if (!value) return {};
+  if (!value) return emptyTags;
   return Object.fromEntries(
     value.split(',').flatMap((entry) => {
       const separator = entry.indexOf('=');
@@ -70,7 +71,7 @@ export function parseOplLine(line) {
       tags:
         tagStart >= 0 && coordinateStart > tagStart
           ? parseOplTags(line.slice(tagStart + 2, coordinateStart))
-          : {},
+          : emptyTags,
       type: 'node',
     };
   }
@@ -322,14 +323,14 @@ function lineLengthMeters(coordinates) {
 
 function resampleChain(chain) {
   const samples = resampleCoordinates(chain.coordinates);
+  for (const [sampleIndex, sample] of samples.entries()) {
+    sample.chainId = chain.id;
+    sample.sampleIndex = sampleIndex;
+  }
   return {
     ...chain,
     lengthMeters: samples.at(-1)?.distanceMeters ?? 0,
-    samples: samples.map((sample, sampleIndex) => ({
-      ...sample,
-      chainId: chain.id,
-      sampleIndex,
-    })),
+    samples,
   };
 }
 
@@ -647,7 +648,7 @@ function continueBoundedCarriagewayPairs(chain, matches, grid, chainById, ordere
   return continuations;
 }
 
-export function buildAveragedMainlines(chains) {
+export function buildAveragedMainlines(chains, { retainSamples = true } = {}) {
   const sampledChains = chains.map(resampleChain);
   const chainById = new Map(sampledChains.map((chain) => [chain.id, chain]));
   const grid = new Map();
@@ -970,7 +971,7 @@ export function buildAveragedMainlines(chains) {
     }
   }
   return {
-    chains: sampledChains,
+    ...(retainSamples ? { chains: sampledChains } : {}),
     parts,
     statistics: {
       averagedPartCount: parts.length,
@@ -4354,10 +4355,11 @@ export function buildRampConnectors(
   };
 }
 
-export function buildOsmHighwayCenterlines(osm, onProgress = () => {}) {
+export function buildOsmHighwayCenterlines(osm, onProgress = () => {}, options = {}) {
   const prepared = prepareWays(osm);
   const chains = traceMotorwayChains(prepared.mainlines);
-  const averaged = buildAveragedMainlines(chains);
+  const averaged = buildAveragedMainlines(chains, options);
+  if (options.retainSamples === false) globalThis.gc?.();
   const originalParts = structuredClone(averaged.parts);
   let mainlineTopology = connectMainlinePartsAtSourceNodes(
     osm,

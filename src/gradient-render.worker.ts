@@ -9,17 +9,32 @@ import {
 } from './gradient-render-protocol.js';
 
 import { fetchParsed } from './parse.js';
-import { highwayCircumferenceDataSchema } from './highway-circumference.js';
+import {
+  roadCircleGeometrySchema,
+  type RoadCircleGeometry,
+} from './highway-circumference.js';
 
 const geometries = new Map<string, Promise<GradientGeometry>>();
-async function loadHighwayGeometry(url: string): Promise<GradientGeometry> {
-  const data = await fetchParsed(url, highwayCircumferenceDataSchema);
+const roadGeometry = new Map<string, Promise<RoadCircleGeometry>>();
+
+async function loadHighwayGeometry(circleUrl: string): Promise<GradientGeometry> {
+  const url = new URL(circleUrl);
+  const id = url.hash.slice(1);
+  url.hash = '';
+  const path = url.href;
+  const pending = roadGeometry.get(path) ?? fetchParsed(path, roadCircleGeometrySchema);
+  roadGeometry.set(path, pending);
+  const data = await pending.catch((error: unknown) => {
+    roadGeometry.delete(path);
+    throw error;
+  });
+  const circle = data.circles[id];
+  if (!circle)
+    throw new Error(`Road circle ${id} is missing from the geometry catalog.`);
   return {
-    coordinates: data.route.coordinates,
-    landmassPolygons: data.landmass.mask,
-    maxDistanceMeters: circumferenceGradientDistanceForArea(
-      data.route.areaSquareMeters,
-    ),
+    coordinates: circle.coordinates,
+    landmassPolygons: data.mask,
+    maxDistanceMeters: circumferenceGradientDistanceForArea(circle.areaSquareMeters),
     outsideOnly: true,
   };
 }

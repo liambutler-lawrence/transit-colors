@@ -51,6 +51,11 @@ export function showTransitGradeCoverage(): void {
   }
 }
 
+export function showRoadGradeCoverage(total: number, pending: number): void {
+  const reviewed = (total - pending).toLocaleString('en-US');
+  coverage.textContent = `${reviewed} of ${total.toLocaleString('en-US')} road segments have a grade. The search uses reviewed segments only.`;
+}
+
 export function writeCircumferenceCriteria(url: URL): void {
   url.searchParams.delete('criterion');
   url.searchParams.delete('network');
@@ -96,7 +101,7 @@ export function installCircumferenceCriteria(onChange: () => void): void {
     }
     coverage.textContent =
       mode === 'road'
-        ? 'Road circles require a grade for every segment on the boundary.'
+        ? 'Only reviewed road segments enter the search.'
         : 'Only reviewed ride segments enter the search. Coverage expands as tracks are classified.';
   }
 

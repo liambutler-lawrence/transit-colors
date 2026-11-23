@@ -20,8 +20,7 @@ export function installCircumferenceLayers(): void {
     id: 'highway-circumference-area',
     type: 'fill',
     source: 'highway-circumference',
-    'source-layer': 'boundary',
-    filter: ['==', ['get', 'kind'], 'highway-inside'],
+    'source-layer': 'circles',
     layout: { visibility: 'none' },
     paint: {
       'fill-color': '#fff4df',
@@ -108,15 +107,10 @@ export function installCircumferenceLayers(): void {
   });
 
   map.addLayer({
-    id: 'highway-circumference-boundary-line',
+    id: 'highway-circumference-graded-line',
     type: 'line',
     source: 'highway-circumference',
-    'source-layer': 'boundary',
-    filter: [
-      'in',
-      ['get', 'kind'],
-      ['literal', ['highway-route-mainline', 'highway-route-connector']],
-    ],
+    'source-layer': 'roads',
     layout: {
       visibility: 'none',
       'line-cap': 'round',
@@ -133,8 +127,8 @@ export function installCircumferenceLayers(): void {
     id: 'highway-circumference-route-casing',
     type: 'line',
     source: 'highway-circumference',
-    'source-layer': 'boundary',
-    filter: ['==', ['get', 'kind'], 'highway-route-mainline'],
+    'source-layer': 'roads',
+    filter: ['==', ['get', 'role'], 'mainline'],
     layout: {
       visibility: 'none',
       'line-cap': 'round',
@@ -151,8 +145,8 @@ export function installCircumferenceLayers(): void {
     id: 'highway-circumference-route-line',
     type: 'line',
     source: 'highway-circumference',
-    'source-layer': 'boundary',
-    filter: ['==', ['get', 'kind'], 'highway-route-mainline'],
+    'source-layer': 'roads',
+    filter: ['==', ['get', 'role'], 'mainline'],
     layout: {
       visibility: 'none',
       'line-cap': 'round',
@@ -169,8 +163,8 @@ export function installCircumferenceLayers(): void {
     id: 'highway-circumference-route-connector-casing',
     type: 'line',
     source: 'highway-circumference',
-    'source-layer': 'boundary',
-    filter: ['==', ['get', 'kind'], 'highway-route-connector'],
+    'source-layer': 'roads',
+    filter: ['==', ['get', 'role'], 'connector'],
     layout: {
       visibility: 'none',
       'line-cap': 'round',
@@ -187,8 +181,8 @@ export function installCircumferenceLayers(): void {
     id: 'highway-circumference-route-connector-line',
     type: 'line',
     source: 'highway-circumference',
-    'source-layer': 'boundary',
-    filter: ['==', ['get', 'kind'], 'highway-route-connector'],
+    'source-layer': 'roads',
+    filter: ['==', ['get', 'role'], 'connector'],
     layout: {
       visibility: 'none',
       'line-cap': 'round',

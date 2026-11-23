@@ -9,7 +9,7 @@ import type {
 import { z } from 'zod';
 
 import { coordinateSchema, type Coordinate, type LandmassArea } from './domain.js';
-import { roadGradeSchema } from './circumference/grades.js';
+import { ROAD_GRADES, roadGradeSchema } from './circumference/grades.js';
 import {
   circumferenceGradientBounds,
   circumferenceGradientDistanceForArea,
@@ -122,6 +122,45 @@ export type HighwayCircumferenceSummary = z.infer<
   typeof highwayCircumferenceSummarySchema
 >;
 
+const roadCircleSchema = z.object({
+  id: z.string(),
+  areaSquareMeters: z.number().positive(),
+  boundaryCorridorCount: z.number().int().positive(),
+  bounds: z.tuple([coordinateSchema, coordinateSchema]),
+  containedLandAreaSquareMeters: z.number().nonnegative(),
+  gradientBounds: z.tuple([z.number(), z.number(), z.number(), z.number()]),
+  grades: z.array(roadGradeSchema).min(1),
+  lengthMeters: z.number().positive(),
+  outsideLandAreaSquareMeters: z.number().nonnegative(),
+});
+export type RoadCircle = z.infer<typeof roadCircleSchema>;
+
+export const gradedRoadNetworkSchema = z.object({
+  sourceVersion: z.string(),
+  segmentCount: z.number().int().positive(),
+  coverage: z.partialRecord(
+    z.union([roadGradeSchema, z.literal('pending')]),
+    z.number().int().nonnegative(),
+  ),
+  bounds: z.tuple([coordinateSchema, coordinateSchema]),
+  landmassLabel: z.string(),
+  selections: z.array(z.string().nullable()).length(1 << ROAD_GRADES.length),
+  circles: z.record(z.string(), roadCircleSchema),
+});
+export type GradedRoadNetwork = z.infer<typeof gradedRoadNetworkSchema>;
+
+export const roadCircleGeometrySchema = z.object({
+  mask: highwayLandmassSchema.shape.mask,
+  circles: z.record(
+    z.string(),
+    z.object({
+      coordinates: z.array(coordinateSchema).min(4),
+      areaSquareMeters: z.number().positive(),
+    }),
+  ),
+});
+export type RoadCircleGeometry = z.infer<typeof roadCircleGeometrySchema>;
+
 export function highwayCircumferenceSummary(
   data: HighwayCircumferenceData,
 ): HighwayCircumferenceSummary {
@@ -141,6 +180,10 @@ export type HighwayFeatureProperties = z.infer<typeof highwayFeaturePropertiesSc
 
 export const highwayMapFeaturePropertiesSchema = highwayFeaturePropertiesSchema.extend({
   segment_id: z.number().int().positive().optional(),
+  grade: roadGradeSchema.optional(),
+  review_issue: z.string().optional(),
+  osm_ways: z.string().optional(),
+  circles: z.string().optional(),
   kind: z
     .enum([
       'highway-network-mainline',
